@@ -6,6 +6,7 @@
 
 use base64::Engine;
 use uuid::Uuid;
+use warp_core::cli_agent_protocol::{ClaudeProcessEvidence, CodexProcessEvidence};
 use warpui::clipboard::{ClipboardContent, ImageData};
 
 use crate::ai::agent::ImageContext;
@@ -20,6 +21,8 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
 mod file_attachments;
+#[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
+mod grok_native;
 #[cfg(all(
     feature = "local_fs",
     feature = "local_tty",
@@ -116,7 +119,7 @@ const CLI_AGENT_IMAGE_PASTE_DELAY: Duration = Duration::from_millis(300);
 #[allow(clippy::byte_char_slices)]
 const CLI_AGENT_MODE_SWITCH_PREFIXES: &[u8] = &[b'!', b'&'];
 
-/// 普通粘贴、拖放和富输入附件共用平台策略；Grok 图片尚未通过真实验证。
+/// 普通粘贴、拖放和富输入附件共用平台策略；Grok 图片只走类型化提交，不发粘贴按键。
 fn cli_agent_paste_keystroke_bytes(agent: CLIAgent, windows: bool) -> Option<Vec<u8>> {
     if agent == CLIAgent::Grok {
         None
@@ -713,8 +716,13 @@ impl TerminalView {
         let draft = self.input.as_ref(ctx).buffer_text(ctx);
         let view_id = self.view_id;
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
-            sessions_model.set_draft(view_id, draft);
-            sessions_model.close_input(view_id, should_auto_toggle_input, ctx);
+            sessions_model.close_input_with_draft(
+                view_id,
+                should_auto_toggle_input,
+                reason,
+                Some(draft),
+                ctx,
+            );
         });
 
         let cli_agent_type: Option<CLIAgentType> = CLIAgentSessionsModel::as_ref(ctx)
@@ -818,7 +826,15 @@ impl TerminalView {
             self.submit_owned_grok_input(text, ctx);
             return;
         }
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
+        if agent == CLIAgent::Grok {
+            self.submit_native_grok_input(text, generation, ctx);
+            return;
+        }
         if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
+            return;
+        }
+        if images.is_empty() && self.reject_unconfirmed_tmux_claude_text(ctx) {
             return;
         }
         if !files.is_empty() {
@@ -830,6 +846,14 @@ impl TerminalView {
                 return;
             }
             if !matches!(agent, CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok) {
+                self.show_error_toast(
+                    crate::t!("cli-agent-input-file-attachment-unavailable"),
+                    ctx,
+                );
+                return;
+            }
+            if agent.supports_bash_mode() && text.starts_with('!') {
+                // 文件路径说明不能跟随原生 bash 前缀进入 CLI 的命令模式。
                 self.show_error_toast(
                     crate::t!("cli-agent-input-file-attachment-unavailable"),
                     ctx,
@@ -910,6 +934,9 @@ impl TerminalView {
         text: String,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self.reject_unconfirmed_tmux_claude_text(ctx) {
+            return;
+        }
         let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
             .session(self.view_id)
             .map(|s| s.agent)
@@ -943,6 +970,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         if text.is_empty()
+            || self.reject_unconfirmed_tmux_claude_text(ctx)
             || self.reject_unsafe_cli_agent_input(generation, Some(text.to_owned()), ctx)
             || !self.begin_cli_agent_text_submit(generation, ctx)
         {
@@ -1160,7 +1188,9 @@ impl TerminalView {
                 all(windows, target_arch = "x86_64")
             )
         ))]
-        if self.prepare_owned_grok_image_composer(ctx) {
+        if self.prepare_owned_grok_image_composer(ctx)
+            || self.prepare_native_grok_image_composer(ctx)
+        {
             let content = ctx.clipboard().read();
             return self.input.update(ctx, |input, ctx| {
                 input.attach_cli_clipboard_images(content, ctx)
@@ -1207,7 +1237,9 @@ impl TerminalView {
                 all(windows, target_arch = "x86_64")
             )
         ))]
-        if self.prepare_owned_grok_image_composer(ctx) {
+        if self.prepare_owned_grok_image_composer(ctx)
+            || self.prepare_native_grok_image_composer(ctx)
+        {
             self.input.update(ctx, |input, ctx| {
                 input.handle_pasted_or_dragdropped_image_filepaths(image_filepaths, ctx)
             });
@@ -1291,6 +1323,115 @@ impl TerminalView {
         CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id) == Some(generation)
     }
 
+    /// hook 与专属原生只读证明分别验证；后者不能提供状态、审批或回合完成语义。
+    fn cli_agent_has_bound_input_session(&self, ctx: &AppContext) -> bool {
+        if CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.view_id)
+            .is_some_and(|session| session.received_rich_notification)
+        {
+            return true;
+        }
+        self.codex_owned_input_process(ctx).is_some()
+            || self.tmux_restored_input_identity(ctx)
+    }
+
+    fn tmux_restored_input_identity(&self, ctx: &AppContext) -> bool {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        {
+            return self.tmux_restored_claude_image(ctx).is_some()
+                || self.remote_owned_grok_readonly_identity(ctx).is_some();
+        }
+        #[cfg(not(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        )))]
+        false
+    }
+
+    fn tmux_restored_claude_image_candidate(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<(ClaudeProcessEvidence, String)> {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        {
+            return self.tmux_restored_claude_image(ctx);
+        }
+        #[cfg(not(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        )))]
+        None
+    }
+
+    /// 恢复的身份仅允许原生图片队列；Unknown 不能变成向当前 PTY 发送文字的许可。
+    pub(super) fn reject_unconfirmed_tmux_claude_text(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let only_identity = self.tmux_restored_claude_image_candidate(ctx).is_some()
+            && CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some_and(|session| !session.received_rich_notification);
+        if only_identity {
+            self.show_error_toast(crate::t!("cli-agent-tmux-restored-text-unconfirmed"), ctx);
+        }
+        only_identity
+    }
+
+    fn codex_owned_input_process(&self, ctx: &AppContext) -> Option<CodexProcessEvidence> {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        {
+            return self.remote_owned_codex_process(ctx);
+        }
+        #[cfg(not(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        )))]
+        {
+            let _ = ctx;
+            None
+        }
+    }
+
     pub(super) fn bind_cli_agent_hook_input_target(&mut self, ctx: &AppContext) {
         let sessions = CLIAgentSessionsModel::as_ref(ctx);
         let Some(session) = sessions.session(self.view_id) else {
@@ -1302,7 +1443,7 @@ impl TerminalView {
         ) else {
             return;
         };
-        if !session.received_rich_notification || native_session_id.is_empty() {
+        if !self.cli_agent_has_bound_input_session(ctx) || native_session_id.is_empty() {
             return;
         }
         let model = self.model.lock();
@@ -1329,6 +1470,7 @@ impl TerminalView {
         let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
             return false;
         };
+        let has_bound_session = self.cli_agent_has_bound_input_session(ctx);
         let model = self.model.lock();
         let block = model.block_list().active_block();
         // 包装命令名本身不能证明 CLI 身份；通知绑定必须仍属于同一 block、PTY 和原生会话。
@@ -1338,7 +1480,7 @@ impl TerminalView {
             .is_some_and(|target| {
                 &target.block_id == block.id()
                     && target.model_events_id == self.model_events_handle.id()
-                    && session.received_rich_notification
+                    && has_bound_session
                     && session.session_context.session_id.as_ref()
                         == Some(&target.native_session_id)
                     && session.listener.as_ref().map(|listener| listener.id())
@@ -1439,10 +1581,61 @@ impl TerminalView {
         }
     }
 
+    /// 已验证的图片消费回执只能清理这次草稿，不补造延迟的 PromptSubmit 状态。
+    fn complete_remote_cli_image_consumption(
+        &mut self,
+        submission_id: Uuid,
+        snapshot: &CliInputSubmission,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let revision = CLIAgentSessionsModel::as_ref(ctx)
+            .remote_image_consumption_revision(self.view_id, submission_id);
+        let current_revision = self
+            .input
+            .as_ref(ctx)
+            .editor()
+            .as_ref(ctx)
+            .buffer_revision(ctx);
+        let unchanged = revision.as_ref() == Some(&current_revision)
+            && self
+                .ai_context_model
+                .as_ref(ctx)
+                .pending_attachments_revision()
+                == snapshot.attachments_revision;
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.finish_remote_image_consumption(self.view_id, submission_id);
+        });
+        if !unchanged {
+            return false;
+        }
+        if self.has_active_cli_agent_input_session(ctx) {
+            self.input.update(ctx, |input, ctx| {
+                input.acknowledge_cli_input_submission(&current_revision, ctx)
+            });
+        }
+        self.ai_context_model.update(ctx, |model, ctx| {
+            model.clear_pending_attachments(ctx);
+        });
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.clear_draft(self.view_id);
+        });
+        true
+    }
+
     fn complete_cli_agent_text_submit(
         &mut self,
         generation: Uuid,
         snapshot: Option<Rc<CliInputSubmission>>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.complete_cli_agent_input_submit(generation, snapshot, false, ctx);
+    }
+
+    fn complete_cli_agent_input_submit(
+        &mut self,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
+        atomic_draft: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         self.release_cli_agent_input_submission(generation, ctx);
@@ -1457,10 +1650,21 @@ impl TerminalView {
             .as_ref(ctx)
             .pending_attachments_revision()
             == snapshot.attachments_revision;
-        let editor_unchanged = self.input.update(ctx, |input, ctx| {
-            input.acknowledge_cli_input_submission(&snapshot.editor_revision, ctx)
-        });
-        if attachments_unchanged {
+        // 原子图文的旧回执不能拆清新草稿；文字或附件任一变化时整批保留。
+        let may_clear = !atomic_draft
+            || (attachments_unchanged
+                && self
+                    .input
+                    .as_ref(ctx)
+                    .editor()
+                    .as_ref(ctx)
+                    .buffer_revision(ctx)
+                    == snapshot.editor_revision);
+        let editor_unchanged = may_clear
+            && self.input.update(ctx, |input, ctx| {
+                input.acknowledge_cli_input_submission(&snapshot.editor_revision, ctx)
+            });
+        if attachments_unchanged && may_clear {
             self.ai_context_model.update(ctx, |model, ctx| {
                 model.clear_pending_attachments(ctx);
             });
@@ -1477,7 +1681,7 @@ impl TerminalView {
                 query: Some(snapshot.query.clone()),
                 ..Default::default()
             },
-            // 仅确认向 PTY 转交输入，不伪装成插件 ACK 或真实任务完成。
+            // 仅更新输入提交的界面状态，不伪装成插件事件或真实任务完成。
             source: CLIAgentEventSource::LocalRichInput,
         };
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {

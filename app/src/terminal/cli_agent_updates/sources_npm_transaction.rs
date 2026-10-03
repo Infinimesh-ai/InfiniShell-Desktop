@@ -23,7 +23,7 @@ use super::{
 use super::{claude_downgrade, npm_codex};
 
 use super::package_tree as tree;
-use tree::{Directory, Identity, Snapshot};
+use tree::{ClaudeHardlink, Directory, Identity, Snapshot};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -108,7 +108,59 @@ pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
     match version {
         "2.1.280" => Ok(()),
         claude_downgrade::TO => claude_downgrade::platform().map(|_| ()),
+        super::claude_current_release::V285 | super::claude_current_release::V287 => {
+            super::claude_current_release::supports(version, &target()?)
+        }
         _ => Err(Error::InvalidRelease),
+    }
+}
+
+fn claude_hardlink(agent: CLIAgent, version: &str) -> Result<Option<ClaudeHardlink>, Error> {
+    if agent != CLIAgent::Claude {
+        return Ok(None);
+    }
+    let platform = target()?;
+    if !matches!(platform.as_str(), "darwin-arm64" | "linux-x64") {
+        return Ok(None);
+    }
+    let native = match version {
+        claude_downgrade::TO => {
+            let files = claude_downgrade::files(&platform)?;
+            let (length, digest, _) = files
+                .get(Path::new("claude"))
+                .ok_or(Error::InvalidRelease)?;
+            (*length, super::brew::decode_sha256(digest)?)
+        }
+        "2.1.280" => {
+            // 与已审 Claude 2.1.280 macOS 原件清单、Linux 版本探针映像保持一致。
+            let (length, digest) = if platform == "darwin-arm64" {
+                (
+                    217_254_576,
+                    "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+                )
+            } else {
+                (
+                    233_709_640,
+                    "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b",
+                )
+            };
+            (length, super::brew::decode_sha256(digest)?)
+        }
+        super::claude_current_release::V285 | super::claude_current_release::V287 => {
+            super::claude_current_release::native(version, &platform)?
+        }
+        _ => return Ok(None),
+    };
+    ClaudeHardlink::new(&platform, native.0, native.1).map(Some)
+}
+
+fn original_snapshot(
+    directory: &Directory,
+    link: Option<&ClaudeHardlink>,
+) -> Result<Snapshot, Error> {
+    match link {
+        Some(link) => directory.claude_snapshot(link),
+        None => directory.snapshot(),
     }
 }
 
@@ -441,7 +493,7 @@ pub(super) async fn execute(
     )
     .await?;
     if plan.agent == CLIAgent::Codex {
-        npm_codex::verify_metadata(&wrapper_meta, &platform_meta)?;
+        npm_codex::verify_metadata(&plan.target_version, &wrapper_meta, &platform_meta)?;
     } else if plan.target_version == claude_downgrade::TO {
         claude_downgrade::verify_metadata(&platform, &wrapper_meta, &platform_meta)?;
     }
@@ -464,7 +516,8 @@ pub(super) async fn execute(
         .file_name()
         .ok_or(Error::UnsupportedSource)?
         .to_owned();
-    let original = parent.child(&package_name)?.snapshot()?;
+    let original_link = claude_hardlink(plan.agent, &plan.installed_version)?;
+    let original = original_snapshot(&parent.child(&package_name)?, original_link.as_ref())?;
     let protected_config = protected_config(plan.agent)?;
     let claude_policy = if plan.agent == CLIAgent::Claude {
         let config = plan.config.as_ref().ok_or(Error::UnsupportedSource)?;
@@ -499,9 +552,24 @@ pub(super) async fn execute(
         .verify_archive(platform_file.as_file_mut())?;
     release.verify_entries(&wrapper_verified, &platform_verified)?;
     if plan.agent == CLIAgent::Codex {
-        npm_codex::verify_archives(&release, &wrapper_verified, &platform_verified)?;
+        npm_codex::verify_archives(
+            &plan.target_version,
+            &release,
+            &wrapper_verified,
+            &platform_verified,
+        )?;
     } else if plan.target_version == claude_downgrade::TO {
         claude_downgrade::verify_archives(&platform, &wrapper_verified, &platform_verified)?;
+    } else if matches!(
+        plan.target_version.as_str(),
+        super::claude_current_release::V285 | super::claude_current_release::V287
+    ) {
+        super::claude_current_release::verify_archives(
+            &plan.target_version,
+            &platform,
+            &wrapper_verified,
+            &platform_verified,
+        )?;
     }
     #[cfg(test)]
     live_tests::preserve_verified_inputs(
@@ -643,7 +711,10 @@ pub(super) async fn execute(
         }
         verify_probe_dependencies(&journal)?;
         let current_parent = journal.owner.verify_external()?;
-        if current_parent.child(&package_name)?.snapshot()? != journal.original
+        if original_snapshot(
+            &current_parent.child(&package_name)?,
+            original_link.as_ref(),
+        )? != journal.original
             || current_parent.child(&journal.stage_name)?.snapshot()?
                 != *journal.prepared.as_ref().ok_or(Error::RecoveryRequired)?
         {
@@ -827,6 +898,19 @@ async fn probe_version(
 }
 
 fn verify_swapped(journal: &Journal) -> Result<Directory, Error> {
+    let agent = if journal.agent == "claude" {
+        CLIAgent::Claude
+    } else {
+        CLIAgent::Codex
+    };
+    let link = claude_hardlink(agent, &journal.old_version)?;
+    verify_swapped_with_link(journal, link.as_ref())
+}
+
+fn verify_swapped_with_link(
+    journal: &Journal,
+    link: Option<&ClaudeHardlink>,
+) -> Result<Directory, Error> {
     verify_probe_dependencies(journal)?;
     let parent = journal.owner.verify_external()?;
     let name = journal
@@ -836,7 +920,7 @@ fn verify_swapped(journal: &Journal) -> Result<Directory, Error> {
         .ok_or(Error::RecoveryRequired)?;
     if parent.child(name)?.snapshot()?
         != *journal.prepared.as_ref().ok_or(Error::RecoveryRequired)?
-        || parent.child(&journal.stage_name)?.snapshot()? != journal.original
+        || original_snapshot(&parent.child(&journal.stage_name)?, link)? != journal.original
     {
         return Err(Error::RecoveryRequired);
     }
@@ -922,6 +1006,7 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
                     &closure.expected_files,
                 )
                 .is_err()
+                || npm_codex::verify_probe_target(&journal.target_version, &stage, closure).is_err()
                 || probe.binding_digest
                     != format!(
                         "{:x}",
@@ -996,13 +1081,24 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     let mut journal: Journal = serde_json::from_slice(&read_limited(&path, 12 * MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
     validate(agent, entry, &journal)?;
-    verified_probe_exit(root, &journal)?;
+    let link = claude_hardlink(agent, &journal.old_version)?;
+    recover_validated(agent, root, &path, &mut journal, link.as_ref())
+}
+
+fn recover_validated(
+    agent: CLIAgent,
+    root: &Path,
+    path: &Path,
+    journal: &mut Journal,
+    link: Option<&ClaudeHardlink>,
+) -> Result<Option<String>, Error> {
+    verified_probe_exit(root, journal)?;
     verify_probe_dependencies(&journal)?;
     if let Some(scope) = &journal.claude_policy {
         super::verify_claude_originals(scope)?;
     }
     if journal.phase == Phase::PublishingConfig {
-        verify_swapped(&journal)?;
+        verify_swapped_with_link(journal, link)?;
         if journal
             .probe
             .as_ref()
@@ -1020,8 +1116,8 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         save(&path, &journal)?;
     }
     if journal.phase == Phase::Committed {
-        finish_committed(root, agent, &path, &journal)?;
-        return Ok(Some(journal.target_version));
+        finish_committed_with_link(root, agent, path, journal, link)?;
+        return Ok(Some(journal.target_version.clone()));
     }
     let parent = journal.owner.verify_external()?;
     let name = journal
@@ -1029,12 +1125,12 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         .package_root
         .file_name()
         .ok_or(Error::RecoveryRequired)?;
-    let actual = parent.child(name)?.snapshot()?;
+    let actual = original_snapshot(&parent.child(name)?, link)?;
     if actual != journal.original {
-        let parent = verify_swapped(&journal)?;
+        let parent = verify_swapped_with_link(journal, link)?;
         // 先确认外部安装没有再变动，才允许用完整旧树交换回去。
         parent.exchange(name, &journal.stage_name)?;
-        if parent.child(name)?.snapshot()? != journal.original {
+        if original_snapshot(&parent.child(name)?, link)? != journal.original {
             return Err(Error::RecoveryRequired);
         }
     }
@@ -1059,7 +1155,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     super::save_failure_with_intent(
         root,
         agent,
-        entry,
+        &journal.owner.entry,
         &journal.target_version,
         Some(journal.intent.clone()),
     )?;
@@ -1073,6 +1169,17 @@ fn finish_committed(
     agent: CLIAgent,
     path: &Path,
     journal: &Journal,
+) -> Result<(), Error> {
+    let link = claude_hardlink(agent, &journal.old_version)?;
+    finish_committed_with_link(root, agent, path, journal, link.as_ref())
+}
+
+fn finish_committed_with_link(
+    root: &Path,
+    agent: CLIAgent,
+    path: &Path,
+    journal: &Journal,
+    link: Option<&ClaudeHardlink>,
 ) -> Result<(), Error> {
     if journal
         .probe
@@ -1101,7 +1208,12 @@ fn finish_committed(
         return Err(Error::RecoveryRequired);
     }
     if parent.has_child(&journal.stage_name)? {
-        parent.remove_matching(&journal.stage_name, &journal.original)?;
+        match link {
+            Some(link) => {
+                parent.remove_claude_matching(&journal.stage_name, &journal.original, link)?
+            }
+            None => parent.remove_matching(&journal.stage_name, &journal.original)?,
+        }
     }
     if let Some(config) = &journal.config {
         super::cleanup_config_restore(config)?;

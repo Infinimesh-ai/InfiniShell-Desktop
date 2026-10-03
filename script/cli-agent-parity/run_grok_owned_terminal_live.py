@@ -26,11 +26,23 @@ from run_grok_official_adapter_live import copy_private_auth
 
 GROK_SHA = "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
 TEST = "terminal::cli_agent_sessions::grok_owned_launch::native::live_tests::grok_owned_native_two_turns_and_duplicate_guard"
+COLD_RECOVERY_TEST = TEST.replace("grok_owned_native_two_turns_and_duplicate_guard", "grok_owned_native_readonly_cold_recovery")
+AFTER_EXIT_TEST = TEST.replace("grok_owned_native_two_turns_and_duplicate_guard", "grok_owned_native_recovery_after_exit")
+COLD_AFTER_EXIT_TEST = TEST.replace("grok_owned_native_two_turns_and_duplicate_guard", "grok_owned_native_cold_after_exit")
 
 
 def digest(path):
     with path.open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest()
+
+
+def native_user_turn_count(root, session_id):
+    files = list((root / "home/.grok/sessions").glob(f"*/{session_id}/updates.jsonl"))
+    if len(files) != 1:
+        raise RuntimeError("native_session_history_identity_unavailable")
+    with files[0].open(encoding="utf-8") as history:
+        return sum(json.loads(line).get("params", {}).get("update", {}).get("sessionUpdate")
+                   == "user_message_chunk" for line in history)
 
 
 def internal(path):
@@ -113,6 +125,7 @@ def main():
     parser.add_argument("--app-binary", type=Path, required=True)
     parser.add_argument("--grok", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--cold-recovery", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)
     root = args.output
@@ -162,6 +175,7 @@ if (notification) fs.appendFileSync(process.argv[3], JSON.stringify(notification
     private_json(root / "home/.grok/hooks/owned-probe.json", {"hooks": hooks})
     private_json(root / "source.safe.json", {"binaries": binaries, "grok_sha256": GROK_SHA,
         "mapper_sha256": digest(mapper), "runner_sha256": digest(Path(__file__)), "test": TEST,
+        "cold_recovery": args.cold_recovery,
         "scope": "真实原生 PTY 加生产启动、侧车、SQLite；hook 使用生产 mapper，未经过 GUI OSC 接收", "gui_verified": False})
     auth = None
     shell = None
@@ -213,6 +227,8 @@ if (notification) fs.appendFileSync(process.argv[3], JSON.stringify(notification
                         test_env.update(INFINISHELL_GROK_OWNED_LIVE_ROOT=str(root),
                             INFINISHELL_GROK_LIVE_EXECUTABLE=str(grok),
                             INFINISHELL_GROK_OWNED_APP_EXECUTABLE=str(root / "bin/infinishell"))
+                        if args.cold_recovery:
+                            test_env["INFINISHELL_GROK_OWNED_PAUSE_AFTER_ACK"] = "1"
                         with (root / "test.log").open("xb") as log:
                             test = subprocess.Popen([str(root / "bin/test"), TEST, "--exact", "--ignored", "--nocapture", "--test-threads=1"],
                                 env=test_env, cwd=root, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, pass_fds=(master,))
@@ -234,7 +250,33 @@ if (notification) fs.appendFileSync(process.argv[3], JSON.stringify(notification
                         leader_pid = json.loads(bound.read_text())["leader"]["pid"]
                 if test and test.poll() is not None:
                     result["test_exit_code"] = test.returncode
-                    result["passed"] = test.returncode == 0 and (root / "native-result.json").exists()
+                    if args.cold_recovery and test.returncode == 0 and (root / "cold-ack.safe.json").exists():
+                        directory = Path(launch["manifest_path"]).parent
+                        receipt = json.loads((directory / "exec.json").read_text())
+                        bound = json.loads((directory / "bound.json").read_text())
+                        assert same_lifetime(receipt["process"], process_identity(receipt["process"]["pid"]))
+                        assert same_lifetime(bound["leader"], process_identity(bound["leader"]["pid"]))
+                        result["native_alive_during_recovery"] = True
+                        before = native_user_turn_count(root, launch["session_id"])
+                        assert before == 2
+                        recovery_env = env.copy()
+                        recovery_env["INFINISHELL_GROK_OWNED_LIVE_ROOT"] = str(root)
+                        with (root / "cold-recovery.log").open("xb") as log:
+                            recovered = subprocess.run([str(root / "bin/test"), COLD_RECOVERY_TEST,
+                                "--exact", "--ignored", "--nocapture", "--test-threads=1"],
+                                env=recovery_env, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=60)
+                        result["cold_recovery_exit_code"] = recovered.returncode
+                        after = native_user_turn_count(root, launch["session_id"])
+                        result["native_user_turns_before_recovery"] = before
+                        result["native_user_turns_after_recovery"] = after
+                        assert after == before
+                        assert same_lifetime(receipt["process"], process_identity(receipt["process"]["pid"]))
+                        assert same_lifetime(bound["leader"], process_identity(bound["leader"]["pid"]))
+                        result["passed"] = recovered.returncode == 0 and (root / "cold-recovery.safe.json").exists()
+                    elif args.cold_recovery:
+                        result["passed"] = False
+                    else:
+                        result["passed"] = test.returncode == 0 and (root / "native-result.json").exists()
                     break
             else:
                 raise TimeoutError("native_probe_timeout")
@@ -279,16 +321,17 @@ if (notification) fs.appendFileSync(process.argv[3], JSON.stringify(notification
             except BaseException as error:
                 cleanup["failure_class"] = type(error).__name__
             if cleanup["tui_exited"] and cleanup["leader_exited"]:
-                # 第二个独立测试进程只核对退出恢复与生产清理，不重新登录或提交模型输入。
+                # 原生退出后只重开 SQLite 核对持久化与清理，不再请求同会话历史。
                 recovery_env = env.copy()
                 recovery_env["INFINISHELL_GROK_OWNED_LIVE_ROOT"] = str(root)
                 try:
                     with (root / "recovery.log").open("xb") as log:
                         recovery = subprocess.run([str(root / "bin/test"),
-                            TEST.replace("grok_owned_native_two_turns_and_duplicate_guard", "grok_owned_native_recovery_after_exit"),
+                            COLD_AFTER_EXIT_TEST if args.cold_recovery else AFTER_EXIT_TEST,
                             "--exact", "--ignored", "--nocapture", "--test-threads=1"],
                             env=recovery_env, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=30)
-                    receipt = json.loads((root / "native-recovery-result.json").read_text())
+                    evidence = "cold-after-exit.safe.json" if args.cold_recovery else "native-recovery-result.json"
+                    receipt = json.loads((root / evidence).read_text())
                     result["recovery_after_exit_verified"] = recovery.returncode == 0 and receipt.get("passed") is True
                 except BaseException as error:
                     result["recovery_after_exit_verified"] = False

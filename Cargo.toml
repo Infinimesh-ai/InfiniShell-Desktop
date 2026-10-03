@@ -27,6 +27,7 @@ license = "AGPL-3.0-only"
 publish = false
 
 [workspace.dependencies]
+blake3 = "=1.8.2"
 # Local workspace crates. This lets us reference them in other crates without specifying a path.
 ai = { path = "crates/ai" }
 app-installation-detection = { path = "crates/app-installation-detection" }
@@ -498,6 +499,8 @@ split-debuginfo = "unpacked"
 [profile.dev.package]
 # Improve the performance of core terminal logic.
 warp_terminal.opt-level = 3
+# 原生工件须完整校验；优化调试版的软件 SHA-256 压缩，避免大映像校验长时间占用后台。
+"sha2:0.10.9".opt-level = 3
 # Minimize the runtime overhead of CPU profiling at the cost of a small
 # increase in compile time for this crate.
 backtrace.opt-level = 3

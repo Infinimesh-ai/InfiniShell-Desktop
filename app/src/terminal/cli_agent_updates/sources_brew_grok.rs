@@ -7,20 +7,46 @@ use sha2::{Digest as _, Sha256};
 
 use super::{Error, Installation, MAX_CONFIG, brew, read_limited, stamp};
 
-pub(super) const METADATA_URL: &str = "https://raw.githubusercontent.com/Homebrew/homebrew-cask/52a97ac96ae1af1a764eaefe0bdcad4296a12541/Casks/g/grok-build.rb";
-const CASK_SHA256: &str = "623f5dedb31afda33d630de3e023748142e5465edbfdc0594f50ddf1c4552ec1";
-
-pub(super) fn prefix() -> Result<&'static Path, Error> {
-    match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "aarch64") => Ok(Path::new("/opt/homebrew")),
-        ("linux", "x86_64") => Ok(Path::new("/home/linuxbrew/.linuxbrew")),
-        _ => Err(Error::UnsupportedPlatform),
+fn cask_contract(version: &str) -> Result<(&'static str, &'static str, &'static str), Error> {
+    supports(version)?;
+    match version {
+        "1.0.41" => Ok((
+            "https://raw.githubusercontent.com/Homebrew/homebrew-cask/52a97ac96ae1af1a764eaefe0bdcad4296a12541/Casks/g/grok-build.rb",
+            "623f5dedb31afda33d630de3e023748142e5465edbfdc0594f50ddf1c4552ec1",
+            "52a97ac96ae1af1a764eaefe0bdcad4296a12541",
+        )),
+        "1.0.46" => Ok((
+            "https://raw.githubusercontent.com/Homebrew/homebrew-cask/8d9df9ae501d586458789ecbf01115d91fe838c0/Casks/g/grok-build.rb",
+            "ceec04874c2c747be445d16ee8e562ea91573b72cb49835903741ed6596599fe",
+            "8d9df9ae501d586458789ecbf01115d91fe838c0",
+        )),
+        _ => Err(Error::InvalidRelease),
     }
 }
 
+pub(super) fn metadata_url(version: &str) -> Result<&'static str, Error> {
+    cask_contract(version).map(|(url, _, _)| url)
+}
+
 pub(super) fn supports(version: &str) -> Result<(), Error> {
-    prefix()?;
-    if version != "1.0.41" {
+    if !cfg!(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )) {
+        return Err(Error::UnsupportedPlatform);
+    }
+    if version != "1.0.41"
+        && !(version == "1.0.46" && cfg!(all(target_os = "macos", target_arch = "aarch64")))
+    {
+        return Err(Error::InvalidRelease);
+    }
+    Ok(())
+}
+
+pub(super) fn supports_transition(old: &str, target: &str) -> Result<(), Error> {
+    supports(target)?;
+    native(old)?;
+    if old == "1.0.46" && target != "1.0.46" {
         return Err(Error::InvalidRelease);
     }
     Ok(())
@@ -37,6 +63,10 @@ pub(super) fn native(version: &str) -> Result<(u64, [u8; 32]), Error> {
         ("macos", "1.0.41") => (
             145_657_952,
             "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+        ),
+        ("macos", "1.0.46") => (
+            150_374_256,
+            "e8daa302364c9c3b6a5546d511cfbd1ab5e5d407a9b04282f660665ea405f9f3",
         ),
         ("linux", "1.0.40") => (
             165_587_968,
@@ -73,13 +103,13 @@ fn artifacts(version: &str) -> Result<Value, Error> {
 }
 
 pub(super) fn release(version: &str, bytes: &[u8]) -> Result<(Value, String, [u8; 32]), Error> {
-    supports(version)?;
-    if <[u8; 32]>::from(Sha256::digest(bytes)) != brew::decode_sha256(CASK_SHA256)? {
+    let (_, cask_sha256, tap_git_head) = cask_contract(version)?;
+    if <[u8; 32]>::from(Sha256::digest(bytes)) != brew::decode_sha256(cask_sha256)? {
         return Err(Error::InvalidRelease);
     }
     Ok((
         json!({"token":"grok-build","tap":"homebrew/cask","version":version,
-        "tap_git_head":"52a97ac96ae1af1a764eaefe0bdcad4296a12541","artifacts":artifacts(version)?}),
+        "tap_git_head":tap_git_head,"artifacts":artifacts(version)?}),
         format!(
             "https://x.ai/cli/{}",
             entry(version)?.to_str().ok_or(Error::InvalidRelease)?
@@ -98,8 +128,8 @@ pub(super) fn verify_registration(
     let relative = entry(version)?;
     let (length, digest) = native(version)?;
     let native = registered.root.join(version).join(&relative);
-    if prefix != self::prefix()?
-        || registered.root != prefix.join("Caskroom/grok-build")
+    brew::validate_prefix(prefix)?;
+    if registered.root != prefix.join("Caskroom/grok-build")
         || registered.entry_relative != relative
         || installation.stamp.canonical != native
         || installation.stamp.digest != digest
@@ -156,3 +186,7 @@ pub(super) fn completion_paths(prefix: &Path) -> [(&'static str, PathBuf); 3] {
         ),
     ]
 }
+
+#[cfg(test)]
+#[path = "sources_brew_grok_tests.rs"]
+mod tests;

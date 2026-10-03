@@ -18,12 +18,15 @@ use {
     warpui::r#async::FutureExt as _,
 };
 
-use super::{CliAgentPluginManager, PluginInstallError, PluginInstructionStep, PluginInstructions};
+use super::{
+    CliAgentPluginManager, PluginComponentIntegrity, PluginInstallError, PluginInstructionStep,
+    PluginInstructions, PluginIntegrityReport,
+};
 #[cfg(not(target_family = "wasm"))]
 use crate::util::path::resolve_executable_in_path;
 
 const PLUGIN_NAME: &str = "infinishell-grok";
-const PLUGIN_VERSION: &str = "0.1.5";
+const PLUGIN_VERSION: &str = "0.1.6";
 const TESTED_GROK_VERSION: &str = "1.0.30";
 const STARTUP_BRIDGE_NAME: &str = "infinishell-1.0.41";
 // 仅认可已发布 Mac 补桥的完整原字节，并要求原生 JSON 同时匹配本次安装。
@@ -99,6 +102,25 @@ const LEGACY_014_SHA256: &[(&str, &str)] = &[
     (
         "README.md",
         "50308b3c9a7822afd1f6985ec049ffabdf62b5d0f027d924e6b22f046d84f534",
+    ),
+];
+// 0.1.5 的四文件原字节来自已发布提交；原子通知升级必须保留旧来源和恢复副本。
+const LEGACY_015_SHA256: &[(&str, &str)] = &[
+    (
+        ".grok-plugin/plugin.json",
+        "5c4b3c4a4c46f141d99e5ac7542cb1c9772ee8aa68075aa53c6445acc0b21e9a",
+    ),
+    (
+        "hooks/hooks.json",
+        "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe",
+    ),
+    (
+        "hooks/notify.cjs",
+        "f6c0ee3e79a38de6412fffd2c7cf4bcd7f7abc7c43230a2dd19f96bb31a2ad36",
+    ),
+    (
+        "README.md",
+        "66fd9cf96faba1d3495c30c5751cec42386a14729a9426ece6c3068c453f6999",
     ),
 ];
 const BUNDLED_FILES: &[(&str, &str)] = &[
@@ -415,6 +437,22 @@ impl GrokPluginManager {
 
 #[async_trait]
 impl CliAgentPluginManager for GrokPluginManager {
+    fn integrity_report(&self) -> PluginIntegrityReport {
+        let notification =
+            if env::var_os("GROK_CONFIG_PATH").is_some() || env::var_os("GROK_CONFIG").is_some() {
+                PluginComponentIntegrity::Unverified
+            } else {
+                grok_home_dir().map_or(PluginComponentIntegrity::Unverified, |home| {
+                    notification_integrity(&home)
+                })
+            };
+        PluginIntegrityReport {
+            notification,
+            // Grok 没有独立的编排插件。
+            platform: PluginComponentIntegrity::NotRequired,
+        }
+    }
+
     fn minimum_plugin_version(&self) -> &'static str {
         PLUGIN_VERSION
     }
@@ -693,6 +731,83 @@ fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
     Ok(plugin)
 }
 
+fn notification_integrity(root: &Path) -> PluginComponentIntegrity {
+    match plugin_disabled(root) {
+        Ok(true) => return PluginComponentIntegrity::Disabled,
+        Ok(false) => {}
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    }
+    let plugin = match registered_plugin(root) {
+        Ok(Some(plugin)) => plugin,
+        Ok(None) => return PluginComponentIntegrity::Missing,
+        // 无法辨认唯一原生登记时，尚无可据以判断树损坏的合同。
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    };
+    match plugin_enabled(root) {
+        Ok(true) => {}
+        Ok(false) => return PluginComponentIntegrity::Disabled,
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    }
+    if !matches!(
+        plugin.version.as_str(),
+        "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4" | "0.1.5"
+    ) && plugin.version != PLUGIN_VERSION
+    {
+        return PluginComponentIntegrity::Unverified;
+    }
+    for path in [&plugin.path, &plugin.source] {
+        match validate_expected_tree(path, &plugin.version) {
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+                return PluginComponentIntegrity::Unverified;
+            }
+            Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+        }
+    }
+    if plugin.version == PLUGIN_VERSION {
+        PluginComponentIntegrity::Verified
+    } else {
+        PluginComponentIntegrity::NeedsUpdate
+    }
+}
+
+pub(super) fn inspect_startup_bridge(executable: &Path, version: &str) -> PluginComponentIntegrity {
+    let Ok(root) = grok_home_dir() else {
+        return PluginComponentIntegrity::Unverified;
+    };
+    // Node 仅用于比对既有桥文件；这里不运行它，也不证明其身份、版本或通知可用性。
+    let node = GrokPluginManager::new(None).executable("node");
+    startup_bridge_integrity_for_runtime(&root, executable, version, node.as_deref())
+}
+
+fn startup_bridge_integrity_for_runtime(
+    root: &Path,
+    executable: &Path,
+    version: &str,
+    node: Option<&Path>,
+) -> PluginComponentIntegrity {
+    if !executable.is_absolute() {
+        return PluginComponentIntegrity::Unverified;
+    }
+    match version {
+        TESTED_GROK_VERSION => PluginComponentIntegrity::Verified,
+        "1.0.41"
+            if cfg!(any(
+                target_os = "macos",
+                target_os = "linux",
+                target_os = "windows"
+            )) =>
+        {
+            match node {
+                Some(node) => startup_bridge_integrity(root, executable, node),
+                None => PluginComponentIntegrity::Unverified,
+            }
+        }
+        // 未知版本没有启动桥合同，不能靠旧 metadata 记录免检。
+        _ => PluginComponentIntegrity::Unverified,
+    }
+}
+
 fn startup_bridge_files(
     root: &Path,
     executable: &Path,
@@ -854,6 +969,45 @@ fn startup_bridge_current(root: &Path, executable: &Path, node: &Path) -> bool {
                 .iter()
                 .all(|(path, expected)| bridge_file_matches(path, expected).unwrap_or(false))
         })
+}
+
+fn startup_bridge_integrity(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+) -> PluginComponentIntegrity {
+    match plain_directory(&root.join("hooks")) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return PluginComponentIntegrity::NeedsUpdate;
+        }
+        Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+            return PluginComponentIntegrity::Unverified;
+        }
+        Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+    }
+    let files = match startup_bridge_files(root, executable, node) {
+        Ok(files) => files,
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    };
+    for (path, expected) in files {
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return PluginComponentIntegrity::NeedsUpdate;
+            }
+            Err(_) => return PluginComponentIntegrity::Unverified,
+            Ok(_) => {}
+        }
+        match bridge_file_matches(&path, &expected) {
+            Ok(true) => {}
+            Ok(false) => return PluginComponentIntegrity::IntegrityMismatch,
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+                return PluginComponentIntegrity::Unverified;
+            }
+            Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+        }
+    }
+    PluginComponentIntegrity::Verified
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1186,8 +1340,10 @@ fn plugin_tree(root: &Path, allow_missing: bool) -> io::Result<PluginTree> {
 
 fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> {
     let tree = plugin_tree(root, false)?;
-    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4")
-        && version != PLUGIN_VERSION
+    if !matches!(
+        version,
+        "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4" | "0.1.5"
+    ) && version != PLUGIN_VERSION
     {
         return Err(invalid_tree());
     }
@@ -1226,6 +1382,11 @@ fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> 
                     name == *expected_name && digest == *expected_digest
                 }),
             ("0.1.4", name) => LEGACY_014_SHA256
+                .iter()
+                .any(|(expected_name, expected_digest)| {
+                    name == *expected_name && digest == *expected_digest
+                }),
+            ("0.1.5", name) => LEGACY_015_SHA256
                 .iter()
                 .any(|(expected_name, expected_digest)| {
                     name == *expected_name && digest == *expected_digest

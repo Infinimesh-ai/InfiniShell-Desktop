@@ -64,7 +64,7 @@ fn message_command(
 ) -> Result<RuntimeCommand, String> {
     // 原代结果仅由专用入口传递；当前 worker 与 SQLite 领取事务仍会验证进程和亲缘。
     let original_result = prepared_result
-        && endpoint.harness == Harness::Grok
+        && matches!(endpoint.harness, Harness::Grok | Harness::Claude)
         && message.subject == "local_task_result"
         && message.recipient_generation >= 1
         && message.recipient_generation <= endpoint.generation;

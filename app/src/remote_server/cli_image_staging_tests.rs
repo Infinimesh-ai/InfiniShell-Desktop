@@ -32,6 +32,116 @@ fn staging(parent: &Path, max_bytes: u64) -> RemoteImageStaging {
 }
 
 #[test]
+fn retained_references_keep_the_global_budget_across_daemon_restarts() {
+    let parent = private_parent();
+    let prior = scope(Uuid::new_v4());
+    let transfer = Uuid::new_v4();
+    let key = Uuid::new_v4();
+    let mut old = staging(parent.path(), 16);
+    old.activate_scope(prior.clone()).unwrap();
+    let bytes = b"\x89PNG\r\n\x1a\n";
+    old.begin(&prior, transfer, spec(bytes)).unwrap();
+    old.write_chunk(&prior, transfer, 0, bytes).unwrap();
+    let (image, _) = old.publish(&prior, transfer, key).unwrap();
+    let owner = fs::metadata(&image).unwrap().uid();
+    drop(old);
+
+    let mut second = prior.clone();
+    second.host_id = HostId::new("daemon-b".into());
+    second.connection_id = Uuid::new_v4();
+    let mut reopened = RemoteImageStaging::new(second.host_id.clone(), parent.path(), 16).unwrap();
+    assert_eq!(reopened.reserved_bytes, 8);
+    assert_eq!(fs::read(&image).unwrap(), bytes);
+    assert_eq!(fs::metadata(&image).unwrap().uid(), owner);
+    let record_path = parent
+        .path()
+        .join("cli-image-references-v1")
+        .join(format!("reference-{transfer}.json"));
+    let record: serde_json::Value =
+        serde_json::from_slice(&fs::read(record_path).unwrap()).unwrap();
+    assert_eq!(record["host"], prior.host_id.as_str());
+    assert!(
+        reopened
+            .recover_reference(&second, transfer, key, false)
+            .is_err()
+    );
+    reopened.activate_scope(second.clone()).unwrap();
+    let second_transfer = Uuid::new_v4();
+    let second_key = Uuid::new_v4();
+    reopened.begin(&second, second_transfer, spec(bytes)).unwrap();
+    reopened
+        .write_chunk(&second, second_transfer, 0, bytes)
+        .unwrap();
+    let (second_image, _) = reopened
+        .publish(&second, second_transfer, second_key)
+        .unwrap();
+    assert_eq!(reopened.reserved_bytes, 16);
+    assert!(reopened.begin(&second, Uuid::new_v4(), spec(b"x")).is_err());
+    drop(reopened);
+
+    let mut current = second.clone();
+    current.host_id = HostId::new("daemon-c".into());
+    current.connection_id = Uuid::new_v4();
+    let mut twice = RemoteImageStaging::new(current.host_id.clone(), parent.path(), 16).unwrap();
+    twice.activate_scope(current.clone()).unwrap();
+    assert_eq!(twice.reserved_bytes, 16);
+    assert!(twice.begin(&current, Uuid::new_v4(), spec(b"x")).is_err());
+    assert!(
+        twice
+            .recover_reference(&current, transfer, key, true)
+            .is_err()
+    );
+    assert!(
+        twice
+            .recover_reference(&prior, transfer, Uuid::new_v4(), true)
+            .is_err()
+    );
+    assert_eq!(twice.reserved_bytes, 16);
+    assert_eq!(fs::read(&image).unwrap(), bytes);
+    assert_eq!(fs::read(&second_image).unwrap(), bytes);
+    twice
+        .recover_reference(&prior, transfer, key, true)
+        .unwrap();
+    assert_eq!(twice.reserved_bytes, 8);
+    assert!(!image.exists());
+    twice.recover_reference(&prior, transfer, key, true).unwrap();
+    assert_eq!(twice.reserved_bytes, 8);
+    assert_eq!(fs::read(&second_image).unwrap(), bytes);
+    twice.begin(&current, Uuid::new_v4(), spec(bytes)).unwrap();
+    assert_eq!(twice.reserved_bytes, 16);
+    assert!(twice.begin(&current, Uuid::new_v4(), spec(b"x")).is_err());
+}
+
+#[test]
+fn damaged_other_host_reference_still_blocks_daemon_initialization() {
+    let parent = private_parent();
+    let prior = scope(Uuid::new_v4());
+    let transfer = Uuid::new_v4();
+    let mut old = staging(parent.path(), 8);
+    old.activate_scope(prior.clone()).unwrap();
+    let bytes = b"\x89PNG\r\n\x1a\n";
+    old.begin(&prior, transfer, spec(bytes)).unwrap();
+    old.write_chunk(&prior, transfer, 0, bytes).unwrap();
+    let (image, _) = old.publish(&prior, transfer, Uuid::new_v4()).unwrap();
+    drop(old);
+    let path = parent
+        .path()
+        .join("cli-image-references-v1")
+        .join(format!("reference-{transfer}.json"));
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    for (field, replacement) in [
+        ("transfer_id", serde_json::json!(Uuid::new_v4())),
+        ("directory", serde_json::json!("../unrelated")),
+    ] {
+        let mut damaged = original.clone();
+        damaged[field] = replacement;
+        fs::write(&path, serde_json::to_vec(&damaged).unwrap()).unwrap();
+        assert!(RemoteImageStaging::new(HostId::new("daemon-b".into()), parent.path(), 8).is_err());
+        assert_eq!(fs::read(&image).unwrap(), bytes);
+    }
+}
+
+#[test]
 fn exact_bytes_and_duplicate_chunks_produce_the_same_verified_receipt() {
     let parent = private_parent();
     let mut store = staging(parent.path(), 32);

@@ -23,13 +23,14 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use string_offset::CharOffset;
+use unicode_segmentation::UnicodeSegmentation;
 use warp::editor::CodeEditorModel;
 use warp_editor::model::CoreEditorModel;
 use warp_editor::render::model::{DisplayLattice, DisplayRow, DisplayRowKind};
 use warpui_core::elements::tui::{
     TuiConstraint, TuiElement, TuiEvent, TuiEventContext, TuiFlex, TuiGridPoint, TuiLayoutContext,
     TuiLocalPoint, TuiPaintContext, TuiPaintSurface, TuiParentElement, TuiScreenPoint,
-    TuiScreenPosition, TuiSize, TuiStyle, TuiText,
+    TuiScreenPosition, TuiSize, TuiStyle, TuiText, text_width,
 };
 use warpui_core::{AppContext, ModelHandle};
 
@@ -785,17 +786,34 @@ impl TuiElement for TuiEditorElement {
                 && self.cursor_row_in_view < size.height
             {
                 let mut col = self.cursor_col.saturating_add(cursor_gap);
-                for char in text.chars() {
-                    if col >= size.width {
+                for grapheme in UnicodeSegmentation::graphemes(text, true) {
+                    if grapheme.chars().any(char::is_control) {
+                        continue;
+                    }
+                    let width = text_width(grapheme);
+                    if width == 0 {
+                        continue;
+                    }
+                    let Some(next_col) = col.checked_add(width) else {
+                        break;
+                    };
+                    if next_col > size.width {
                         break;
                     }
                     let position =
                         origin.offset(i32::from(col), i32::from(self.cursor_row_in_view));
                     if let Some(cell) = surface.cell_mut(position) {
-                        cell.set_char(char);
+                        cell.set_symbol(grapheme);
                         cell.set_style(style);
                     }
-                    col += 1;
+                    for trailing_col in col + 1..next_col {
+                        let position = origin
+                            .offset(i32::from(trailing_col), i32::from(self.cursor_row_in_view));
+                        if let Some(cell) = surface.cell_mut(position) {
+                            cell.reset();
+                        }
+                    }
+                    col = next_col;
                 }
             }
         }

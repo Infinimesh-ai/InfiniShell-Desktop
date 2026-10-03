@@ -100,6 +100,18 @@ def one(events, kind, **filters):
     return next(e for e in events if e["event"] == kind and all(e.get(k) == v for k, v in filters.items()))
 
 
+def identity_fixture():
+    events = fixture()
+    replay = dict(one(events, "message_accepted", phase="image"),
+                  event="cached_native_ack_replayed", observed_phase="image",
+                  receipt_source="CachedNativeProtocol", native_input_added=False)
+    events.insert(events.index(one(events, "turn_started", phase="image")), replay)
+    for event in events:
+        if event["event"] in runner.IDENTITY_OBSERVATION_EVENTS:
+            event.update(native_session_id_at_observation=NATIVE, identity_bound_after_pairing=False)
+    return events
+
+
 class ManagedImageAuditTests(unittest.TestCase):
     def test_complete_production_proof_passes_and_summary_alone_fails(self):
         events, output = complete_proof()
@@ -108,6 +120,59 @@ class ManagedImageAuditTests(unittest.TestCase):
         self.assertFalse(runner.verified_acceptance(1, output, events))
         self.assertFalse(runner.verified_acceptance(False, output, events))
         self.assertEqual(runner.audit_events(fixture())["input_ids"], INPUTS)
+
+    def test_legacy_receipts_remain_readable_without_inventing_pairing_observations(self):
+        events = fixture()
+        original = copy.deepcopy(events)
+        proof = runner.audit_events(events)
+        self.assertFalse(proof["native_identity_observations_complete"])
+        self.assertIsNone(proof["identity_bound_after_pairing_count"])
+        self.assertEqual(events, original)
+
+    def test_observed_identity_and_deferred_pairing_receipts_are_distinguished(self):
+        kinds = ("message_accepted", "cached_native_ack_replayed", "turn_started")
+        for deferred_count in range(4):
+            events = identity_fixture()
+            for kind in kinds[:deferred_count]:
+                one(events, kind, phase="image").update(
+                    native_session_id_at_observation=None, identity_bound_after_pairing=True)
+            with self.subTest(deferred_count=deferred_count):
+                proof = runner.audit_events(events)
+                self.assertTrue(proof["native_identity_observations_complete"])
+                self.assertEqual(proof["identity_bound_after_pairing_count"], deferred_count)
+                self.assertEqual(proof["native_session_id"], NATIVE)
+                self.assertEqual(proof["native_inputs"], 3)
+
+    def test_identity_observation_fields_are_atomic_and_match_final_native_identity(self):
+        for kind in runner.IDENTITY_OBSERVATION_EVENTS:
+            for missing in runner.IDENTITY_OBSERVATION_KEYS:
+                events = identity_fixture()
+                del one(events, kind, phase="image")[missing]
+                with self.subTest(kind=kind, missing=missing), self.assertRaises(ValueError):
+                    runner.audit_events(events)
+            for changes in (
+                {"native_session_id_at_observation": INPUTS[0]},
+                {"native_session_id_at_observation": ""},
+                {"native_session_id_at_observation": None},
+                {"identity_bound_after_pairing": True},
+                {"identity_bound_after_pairing": 0},
+                {"identity_bound_after_pairing": "false"},
+                {"native_session_id_at_observation": None, "identity_bound_after_pairing": 1},
+                {"native_session_id": None},
+                {"native_session_id": INPUTS[0]},
+            ):
+                events = identity_fixture()
+                one(events, kind, phase="image").update(changes)
+                with self.subTest(kind=kind, changes=changes), self.assertRaises(ValueError):
+                    runner.audit_events(events)
+
+    def test_mixed_legacy_receipts_do_not_claim_complete_identity_observations(self):
+        events = identity_fixture()
+        for key in runner.IDENTITY_OBSERVATION_KEYS:
+            del one(events, "turn_started", phase="recall")[key]
+        proof = runner.audit_events(events)
+        self.assertFalse(proof["native_identity_observations_complete"])
+        self.assertEqual(proof["identity_bound_after_pairing_count"], 0)
 
     def test_every_runtime_and_storage_proof_is_required(self):
         for kind in ("attachment_prepared", "attachment_restore_verified", "managed_connection_ready",

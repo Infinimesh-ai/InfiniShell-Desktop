@@ -58,12 +58,20 @@ pub(crate) enum Action {
     Status {
         ticket: Ticket,
     },
+    Observe {
+        ticket: Ticket,
+    },
     Cancel {
         ticket: Ticket,
     },
     Submit {
         ticket: Ticket,
         observation: Observation,
+        input: Input,
+    },
+    SubmitOwned {
+        ticket: Ticket,
+        binding_id: Uuid,
         input: Input,
     },
     InputStatus {
@@ -97,6 +105,13 @@ pub(crate) enum Reply {
         native_session: Option<Uuid>,
         manifest_sha256: Option<String>,
         phase: String,
+    },
+    OwnedIdentity {
+        ticket: Ticket,
+        native_session: Uuid,
+        cwd: String,
+        manifest_sha256: String,
+        permission_mode: String,
     },
     Input {
         ticket: Ticket,

@@ -1,7 +1,8 @@
 //! macOS 原生单文件更新程序的私有、不可变 generation 快照。
 //!
 //! 本模块只接受已经由来源层冻结身份的单个 Mach-O 文件。脚本、解释器入口、npm、
-//! Homebrew、动态库或其他依赖闭包不属于这里的安全边界，调用方不得把它们降级为单文件。
+//! 任意包管理器、动态库或其他依赖闭包不属于这里的安全边界，调用方不得把它们降级为单文件。
+//! 已冻结 Homebrew 原生版本/补全探针另有专用入口，只例外处理私有前缀的 Caskroom 祖先。
 
 use std::ffi::CString;
 use std::fs::{self, File, OpenOptions};
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
 
-use super::{ExpectedFileId, ExpectedFileIdentity};
+use super::{AtomicLaunchKind, ExpectedFileId, ExpectedFileIdentity, Manifest, version_probe};
 
 const SNAPSHOT_ROOT: &str = "cli-agent-executable-snapshots";
 const PROGRAM_FILE: &str = "program";
@@ -157,6 +158,47 @@ pub(super) fn prepare_native_executable(
     )
 }
 
+/// 仅固定 Homebrew 版本/补全探针可认领私有前缀下的 0775 Caskroom。
+/// 通用更新、G01 和快照状态目录不经过此例外。
+pub(super) fn prepare_homebrew_probe_executable(
+    state_dir: &Path,
+    binding_digest: &str,
+    manifest: &Manifest,
+) -> io::Result<PublishedMacosExecutable> {
+    if !manifest.launch_allowed
+        || !matches!(
+            manifest.atomic_launch_kind,
+            Some(
+                AtomicLaunchKind::ClaudeHomebrewVersionProbeV1
+                    | AtomicLaunchKind::CodexHomebrewVersionProbeV1
+                    | AtomicLaunchKind::GrokHomebrewVersionProbeV1
+            )
+        )
+    {
+        return Err(error(
+            "managed_process.atomic_macos_homebrew_probe_kind_invalid",
+        ));
+    }
+    version_probe::validate(manifest, state_dir)?;
+    let expected = manifest
+        .expected_files
+        .first()
+        .ok_or_else(|| error("managed_process.atomic_macos_source_identity_invalid"))?;
+    if validate_secure_ancestors(&expected.path, false).is_ok() {
+        return prepare_native_executable(state_dir, manifest.generation, binding_digest, expected);
+    }
+    let caskroom = PrivateHomebrewCaskroom::capture(&expected.path)?;
+    prepare_executable_inner(
+        state_dir,
+        manifest.generation,
+        binding_digest,
+        expected,
+        Some(&caskroom),
+        || Ok(()),
+        || Ok(()),
+    )
+}
+
 fn prepare_native_executable_inner(
     state_dir: &Path,
     generation: Uuid,
@@ -165,9 +207,29 @@ fn prepare_native_executable_inner(
     after_source_verified: impl FnOnce() -> io::Result<()>,
     after_published: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<PublishedMacosExecutable> {
+    prepare_executable_inner(
+        state_dir,
+        generation,
+        binding_digest,
+        expected,
+        None,
+        after_source_verified,
+        after_published,
+    )
+}
+
+fn prepare_executable_inner(
+    state_dir: &Path,
+    generation: Uuid,
+    binding_digest: &str,
+    expected: &ExpectedFileIdentity,
+    caskroom: Option<&PrivateHomebrewCaskroom>,
+    after_source_verified: impl FnOnce() -> io::Result<()>,
+    after_published: impl FnOnce() -> io::Result<()>,
+) -> io::Result<PublishedMacosExecutable> {
     validate_digest(binding_digest)?;
     validate_source_path(expected)?;
-    validate_secure_ancestors(&expected.path, false)?;
+    validate_source_ancestors(&expected.path, caskroom)?;
     validate_secure_ancestors(state_dir, true)?;
 
     let mut source = open_plain_file(&expected.path, false)?;
@@ -184,6 +246,9 @@ fn prepare_native_executable_inner(
     }
 
     after_source_verified()?;
+    if let Some(caskroom) = caskroom {
+        validate_source_ancestors(&expected.path, Some(caskroom))?;
+    }
 
     let (root_path, root) = open_snapshot_root(state_dir)?;
     let generation_name = generation.to_string();
@@ -204,6 +269,9 @@ fn prepare_native_executable_inner(
         let mut snapshot = create_file_at(scratch.as_raw_fd(), PROGRAM_FILE, 0o600, libc::O_RDWR)?;
         copy_open_file(&mut source, &mut snapshot)?;
         snapshot.sync_all()?;
+        if let Some(caskroom) = caskroom {
+            validate_source_ancestors(&expected.path, Some(caskroom))?;
+        }
 
         let source_after_copy = inspect_open_file(&source)?;
         if source_after_copy != source_before || inspect_path_file(&expected.path)? != source_before
@@ -270,6 +338,9 @@ fn prepare_native_executable_inner(
             return Err(error("managed_process.atomic_macos_summary_mode_invalid"));
         }
 
+        if let Some(caskroom) = caskroom {
+            validate_source_ancestors(&expected.path, Some(caskroom))?;
+        }
         set_directory_mode(&scratch, PUBLISHED_DIRECTORY_MODE)?;
         scratch.sync_all()?;
         publish_noclobber(root.as_raw_fd(), &scratch_name, &generation_name)?;
@@ -513,6 +584,102 @@ fn validate_private_generation_directory(path: &Path) -> io::Result<()> {
         ));
     }
     Ok(())
+}
+
+struct PrivateHomebrewCaskroom {
+    prefix_path: PathBuf,
+    caskroom_path: PathBuf,
+    prefix: File,
+    caskroom: File,
+    prefix_identity: InspectedFile,
+    caskroom_identity: InspectedFile,
+}
+
+impl PrivateHomebrewCaskroom {
+    fn capture(source: &Path) -> io::Result<Self> {
+        let caskroom_path = source
+            .ancestors()
+            .find(|path| path.file_name().is_some_and(|name| name == "Caskroom"))
+            .ok_or_else(|| error("managed_process.atomic_macos_homebrew_caskroom_missing"))?
+            .to_owned();
+        let prefix_path = caskroom_path
+            .parent()
+            .ok_or_else(|| error("managed_process.atomic_macos_homebrew_prefix_missing"))?
+            .to_owned();
+        let prefix = open_directory(&prefix_path)?;
+        let caskroom = open_directory_at(prefix.as_raw_fd(), "Caskroom")?;
+        let prefix_identity = inspect_open_file(&prefix)?;
+        let caskroom_identity = inspect_open_file(&caskroom)?;
+        let captured = Self {
+            prefix_path,
+            caskroom_path,
+            prefix,
+            caskroom,
+            prefix_identity,
+            caskroom_identity,
+        };
+        captured.verify()?;
+        Ok(captured)
+    }
+
+    fn verify(&self) -> io::Result<()> {
+        #[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+        let registered =
+            crate::terminal::cli_agent_updates::valid_homebrew_caskroom(&self.prefix_path);
+        #[cfg(not(all(feature = "local_fs", target_arch = "aarch64")))]
+        let registered = false;
+        // 共享合同同时复核前缀祖先及两个目录的 ACL；句柄必须仍对应这些同名路径。
+        if !registered
+            || self.prefix_identity.owner != unsafe { libc::geteuid() }
+            || self.prefix_identity.mode != PRIVATE_DIRECTORY_MODE
+            || self.caskroom_identity.owner != self.prefix_identity.owner
+            || self.caskroom_identity.id.volume != self.prefix_identity.id.volume
+            || self.caskroom_identity.mode != 0o775
+            || inspect_open_file(&self.prefix)? != self.prefix_identity
+            || inspect_path_file(&self.prefix_path)? != self.prefix_identity
+            || inspect_open_file(&self.caskroom)? != self.caskroom_identity
+            || inspect_path_file(&self.caskroom_path)? != self.caskroom_identity
+            || inspect_open_file(&open_directory_at(self.prefix.as_raw_fd(), "Caskroom")?)?
+                != self.caskroom_identity
+        {
+            return Err(error(
+                "managed_process.atomic_macos_homebrew_caskroom_changed",
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_source_ancestors(
+    path: &Path,
+    caskroom: Option<&PrivateHomebrewCaskroom>,
+) -> io::Result<()> {
+    let Some(caskroom) = caskroom else {
+        return validate_secure_ancestors(path, false);
+    };
+    caskroom.verify()?;
+    if !path.is_absolute() || !path.starts_with(&caskroom.caskroom_path) {
+        return Err(error("managed_process.atomic_macos_path_not_absolute"));
+    }
+    let mut current = PathBuf::from("/");
+    let components = path.components().collect::<Vec<_>>();
+    for component in components.iter().take(components.len().saturating_sub(1)) {
+        match component {
+            Component::RootDir => continue,
+            Component::Normal(name) => current.push(name),
+            Component::CurDir | Component::ParentDir | Component::Prefix(_) => {
+                return Err(error("managed_process.atomic_macos_path_not_normalized"));
+            }
+        }
+        let metadata = fs::symlink_metadata(&current)?;
+        if !metadata.file_type().is_dir()
+            || metadata.uid() != 0 && metadata.uid() != unsafe { libc::geteuid() }
+            || (metadata.mode() & 0o022 != 0 && current != caskroom.caskroom_path)
+        {
+            return Err(error("managed_process.atomic_macos_ancestor_unsafe"));
+        }
+    }
+    caskroom.verify()
 }
 
 fn validate_secure_ancestors(path: &Path, include_leaf: bool) -> io::Result<()> {

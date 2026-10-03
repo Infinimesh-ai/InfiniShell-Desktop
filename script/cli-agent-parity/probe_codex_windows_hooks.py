@@ -273,10 +273,20 @@ class NativeRecorder:
 
     def _close_root_and_outputs(self):
         started = time.monotonic()
+        self.close_receipt.update(stdin_closed_before=self.process.stdin.closed,
+            stdin_close_returned=False, stdin_close_error_type=None,
+            stdin_close_errno=None, stdin_close_winerror=None)
         try:
             self.process.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass
+            self.close_receipt['stdin_close_returned'] = True
+        except (BrokenPipeError, OSError) as error:
+            # 只保留错误类别与数值码；关闭异常和对象 closed 状态均不能证明子进程已收到 EOF。
+            self.close_receipt.update(stdin_close_error_type=type(error).__name__,
+                stdin_close_errno=error.errno, stdin_close_winerror=getattr(error, 'winerror', None))
+        finally:
+            self.close_receipt.update(stdin_closed_after=self.process.stdin.closed,
+                stdin_close_elapsed_ms=round((time.monotonic() - started) * 1000))
+        wait_started = time.monotonic()
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -290,7 +300,7 @@ class NativeRecorder:
                 self.process.wait(timeout=3)
         self.close_receipt.update(root_exit_code=self.process.returncode,
             root_exited_naturally=not self.close_receipt['termination_requested'],
-            root_wait_elapsed_ms=round((time.monotonic() - started) * 1000))
+            root_wait_elapsed_ms=round((time.monotonic() - wait_started) * 1000))
         if self.probe_job is not None:
             require(self.close_receipt['job_assigned_before_resume'], '原生进程没有在运行前归属私有 Job')
             active = self.probe_job.wait_empty(5)
@@ -328,8 +338,13 @@ class NativeRecorder:
 def start_codex(executable, env, directory, traces):
     events = []
     traces.append(events)
+    # 仅私有 app-server 启用关停日志；ConPTY 复用此入口，调用方环境保持原样。
+    # 原生“EOF”日志也可由读取或转发失败触发，不能单独作为输入 EOF 证明。
+    app_server_env = dict(env)
+    app_server_env.update(RUST_LOG='warn,codex_app_server=info,codex_app_server_transport::transport::stdio=debug',
+                          LOG_FORMAT='json')
     recorder = NativeRecorder([str(executable), 'app-server', '--stdio', '--disable', 'shell_snapshot'],
-                              env, directory, events, supervise_windows=True)
+                              app_server_env, directory, events, supervise_windows=True)
     try:
         recorder.rpc('initialize', {'clientInfo': {'name': 'windows_hook_verification', 'version': '0.1.0'},
                                     'capabilities': {'experimentalApi': True}}, 1)
@@ -466,6 +481,13 @@ def cleanup_private_cases(directory, cases, evidence):
             require(len(closes) == 2 and all(close['root_exited_naturally'] and close['root_exit_code'] == 0
                     and close['output_readers_eof'] for close in closes) and not phase.get('close_failure')
                     and phase.get('config_rollback', {}).get('restored'), '缺少退出、EOF 或配置回滚证据，保留现场')
+            require(all(close.get('job_supervision_requested') is True
+                    and close.get('job_assigned_before_resume') is True
+                    and close.get('all_descendants_job_verified') is True
+                    and close.get('job_active_after_cleanup') == 0
+                    and close.get('job_close_confirmed') is True for close in closes),
+                    '缺少完整后代 Job 退出和关闭证据，保留现场')
+    evidence['descendants_job_verified'] = True
     require(directory.is_dir() and not directory.is_symlink(), '私有临时目录已被替换，拒绝清理')
     root_identity = directory.lstat()
     require(not getattr(root_identity, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT,

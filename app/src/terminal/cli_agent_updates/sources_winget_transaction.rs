@@ -1,4 +1,4 @@
-//! WinGet 单文件 portable 的文件/ARP 双状态恢复层。
+//! WinGet 单文件 portable 的文件、ARP 与显式渠道配置恢复层。
 //! 发布必须持有独立 AppContainer 原生探针及清理收据，文件与登记分别核对和恢复。
 
 use std::fs::{self, File, OpenOptions};
@@ -32,8 +32,9 @@ use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
 
 use super::winget::{Owner, UNINSTALL};
 use super::{
-    CLIAgent, Error, MAX_CONFIG, MAX_OUTPUT, UPDATE_TIMEOUT, UpdatePlan, VerificationProgress,
-    managed_process, read_limited,
+    CLIAgent, ClaudeUpdateScope, ConfigBackup, Error, MAX_CONFIG, MAX_OUTPUT, UPDATE_TIMEOUT,
+    UpdatePlan, VerificationProgress, claude_downgrade, managed_process, read_limited,
+    winget_claude_contract as contract,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -191,10 +192,11 @@ enum Phase {
     Prepared,
     ReplaceIntent,
     Registering,
+    ConfigPublishing,
     Committed,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct CandidateReceipt {
     pub(super) generation: Uuid,
@@ -219,9 +221,15 @@ struct Journal {
     probe: CandidateReceipt,
     phase: Phase,
     intent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    downgrade: Option<claude_downgrade::Intent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    config: Option<ConfigBackup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    claude_policy: Option<ClaudeUpdateScope>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct PreparedCandidate {
     pub(super) id: Uuid,
@@ -234,6 +242,116 @@ pub(super) struct PreparedCandidate {
     image: Option<Image>,
     probe: Option<CandidateReceipt>,
     intent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    downgrade: Option<claude_downgrade::Intent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    config: Option<ConfigBackup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    claude_policy: Option<ClaudeUpdateScope>,
+}
+
+// 旧 280 账本没有以下三个字段；恢复沿用原合同，不套用新计划的版本边规则。
+fn validate_policy(
+    owner: &Owner,
+    target: &str,
+    downgrade: Option<claude_downgrade::Intent>,
+    config: &Option<ConfigBackup>,
+    policy: &Option<ClaudeUpdateScope>,
+    original: &Image,
+) -> Result<(), Error> {
+    if target == "2.1.280" && downgrade.is_none() && config.is_none() && policy.is_none() {
+        return Ok(());
+    }
+    if owner.version != contract::FROM || target != contract::TO {
+        return Err(Error::RecoveryRequired);
+    }
+    claude_downgrade::validate_winget(downgrade, &owner.version, target, config)?;
+    let config = config.as_ref().ok_or(Error::RecoveryRequired)?;
+    let policy = policy.as_ref().ok_or(Error::RecoveryRequired)?;
+    super::validate_claude_scope(policy)?;
+    if policy.settings_path != config.path || config.after != config.before {
+        return Err(Error::RecoveryRequired);
+    }
+    let (length, digest) = contract::native(&owner.version)?;
+    if original.length != length
+        || original.sha256 != digest
+        || super::brew::decode_sha256(&owner.sha256)? != digest
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
+fn validate_target(version: &str, expected: &Image) -> Result<(), Error> {
+    if version == "2.1.280" {
+        return Ok(());
+    }
+    if version != contract::TO || !cfg!(target_arch = "x86_64") {
+        return Err(Error::RecoveryRequired);
+    }
+    let (length, digest) = contract::native(version)?;
+    if expected.length != length || expected.sha256 != digest {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
+fn verify_config(
+    config: &Option<ConfigBackup>,
+    policy: &Option<ClaudeUpdateScope>,
+    published: bool,
+) -> Result<(), Error> {
+    if let Some(policy) = policy {
+        super::verify_claude_originals(policy)?;
+    }
+    if let Some(config) = config {
+        if super::read_optional_config(&config.path)?.as_ref()
+            != config.publication_bytes(published)
+        {
+            return Err(Error::SourceChanged);
+        }
+    }
+    Ok(())
+}
+
+fn validate_prepared(prepared: &PreparedCandidate) -> Result<(), Error> {
+    validate_policy(
+        &prepared.owner,
+        &prepared.version,
+        prepared.downgrade,
+        &prepared.config,
+        &prepared.claude_policy,
+        &prepared.original,
+    )?;
+    if prepared.version == contract::TO {
+        if prepared
+            .config
+            .as_ref()
+            .is_some_and(|config| config.restore_stage.is_some())
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        if prepared.manifest_sha256 != contract::manifest_sha256(contract::TO)?
+            || prepared.sha256 != contract::native(contract::TO)?.1
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        if let Some(image) = &prepared.image {
+            validate_target(&prepared.version, image)?;
+        }
+        if let Some(probe) = &prepared.probe {
+            let mut binding = prepared.clone();
+            binding.probe = None;
+            let digest = format!(
+                "{:x}",
+                Sha256::digest(serde_json::to_vec(&binding).map_err(|_| Error::RecoveryRequired)?)
+            );
+            if probe.binding_digest != digest {
+                return Err(Error::RecoveryRequired);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn candidate_path(root: &Path) -> PathBuf {
@@ -288,32 +406,8 @@ async fn download(url: &str, limit: u64) -> Result<NamedTempFile, Error> {
     Ok(output)
 }
 
-/// 仅准备官方 portable 清单指定的固定 native；不运行 winget、不修改 ARP 或当前入口。
-pub(super) async fn prepare_candidate(
-    owner: Owner,
-    root: &Path,
-    intent: &str,
-) -> Result<PreparedCandidate, Error> {
-    if candidate_path(root)
-        .try_exists()
-        .map_err(|_| Error::RecoveryRequired)?
-    {
-        return Err(Error::RecoveryRequired);
-    }
-    owner.verify_layout()?;
-    if Owner::read()?.as_ref() != Some(&owner) {
-        return Err(Error::SourceChanged);
-    }
-    let old = image(&owner.target)?;
-    if old.sha256 != super::brew::decode_sha256(&owner.sha256)? {
-        return Err(Error::SourceChanged);
-    }
+fn legacy_release(bytes: &[u8]) -> Result<(String, [u8; 32]), Error> {
     let version = "2.1.280";
-    let url = format!(
-        "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/a/Anthropic/ClaudeCode/{version}/Anthropic.ClaudeCode.installer.yaml"
-    );
-    let metadata = download(&url, MAX_CONFIG).await?;
-    let bytes = read_limited(metadata.path(), MAX_CONFIG)?;
     let manifest: serde_json::Value =
         serde_yaml::from_slice(&bytes).map_err(|_| Error::InvalidRelease)?;
     if manifest["PackageIdentifier"] != "Anthropic.ClaudeCode"
@@ -367,7 +461,69 @@ pub(super) async fn prepare_candidate(
             .as_str()
             .ok_or(Error::InvalidRelease)?,
     )?;
-    let candidate = download(installer_url, 512 * 1024 * 1024).await?;
+    Ok((installer_url.to_owned(), sha256))
+}
+
+/// 仅准备官方 portable 清单指定的固定 native；不运行 winget、不修改 ARP 或当前入口。
+pub(super) async fn prepare_candidate(
+    owner: Owner,
+    root: &Path,
+    plan: &UpdatePlan,
+) -> Result<PreparedCandidate, Error> {
+    if candidate_path(root)
+        .try_exists()
+        .map_err(|_| Error::RecoveryRequired)?
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    owner.verify_layout()?;
+    if Owner::read()?.as_ref() != Some(&owner) {
+        return Err(Error::SourceChanged);
+    }
+    let old = image(&owner.target)?;
+    if old.sha256 != super::brew::decode_sha256(&owner.sha256)? {
+        return Err(Error::SourceChanged);
+    }
+    let version = plan.target_version.as_str();
+    let mut config = plan.config.clone();
+    if let Some(config) = &mut config {
+        config.after = config.before.clone();
+    }
+    let claude_policy = config
+        .as_ref()
+        .map(|config| {
+            super::snapshot_claude_scope(
+                config,
+                Uuid::new_v4(),
+                super::claude_metadata_path(config)?,
+                version,
+            )
+        })
+        .transpose()?;
+    validate_policy(
+        &owner,
+        version,
+        plan.downgrade,
+        &config,
+        &claude_policy,
+        &old,
+    )?;
+    verify_config(&config, &claude_policy, false)?;
+    let url = if version == contract::TO {
+        contract::metadata_url(version)?
+    } else {
+        format!(
+            "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/a/Anthropic/ClaudeCode/{version}/Anthropic.ClaudeCode.installer.yaml"
+        )
+    };
+    let metadata = download(&url, MAX_CONFIG).await?;
+    let bytes = read_limited(metadata.path(), MAX_CONFIG)?;
+    let (installer_url, sha256) = if version == contract::TO {
+        contract::release(version, &bytes)?
+    } else {
+        legacy_release(&bytes)?
+    };
+    let candidate = download(&installer_url, 512 * 1024 * 1024).await?;
     if super::stamp(candidate.path())?.digest != sha256 {
         return Err(Error::InvalidRelease);
     }
@@ -387,7 +543,10 @@ pub(super) async fn prepare_candidate(
         original: old,
         image: None,
         probe: None,
-        intent: intent.to_owned(),
+        intent: plan.intent.clone(),
+        downgrade: plan.downgrade,
+        config,
+        claude_policy,
     };
     // 构造中断时仍保留归属记录，不按目录扫描删除未知 exe。
     save_candidate(root, &prepared)?;
@@ -416,6 +575,8 @@ pub(super) async fn prepare_candidate(
         return Err(Error::SourceChanged);
     }
     prepared.image = Some(identity);
+    validate_prepared(&prepared)?;
+    verify_config(&prepared.config, &prepared.claude_policy, false)?;
     save_candidate(root, &prepared)?;
     Ok(prepared)
 }
@@ -426,9 +587,12 @@ pub(super) async fn execute(
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
     super::winget::supports(plan.agent, &plan.target_version)?;
-    if plan.config.is_some() {
-        return Err(Error::ChannelMismatch);
-    }
+    claude_downgrade::validate_winget(
+        plan.downgrade,
+        &plan.installed_version,
+        &plan.target_version,
+        &plan.config,
+    )?;
     super::verify_installation_identity(&plan.installation)?;
     let owner = Owner::read()?.ok_or(Error::SourceChanged)?;
     owner.verify_layout()?;
@@ -448,7 +612,50 @@ pub(super) async fn execute(
     {
         return Err(Error::RecoveryRequired);
     }
-    let mut prepared = prepare_candidate(owner, root, &plan.intent).await?;
+    if !plan.requires_native_update() && plan.target_version == contract::TO {
+        if candidate_path(root)
+            .try_exists()
+            .map_err(|_| Error::RecoveryRequired)?
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        let mut config = plan.config.clone().ok_or(Error::UnsupportedSource)?;
+        if super::read_optional_config(&config.path)? != config.before {
+            return Err(Error::SourceChanged);
+        }
+        config.after = config.before.clone();
+        let journal = super::Journal {
+            schema: 2,
+            agent: plan.agent.command_prefix().to_owned(),
+            entry: plan.installation.entry.clone(),
+            old_version: plan.installed_version.clone(),
+            target_version: plan.target_version.clone(),
+            phase: "config_prepared".to_owned(),
+            config: Some(config),
+            channel: super::channel_name(plan.installation.channel)?.to_owned(),
+            publish_desired: false,
+            command_failed: false,
+            intent: Some(plan.intent.clone()),
+            generation: None,
+            old_stamp: Some(plan.installation.stamp.clone()),
+            claude_update: None,
+            launch: None,
+            binding_digest: None,
+            binding_kind: None,
+        };
+        super::save_journal(&root.join("claude.json"), &journal)?;
+        if let Some(progress) = progress {
+            progress.enter().await;
+        }
+        super::reconcile_journal_locked(
+            plan.agent,
+            &plan.installation.entry,
+            &plan.installed_version,
+            root,
+        )?;
+        return Ok(plan.target_version.clone());
+    }
+    let mut prepared = prepare_candidate(owner, root, plan).await?;
     let result = async {
         let held = prepared.image.as_ref().ok_or(Error::RecoveryRequired)?;
         let expected = managed_process::ExpectedFileIdentity::capture_release_image(
@@ -525,16 +732,7 @@ pub(super) async fn execute(
         if let Some(progress) = progress {
             progress.enter().await;
         }
-        let probe = prepared.probe.take().ok_or(Error::RecoveryRequired)?;
-        publish_verified_candidate(
-            root,
-            prepared.owner.clone(),
-            prepared.id,
-            probe,
-            plan.intent.clone(),
-            &prepared.original,
-            prepared.image.as_ref().ok_or(Error::RecoveryRequired)?,
-        )
+        publish_verified_candidate(root, &prepared)
     }
     .await;
     if result.is_err() {
@@ -564,7 +762,7 @@ fn save(root: &Path, journal: &Journal) -> Result<(), Error> {
     super::sync_config_directory(root)
 }
 
-fn verify_probe(root: &Path, receipt: &CandidateReceipt) -> Result<(), Error> {
+fn verify_probe(root: &Path, receipt: &CandidateReceipt, version: &str) -> Result<(), Error> {
     // 不能接受 native_file 或其他来源的探针收据替代 AppContainer 合同。
     let binding = managed_process::PreparedLaunchBinding::from_persisted(
         receipt.binding_digest.clone(),
@@ -574,7 +772,7 @@ fn verify_probe(root: &Path, receipt: &CandidateReceipt) -> Result<(), Error> {
     let exited = managed_process::confirmed_exit_with_binding(root, receipt.generation, &binding)
         .map_err(|_| Error::RecoveryRequired)?
         .ok_or(Error::RecoveryRequired)?;
-    if !exited.cleanup_confirmed || exited.exit_code != Some(0) || receipt.version != "2.1.280" {
+    if !exited.cleanup_confirmed || exited.exit_code != Some(0) || receipt.version != version {
         return Err(Error::RecoveryRequired);
     }
     Ok(())
@@ -670,6 +868,11 @@ fn replace(
 fn owned_arp(journal: &Journal) -> Result<Owner, Error> {
     let actual = Owner::read()?.ok_or(Error::SourceChanged)?;
     actual.verify_layout()?;
+    verify_arp_fields(journal, &actual)?;
+    Ok(actual)
+}
+
+fn verify_arp_fields(journal: &Journal, actual: &Owner) -> Result<(), Error> {
     let mut same = actual.clone();
     same.version = journal.owner.version.clone();
     same.sha256 = journal.owner.sha256.clone();
@@ -687,7 +890,7 @@ fn owned_arp(journal: &Journal) -> Result<Owner, Error> {
     {
         return Err(Error::SourceChanged);
     }
-    Ok(actual)
+    Ok(())
 }
 
 fn publish_arp(journal: &Journal, target: bool) -> Result<(), Error> {
@@ -725,34 +928,31 @@ fn publish_arp(journal: &Journal, target: bool) -> Result<(), Error> {
 
 /// 候选必须由官方目标清单校验，且已完成专用原生探针；不下载或运行未知 installer。
 /// 调用方持有 agent 更新预约和 journal 锁；此入口不会自行绕过忙碌状态。
-fn publish_verified_candidate(
-    root: &Path,
-    owner: Owner,
-    id: Uuid,
-    probe: CandidateReceipt,
-    intent: String,
-    expected_original: &Image,
-    expected_candidate: &Image,
-) -> Result<String, Error> {
-    verify_probe(root, &probe)?;
+fn publish_verified_candidate(root: &Path, candidate: &PreparedCandidate) -> Result<String, Error> {
+    validate_prepared(candidate)?;
+    let probe = candidate.probe.as_ref().ok_or(Error::RecoveryRequired)?;
+    verify_probe(root, probe, &candidate.version)?;
+    verify_config(&candidate.config, &candidate.claude_policy, false)?;
+    let owner = &candidate.owner;
     owner.verify_layout()?;
-    if Owner::read()?.as_ref() != Some(&owner)
-        || id.is_nil()
+    if Owner::read()?.as_ref() != Some(owner)
+        || candidate.id.is_nil()
         || path(root)
             .try_exists()
             .map_err(|_| Error::RecoveryRequired)?
     {
         return Err(Error::SourceChanged);
     }
-    let candidate = owner.root.join(format!(".infinishell-winget-{id}.exe"));
+    let id = candidate.id;
+    let program = owner.root.join(format!(".infinishell-winget-{id}.exe"));
     let backup = owner.root.join(format!(".infinishell-winget-old-{id}.exe"));
-    if probe.program != candidate.canonicalize().map_err(|_| Error::SourceChanged)? {
+    if probe.program != program.canonicalize().map_err(|_| Error::SourceChanged)? {
         return Err(Error::SourceChanged);
     }
     let original = image(&owner.target)?;
-    let prepared = image(&candidate)?;
-    if original != *expected_original
-        || prepared != *expected_candidate
+    let prepared = image(&program)?;
+    if original != candidate.original
+        || Some(&prepared) != candidate.image.as_ref()
         || original.sha256 != super::brew::decode_sha256(&owner.sha256)?
         || prepared.sha256 != probe.sha256
         || original.volume != prepared.volume
@@ -767,16 +967,19 @@ fn publish_verified_candidate(
     let mut journal = Journal {
         schema: 1,
         id,
-        owner,
+        owner: owner.clone(),
         target_version: probe.version.clone(),
         target_sha256,
-        candidate,
+        candidate: program,
         backup,
         original,
         prepared,
-        probe,
+        probe: probe.clone(),
         phase: Phase::Prepared,
-        intent,
+        intent: candidate.intent.clone(),
+        downgrade: candidate.downgrade,
+        config: candidate.config.clone(),
+        claude_policy: candidate.claude_policy.clone(),
     };
     save(root, &journal)?;
     let result = (|| {
@@ -786,6 +989,7 @@ fn publish_verified_candidate(
             return Err(Error::SourceChanged);
         }
         owned_arp(&journal)?;
+        verify_config(&journal.config, &journal.claude_policy, false)?;
         journal.phase = Phase::ReplaceIntent;
         save(root, &journal)?;
         replace(
@@ -800,16 +1004,42 @@ fn publish_verified_candidate(
         {
             return Err(Error::RecoveryRequired);
         }
+        verify_config(&journal.config, &journal.claude_policy, false)?;
         journal.phase = Phase::Registering;
         save(root, &journal)?;
         publish_arp(&journal, true)?;
-        journal.phase = Phase::Committed;
+        verify_config(&journal.config, &journal.claude_policy, false)?;
+        if let Some(config) = &mut journal.config {
+            super::plan_config_publish(config, true)?;
+            // 此提交点之前回旧版；之后只在 PE 与 ARP 均已发布时完成 Stable 配置。
+            journal.phase = Phase::ConfigPublishing;
+        } else {
+            journal.phase = Phase::Committed;
+        }
         save(root, &journal)?;
-        finish(root, &journal)?;
+        finish(root, &mut journal)?;
         Ok(journal.target_version.clone())
     })();
     if result.is_err() {
-        recover(CLIAgent::Claude, &journal.owner.public, root)?;
+        let recovered = recover(CLIAgent::Claude, &journal.owner.public, root)?;
+        return publication_result(result, recovered, &journal.target_version);
+    }
+    result
+}
+
+fn publication_result(
+    result: Result<String, Error>,
+    recovered: Option<String>,
+    target: &str,
+) -> Result<String, Error> {
+    if target == contract::TO
+        && let Some(version) = recovered
+    {
+        // 配置提交点后的中断已由同一账本完成，不再把成功前滚报告成安装失败。
+        if version != target {
+            return Err(Error::RecoveryRequired);
+        }
+        return Ok(version);
     }
     result
 }
@@ -836,8 +1066,61 @@ fn remove_matching(path: &Path, expected: &Image) -> Result<(), Error> {
     }
 }
 
-fn finish(root: &Path, journal: &Journal) -> Result<(), Error> {
-    verify_probe(root, &journal.probe)?;
+fn validate_journal(journal: &Journal) -> Result<(), Error> {
+    validate_policy(
+        &journal.owner,
+        &journal.target_version,
+        journal.downgrade,
+        &journal.config,
+        &journal.claude_policy,
+        &journal.original,
+    )?;
+    validate_target(&journal.target_version, &journal.prepared)?;
+    if journal.target_version == contract::TO {
+        if !matches!(journal.phase, Phase::ConfigPublishing | Phase::Committed)
+            && journal
+                .config
+                .as_ref()
+                .is_some_and(|config| config.restore_stage.is_some())
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        if journal.original.volume != journal.prepared.volume
+            || journal.probe.version != journal.target_version
+            || journal.probe.sha256 != journal.prepared.sha256
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        let mut config = journal.config.clone();
+        if let Some(config) = &mut config {
+            config.restore_stage = None;
+        }
+        // 新账本必须能重建派生前的完整候选绑定，不能拼接另一代原生退出收据。
+        let candidate = PreparedCandidate {
+            id: journal.id,
+            owner: journal.owner.clone(),
+            program: journal.probe.program.clone(),
+            version: journal.target_version.clone(),
+            sha256: journal.prepared.sha256,
+            manifest_sha256: contract::manifest_sha256(contract::TO)?,
+            original: journal.original.clone(),
+            image: Some(journal.prepared.clone()),
+            probe: Some(journal.probe.clone()),
+            intent: journal.intent.clone(),
+            downgrade: journal.downgrade,
+            config,
+            claude_policy: journal.claude_policy.clone(),
+        };
+        validate_prepared(&candidate)?;
+    } else if journal.phase == Phase::ConfigPublishing {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
+fn finish(root: &Path, journal: &mut Journal) -> Result<(), Error> {
+    validate_journal(journal)?;
+    verify_probe(root, &journal.probe, &journal.target_version)?;
     let arp = owned_arp(journal)?;
     if image(&journal.owner.target)? != journal.prepared
         || arp.version != journal.target_version
@@ -845,9 +1128,71 @@ fn finish(root: &Path, journal: &Journal) -> Result<(), Error> {
     {
         return Err(Error::RecoveryRequired);
     }
+    if journal.phase == Phase::ConfigPublishing {
+        if let Some(policy) = &journal.claude_policy {
+            super::verify_claude_originals(policy)?;
+        }
+        let config = journal.config.as_ref().ok_or(Error::RecoveryRequired)?;
+        super::publish_config(config, true)?;
+        verify_config(&journal.config, &journal.claude_policy, true)?;
+        journal.phase = Phase::Committed;
+        save(root, journal)?;
+    }
+    if journal.phase != Phase::Committed {
+        return Err(Error::RecoveryRequired);
+    }
+    verify_config(&journal.config, &journal.claude_policy, true)?;
+    if journal.config.is_some() {
+        let arp = owned_arp(journal)?;
+        if image(&journal.owner.target)? != journal.prepared
+            || arp.version != journal.target_version
+            || arp.sha256 != journal.target_sha256
+        {
+            return Err(Error::SourceChanged);
+        }
+    }
     remove_matching(&journal.backup, &journal.original)?;
+    if let Some(config) = &journal.config {
+        super::cleanup_config_restore(config)?;
+    }
+    if journal.target_version == contract::TO {
+        clear_failure(root)?;
+    }
     fs::remove_file(path(root)).map_err(|_| Error::RecoveryRequired)?;
     super::sync_config_directory(root)
+}
+
+fn clear_failure(root: &Path) -> Result<(), Error> {
+    match fs::remove_file(super::failure_path(root, CLIAgent::Claude)) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(_) => Err(Error::RecoveryRequired),
+    }
+}
+
+fn optional_image(path: &Path) -> Result<Option<Image>, Error> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => image(path).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(Error::SourceChanged),
+    }
+}
+
+fn verify_rollback_images(journal: &Journal) -> Result<(), Error> {
+    let target = optional_image(&journal.owner.target)?;
+    let backup = optional_image(&journal.backup)?;
+    let candidate = optional_image(&journal.candidate)?;
+    let old = Some(&journal.original);
+    let new = Some(&journal.prepared);
+    let valid = target.as_ref() == old
+        && backup.is_none()
+        && (candidate.as_ref() == new || candidate.is_none())
+        || target.is_none() && backup.as_ref() == old && candidate.as_ref() == new
+        || target.as_ref() == new && backup.as_ref() == old && candidate.is_none();
+    if !valid {
+        return Err(Error::SourceChanged);
+    }
+    Ok(())
 }
 
 fn recover_publication(
@@ -862,11 +1207,10 @@ fn recover_publication(
     {
         return Ok(None);
     }
-    let journal: Journal = serde_json::from_slice(&read_limited(&path(root), MAX_CONFIG)?)
+    let mut journal: Journal = serde_json::from_slice(&read_limited(&path(root), MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
     if journal.schema != 1
         || journal.id.is_nil()
-        || journal.target_version != "2.1.280"
         || entry != journal.owner.public && entry != journal.owner.target
         || journal.candidate
             != journal
@@ -891,12 +1235,16 @@ fn recover_publication(
         return Err(Error::RecoveryRequired);
     }
     journal.owner.verify_layout()?;
-    verify_probe(root, &journal.probe)?;
-    if journal.phase == Phase::Committed {
-        finish(root, &journal)?;
+    validate_journal(&journal)?;
+    verify_probe(root, &journal.probe, &journal.target_version)?;
+    if matches!(journal.phase, Phase::ConfigPublishing | Phase::Committed) {
+        finish(root, &mut journal)?;
         return Ok(Some(journal.target_version));
     }
     owned_arp(&journal)?;
+    if journal.target_version == contract::TO {
+        verify_rollback_images(&journal)?;
+    }
     if !journal
         .owner
         .target
@@ -930,6 +1278,8 @@ fn recover_publication(
     if image(&journal.owner.target)? != journal.original {
         return Err(Error::RecoveryRequired);
     }
+    // 配置外改不阻止已认领文件与 ARP 回旧；此处保留失败账本和候选，绝不覆盖用户配置。
+    verify_config(&journal.config, &journal.claude_policy, false)?;
     remove_matching(&journal.candidate, &journal.prepared)?;
     super::save_failure_with_intent(
         root,
@@ -951,6 +1301,7 @@ fn cleanup_candidate(root: &Path, entry: &Path) -> Result<(), Error> {
     let prepared: PreparedCandidate = serde_json::from_slice(&read_limited(&path, MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
     prepared.owner.verify_layout()?;
+    validate_prepared(&prepared)?;
     let candidate = prepared
         .owner
         .root
@@ -962,7 +1313,6 @@ fn cleanup_candidate(root: &Path, entry: &Path) -> Result<(), Error> {
         .map_err(|_| Error::SourceChanged)?
         .join(candidate.file_name().ok_or(Error::SourceChanged)?);
     if prepared.id.is_nil()
-        || prepared.version != "2.1.280"
         || entry != prepared.owner.public && entry != prepared.owner.target
         || prepared.program != candidate && prepared.program != canonical
     {
@@ -1015,6 +1365,7 @@ fn cleanup_candidate(root: &Path, entry: &Path) -> Result<(), Error> {
     if actual != expected {
         return Err(Error::SourceChanged);
     }
+    verify_config(&prepared.config, &prepared.claude_policy, published)?;
     if let Some(expected) = &prepared.image {
         if expected.sha256 != prepared.sha256 {
             return Err(Error::RecoveryRequired);
@@ -1048,3 +1399,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     cleanup_candidate(root, entry)?;
     Ok(recovered)
 }
+
+#[cfg(test)]
+#[path = "sources_winget_transaction_tests.rs"]
+mod tests;

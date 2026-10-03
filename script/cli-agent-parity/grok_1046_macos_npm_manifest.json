@@ -1,0 +1,280 @@
+{
+  "schema": 1,
+  "versions": [
+    "1.0.46"
+  ],
+  "targets": [
+    "darwin-arm64"
+  ],
+  "packages": {
+    "@xai-official/grok@1.0.46": {
+      "integrity": "sha512-qXO4myJFAQCIZNjMJWAaJ0TTUgi2WrQpnYYtrdd9hQ8TYezPH0slSHBYgxqedlwgcHVdqBiiDXULHkIdBDzkyQ==",
+      "archive_sha256": "9fbc80ce4c4c4f8468f9c3caf2c2a0c9620ae0439095690ee9e67b8b38b326a5",
+      "manifest": {
+        "name": "@xai-official/grok",
+        "version": "1.0.46",
+        "bin": {
+          "grok": "bin/grok"
+        },
+        "dependencies": {
+          "@iarna/toml": "^3.0.0"
+        },
+        "optionalDependencies": {
+          "@xai-official/grok-darwin-arm64": "1.0.46",
+          "@xai-official/grok-darwin-x64": "1.0.46",
+          "@xai-official/grok-linux-arm64": "1.0.46",
+          "@xai-official/grok-linux-x64": "1.0.46",
+          "@xai-official/grok-win32-arm64": "1.0.46",
+          "@xai-official/grok-win32-x64": "1.0.46"
+        },
+        "scripts": {
+          "postinstall": "node bin/postinstall.js"
+        },
+        "os": [
+          "darwin",
+          "linux",
+          "win32"
+        ],
+        "cpu": [
+          "arm64",
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok": {
+          "length": 208,
+          "sha256": "1318858fefd9de11c5eb7e6a6f325aa7b0b6c1570981c9596085ed252fa68a51",
+          "executable": true,
+          "mode": 493
+        },
+        "bin/grok-bootstrap.js": {
+          "length": 5245,
+          "sha256": "15abbdc3e34d3c1e53b71def7f9c59f22bd793c51c5f6f88c645103742cc544e",
+          "executable": true,
+          "mode": 493
+        },
+        "bin/postinstall.js": {
+          "length": 10799,
+          "sha256": "9debd63b905270da66d3e0f29d2a16fee1b52c9eddd8b270e05e855e53b2f69d",
+          "executable": false,
+          "mode": 420
+        },
+        "package.json": {
+          "length": 930,
+          "sha256": "1ee926c330f464f215ff17e3c092ea7fee29a81fe49c74b39cdaf094e6729177",
+          "executable": false,
+          "mode": 420
+        },
+        "README.md": {
+          "length": 1181,
+          "sha256": "75d71c9c0839562335ff62a28095266351aab853ad70127aceb990aa58af2b6f",
+          "executable": false,
+          "mode": 420
+        }
+      }
+    },
+    "@xai-official/grok-darwin-arm64@1.0.46": {
+      "integrity": "sha512-u/JdKgd6Ef1PSmaMbdV32vFc3ISLI/NE7h9rbaYj+iic7oAn0q1uHo8Ijdm5Ztg8gYwTuhRBZsMnHJr5zcKEXA==",
+      "archive_sha256": "537b80ea602e148dc076ee9b2f68bf65bd5bb32131eafa3557e948324e76b167",
+      "manifest": {
+        "name": "@xai-official/grok-darwin-arm64",
+        "version": "1.0.46",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "darwin"
+        ],
+        "cpu": [
+          "arm64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.br": {
+          "length": 43891586,
+          "sha256": "70b859111ff2f06b0f71d4df8cff4847fe8366376325e66e6f190fff9c52313f",
+          "executable": false,
+          "mode": 420
+        },
+        "package.json": {
+          "length": 431,
+          "sha256": "c448ed142fe3da37359da82bb25914ed5a8b70fd02c8296e0becf8b873367d21",
+          "executable": false,
+          "mode": 420
+        },
+        "README.md": {
+          "length": 379,
+          "sha256": "7724d078f35ac67bbe858396e1c0ff87e8e668888aaf91b3d85ed6dc37391eee",
+          "executable": false,
+          "mode": 420
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false,
+          "mode": 420
+        }
+      }
+    },
+    "@iarna/toml@3.0.0": {
+      "integrity": "sha512-td6ZUkz2oS3VeleBcN+m//Q6HlCFCPrnI0FZhrt/h4XqLEdOyYp2u21nd8MdsR+WJy5r9PTDaHTDDfhf4H4l6Q==",
+      "archive_sha256": "61054d8858f0a64f341757224ec924a021da42d0ac87da9f0a81b8b98999d24c",
+      "manifest": {
+        "name": "@iarna/toml",
+        "version": "3.0.0",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {
+          "test": "tap -J --100 test/*.js test/toml-stream/*.js",
+          "benchmark": "node benchmark.js && node benchmark-per-file.js && node results2table.js",
+          "prerelease": "npm t",
+          "prepack": "rm -f *~",
+          "postpublish": "git push --follow-tags",
+          "pretest": "iarna-standard",
+          "update-coc": "weallbehave -o . && git add CODE_OF_CONDUCT.md && git commit -m 'docs(coc): updated CODE_OF_CONDUCT.md'",
+          "update-contrib": "weallcontribute -o . && git add CONTRIBUTING.md && git commit -m 'docs(contributing): updated CONTRIBUTING.md'",
+          "setup-burntsushi-toml-suite": "[ -d test/burntsushi-toml-test ] || (git clone https://github.com/BurntSushi/toml-test test/burntsushi-toml-test; rimraf test/burntsushi-toml-test/.git/hooks/*); cd test/burntsushi-toml-test; git pull",
+          "setup-iarna-toml-suite": "[ -d test/spec-test ] || (git clone https://github.com/iarna/toml-spec-tests -b 1.0.0-rc.1 test/spec-test; rimraf test/spec-test/.git/hooks/*); cd test/spec-test; git pull",
+          "prepare": "npm run setup-burntsushi-toml-suite && npm run setup-iarna-toml-suite"
+        },
+        "os": null,
+        "cpu": null,
+        "libc": null
+      },
+      "files": {
+        "LICENSE": {
+          "length": 752,
+          "sha256": "d4dc58571be1260e45f2fb8ab174e0a838c9ca361720e1b0e2ca020c037988b2",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/create-date.js": {
+          "length": 485,
+          "sha256": "3941f4748f25f11c5ccf55c85ddc41e06e85379482e5885a8aff8b964d6a2ad8",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/create-datetime-float.js": {
+          "length": 663,
+          "sha256": "aa5ac5619fafcb487edf249d3a8bbd9d672626299966eba6945afbc96470c6c1",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/create-datetime.js": {
+          "length": 197,
+          "sha256": "b83215e9dd32e34332c7ddd9b868e03e321dcb28cde830d1b7951df68325bbbf",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/create-time.js": {
+          "length": 508,
+          "sha256": "2d40222ea3f60c1c95cf3f60e3b1554f39cc3a0d5ef5ff8bfb031635fa987707",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/format-num.js": {
+          "length": 120,
+          "sha256": "b4f02ed3ea839792827aacd1bd1492f0150f53024a006832579cd6ec43e92801",
+          "executable": true,
+          "mode": 511
+        },
+        "parse-async.js": {
+          "length": 863,
+          "sha256": "277f98c122d6f3c6755d2a1bf81bece2472696e0e899f02a193d8ad57255493f",
+          "executable": true,
+          "mode": 511
+        },
+        "parse-pretty-error.js": {
+          "length": 1045,
+          "sha256": "4e9783b41b343c62be4d3bf3b21fb7972bfc27523e913a782c4624c008a80eb1",
+          "executable": true,
+          "mode": 511
+        },
+        "parse-stream.js": {
+          "length": 1625,
+          "sha256": "b1ce5edabc3a7a4db886c9a5a0903cd2e20ffbcd338405b7b08da853b04c5913",
+          "executable": true,
+          "mode": 511
+        },
+        "parse-string.js": {
+          "length": 415,
+          "sha256": "cd9e497870ffda7ad1e266b86580c270388a45c2d04e75acd985a42a0597fdb0",
+          "executable": true,
+          "mode": 511
+        },
+        "parse.js": {
+          "length": 227,
+          "sha256": "a103f6919f045c44cddda84af4cd44b94fe4a253f8d07a81d779db06ab081976",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/parser-debug.js": {
+          "length": 1986,
+          "sha256": "3e202f84762b40144f338b1040a597aa2a0fa1537abbb22e13cd5480313df2ce",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/parser.js": {
+          "length": 2975,
+          "sha256": "175e4cc273aea2e0505e0f0000bcba471f8da041d219a9ab73978567e8f66029",
+          "executable": true,
+          "mode": 511
+        },
+        "stringify.js": {
+          "length": 7622,
+          "sha256": "fb74cb2cf4504facc60640801dc8127353a362f2db50e5425bbfb2a762920d38",
+          "executable": true,
+          "mode": 511
+        },
+        "lib/toml-parser.js": {
+          "length": 46935,
+          "sha256": "59ac2261f3b40a9780db5cdf99de4fc9b70d462651df2becb2da020c0c59c844",
+          "executable": true,
+          "mode": 511
+        },
+        "toml.js": {
+          "length": 97,
+          "sha256": "b6bdf7ac57047ec0a2fab0e34c42d500fb95a3234fa649c3ff5725aef9d09eb0",
+          "executable": true,
+          "mode": 511
+        },
+        "package.json": {
+          "length": 2715,
+          "sha256": "360a7c4b213f5aedb8efc842bc11cd4f91bc53c34602a6770913315688a4dad0",
+          "executable": true,
+          "mode": 511
+        },
+        "CHANGELOG.md": {
+          "length": 11295,
+          "sha256": "b46126574c44bcc69f84380cea2d26d619985e4289551438add0fbc236820335",
+          "executable": true,
+          "mode": 511
+        },
+        "README.md": {
+          "length": 17754,
+          "sha256": "4a0f8cef35fe27ee7d0fd09b2664b97f621da7c682f4a11a221e75ad55e0b91d",
+          "executable": true,
+          "mode": 511
+        },
+        "index.d.ts": {
+          "length": 1681,
+          "sha256": "72c6cda658c066bfd9f51a34a077648f11a0d8867050733f2cef365729043bf0",
+          "executable": true,
+          "mode": 511
+        }
+      }
+    }
+  },
+  "native": {
+    "1.0.46": {
+      "darwin-arm64": {
+        "length": 150374256,
+        "sha256": "e8daa302364c9c3b6a5546d511cfbd1ab5e5d407a9b04282f660665ea405f9f3"
+      }
+    }
+  }
+}

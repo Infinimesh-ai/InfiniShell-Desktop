@@ -21,6 +21,19 @@ use warpui::r#async::FutureExt as _;
 use super::brew_completions::Completion;
 use super::brew_grok_aliases::Alias;
 
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+#[path = "sources_brew_claude_migration.rs"]
+mod claude_migration;
+
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(super) use claude_migration::metadata as claude_migration_metadata;
+
 #[cfg(target_os = "linux")]
 #[path = "sources_brew_claude_linux_probes.rs"]
 mod claude_linux_probes;
@@ -130,14 +143,18 @@ impl Journal {
             .join(format!(".infinishell-brew-link-{}", self.id))
     }
     fn verify_external(&self) -> Result<Directory, Error> {
-        if Directory::open(&self.prefix)?.identity()? != self.prefix_identity
+        #[cfg(target_os = "macos")]
+        brew::validate_prefix(&self.prefix)?;
+        let prefix = Directory::open(&self.prefix)?;
+        if prefix.identity()? != self.prefix_identity
             || Directory::open(&self.prefix.join("bin"))?.identity()? != self.bin_identity
             || stamp(&self.manager.canonical)? != self.manager
+            || stamp(&self.prefix.join("bin/brew"))? != self.manager
         {
             return Err(Error::SourceChanged);
         }
-        let parent = Directory::open(&self.parent())?;
-        if parent.identity()? != self.parent_identity {
+        let (parent, identity) = prefix.homebrew_caskroom()?;
+        if identity != self.parent_identity {
             return Err(Error::SourceChanged);
         }
         Ok(parent)
@@ -172,6 +189,7 @@ fn save(path: &Path, journal: &Journal) -> Result<(), Error> {
 // Homebrew CaskLock 使用 prefix/var/homebrew/locks/<token>.cask.lock 与 flock。
 // 不删除管理器锁文件；锁的 inode 改变时拒绝继续。
 fn lock_cask(prefix: &Path, token: &str) -> Result<File, Error> {
+    brew::validate_prefix(prefix)?;
     if !matches!(
         token,
         "claude-code" | "claude-code@latest" | "codex" | "grok-build"
@@ -219,9 +237,8 @@ async fn download(url: &str, output: &mut File, limit: u64) -> Result<(), Error>
         .send()
         .await
         .map_err(|_| Error::Network)?;
-    let github_asset = url.starts_with(
-        "https://github.com/openai/codex/releases/download/rust-v0.156.1/codex-package-",
-    ) && response.url().scheme() == "https"
+    let github_asset = super::brew_codex::is_archive_url(url)
+        && response.url().scheme() == "https"
         && response.url().host_str() == Some("release-assets.githubusercontent.com");
     if !response.status().is_success() || response.url().as_str() != url && !github_asset {
         return Err(Error::Network);
@@ -264,14 +281,24 @@ pub(super) async fn execute(
     root: &Path,
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    if plan.downgrade == Some(super::claude_downgrade::Intent::ClaudeHomebrewStable21287To21285) {
+        return claude_migration::execute(plan, root, progress).await;
+    }
+    #[cfg(target_os = "linux")]
+    if plan.agent == CLIAgent::Claude {
+        // 消费者降级只能进入双 cask 事务；同 token 升级继续沿用原有固定合同。
+        super::brew_claude_linux::supports(&plan.target_version)?;
+    }
     brew::supports(plan.agent, &plan.target_version)?;
-    if plan.agent == CLIAgent::Codex
-        && !matches!(plan.installed_version.as_str(), "0.155.1" | "0.156.1")
-    {
-        return Err(Error::UnsupportedSource);
+    if plan.agent == CLIAgent::Codex {
+        super::brew_codex::supports_installed(&plan.installed_version)?;
     }
     if plan.agent == CLIAgent::Grok {
-        super::brew_grok::native(&plan.installed_version)?;
+        super::brew_grok::supports_transition(&plan.installed_version, &plan.target_version)?;
     }
     // cask 渠道由包名决定，不能借更新触发第二套安装或改用户 Claude 全局设置。
     if plan.config.is_some() {
@@ -330,9 +357,9 @@ pub(super) async fn execute(
             return Err(Error::UnsupportedPlatform);
         }
     } else if plan.agent == CLIAgent::Codex {
-        super::brew_codex::METADATA_URL.to_owned()
+        super::brew_codex::metadata_url(&plan.target_version)?.to_owned()
     } else if plan.agent == CLIAgent::Grok {
-        super::brew_grok::METADATA_URL.to_owned()
+        super::brew_grok::metadata_url(&plan.target_version)?.to_owned()
     } else {
         format!("https://formulae.brew.sh/api/cask/{token}.json")
     };
@@ -353,7 +380,9 @@ pub(super) async fn execute(
         .metadata()
         .map_err(|_| Error::PersistenceFailed)?
         .len();
-    let parent = Directory::open(&prefix.join("Caskroom"))?;
+    let prefix_directory = Directory::open(prefix)?;
+    let prefix_identity = prefix_directory.identity()?;
+    let (parent, parent_identity) = prefix_directory.homebrew_caskroom()?;
     let original = parent.child(token.as_ref())?.snapshot()?;
     let original_link = link(&plan.installation.entry)?;
     let receipt_bytes = read_limited(&registered.receipt, MAX_CONFIG)?;
@@ -373,8 +402,8 @@ pub(super) async fn execute(
         id,
         agent: plan.agent.command_prefix().to_owned(),
         prefix: prefix.clone(),
-        prefix_identity: Directory::open(prefix)?.identity()?,
-        parent_identity: parent.identity()?,
+        prefix_identity,
+        parent_identity,
         bin_identity: Directory::open(&prefix.join("bin"))?.identity()?,
         token: token.to_owned(),
         entry: plan.installation.entry.clone(),
@@ -969,6 +998,13 @@ fn rollback_publication(journal: &Journal, parent: &Directory) -> Result<(), Err
 }
 
 pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Option<String>, Error> {
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    if let Some(result) = claude_migration::recover_if_present(agent, entry, root)? {
+        return Ok(result);
+    }
     let path = journal_path(root, agent);
     if !path.try_exists().map_err(|_| Error::RecoveryRequired)? {
         return Ok(None);
@@ -976,6 +1012,9 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     let journal: Journal = serde_json::from_slice(&read_limited(&path, 12 * MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
     brew::supports(agent, &journal.target_version)?;
+    if agent == CLIAgent::Grok {
+        super::brew_grok::supports_transition(&journal.old_version, &journal.target_version)?;
+    }
     #[cfg(target_os = "linux")]
     if is_linux_claude(agent) {
         super::brew_claude_linux::verify_recovery(
@@ -997,12 +1036,8 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         .join(&journal.token)
         .join(&journal.old_version)
         .join(old_entry);
-    let allowed_prefix = journal
-        .prefix
-        .to_str()
-        .is_some_and(|prefix| super::brew_prefixes().contains(&prefix));
-    #[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
-    let allowed_prefix = allowed_prefix || live_tests::allows_private_prefix(&journal.prefix, root);
+    let allowed_prefix =
+        brew::prefix_from_entry(agent, entry).ok().as_ref() == Some(&journal.prefix);
     if journal.schema != 1
         || journal.agent != agent.command_prefix()
         || journal.id.is_nil()
@@ -1013,13 +1048,11 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         || journal.entry != entry
         || journal.entry != journal.prefix.join("bin").join(agent.command_prefix())
         || !allowed_prefix
+        || brew::manager_stamp(&journal.prefix).ok().as_ref() != Some(&journal.manager)
         || journal.probe.as_ref().is_some_and(|probe| {
             probe.program != candidate_program || probe.arguments != [OsString::from("--version")]
         })
-        || agent == CLIAgent::Grok
-            && (journal.prefix != super::brew_grok::prefix()?
-                || journal.aliases.len() != 1
-                || journal.entry_probes.len() > 4)
+        || agent == CLIAgent::Grok && (journal.aliases.len() != 1 || journal.entry_probes.len() > 4)
         || agent != CLIAgent::Grok
             && (!journal.aliases.is_empty()
                 || !is_linux_claude(agent) && !journal.entry_probes.is_empty())

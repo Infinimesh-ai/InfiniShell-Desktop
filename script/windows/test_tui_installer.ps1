@@ -88,6 +88,7 @@ try {
         Join-Path $inputDir 'infinishell-tui-dev.exe'
     )
     Write-FixtureFile (Join-Path $inputDir 'resources\marker.txt') 'fixture'
+    Write-FixtureFile (Join-Path $inputDir 'infinishell-station-bootstrap.exe') 'station-bootstrap-fixture'
     foreach ($asset in @(
             'conpty.dll',
             'OpenConsole.exe',
@@ -118,6 +119,12 @@ try {
     }
 
     $version1Binary = Join-Path $installDir "versions\$version1\infinishell-tui-dev.exe"
+    $version1Bootstrap = Join-Path $installDir "versions\$version1\infinishell-station-bootstrap.exe"
+    if ((Get-Content -LiteralPath $version1Bootstrap -Raw) -cne 'station-bootstrap-fixture') {
+        throw '首个版本未将窗口站引导安装在实际 TUI 旁边'
+    }
+    # 模拟已发布的旧布局，验证升级不会丢失其回滚登记。
+    Remove-Item -LiteralPath $version1Bootstrap
     $runningProcess = Start-Process -FilePath $version1Binary -ArgumentList @(
         '-NoLogo',
         '-NoProfile',
@@ -141,6 +148,23 @@ try {
     }
     if (-not (Test-Path -LiteralPath $version1Binary -PathType Leaf)) {
         throw 'The upgrade removed the running v1 payload'
+    }
+
+    if (Test-Path -LiteralPath $version1Bootstrap) {
+        throw '升级不应向旧版本补写新窗口站引导'
+    }
+    $version2Bootstrap = Join-Path $installDir "versions\$version2\infinishell-station-bootstrap.exe"
+    if ((Get-Content -LiteralPath $version2Bootstrap -Raw) -cne 'station-bootstrap-fixture') {
+        throw '新版本缺少同目录窗口站引导'
+    }
+    # 同版本缺失新引导必须触发修复，不能被旧完整性条件提前跳过。
+    Remove-Item -LiteralPath $version2Bootstrap
+    Invoke-Installer $installer2 $installDir $binDir
+    if ((Get-Content -LiteralPath $version2Bootstrap -Raw) -cne 'station-bootstrap-fixture') {
+        throw '同版本重装未修复缺失的窗口站引导'
+    }
+    if ((Get-Content (Join-Path $installDir 'previous') -Raw).Trim() -cne $version1 -or $runningProcess.HasExited) {
+        throw '新版本修复破坏了旧版本回滚登记或运行中的进程'
     }
 
     $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\infinishell-tui-dev_is1'

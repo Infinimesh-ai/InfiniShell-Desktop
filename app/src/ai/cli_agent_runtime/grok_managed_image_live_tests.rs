@@ -6,10 +6,10 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use image::{DynamicImage, ImageFormat, Rgb, RgbImage};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
@@ -19,8 +19,8 @@ use super::{connect, encode_prompt_content};
 use crate::ai::agent::ImageContext;
 use crate::ai::cli_agent_runtime::managed_input::{prepare_managed_input, restore_managed_images};
 use crate::ai::cli_agent_runtime::{
-    managed_process, ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction,
-    RuntimeCommand, RuntimeError, RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
+    ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeError,
+    RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome, managed_process,
 };
 
 struct AbortOnDrop(JoinHandle<Result<(), RuntimeError>>);

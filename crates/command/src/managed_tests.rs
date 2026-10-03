@@ -206,3 +206,166 @@ fn fixture_descendant() {
         thread::sleep(Duration::from_millis(20));
     }
 }
+
+#[cfg(windows)]
+mod probe_job_contract {
+    use super::super::probe_job::{Authorization, Identity, accepts_stage, validate_identity};
+    use super::*;
+
+    fn identity(pid: u32, logon_low: u32, appcontainer: u32) -> Identity {
+        serde_json::from_value(serde_json::json!({
+            "pid": pid, "created_at": 100, "logon_low": logon_low, "logon_high": 0,
+            "session_id": 1, "owner": [1, 0, 0, 0, 0, 0, 0, 5],
+            "image": "C:\\private\\fixed.exe", "appcontainer": appcontainer,
+        }))
+        .unwrap()
+    }
+
+    fn job_request(operation: ProbeJobOperation, identity: Identity) -> ProbeJobRequest {
+        ProbeJobRequest {
+            operation,
+            source_handle: 72,
+            identity,
+        }
+    }
+
+    #[test]
+    fn only_bootstrap_then_candidate_can_be_authorized_once() {
+        let state = Authorization::Bootstrap {
+            worker: identity(10, 1, 0),
+            bootstrap: identity(11, 2, 0),
+        };
+        assert!(accepts_stage(
+            &Authorization::Initial,
+            ProbeJobOperation::ClaimBootstrap
+        ));
+        assert!(!accepts_stage(
+            &Authorization::Initial,
+            ProbeJobOperation::VerifyCandidate
+        ));
+        assert!(!accepts_stage(&state, ProbeJobOperation::ClaimBootstrap));
+        assert!(accepts_stage(&state, ProbeJobOperation::VerifyCandidate));
+        assert!(!accepts_stage(
+            &Authorization::Complete,
+            ProbeJobOperation::VerifyCandidate
+        ));
+        assert!(!accepts_stage(
+            &Authorization::Rejected,
+            ProbeJobOperation::ClaimBootstrap
+        ));
+    }
+
+    #[test]
+    fn bootstrap_requires_a_new_logon_and_the_bound_image() {
+        let worker = identity(10, 1, 0);
+        let actual = identity(11, 2, 0);
+        let request = job_request(ProbeJobOperation::ClaimBootstrap, actual.clone());
+        assert!(
+            validate_identity(
+                &Authorization::Initial,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &worker,
+                &actual
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_identity(
+                &Authorization::Initial,
+                &request,
+                Path::new("C:\\other.exe"),
+                &worker,
+                &actual
+            )
+            .is_err()
+        );
+        let old_logon = identity(11, 1, 0);
+        let request = job_request(ProbeJobOperation::ClaimBootstrap, old_logon.clone());
+        assert!(
+            validate_identity(
+                &Authorization::Initial,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &worker,
+                &old_logon
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn candidate_requires_the_original_worker_and_bootstrap_logon() {
+        let worker = identity(10, 1, 0);
+        let state = Authorization::Bootstrap {
+            worker: worker.clone(),
+            bootstrap: identity(11, 2, 0),
+        };
+        let actual = identity(12, 2, 1);
+        let request = job_request(ProbeJobOperation::VerifyCandidate, actual.clone());
+        assert!(
+            validate_identity(
+                &state,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &worker,
+                &actual
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_identity(
+                &state,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &identity(20, 1, 0),
+                &actual
+            )
+            .is_err()
+        );
+        let wrong_logon = identity(12, 3, 1);
+        let request = job_request(ProbeJobOperation::VerifyCandidate, wrong_logon.clone());
+        assert!(
+            validate_identity(
+                &state,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &worker,
+                &wrong_logon
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn candidate_cannot_substitute_the_claimed_process_or_a_full_token() {
+        let worker = identity(10, 1, 0);
+        let state = Authorization::Bootstrap {
+            worker: worker.clone(),
+            bootstrap: identity(11, 2, 0),
+        };
+        let request = job_request(ProbeJobOperation::VerifyCandidate, identity(12, 2, 1));
+        assert!(
+            validate_identity(
+                &state,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &worker,
+                &identity(13, 2, 1)
+            )
+            .is_err()
+        );
+        let full_token = identity(12, 2, 0);
+        let request = job_request(ProbeJobOperation::VerifyCandidate, full_token.clone());
+        assert!(
+            validate_identity(
+                &state,
+                &request,
+                Path::new("C:\\private\\fixed.exe"),
+                &worker,
+                &full_token
+            )
+            .is_err()
+        );
+    }
+}

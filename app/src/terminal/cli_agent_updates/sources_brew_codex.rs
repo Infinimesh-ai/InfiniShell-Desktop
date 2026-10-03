@@ -1,4 +1,4 @@
-//! Codex 0.156.1 的固定 cask 和完整资源归档；复用已保存的逐文件发行清单。
+//! Codex 固定 cask 与完整资源归档；各版本、平台分别绑定已审核的逐文件发行清单。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
@@ -13,10 +13,35 @@ use sha2::{Digest as _, Sha256};
 use super::package_tree::Directory;
 use super::{Error, brew};
 
-pub(super) const METADATA_URL: &str = "https://raw.githubusercontent.com/Homebrew/homebrew-cask/8fb173ad115785e9dd050af916e14b3d3af26d65/Casks/c/codex.rb";
-const CASK_SHA256: &str = "65252c5f63b2c39fe18622bea057df0b5bbf1d1c42777507b925c4e6e057c20b";
 const FIXED_PACKAGES: &[u8] =
     include_bytes!("../../../../script/cli-agent-parity/codex_0156_package_manifest.json");
+const MACOS_0160_PACKAGE: &[u8] =
+    include_bytes!("../../../../script/cli-agent-parity/codex_0160_macos_package_manifest.json");
+
+struct Contract {
+    packages: &'static [u8],
+    metadata_url: &'static str,
+    cask_sha256: &'static str,
+    tap_git_head: &'static str,
+}
+
+fn contract(version: &str) -> Result<Contract, Error> {
+    match version {
+        "0.156.1" => Ok(Contract {
+            packages: FIXED_PACKAGES,
+            metadata_url: "https://raw.githubusercontent.com/Homebrew/homebrew-cask/8fb173ad115785e9dd050af916e14b3d3af26d65/Casks/c/codex.rb",
+            cask_sha256: "65252c5f63b2c39fe18622bea057df0b5bbf1d1c42777507b925c4e6e057c20b",
+            tap_git_head: "8fb173ad115785e9dd050af916e14b3d3af26d65",
+        }),
+        "0.160.0" if cfg!(all(target_os = "macos", target_arch = "aarch64")) => Ok(Contract {
+            packages: MACOS_0160_PACKAGE,
+            metadata_url: "https://raw.githubusercontent.com/Homebrew/homebrew-cask/b5244981746375f8dee94b80c7f7738ff105256e/Casks/c/codex.rb",
+            cask_sha256: "163cad3efc91c2489633d78346d12c8c37fc45b77aa06ec9ee9e324e6ce2efd6",
+            tap_git_head: "b5244981746375f8dee94b80c7f7738ff105256e",
+        }),
+        _ => Err(Error::InvalidRelease),
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,14 +56,19 @@ struct Package {
     metadata: Value,
 }
 
-fn package() -> Result<Package, Error> {
+fn package(version: &str) -> Result<Package, Error> {
+    let contract = contract(version)?;
     let (key, target, archive, digest) = if cfg!(all(target_os = "macos", target_arch = "aarch64"))
     {
         (
             "macos-arm64",
             "aarch64-apple-darwin",
             "codex-package-aarch64-apple-darwin.tar.gz",
-            "fea42f9625091f011e38f059da974d52e57ba31831648bb1c7f0b1a385fde547",
+            if version == "0.160.0" {
+                "007df41b607dbbc8d204b9746ce7fed2d4ce6c813f44c32ceee54175ca796525"
+            } else {
+                "fea42f9625091f011e38f059da974d52e57ba31831648bb1c7f0b1a385fde547"
+            },
         )
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         (
@@ -50,8 +80,9 @@ fn package() -> Result<Package, Error> {
     } else {
         return Err(Error::UnsupportedPlatform);
     };
-    let root: Value = serde_json::from_slice(FIXED_PACKAGES).map_err(|_| Error::InvalidRelease)?;
-    if root["version"] != "0.156.1" || root["release_tag"] != "rust-v0.156.1" {
+    let root: Value =
+        serde_json::from_slice(contract.packages).map_err(|_| Error::InvalidRelease)?;
+    if root["version"] != version || root["release_tag"] != format!("rust-v{version}") {
         return Err(Error::InvalidRelease);
     }
     let package: Package =
@@ -61,7 +92,7 @@ fn package() -> Result<Package, Error> {
         || package.archive != archive
         || package.sha256 != digest
         || package.metadata
-            != json!({"layoutVersion":1,"version":"0.156.1","target":target,
+            != json!({"layoutVersion":1,"version":version,"target":target,
             "variant":"codex","entrypoint":"bin/codex","resourcesDir":"codex-resources","pathDir":"codex-path"})
     {
         return Err(Error::InvalidRelease);
@@ -70,25 +101,47 @@ fn package() -> Result<Package, Error> {
 }
 
 pub(super) fn supports(version: &str) -> Result<(), Error> {
-    if version != "0.156.1" {
-        return Err(Error::InvalidRelease);
-    }
-    package().map(|_| ())
+    package(version).map(|_| ())
+}
+
+pub(super) fn supports_installed(version: &str) -> Result<(), Error> {
+    // 0.155.1 是既有认领的旧安装；后续已提交版本也必须具有本平台发行合同。
+    supports(if version == "0.155.1" {
+        "0.156.1"
+    } else {
+        version
+    })
+}
+
+pub(super) fn metadata_url(version: &str) -> Result<&'static str, Error> {
+    supports(version)?;
+    Ok(contract(version)?.metadata_url)
+}
+
+fn archive_url(version: &str, package: &Package) -> String {
+    format!(
+        "https://github.com/openai/codex/releases/download/rust-v{version}/{}",
+        package.archive
+    )
+}
+
+pub(super) fn is_archive_url(url: &str) -> bool {
+    ["0.156.1", "0.160.0"]
+        .into_iter()
+        .any(|version| package(version).is_ok_and(|package| archive_url(version, &package) == url))
 }
 
 pub(super) fn release(version: &str, source: &[u8]) -> Result<(Value, String, [u8; 32]), Error> {
     supports(version)?;
-    if <[u8; 32]>::from(Sha256::digest(source)) != brew::decode_sha256(CASK_SHA256)? {
+    let contract = contract(version)?;
+    if <[u8; 32]>::from(Sha256::digest(source)) != brew::decode_sha256(contract.cask_sha256)? {
         return Err(Error::InvalidRelease);
     }
-    let package = package()?;
-    let url = format!(
-        "https://github.com/openai/codex/releases/download/rust-v{version}/{}",
-        package.archive
-    );
+    let package = package(version)?;
+    let url = archive_url(version, &package);
     // 这不是 Ruby 求值：仅把已固定完整源码的三个已审核 artifact 转成 Homebrew tab 结构。
     let metadata = json!({"token":"codex","tap":"homebrew/cask","version":version,
-        "tap_git_head":"8fb173ad115785e9dd050af916e14b3d3af26d65",
+        "tap_git_head":contract.tap_git_head,
         "artifacts":[{"binary":["bin/codex"]},
             {"generate_completions_from_executable":["bin/codex","completion",{"base_name":null,"shell_parameter_format":null,"shells":["bash","zsh","fish"]}]},
             {"zap":[{"rmdir":"~/.codex"}]}]});
@@ -101,7 +154,7 @@ pub(super) fn unpack(
     version: &str,
 ) -> Result<(BTreeMap<PathBuf, (u64, [u8; 32])>, BTreeMap<PathBuf, bool>), Error> {
     supports(version)?;
-    let package = package()?;
+    let package = package(version)?;
     if input.metadata().map_err(|_| Error::InvalidRelease)?.len() != package.bytes {
         return Err(Error::InvalidRelease);
     }
@@ -173,3 +226,13 @@ pub(super) fn completion_paths(prefix: &Path) -> [(&'static str, PathBuf); 3] {
         ),
     ]
 }
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+#[path = "sources_brew_codex_tests.rs"]
+mod tests;

@@ -7,6 +7,27 @@ use super::super::proto::{
 use super::*;
 use sha2::{Digest, Sha256};
 
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+#[test]
+fn claude_tmux_reference_requires_its_daemon_guard_service() {
+    let parent = private_parent();
+    let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
+    let request = activate(7, 0);
+    let scope = parse_scope(request.scope.as_ref(), Uuid::new_v4(), &service.host_id).unwrap();
+    let candidate = super::super::proto::CliImageClaudeBinding {
+        tmux_owned: Some(super::super::proto::TerminalBindingOwnedReference {
+            opaque_binding_id: Uuid::new_v4().to_string(),
+            launch_id: Uuid::new_v4().to_string(),
+            launch_key: Uuid::new_v4().to_string(),
+        }),
+        ..Default::default()
+    };
+    assert!(service.claude_tmux_guard(&scope, &candidate, 0, 0).is_err());
+}
+
 fn private_parent() -> tempfile::TempDir {
     // RPC 正例使用创建时即为私有的目录，生产入口仍核对权限与所有者。
     tempfile::Builder::new()

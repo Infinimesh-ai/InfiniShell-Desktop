@@ -125,9 +125,11 @@ fn link(directory: &Directory, leaf: &OsStr) -> Result<Link, Error> {
         return Err(Error::SourceChanged);
     }
     let target = OsStr::from_bytes(&target[..length as usize]).to_owned();
-    if !matches!(target.to_str(), Some("grok-1.0.40" | "grok-1.0.41")) {
-        return Err(Error::UnsupportedSource);
-    }
+    let version = target
+        .to_str()
+        .and_then(|target| target.strip_prefix("grok-"))
+        .ok_or(Error::UnsupportedSource)?;
+    contract::native(version).map_err(|_| Error::UnsupportedSource)?;
     Ok(Link {
         device: before.0,
         inode: before.1,
@@ -150,12 +152,17 @@ fn matches_native(node: &Node, version: &str) -> Result<(), Error> {
 }
 
 impl Mirror {
-    pub(in super::super) fn capture(home: &Path, old: &str, id: Uuid) -> Result<Self, Error> {
-        contract::native(old)?;
+    pub(in super::super) fn capture(
+        home: &Path,
+        old: &str,
+        target: &str,
+        id: Uuid,
+    ) -> Result<Self, Error> {
+        contract::supports_transition(old, target)?;
         let bin = home.join("bin");
         let directory = Directory::open(&bin)?;
         let old_name: OsString = format!("grok-{old}").into();
-        let new_name: OsString = format!("grok-{}", contract::VERSION).into();
+        let new_name: OsString = format!("grok-{target}").into();
         let old_link = link(&directory, OsStr::new("grok"))?;
         if old_link.target != old_name {
             return Err(Error::UnsupportedSource);
@@ -164,7 +171,7 @@ impl Mirror {
         matches_native(&old_file, old)?;
         let existing_new = if directory.has_child(&new_name)? {
             let file = file_node(&directory, &new_name)?;
-            matches_native(&file, contract::VERSION)?;
+            matches_native(&file, target)?;
             Some(file)
         } else {
             None
@@ -184,10 +191,17 @@ impl Mirror {
         })
     }
 
-    pub(in super::super) fn validate(&self, home: &Path, old: &str, id: Uuid) -> Result<(), Error> {
+    pub(in super::super) fn validate(
+        &self,
+        home: &Path,
+        old: &str,
+        target: &str,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        contract::supports_transition(old, target)?;
         if self.bin != home.join("bin")
             || self.old_name != OsString::from(format!("grok-{old}"))
-            || self.new_name != OsString::from(format!("grok-{}", contract::VERSION))
+            || self.new_name != OsString::from(format!("grok-{target}"))
             || self.file_stage != OsString::from(format!(".infinishell-grok-npm-image-{id}"))
             || self.link_stage != OsString::from(format!(".infinishell-grok-npm-link-{id}"))
             || self.old_link.target != self.old_name
@@ -200,7 +214,7 @@ impl Mirror {
         }
         matches_native(&self.old_file, old)?;
         for node in self.existing_new.iter().chain(self.new_file.iter()) {
-            matches_native(node, contract::VERSION)?;
+            matches_native(node, target)?;
         }
         Ok(())
     }
@@ -215,7 +229,15 @@ impl Mirror {
         Ok(directory)
     }
 
-    pub(in super::super) fn prepare(&mut self, native: &mut File) -> Result<(), Error> {
+    pub(in super::super) fn prepare(
+        &mut self,
+        native: &mut File,
+        target: &str,
+    ) -> Result<(), Error> {
+        contract::supports(target)?;
+        if self.new_name != OsString::from(format!("grok-{target}")) {
+            return Err(Error::RecoveryRequired);
+        }
         let directory = self.directory()?;
         if link(&directory, OsStr::new("grok"))? != self.old_link {
             return Err(Error::SourceChanged);
@@ -226,7 +248,7 @@ impl Mirror {
             }
             self.new_file = Some(expected.clone());
         } else {
-            let expected = contract::native(contract::VERSION)?;
+            let expected = contract::native(target)?;
             directory.write_new(
                 Path::new(&self.file_stage),
                 native,
@@ -363,3 +385,13 @@ fn unlink(directory: &Directory, leaf: &OsStr) -> Result<(), Error> {
     }
     directory.sync()
 }
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+#[path = "sources_npm_grok_mirror_tests.rs"]
+mod tests;

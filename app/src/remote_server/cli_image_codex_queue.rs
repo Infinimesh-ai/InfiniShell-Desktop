@@ -65,7 +65,28 @@ impl CodexImageQueue {
         cwd: &Path,
         validate: &impl Fn(&UnixStream) -> io::Result<()>,
     ) -> io::Result<Self> {
-        if thread_id.is_nil() || !cwd.is_absolute() || cwd.to_str().is_none() {
+        if thread_id.is_nil() {
+            return Err(rejected("invalid_binding"));
+        }
+        Self::connect_inner(stream, Some(thread_id), cwd, validate)
+    }
+
+    /// 专属票据仅发现原生已加载会话；不创建线程、不执行 turn，也不生成 hook 事件。
+    pub(super) fn discover(
+        stream: UnixStream,
+        cwd: &Path,
+        validate: &impl Fn(&UnixStream) -> io::Result<()>,
+    ) -> io::Result<Uuid> {
+        Self::connect_inner(stream, None, cwd, validate).map(|client| client.thread_id)
+    }
+
+    fn connect_inner(
+        stream: UnixStream,
+        expected_thread: Option<Uuid>,
+        cwd: &Path,
+        validate: &impl Fn(&UnixStream) -> io::Result<()>,
+    ) -> io::Result<Self> {
+        if !cwd.is_absolute() || cwd.to_str().is_none() {
             return Err(rejected("invalid_binding"));
         }
         validate(&stream)?;
@@ -83,7 +104,7 @@ impl CodexImageQueue {
                 .map_err(|_| rejected("websocket_handshake_failed"))?;
         let mut client = Self {
             socket,
-            thread_id,
+            thread_id: Uuid::nil(),
             cwd: cwd.to_owned(),
         };
         validate(&client.socket.get_ref().inner)?;
@@ -109,7 +130,7 @@ impl CodexImageQueue {
             return Err(rejected("incompatible_running_version"));
         }
         client.send_value(json!({ "method": "initialized" }))?;
-        client.verify_loaded_thread()?;
+        client.thread_id = client.read_unique_loaded_thread(expected_thread)?;
         validate(&client.socket.get_ref().inner)?;
         Ok(client)
     }
@@ -183,10 +204,14 @@ impl CodexImageQueue {
     }
 
     fn verify_loaded_thread(&mut self) -> io::Result<()> {
+        self.read_unique_loaded_thread(Some(self.thread_id))?;
+        Ok(())
+    }
+
+    fn read_unique_loaded_thread(&mut self, expected_thread: Option<Uuid>) -> io::Result<Uuid> {
         let mut cursor: Option<String> = None;
         let mut seen = HashSet::new();
-        let thread_id = self.thread_id.to_string();
-        let mut loaded = false;
+        let mut loaded = None;
         let mut complete = false;
         // 只读现有实例；不以 thread/read 能读取磁盘历史冒充已加载线程。
         // 固定版本的 hook 不含发起客户端身份；共享 daemon 多线程不能凭 TTY 环境猜归属。
@@ -199,14 +224,19 @@ impl CodexImageQueue {
                 .get("data")
                 .and_then(Value::as_array)
                 .ok_or_else(|| rejected("invalid_loaded_threads"))?;
-            if ids.len() > 1
-                || ids.iter().any(|id| id.as_str() != Some(thread_id.as_str()))
-                || loaded && !ids.is_empty()
-            {
+            if ids.len() > 1 || loaded.is_some() && !ids.is_empty() {
                 return Err(rejected("shared_daemon_thread_binding_ambiguous"));
             }
-            if !ids.is_empty() {
-                loaded = true;
+            if let Some(id) = ids.first() {
+                let id = id
+                    .as_str()
+                    .and_then(|id| Uuid::parse_str(id).ok())
+                    .filter(|id| !id.is_nil())
+                    .ok_or_else(|| rejected("invalid_loaded_threads"))?;
+                if expected_thread.is_some_and(|expected| expected != id) {
+                    return Err(rejected("shared_daemon_thread_binding_ambiguous"));
+                }
+                loaded = Some(id);
             }
             match page.get("nextCursor") {
                 Some(Value::String(next)) if !next.is_empty() && seen.insert(next.clone()) => {
@@ -219,9 +249,11 @@ impl CodexImageQueue {
                 _ => return Err(rejected("invalid_loaded_cursor")),
             }
         }
-        if !loaded || !complete {
+        if !complete {
             return Err(rejected("thread_not_loaded_in_bound_daemon"));
         }
+        let loaded = loaded.ok_or_else(|| rejected("thread_not_loaded_in_bound_daemon"))?;
+        let thread_id = loaded.to_string();
         let response = self.request(
             "thread/read",
             json!({ "threadId": thread_id, "includeTurns": false }),
@@ -240,7 +272,7 @@ impl CodexImageQueue {
         {
             return Err(rejected("loaded_thread_binding_mismatch"));
         }
-        Ok(())
+        Ok(loaded)
     }
 
     fn request(&mut self, method: &str, params: Value) -> io::Result<Value> {
@@ -467,3 +499,7 @@ fn rejected(code: &'static str) -> io::Error {
     // 只返回稳定内部码；原生错误正文可能含提示词、路径或认证信息。
     io::Error::other(code)
 }
+
+#[cfg(test)]
+#[path = "cli_image_codex_queue_tests.rs"]
+mod tests;

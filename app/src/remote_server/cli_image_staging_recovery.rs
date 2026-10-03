@@ -9,6 +9,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::super::cli_image_claude_queue::{
+    ClaudeImageAttempt, ClaudePendingImageAttempt, ClaudeTranscriptBinding,
+    identity as transcript_identity, verify_file_path as verify_transcript_path,
+};
+
 const RECORD_LIMIT: u64 = 256 * 1024;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -36,6 +41,17 @@ struct Release {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub(in crate::remote_server) struct TmuxImageRecovery {
+    pub(in crate::remote_server) version: u32,
+    pub(in crate::remote_server) launch_id: Uuid,
+    pub(in crate::remote_server) launch_key_sha256: String,
+    pub(in crate::remote_server) agent: i32,
+    pub(in crate::remote_server) original_host: String,
+    pub(in crate::remote_server) original_terminal_session: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(in crate::remote_server) struct QueueClaim {
     pub(in crate::remote_server) version: u32,
     pub(in crate::remote_server) host: String,
@@ -48,6 +64,22 @@ pub(in crate::remote_server) struct QueueClaim {
     /// 仅原生历史恢复所需路径、偏移和原图摘要；不含 socket 认证材料。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(in crate::remote_server) claude_recovery: Option<serde_json::Value>,
+    /// 仅已验证的原生目标可登记；此关联只恢复原提交，不恢复输入授权。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::remote_server) tmux_recovery: Option<TmuxImageRecovery>,
+}
+
+/// 此终态仅在原生首写尚未开始时保存，不伪造原生历史或领取记录。
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(in crate::remote_server) struct PreflightRejection {
+    pub(in crate::remote_server) version: u32,
+    pub(in crate::remote_server) host: String,
+    pub(in crate::remote_server) native_session: String,
+    pub(in crate::remote_server) submission: Uuid,
+    pub(in crate::remote_server) key_hash: [u8; 32],
+    pub(in crate::remote_server) subject: [u8; 32],
+    pub(in crate::remote_server) references: Vec<(Uuid, Uuid)>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -142,7 +174,7 @@ impl ReferenceStore {
     }
 
     /// 回收仅依据已经落盘的显式释放请求；无记录或未释放的图片不会按年龄删除。
-    pub(super) fn retained_bytes(&self, host: &str) -> io::Result<u64> {
+    pub(super) fn retained_bytes(&self) -> io::Result<u64> {
         let _guard = self.acquire()?;
         let mut bytes = 0u64;
         for item in fs::read_dir(&self.root)? {
@@ -159,7 +191,7 @@ impl ReferenceStore {
             };
             let reference = read_record::<Reference>(&path)?.ok_or_else(invalid)?;
             self.validate_reference(&reference)?;
-            if reference.transfer_id != id || reference.host != host {
+            if reference.transfer_id != id {
                 return Err(invalid());
             }
             if let Some(release) = self.release_record(id)? {
@@ -169,6 +201,7 @@ impl ReferenceStore {
                 self.remove_reference_file(&reference)?;
                 continue;
             }
+            // daemon 重启不会重置额度；所有 host 的未释放图片声明字节均占用预算。
             // 发布未返回时发生崩溃也保留这份引用，等待客户端的持久意图决定。
             bytes = bytes.checked_add(reference.byte_len).ok_or_else(invalid)?;
         }
@@ -238,6 +271,74 @@ impl ReferenceStore {
             .join(&reference.filename)
     }
 
+    pub(super) fn reject_preflight(&self, rejection: &PreflightRejection) -> io::Result<()> {
+        let _guard = self.acquire()?;
+        if rejection.version != 1
+            || rejection.host.is_empty()
+            || rejection.native_session.is_empty()
+            || rejection.submission.is_nil()
+            || rejection.references.is_empty()
+            || rejection.references.len() > 20
+            || read_record::<QueueClaim>(
+                &self
+                    .root
+                    .join(format!("queue-{}.json", rejection.submission)),
+            )?
+            .is_some()
+        {
+            return Err(invalid());
+        }
+        let path = self.preflight_rejection_path(rejection.submission);
+        if let Some(previous) = read_record::<PreflightRejection>(&path)? {
+            return if previous == *rejection {
+                Ok(())
+            } else {
+                Err(invalid())
+            };
+        }
+        for (id, key) in &rejection.references {
+            let reference =
+                read_record::<Reference>(&self.record_path(*id))?.ok_or_else(invalid)?;
+            self.require_owner(
+                &reference,
+                &rejection.host,
+                &rejection.native_session,
+                key_hash(*key)?,
+            )?;
+            if self.release_record(*id)?.is_some() {
+                return Err(invalid());
+            }
+            self.open_reference_file(&reference)?;
+        }
+        write_record(&self.root, &path, rejection)
+    }
+
+    pub(super) fn preflight_rejection(
+        &self,
+        host: &str,
+        native_session: &str,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<PreflightRejection>> {
+        let _guard = self.acquire()?;
+        let value = read_record::<PreflightRejection>(&self.preflight_rejection_path(submission))?;
+        if let Some(rejection) = &value
+            && (rejection.version != 1
+                || rejection.host != host
+                || rejection.native_session != native_session
+                || rejection.submission != submission
+                || rejection.key_hash != key_hash(key)?)
+        {
+            return Err(invalid());
+        }
+        Ok(value)
+    }
+
+    fn preflight_rejection_path(&self, submission: Uuid) -> PathBuf {
+        self.root
+            .join(format!("queue-preflight-rejected-{submission}.json"))
+    }
+
     /// 原生写入前落盘未知状态。已经存在的编号只可查询，不能再次领取发送。
     pub(super) fn claim_queue(&self, claim: &QueueClaim) -> io::Result<()> {
         let _guard = self.acquire()?;
@@ -247,6 +348,8 @@ impl ReferenceStore {
             || claim.references.len() > 20
             || claim.submission.is_nil()
             || read_record::<QueueClaim>(&path)?.is_some()
+            || read_record::<PreflightRejection>(&self.preflight_rejection_path(claim.submission))?
+                .is_some()
         {
             return Err(invalid());
         }
@@ -276,8 +379,12 @@ impl ReferenceStore {
         )?
         .ok_or_else(invalid)?;
         if claim != result.claim
-            || !matches!(result.status.as_str(), "confirmed" | "rejected")
+            || !matches!(result.status.as_str(), "confirmed" | "rejected" | "retired")
             || (result.status == "confirmed" && result.native_queue_id.is_empty())
+            || (result.status == "retired"
+                && (claim.claude_recovery.is_none()
+                    || !result.native_queue_id.is_empty()
+                    || result.native_ack_sha256.is_some()))
         {
             return Err(invalid());
         }
@@ -292,6 +399,85 @@ impl ReferenceStore {
             };
         }
         write_record(&self.root, &path, result)
+    }
+
+    /// 不改写原领取记录。首次原生文件绑定在同一存储锁内落盘，冷恢复只能使用该 inode。
+    pub(super) fn bind_claude_transcript(
+        &self,
+        claim: &QueueClaim,
+        pending: &ClaudePendingImageAttempt,
+    ) -> io::Result<(File, ClaudeImageAttempt, ClaudeTranscriptBinding)> {
+        let _guard = self.acquire()?;
+        let original =
+            read_record::<QueueClaim>(&self.root.join(format!("queue-{}.json", claim.submission)))?
+                .ok_or_else(invalid)?;
+        let encoded_pending = serde_json::to_value(pending).map_err(|_| invalid())?;
+        if original != *claim
+            || claim.version != 1
+            || pending.version != 1
+            || claim.submission != pending.client_message_id
+            || claim.native_session != pending.session_id.to_string()
+            || claim.native_request_sha256 != pending.request_sha256
+            || claim
+                .claude_recovery
+                .as_ref()
+                .and_then(|data| data.get("attempt"))
+                != Some(&encoded_pending)
+        {
+            return Err(invalid());
+        }
+        pending
+            .anchor
+            .verify(&pending.transcript_path, pending.session_id)?;
+        let claim_sha256: [u8; 32] =
+            Sha256::digest(serde_json::to_vec(&original).map_err(|_| invalid())?).into();
+        let path = self
+            .root
+            .join(format!("queue-claude-transcript-{}.json", claim.submission));
+        let (file, binding) = match read_record::<ClaudeTranscriptBinding>(&path)? {
+            Some(binding) => {
+                if binding.version != 1
+                    || binding.claim_sha256 != claim_sha256
+                    || !binding.anchor.extends(&pending.anchor)
+                {
+                    return Err(invalid());
+                }
+                let (file, anchor) = binding
+                    .anchor
+                    .open(&pending.transcript_path, pending.session_id)?;
+                if anchor != binding.anchor
+                    || transcript_identity(&file.metadata()?) != binding.identity
+                    || file.metadata()?.len() < binding.observed_len
+                {
+                    return Err(invalid());
+                }
+                (file, binding)
+            }
+            None => {
+                let (file, anchor) = pending
+                    .anchor
+                    .open(&pending.transcript_path, pending.session_id)?;
+                let metadata = file.metadata()?;
+                let binding = ClaudeTranscriptBinding {
+                    version: 1,
+                    claim_sha256,
+                    anchor,
+                    identity: transcript_identity(&metadata),
+                    observed_len: metadata.len(),
+                };
+                write_record(&self.root, &path, &binding)?;
+                (file, binding)
+            }
+        };
+        // 落盘后仍保持原文件句柄；目录或文件在 fsync 期间改变不能获得消费确认。
+        binding
+            .anchor
+            .verify(&pending.transcript_path, pending.session_id)?;
+        verify_transcript_path(&file, &pending.transcript_path)?;
+        if file.metadata()?.len() < binding.observed_len {
+            return Err(invalid());
+        }
+        Ok((file, pending.bound(binding.identity.clone())?, binding))
     }
 
     pub(super) fn queue_status(
@@ -320,7 +506,7 @@ impl ReferenceStore {
         )? {
             Some(result)
                 if result.claim == claim
-                    && matches!(result.status.as_str(), "confirmed" | "rejected") =>
+                    && matches!(result.status.as_str(), "confirmed" | "rejected" | "retired") =>
             {
                 Ok(Some(result))
             }
@@ -332,6 +518,76 @@ impl ReferenceStore {
                 native_ack_sha256: None,
             })),
         }
+    }
+
+    /// 先核精确提交凭据，再由上层用受保护的 tmux 记录验证跨 daemon 归属。
+    pub(super) fn queue_recovery_claim(
+        &self,
+        native_session: &str,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        let _guard = self.acquire()?;
+        let claim = self.read_recovery_claim(native_session, submission)?;
+        if let Some(claim) = &claim
+            && claim.key_hash != key_hash(key)?
+        {
+            return Err(invalid());
+        }
+        Ok(claim)
+    }
+
+    pub(super) fn reference_recovery_claim(
+        &self,
+        native_session: &str,
+        submission: Uuid,
+        transfer: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        let _guard = self.acquire()?;
+        let Some(claim) = self.read_recovery_claim(native_session, submission)? else {
+            return Ok(None);
+        };
+        if !claim.references.contains(&(transfer, key)) {
+            return Err(invalid());
+        }
+        let reference = read_record::<Reference>(&self.record_path(transfer))?.ok_or_else(invalid)?;
+        self.require_owner(&reference, &claim.host, native_session, key_hash(key)?)?;
+        Ok(Some(claim))
+    }
+
+    fn read_recovery_claim(
+        &self,
+        native_session: &str,
+        submission: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        let claim = read_record::<QueueClaim>(&self.root.join(format!("queue-{submission}.json")))?;
+        if let Some(claim) = &claim {
+            if claim.version != 1
+                || submission.is_nil()
+                || claim.submission != submission
+                || claim.host.is_empty()
+                || native_session.is_empty()
+                || claim.native_session != native_session
+                || claim.references.is_empty()
+                || claim.references.len() > 20
+                || claim
+                    .references
+                    .iter()
+                    .any(|(id, key)| id.is_nil() || key.is_nil())
+            {
+                return Err(invalid());
+            }
+            for (index, (id, _)) in claim.references.iter().enumerate() {
+                if claim.references[..index]
+                    .iter()
+                    .any(|(previous, _)| previous == id)
+                {
+                    return Err(invalid());
+                }
+            }
+        }
+        Ok(claim)
     }
 
     fn record_path(&self, id: Uuid) -> PathBuf {
@@ -514,3 +770,7 @@ fn write_record<T: Serialize>(directory: &Path, path: &Path, record: &T) -> io::
         .sync_all()?;
     File::open(directory)?.sync_all()
 }
+
+#[cfg(test)]
+#[path = "cli_image_staging_claude_binding_tests.rs"]
+mod claude_binding_tests;

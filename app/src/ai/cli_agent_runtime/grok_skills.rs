@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use ai::skills::{SkillProvider, SkillScope, parse_skill_content_at_location};
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 
@@ -221,15 +221,24 @@ impl SkillCatalog {
         let content = if selected.len() == 1 {
             self.encode(input, &selected[0], attachment_store)?
         } else {
+            self.verify_root_selection(selected)?;
             // 1.0.41 默认 profile 原生展开首个 slash，后续技能由模型按原生目录加载。
             // 每个技能保留独立文本块；不复制正文、不伪造工具调用或审批。
-            let mut content = selected
-                .iter()
-                .map(|skill| {
-                    self.command_for(skill)
-                        .map(|command| InputContent::Text(format!("/{command}")))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let mut content = Vec::new();
+            let mut references = Vec::new();
+            for skill in selected {
+                let name = self.command_for(skill)?;
+                let command = self
+                    .commands
+                    .iter()
+                    .find(|command| command.name == name)
+                    .ok_or_else(unavailable)?;
+                content.push(InputContent::Text(format!("/{name}")));
+                references.push(json!({
+                    "qualifiedName": command.qualified_name.as_ref().ok_or_else(unavailable)?,
+                    "path": command.path.as_ref().ok_or_else(unavailable)?,
+                }));
+            }
             for part in input {
                 match part {
                     part @ (InputContent::Text(_) | InputContent::LocalImage(_)) => {
@@ -238,6 +247,10 @@ impl SkillCatalog {
                     InputContent::Skill { .. } => {}
                 }
             }
+            // 后续 slash 不携带来源路径；追加当前目录已核实的引用，避免猜测用户级技能位置。
+            content.push(InputContent::Text(
+                json!({"selected_skills": references}).to_string(),
+            ));
             encode_prompt_content(content, attachment_store)?
         };
         if serde_json::to_vec(&content)

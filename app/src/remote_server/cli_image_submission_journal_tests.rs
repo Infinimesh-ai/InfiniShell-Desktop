@@ -136,3 +136,111 @@ fn connection_recovery_keeps_unclaimed_images_while_upload_lease_is_held() {
     assert!(work[0].1);
     assert!(work[0].2.is_some());
 }
+
+#[test]
+fn retired_image_cleanup_does_not_unlock_unknown_delivery_after_cold_recovery() {
+    let (directory, journal) = journal();
+    let original = scope("host-a", "claude-a");
+    let image = persist_image(&journal, &original);
+    let queue = journal.prepare_queue(&original, [1; 32], true).unwrap();
+    let retired = CliImageCodexQueueResult {
+        submission_id: original.submission_id.clone(),
+        status: "retired".into(),
+        subject_sha256: vec![1; 32],
+        native_queue_id: String::new(),
+    };
+    assert!(!journal.record_queue_result(&queue, &retired).unwrap());
+    assert!(journal.recovery_work(&original, true).unwrap()[0].1);
+    journal
+        .write(&journal.path("done", image.transfer_id), &true)
+        .unwrap();
+    drop(journal);
+    let restored = Journal {
+        directory: directory.path().to_owned(),
+        lock: safe_options()
+            .read(true)
+            .write(true)
+            .open(directory.path().join("lock"))
+            .unwrap(),
+    };
+    let next = scope("host-a", "claude-a");
+    persist_image(&restored, &next);
+    assert!(restored.prepare_queue(&next, [1; 32], true).is_err());
+    assert!(
+        restored
+            .read::<QueueIntent>(
+                &restored.path("queue", Uuid::parse_str(&next.submission_id).unwrap())
+            )
+            .unwrap()
+            .is_none()
+    );
+    let different = scope("host-a", "claude-a");
+    persist_image(&restored, &different);
+    assert!(restored.prepare_queue(&different, [2; 32], true).is_ok());
+}
+
+#[test]
+fn old_done_without_terminal_receipt_cannot_unlock_a_claimed_subject() {
+    let (_directory, journal) = journal();
+    let original = scope("host-a", "claude-a");
+    let image = persist_image(&journal, &original);
+    journal.prepare_queue(&original, [1; 32], true).unwrap();
+    journal
+        .write(&journal.path("done", image.transfer_id), &true)
+        .unwrap();
+    let next = scope("host-a", "claude-a");
+    persist_image(&journal, &next);
+    assert!(journal.prepare_queue(&next, [1; 32], true).is_err());
+}
+
+#[test]
+fn exact_zero_write_rejection_allows_a_new_explicit_attempt_after_cleanup() {
+    let (_directory, journal) = journal();
+    let original = scope("host-a", "claude-a");
+    let image = persist_image(&journal, &original);
+    let queue = journal.prepare_queue(&original, [1; 32], true).unwrap();
+    let rejected = CliImageCodexQueueResult {
+        submission_id: original.submission_id.clone(),
+        status: "rejected".into(),
+        subject_sha256: vec![1; 32],
+        native_queue_id: String::new(),
+    };
+    assert!(!journal.record_queue_result(&queue, &rejected).unwrap());
+    journal
+        .write(&journal.path("done", image.transfer_id), &true)
+        .unwrap();
+    let next = scope("host-a", "claude-a");
+    persist_image(&journal, &next);
+    assert!(journal.prepare_queue(&next, [1; 32], true).is_ok());
+}
+
+#[test]
+fn retirement_for_another_consumer_or_subject_cannot_release_references() {
+    let (_directory, journal) = journal();
+    let original = scope("host-a", "codex-a");
+    persist_image(&journal, &original);
+    let queue = journal.prepare_queue(&original, [1; 32], false).unwrap();
+    let retired = CliImageCodexQueueResult {
+        submission_id: original.submission_id,
+        status: "retired".into(),
+        subject_sha256: vec![1; 32],
+        native_queue_id: String::new(),
+    };
+    assert!(journal.record_queue_result(&queue, &retired).is_err());
+    let original = scope("host-a", "claude-a");
+    let image = persist_image(&journal, &original);
+    let queue = journal.prepare_queue(&original, [1; 32], true).unwrap();
+    let retired = CliImageCodexQueueResult {
+        submission_id: original.submission_id,
+        status: "retired".into(),
+        subject_sha256: vec![2; 32],
+        native_queue_id: String::new(),
+    };
+    assert!(journal.record_queue_result(&queue, &retired).is_err());
+    assert!(
+        journal
+            .read::<bool>(&journal.path("release", image.submission_id))
+            .unwrap()
+            .is_none()
+    );
+}

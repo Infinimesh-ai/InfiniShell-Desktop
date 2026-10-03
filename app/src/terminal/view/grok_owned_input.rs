@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::json;
 use uuid::Uuid;
@@ -16,16 +18,16 @@ use crate::persistence::local_cli_tasks::grok_terminal::GrokTerminalOwner;
 use crate::persistence::model::{LocalCliTask, LocalCliTaskState};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::grok_leader_input::calibrated_platform;
+#[cfg(windows)]
+use crate::terminal::cli_agent_sessions::grok_owned_launch::windows_launch_command;
 use crate::terminal::cli_agent_sessions::grok_owned_launch::{GrokOwnedLaunch, GrokOwnedPty};
 use crate::terminal::cli_agent_sessions::grok_owned_worker::{
-    GrokOwnedInputLease, GrokOwnedWorker,
+    GrokOwnedInputLease, GrokOwnedWorker, recover_historical_results,
 };
 use crate::terminal::cli_agent_sessions::{CLIAgentSessionsModel, GrokPermissionEvidence};
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 #[cfg(not(windows))]
 use crate::terminal::model::session::command_executor::shell_quote_arg;
-#[cfg(windows)]
-use crate::terminal::cli_agent_sessions::grok_owned_launch::windows_launch_command;
 
 #[derive(Clone, PartialEq, Eq)]
 struct LaunchSnapshot {
@@ -45,9 +47,31 @@ pub(super) struct OwnedInput {
     pub(super) last_attempt: Option<(EditorBufferRevision, u64)>,
     pub(super) sending: bool,
     pub(super) invalidated: bool,
+    pub(super) recovery_blocks_input: Arc<AtomicBool>,
     pub(super) unconfirmed_drafts: HashMap<Uuid, (String, Vec<PathBuf>, Vec<String>)>,
     binding: bool,
     launch_command: Option<String>,
+}
+
+impl OwnedInput {
+    pub(super) fn accepts_saved_result(&self, task: &LocalCliTask) -> bool {
+        task.task_id == self.task.task_id
+            && task.generation == self.task.generation
+            && task.revision >= self.task.revision
+            && task.harness == self.task.harness
+            && task.working_directory == self.task.working_directory
+            && task.config_json == self.task.config_json
+            && task.native_session_id == self.task.native_session_id
+            && task.result.is_some()
+            && serde_json::from_str::<serde_json::Value>(&task.config_json)
+                .ok()
+                .and_then(|config| {
+                    serde_json::from_value::<GrokTerminalOwner>(config["grok_terminal"].clone())
+                        .ok()
+                })
+                .as_ref()
+                == Some(&self.owner)
+    }
 }
 
 impl Drop for OwnedInput {
@@ -185,7 +209,7 @@ impl TerminalView {
             let command = argv.iter().map(|arg| arg.to_str().map(|arg| shell_quote_arg(arg, snapshot.shell)))
                 .collect::<Option<Vec<_>>>().map(|args| args.join(" "));
             view.grok_owned_input = Some(OwnedInput { task, owner, snapshot: snapshot.clone(),
-                worker: None, lease: None, last_attempt: None, sending: false, invalidated: false, unconfirmed_drafts: HashMap::new(), binding: false,
+                worker: None, lease: None, last_attempt: None, sending: false, invalidated: false, recovery_blocks_input: Arc::new(AtomicBool::new(false)), unconfirmed_drafts: HashMap::new(), binding: false,
                 launch_command: command.clone() });
             let sent = command.is_some_and(|command| view.input.update(ctx, |input, ctx|
                 input.execute_owned_cli_command_once(&command, ctx)));
@@ -200,6 +224,7 @@ impl TerminalView {
         self.grok_owned_input.as_ref().is_some_and(|owned| {
             !owned.invalidated
                 && model.local_pty_identity() == Some(owned.snapshot.pty.clone())
+                && model.block_list().active_block().id() == &owned.snapshot.block
                 && model.block_list().active_block().session_id() == Some(owned.snapshot.session)
                 && !model.shared_session_status().is_sharer_or_viewer()
                 && !model.is_conversation_transcript_viewer()
@@ -237,6 +262,7 @@ impl TerminalView {
         };
         let model = self.model.lock();
         model.local_pty_identity() == Some(owned.snapshot.pty.clone())
+            && model.block_list().active_block().id() == &owned.snapshot.block
             && model.block_list().active_block().session_id() == Some(owned.snapshot.session)
             && !model.shared_session_status().is_sharer_or_viewer()
             && !model.is_conversation_transcript_viewer()
@@ -262,7 +288,7 @@ impl TerminalView {
         let Some(owned) = self.grok_owned_input.as_mut() else {
             return;
         };
-        if owned.invalidated || owned.binding {
+        if owned.invalidated || owned.binding || owned.worker.is_some() {
             return;
         }
         let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
@@ -283,23 +309,52 @@ impl TerminalView {
         let path = PathBuf::from(config["launch_manifest"].as_str().unwrap());
         let sha = config["launch_sha256"].as_str().unwrap().to_owned();
         let owner = owned.owner.clone();
+        let task = owned.task.clone();
+        let database = PersistenceWriter::as_ref(ctx).sender();
         owned.binding = true;
-        let launch_id = owner.launch_id;
+        owned.recovery_blocks_input.store(true, Ordering::SeqCst);
+        let recovery_blocks_input = owned.recovery_blocks_input.clone();
+        let recovery_blocks_input_for_callback = recovery_blocks_input.clone();
+        let expected_owner = owner.clone();
+        let task_id = task.task_id.clone();
+        let generation = task.generation;
         ctx.spawn(
             blocking::unblock(move || {
                 GrokOwnedLaunch::restore(&path, &sha).and_then(|mut launch| {
-                    launch
+                    let binding = launch
                         .bind(owner.binding_id, owner.permission_revision, &observation)
-                        .map_err(|_| std::io::Error::other("原生 Grok 绑定未通过"))
+                        .map_err(|_| std::io::Error::other("原生 Grok 绑定未通过"))?;
+                    if let Some(database) = database {
+                        recover_historical_results(
+                            binding,
+                            task,
+                            owner,
+                            database,
+                            &recovery_blocks_input,
+                        )
+                        .map_err(|_| std::io::Error::other("Grok 回合结果补查失败"))
+                    } else {
+                        Ok(None)
+                    }
                 })
             }),
-            move |view, _result, _ctx| {
-                if let Some(owned) = view
-                    .grok_owned_input
-                    .as_mut()
-                    .filter(|owned| owned.owner.launch_id == launch_id)
-                {
+            move |view, result, _ctx| {
+                if let Some(owned) = view.grok_owned_input.as_mut().filter(|owned| {
+                    owned.owner.launch_id == expected_owner.launch_id
+                        && owned.owner.binding_id == expected_owner.binding_id
+                        && owned.owner.session_id == expected_owner.session_id
+                        && owned.task.task_id == task_id
+                        && owned.task.generation == generation
+                }) {
                     owned.binding = false;
+                    recovery_blocks_input_for_callback.store(false, Ordering::SeqCst);
+                    if owned.owner == expected_owner
+                        && owned.worker.is_none()
+                        && let Ok(Some(task)) = result
+                        && owned.accepts_saved_result(&task)
+                    {
+                        owned.task = task;
+                    }
                 }
             },
         );

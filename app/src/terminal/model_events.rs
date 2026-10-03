@@ -280,6 +280,9 @@ impl ModelEventDispatcher {
                 block_id,
                 is_tagged_in,
             },
+            Event::TerminalBindingChallenge(challenge) => {
+                ModelEvent::TerminalBindingChallenge(challenge)
+            }
             Event::PluggableNotification { title, body } => {
                 ModelEvent::PluggableNotification { title, body }
             }
@@ -334,10 +337,12 @@ impl ModelEventDispatcher {
         // The daemon must have the executor ready before those requests arrive.
         if self.should_use_ssh_remote_server(transport_available) {
             RemoteServerManager::handle(ctx).update(ctx, |mgr, _ctx| {
-                mgr.notify_session_bootstrapped(
+                mgr.notify_session_bootstrapped_with_terminal_candidate(
                     session_id,
                     &shell_type_name,
                     shell_path.as_deref(),
+                    session_info.shell_pid,
+                    session_info.shell_tty.as_deref(),
                 );
             });
         }
@@ -458,6 +463,8 @@ pub enum ModelEvent {
         block_id: BlockId,
         is_tagged_in: bool,
     },
+    /// 只转发到本模型所属 view 的终端线路挑战。
+    TerminalBindingChallenge(ansi::TerminalBindingChallenge),
     /// A pluggable notification triggered via OSC 9 or OSC 777 escape sequences.
     PluggableNotification {
         title: Option<String>,

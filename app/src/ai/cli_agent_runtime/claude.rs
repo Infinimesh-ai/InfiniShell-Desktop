@@ -27,6 +27,7 @@ use super::local_skills::{
 use super::local_tools::{ClaudeMcpRequest, NativeLocalToolRequest};
 use super::managed_input::restore_claude_managed_images;
 use super::permissions::verify_effective_permissions;
+use super::reviewed_project_commands_windows::TOOL_NAME as REVIEWED_COMMAND_TOOL;
 use super::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
     RuntimeConnection, RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget,
@@ -485,7 +486,9 @@ async fn run_transport(
                 }
             }
             Incoming::HostCommand(result) => {
-                let effects = protocol.command(result?);
+                let reply = result?;
+                let cleanup_events = protocol.host_commands.take_cancelled_events();
+                let effects = protocol.host_command_reply(reply, cleanup_events);
                 flush_effects(protocol, stdin, events, effects).await?;
             }
             Incoming::Command(Some(command)) => {
@@ -538,23 +541,40 @@ fn trace_live_protocol_ids(message: &Value, generation: Uuid) {
 #[cfg(test)]
 fn live_native_image_skill_projection(message: &Value) -> Value {
     let command = "infinishell-local-skills:inspect-managed-image";
+    let selected = [
+        command,
+        "infinishell-local-skills:image-alpha",
+        "infinishell-local-skills:image-beta",
+    ];
     let tools = message["message"]["content"]
         .as_array()
         .into_iter()
         .flatten()
         .filter(|block| block["type"] == "tool_use")
         .map(|block| {
+            let selected_command = block["input"]["skill"]
+                .as_str()
+                .filter(|name| block["name"] == "Skill" && selected.contains(name));
             json!({"tool_use_id":live_native_id(&block["id"]),
                 "selected_skill":block["name"] == "Skill" && block["input"] == json!({"skill":command}),
+                "selected_skill_command":selected_command,
                 "input_sha256":format!("{:x}", Sha256::digest(serde_json::to_vec(&block["input"]).expect("原生 JSON 可编码")))})
         })
         .collect::<Vec<_>>();
-    let registered = message["response"]["response"]["commands"]
+    let commands = message["response"]["response"]["commands"]
         .as_array()
-        .map(|commands| commands.iter().any(|entry| entry["name"] == command));
+        .map(|commands| {
+            commands
+                .iter()
+                .filter_map(|entry| entry["name"].as_str())
+                .filter(|name| selected.contains(name))
+                .collect::<Vec<_>>()
+        });
+    let registered = commands.as_ref().map(|names| names.contains(&command));
     let model_verified = (message["type"] == "system" && message["subtype"] == "init")
         .then(|| message["model"] == "claude-opus-5-5");
     json!({"tools":tools,"selected_command_registered":registered,
+        "selected_commands_registered":commands,
         "native_model_matches_fixture":model_verified})
 }
 
@@ -1116,6 +1136,46 @@ impl ClaudeProtocol {
             .await
     }
 
+    fn host_command_reply(
+        &mut self,
+        reply: RuntimeCommand,
+        cleanup_events: Vec<RuntimeEventKind>,
+    ) -> Effects {
+        // 仅 next_reply 确认受审命令完整清理后的内部回复可进入；外部命令仍走严格拒绝。
+        let cancelled = match &reply.action {
+            RuntimeAction::RespondLocalTool {
+                turn_id, call_id, ..
+            } => {
+                reply.generation == self.options.generation
+                    && self.local_tools.get(call_id).is_some_and(|call| {
+                        call.request.call_id == *call_id
+                            && call.request.turn_id == *turn_id
+                            && call.request.tool == REVIEWED_COMMAND_TOOL
+                            && call.response.is_none()
+                            && (call.cancelled
+                                || cleanup_events.iter().any(|event| {
+                                    matches!(event, RuntimeEventKind::TurnFinished {
+                                        turn_id: finished_turn, outcome: TurnOutcome::Cancelled, ..
+                                    } if finished_turn == turn_id)
+                                }))
+                    })
+            }
+            RuntimeAction::Submit { .. }
+            | RuntimeAction::Steer { .. }
+            | RuntimeAction::Interrupt { .. }
+            | RuntimeAction::RespondApproval { .. }
+            | RuntimeAction::Shutdown => false,
+        };
+        let mut effects = if cancelled {
+            // 原生取消已使精确调用失效；保留清理后释放的终态，不再回送迟到工具结果。
+            Effects::default()
+        } else {
+            self.command(reply)
+        };
+        effects.events.extend(cleanup_events);
+        effects
+    }
+
     fn new(options: SessionOptions) -> Self {
         let native_result_evidence = native_result_evidence_enabled(&options.state_dir);
         Self {
@@ -1199,7 +1259,10 @@ impl ClaudeProtocol {
     fn event(&self, kind: RuntimeEventKind) -> RuntimeEvent {
         RuntimeEvent {
             generation: self.options.generation,
-            native_session_id: self.session_id.clone(),
+            native_session_id: self
+                .paired_version
+                .and(self.session_id.as_deref())
+                .map(str::to_owned),
             kind,
         }
     }

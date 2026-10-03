@@ -5564,7 +5564,7 @@ cli-agent-plugin-refresh-marketplace-step = 刷新插件市场并保留已安装
 cli-agent-plugin-disabled = 此插件已禁用。请手动启用以恢复通知。
 cli-agent-plugin-enable-step = 启用已安装插件：
 cli-agent-plugin-enable-codex-config-step = 在 Codex 的 config.toml 中启用此插件：
-cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法直接粘贴图片。请在 InfiniShell 启动的 Grok 富输入会话中，将图片粘贴或拖入输入框后提交。
+cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法粘贴图片。请使用受支持的 Grok 版本，将图片粘贴或拖入富输入框后提交。
 cli-agent-image-too-large = { $filename } 过大，无法发送给智能体（上限 { $limit_mb } MB）。
 
 cli-agent-task-already-bound = 此终端已关联一个本地任务。
@@ -5646,7 +5646,7 @@ cli-task-manager-installation = { $cli }：{ $version }
 cli-task-manager-local-only = 这些任务在本机运行。关闭面板后，已连接的任务仍会继续运行。SSH 和 tmux 终端会话单独管理。
 cli-task-manager-grok-unavailable = Grok Build 1.0.30 支持文本任务、审批、取消、历史继续和任务消息。固定只读或文件工具策略要求逐次审批，子任务使用相同工具，任务权限不得扩大。这两种策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。“继承”策略每轮可使用一个显式选择的技能，其完整路径必须唯一匹配当前会话的技能目录。应用不会自动授予项目信任。托管模式不支持图片。
 cli-task-manager-grok-p0-verification = Grok Build 1.0.34 仅开放已验证的 P0 路径：新建文本任务、精确原生读取请求的逐次允许或拒绝、真实输出后的取消，以及原生会话继续。追加输入、关闭会话、文件写入、本地任务工具、技能、子任务和托管图片仍不可用。终端命令、钩子以及 CLI 或管理员策略不在该 P0 保证范围内；这不是文件系统沙箱。
-cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。在“继承”策略与 grok-4.7 下，可以选择多个项目或用户级技能，并在会话空闲时新增技能。Grok 展开首个技能，通过原生工具加载其余技能；新增技能确认后才发送。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。固定策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。在“继承”策略与 grok-4.7 下，PNG 图片可与已注册技能组合。
+cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。在“继承”策略与 grok-4.7 下，可以选择多个项目或用户级技能，并在会话空闲时新增技能。Grok 展开首个技能，通过原生工具加载其余技能；新增技能确认后才发送。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。这些只读或文件工具策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。在“继承”策略与 grok-4.7 下，PNG 图片可与已注册技能组合。
 cli-task-manager-grok-root-tools-unavailable = 当前 Grok 版本与权限策略组合不支持本地任务工具和子任务。
 cli-task-manager-grok-spawn-unavailable = 选择固定只读或文件工具策略后，才能允许 Grok 子任务。
 cli-task-manager-claude-verification = 托管任务支持 Claude Code 2.1.273、2.1.278 和 2.1.280。
@@ -5740,7 +5740,10 @@ cli-agent-task-skills-require-managed = 技能传递需要托管 Codex、Claude 
 cli-agent-input-images-processing = 请等待图片处理完成。草稿已保留。
 
 cli-agent-input-file-attachment-unavailable = 此 CLI 输入暂不支持发送文件附件卡片。请改为插入文件路径；草稿和附件已保留。
-cli-agent-input-file-unreadable = 无法附加 { $filename }：文件不存在、不可读取或不是普通文件。草稿和附件已保留。
+cli-agent-input-non-image-drop-unavailable = 此 Grok 输入只接受拖入图片文件。未发送任何路径，草稿未改动。
+cli-agent-input-file-unreadable =
+    文件不可用，草稿和附件已保留。
+    { $filename }
 cli-agent-input-remote-file-unavailable = 暂时无法将本地文件附件发送给此远程 CLI。草稿和附件已保留。
 cli-agent-input-local-file-references = 附加的本地文件（以 JSON 数组编码的绝对路径）：{ $paths }。请使用原生文件工具读取，并遵守权限检查；这些引用不包含文件内容。
 
@@ -5833,9 +5836,10 @@ cli-agent-grok-skill-policy-required = Grok 技能需要继承策略或已选技
 cli-agent-grok-skill-unavailable = 所选 Grok 技能已变更，或当前会话中无法唯一匹配其原始路径。请刷新技能并重新选择。
 
 cli-agent-input-waiting-for-native-response = CLI 正在等待回应，已停止提交。请先在原生终端处理提示，草稿和附件已保留。
-cli-agent-grok-input-manual-copy-required = 未发送。复制草稿，关闭富输入，再到 Grok 粘贴提交。
+cli-agent-grok-input-manual-copy-required = 未发送，草稿已保留。关闭富输入后可在 Grok 中键入。
+cli-agent-grok-pasted-to-draft = 已粘贴到富输入，尚未发送给 Grok。
 cli-agent-input-copy-unsent-text = 复制未发送文本
-terminal-input-grok-draft-delivery-hint = Grok 富输入会话可从此提交；普通会话需复制后粘贴
+terminal-input-grok-draft-delivery-hint = 受支持的 Grok 会话可从此提交；否则请在 Grok 中直接键入
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = 已保存的会话尚不能使用这个较旧的 CLI 版本继续。
@@ -5863,7 +5867,27 @@ settings-cli-updates-current = 当前安装已符合所选渠道。
 settings-cli-updates-available = 所选渠道有待应用的更新。
 settings-cli-updates-waiting = 正在等待此 CLI 的会话和任务关闭。
 settings-cli-updates-updating = 正在更新此 CLI…
-settings-cli-updates-verifying = 正在验证安装和渠道…
+settings-cli-updates-verifying = 正在验证安装、渠道和插件文件…
+settings-cli-updates-notification-integrity =
+    { $state ->
+        [verified] 通知插件文件已验证，仍需在新的 CLI 会话中验证通知。
+        [not-required] 此 CLI 无需通知插件。
+        [missing] 缺少通知插件，请在 CLI 会话中配置。
+        [disabled] 通知插件已禁用，请显式启用以恢复通知。
+        [needs-update] 通知插件需要更新，请在 CLI 会话中管理。
+        [integrity-mismatch] 通知插件文件与已验证版本不符，请在 CLI 会话中修复插件。
+       *[unverified] 通知插件文件的完整性尚未验证。
+    }
+settings-cli-updates-platform-integrity =
+    { $state ->
+        [verified] 编排插件文件已验证，托管 CLI 兼容性另行检查。
+        [not-required] 此 CLI 无需编排插件。
+        [missing] 缺少编排插件，请在 CLI 会话中配置。
+        [disabled] 编排插件已禁用，请显式启用以使用相关功能。
+        [needs-update] 编排插件需要更新，请在 CLI 会话中管理。
+        [integrity-mismatch] 编排插件文件与已验证版本不符，请在 CLI 会话中修复插件。
+       *[unverified] 编排插件文件的完整性尚未验证。
+    }
 settings-cli-updates-failed = 更新未完成。
 settings-cli-updates-manual = 暂无法自动更新此 CLI。
 settings-cli-updates-not-installed = 尚未安装此 CLI。请打开安装指南进行安装。
@@ -5910,17 +5934,21 @@ cli-agent-grok-fixed-skills-unavailable = 此 Grok 任务仅接受创建时选�
 cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 可读取、编辑和创建项目文件，列举目录，以及搜索指定单个文件的内容。每次工具调用均需审批。终端命令、钩子和技能均禁用。子任务保持此策略，旧任务不会自动增加权限。这不是操作系统沙箱。
 
 workspace-new-grok-rich-input = Grok 富输入（grok-4.7）
-workspace-start-remote-grok-rich-input = 在当前远程终端启动 Grok 富输入
-workspace-start-remote-codex-rich-input = 在当前远程终端启动 Codex 富输入
+workspace-start-remote-grok-rich-input = 当前窗格 Grok 富输入
+workspace-start-remote-codex-rich-input = 当前窗格 Codex 富输入
 workspace-start-remote-codex-rich-input-help = 启动 Codex 0.156.1，为当前 SSH/tmux 窗格绑定独立 app server。需要 Bash 或 Zsh 及远程图片支持。
 cli-agent-codex-remote-launch-unavailable = 远程 Codex 会话未能启动。需要 Codex 0.156.1、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 cli-agent-codex-owned-launch-claimed = 此 Codex 启动已被认领或状态尚未确认，请先检查当前远程终端，再启动其他会话。
-workspace-start-remote-grok-rich-input-help = 在当前 SSH/tmux 终端中使用 grok-4.7 启动 Grok 1.0.41。需要 Bash 或 Zsh 及远程图片支持。此操作不会更新远端 CLI 安装包。
-cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需要 Grok 1.0.41、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
+workspace-start-remote-grok-rich-input-help = 在当前 SSH/tmux 终端中，以 grok-4.7 启动支持 InfiniShell 会话通知的 Grok 1.0.41 构建版本。需要 Bash 或 Zsh 及远程图片支持。此操作不会更新远端 CLI 安装包。
+cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需要支持 InfiniShell 会话通知的 Grok 1.0.41 构建版本、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 
 cli-agent-grok-owned-launch-unavailable = Grok 富输入需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
 
 cli-agent-grok-owned-input-unavailable = Grok 输入尚未就绪或会话身份已变化，已保留草稿。
+cli-agent-grok-native-images-unavailable = 此 Grok 连接不支持图片输入，已保留草稿与图片。
+cli-agent-grok-native-already-received = Grok 已接收过这次输入，草稿已保留。点击此提示可再次发送，开启新一轮。
+
+cli-agent-grok-owned-result-unverified = Grok 已结束本轮，但任务结果未能核验保存。请查看原生会话。
 
 cli-agent-grok-owned-input-claimed = 此输入已提交或投递尚未确认，请检查原生 Grok 会话后再发送新草稿。
 
@@ -5953,3 +5981,16 @@ cli-agent-reviewed-command-background = CLI 在仅允许前台执行的策略下
 cli-agent-input-remote-image-unconfirmed = 图片投递尚未确认，CLI 可能已收到这条输入。草稿和附件已保留；请先查看 CLI，再决定如何继续。应用不会自动重发。
 
 cli-agent-input-remote-claude-image-hint = 将输入发送到远程 Claude 会话，由其读取原图。如需 Read 审批，请在终端确认；仅有文本入队不代表图片已送达。
+
+workspace-start-tmux-claude = 在 tmux 新窗格启动 Claude
+workspace-start-tmux-codex = 在 tmux 新窗格启动 Codex
+workspace-start-tmux-grok = 在 tmux 新窗格启动 Grok
+workspace-start-tmux-agent-help = 在当前 tmux 会话的新窗格中启动已验证的远端 CLI。需要有效的 SSH 连接和远程图片支持。
+workspace-restore-tmux-agent = 恢复 tmux 富输入
+workspace-restore-tmux-agent-help = 重新连接所选 tmux 窗格中此前启动的 CLI。此操作只查询已有启动。
+cli-agent-tmux-owned-unavailable = 无法验证远端 tmux 窗格或 CLI。请检查连接和所需 CLI 版本。
+cli-agent-tmux-owned-unknown = tmux 启动状态尚未确认。请使用“恢复 tmux 富输入”查询已有启动，不会另建窗格。
+
+cli-agent-tmux-owned-exited = 此 tmux CLI 会话已结束。如需继续，请启动新的 tmux 窗格。
+
+cli-agent-tmux-restored-text-unconfirmed = 当前会话状态尚未确认。请在原生终端输入文字；图片仍可发送到原生图片队列。

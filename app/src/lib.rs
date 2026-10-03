@@ -832,8 +832,11 @@ pub fn run() -> Result<()> {
 fn run_worker_command(worker: &warp_cli::WorkerCommand) -> Result<()> {
     match worker {
         #[cfg(any(target_os = "linux", target_os = "macos", windows))]
-        warp_cli::WorkerCommand::CliAgentNotify { protocol_version } => {
-            crate::terminal::cli_agent_hook_writer::run_worker(*protocol_version)
+        warp_cli::WorkerCommand::CliAgentNotify {
+            protocol_version,
+            require_protocol,
+        } => {
+            crate::terminal::cli_agent_hook_writer::run_worker(*protocol_version, *require_protocol)
                 .map_err(Into::into)
         }
         #[cfg(any(target_os = "linux", target_os = "macos", windows))]

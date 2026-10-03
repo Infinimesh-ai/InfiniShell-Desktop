@@ -296,6 +296,8 @@ impl DProtoHook {
                 "wsl_name" => {
                     value.wsl_name = map_empty_to_none(v);
                 }
+                "shell_pid" => value.shell_pid = v.parse::<u32>().ok().filter(|pid| *pid != 0),
+                "shell_tty" => value.shell_tty = map_empty_to_none(v),
                 "session_id" => value.session_id = v.parse::<u64>().ok(),
                 _ => {
                     log::warn!("Tried to add unknown field {key} to Bootstrapped hook");
@@ -682,6 +684,13 @@ pub struct BootstrappedValue {
     /// The full path to the running shell binary (e.g. "/usr/bin/zsh").
     #[serde(deserialize_with = "empty_string_is_none", default)]
     pub shell_path: Option<String>,
+
+    /// 未经内核验证的候选；旧 bootstrap 可省略。
+    #[serde(default)]
+    pub shell_pid: Option<u32>,
+
+    #[serde(deserialize_with = "empty_string_is_none", default)]
+    pub shell_tty: Option<String>,
 }
 
 /// Custom serde deserializer that parses a float from a string.

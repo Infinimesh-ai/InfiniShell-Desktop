@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,19 @@ class RemoteCodexSshTmuxTests(unittest.TestCase):
     def setUp(self):
         self.notifier = SOURCE.parents[2] / (
             "app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/warp-notify.sh")
+
+    def test_old_probe_keeps_0155_default_and_rejects_unknown_version(self):
+        self.assertEqual(inspect.signature(PROBE.validate_case).parameters["codex_version"].default,
+                         "0.155.1")
+        with self.assertRaisesRegex(RuntimeError, "不支持的 Codex 固定版本"):
+            PROBE.validate_case("tmux-off", {}, {}, "token", "0.154.0")
+
+    def test_trust_prompt_accepts_both_fixed_native_tui_wordings(self):
+        self.assertTrue(PROBE.trust_prompt_visible(
+            "Doyoutrustthecontentsofthisdirectory?Yes,continue"))
+        self.assertTrue(PROBE.trust_prompt_visible(
+            "Trustthisfolder?Trustandcontinue"))
+        self.assertFalse(PROBE.trust_prompt_visible("Trustthisfolder?Quit"))
 
     def test_safe_root_rejects_parent_traversal_and_accepts_private_cache(self):
         self.assertIsNotNone(PROBE.SAFE_REMOTE_ROOT.fullmatch(

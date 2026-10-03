@@ -5752,7 +5752,7 @@ cli-agent-plugin-refresh-marketplace-step = Refresh the marketplace while keepin
 cli-agent-plugin-disabled = This plugin is disabled. Enable it explicitly to restore notifications.
 cli-agent-plugin-enable-step = Enable the installed plugin:
 cli-agent-plugin-enable-codex-config-step = Enable the plugin in your Codex config.toml:
-cli-agent-grok-image-paste-unavailable = Image paste is unavailable in this Grok session. In an InfiniShell Grok rich-input session, paste or drop images into the input box and submit them there.
+cli-agent-grok-image-paste-unavailable = Image paste is unavailable in this Grok session. Use a supported Grok version, then paste or drop images into the rich input box and submit them there.
 cli-agent-image-too-large = { $filename } is too large to send to the agent (limit { $limit_mb } MB).
 
 cli-agent-task-already-bound = This terminal already has an active local task.
@@ -5834,7 +5834,7 @@ cli-task-manager-installation = { $cli }: { $version }
 cli-task-manager-local-only = These tasks run on this computer. Closing this panel keeps connected tasks running. SSH and tmux terminal sessions are managed separately.
 cli-task-manager-grok-unavailable = Grok Build 1.0.30 supports text tasks, approvals, cancellation, history continuation, and task messages. Fixed read or file policies use per-call approval and allow child tasks with the same tools and no broader task permissions. They disable hooks, skills, and shell commands; administrator policies still apply, and file access is not sandboxed. With Inherit, each turn can use one selected skill whose full path uniquely matches the current session's skill list. Project trust is not granted automatically. Managed images are unavailable.
 cli-task-manager-grok-p0-verification = Grok Build 1.0.34 is enabled only for the verified P0 path: new text tasks, exact native read requests with per-call allow or deny, cancellation after real output, and native-session resume. Queued input, session close, file writes, local task tools, skills, child tasks, and managed images remain unavailable. Shell commands, hooks, and CLI or administrator policies are outside this P0 guarantee; this is not a filesystem sandbox.
-cli-task-manager-grok-current-verification = Grok Build 1.0.41 supports text tasks, approvals, queued instructions, cancellation, and history continuation. With Inherit and grok-4.7, you can select multiple project or user skills and add new skills while the session is idle. Grok expands the first skill and loads the others with its native tools; sending waits for new skills to be confirmed. Fixed read or file policies require approval for each call and support local task tools and child tasks with no broader permissions. Fixed policies disable hooks, skills, and shell commands; administrator policies still apply, and file access is not sandboxed. With Inherit and grok-4.7, PNG images can be combined with registered skills.
+cli-task-manager-grok-current-verification = Grok Build 1.0.41 supports text tasks, approvals, queued instructions, cancellation, and history continuation. With Inherit and grok-4.7, you can select multiple project or user skills and add new skills while the session is idle. Grok expands the first skill and loads the others with its native tools; sending waits for new skills to be confirmed. Fixed read or file policies require approval for each call and support local task tools and child tasks with no broader permissions. These read and file policies disable hooks, skills, and shell commands; administrator policies still apply, and file access is not sandboxed. With Inherit and grok-4.7, PNG images can be combined with registered skills.
 cli-task-manager-grok-root-tools-unavailable = Local task tools and child tasks are unavailable with this Grok version and permission policy.
 cli-task-manager-grok-spawn-unavailable = Choose a fixed read or file policy before allowing Grok child tasks.
 cli-task-manager-claude-verification = Managed tasks support Claude Code 2.1.273, 2.1.278, and 2.1.280.
@@ -5928,7 +5928,10 @@ cli-agent-task-skills-require-managed = Skill delivery requires a managed Codex,
 cli-agent-input-images-processing = Wait for the images to finish processing. Your draft is kept.
 
 cli-agent-input-file-attachment-unavailable = This CLI input cannot send file attachment chips yet. Insert the file path instead; your draft and attachments are kept.
-cli-agent-input-file-unreadable = Cannot attach { $filename }: the file is missing, unreadable, or not a regular file. Your draft and attachments are unchanged.
+cli-agent-input-non-image-drop-unavailable = Only image files can be dropped into this Grok input. No paths were sent; your draft is unchanged.
+cli-agent-input-file-unreadable =
+    File unavailable. Draft and attachments kept.
+    { $filename }
 cli-agent-input-remote-file-unavailable = Local file attachments cannot be sent to this remote CLI yet. Your draft and attachments are unchanged.
 cli-agent-input-local-file-references = Attached local files (absolute paths encoded as a JSON array): { $paths }. Read the files using your native file tools and permission checks; these references do not contain file contents.
 
@@ -6021,9 +6024,10 @@ cli-agent-grok-skill-policy-required = Grok skills require the inherit policy or
 cli-agent-grok-skill-unavailable = The selected Grok skill changed or is not uniquely available at its original path in this session. Refresh skills and select it again.
 
 cli-agent-input-waiting-for-native-response = Submission stopped because the CLI is waiting for a response. Handle the prompt in the terminal first. Your draft and attachments are kept.
-cli-agent-grok-input-manual-copy-required = Not sent. Copy this draft, close rich input, and paste it into Grok.
+cli-agent-grok-input-manual-copy-required = Not sent. Your draft is kept. You can close rich input and type directly in Grok.
+cli-agent-grok-pasted-to-draft = Pasted into rich input. Nothing has been sent to Grok.
 cli-agent-input-copy-unsent-text = Copy unsent text
-terminal-input-grok-draft-delivery-hint = Grok rich input sessions can submit here; other sessions require copy and paste
+terminal-input-grok-draft-delivery-hint = Supported Grok sessions can submit here; otherwise type directly in Grok
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = Saved sessions cannot yet resume with this older CLI version.
@@ -6051,7 +6055,27 @@ settings-cli-updates-current = This installation matches the selected channel.
 settings-cli-updates-available = Updates are available for the selected channel.
 settings-cli-updates-waiting = Waiting for this CLI’s sessions and tasks to close.
 settings-cli-updates-updating = Updating this CLI…
-settings-cli-updates-verifying = Verifying the installation and channel…
+settings-cli-updates-verifying = Verifying the installation, channel, and plugin files…
+settings-cli-updates-notification-integrity =
+    { $state ->
+        [verified] Notification plugin files verified. Notifications still need verification in a new CLI session.
+        [not-required] This CLI does not require a notification plugin.
+        [missing] Notification plugin missing. Set it up in the CLI session.
+        [disabled] Notification plugin disabled. Enable it explicitly to restore notifications.
+        [needs-update] Notification plugin needs an update. Manage it in the CLI session.
+        [integrity-mismatch] Notification plugin files do not match the verified version. Repair the plugin in the CLI session.
+       *[unverified] Notification plugin file integrity has not been verified.
+    }
+settings-cli-updates-platform-integrity =
+    { $state ->
+        [verified] Orchestration plugin files verified. Managed CLI compatibility is checked separately.
+        [not-required] This CLI does not require an orchestration plugin.
+        [missing] Orchestration plugin missing. Set it up in the CLI session.
+        [disabled] Orchestration plugin disabled. Enable it explicitly to use its features.
+        [needs-update] Orchestration plugin needs an update. Manage it in the CLI session.
+        [integrity-mismatch] Orchestration plugin files do not match the verified version. Repair the plugin in the CLI session.
+       *[unverified] Orchestration plugin file integrity has not been verified.
+    }
 settings-cli-updates-failed = The update did not complete.
 settings-cli-updates-manual = Automatic updates are unavailable for this CLI.
 settings-cli-updates-not-installed = This CLI is not installed. Open the installation guide to get started.
@@ -6098,17 +6122,21 @@ cli-agent-grok-fixed-skills-unavailable = This Grok task accepts only the skills
 cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 can read, edit, and create project files, list directories, and search the contents of a specified file. Each tool call requires approval. Shell commands, hooks, and skills are disabled. Subtasks keep this policy; earlier tasks do not gain permissions. This is not an operating system sandbox.
 
 workspace-new-grok-rich-input = Grok rich input (grok-4.7)
-workspace-start-remote-grok-rich-input = Grok rich input in current remote terminal
-workspace-start-remote-codex-rich-input = Codex rich input in current remote terminal
+workspace-start-remote-grok-rich-input = Grok rich input in this pane
+workspace-start-remote-codex-rich-input = Codex rich input in this pane
 workspace-start-remote-codex-rich-input-help = Start Codex 0.156.1 with a separate app server bound to this SSH/tmux pane. Requires Bash or Zsh and remote image support.
 cli-agent-codex-remote-launch-unavailable = The remote Codex session could not be started. It requires Codex 0.156.1, Bash or Zsh, and a current SSH connection with remote image support.
 cli-agent-codex-owned-launch-claimed = This Codex launch has already been claimed or its status is unconfirmed. Check the current remote terminal before starting another session.
-workspace-start-remote-grok-rich-input-help = Start Grok 1.0.41 with grok-4.7 in the current SSH/tmux terminal. Requires Bash or Zsh and remote image support. Remote CLI packages are not updated by this action.
-cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be started. It requires Grok 1.0.41, Bash or Zsh, and a current SSH connection with remote image support.
+workspace-start-remote-grok-rich-input-help = Start the InfiniShell build of Grok 1.0.41 with session notifications and grok-4.7 in the current SSH/tmux terminal. Requires Bash or Zsh and remote image support. Remote CLI packages are not updated by this action.
+cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be started. It requires the InfiniShell build of Grok 1.0.41 with session notifications, Bash or Zsh, and a current SSH connection with remote image support.
 
 cli-agent-grok-owned-launch-unavailable = Grok rich input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
 
 cli-agent-grok-owned-input-unavailable = Grok input is not ready or its session identity has changed. Your draft has been kept.
+cli-agent-grok-native-images-unavailable = This Grok connection does not support image input. Your draft and images have been kept.
+cli-agent-grok-native-already-received = Grok already received this input. Your draft is kept. Click this notification to send it again as a new turn.
+
+cli-agent-grok-owned-result-unverified = Grok finished, but its task result could not be verified or saved. Check the native session.
 
 cli-agent-grok-owned-input-claimed = This input has already been submitted or its delivery is unconfirmed. Check the native Grok session before sending a new draft.
 
@@ -6141,3 +6169,16 @@ cli-agent-reviewed-command-background = The CLI reported background execution de
 cli-agent-input-remote-image-unconfirmed = Image delivery is unconfirmed; the CLI may already have received this input. Your draft and attachments are kept. Check the CLI before continuing; this input will not be resent automatically.
 
 cli-agent-input-remote-claude-image-hint = Send this input to the remote Claude session to read the original images. Approve Read in the terminal if requested; queued text alone does not confirm image delivery.
+
+workspace-start-tmux-claude = Claude in a new tmux pane
+workspace-start-tmux-codex = Codex in a new tmux pane
+workspace-start-tmux-grok = Grok in a new tmux pane
+workspace-start-tmux-agent-help = Start the verified remote CLI in a new pane of the current tmux session. Requires an active SSH connection and remote image support.
+workspace-restore-tmux-agent = Restore tmux rich input
+workspace-restore-tmux-agent-help = Reconnect to the previously launched CLI in the selected tmux pane. This only checks the existing launch.
+cli-agent-tmux-owned-unavailable = Could not verify the remote tmux pane or CLI. Check the connection and the required CLI version.
+cli-agent-tmux-owned-unknown = The tmux launch status is unknown. Use Restore tmux rich input to check the existing launch without starting another pane.
+
+cli-agent-tmux-owned-exited = This tmux CLI session has ended. Start a new tmux pane to continue.
+
+cli-agent-tmux-restored-text-unconfirmed = The current session state is unconfirmed. Enter text in the native terminal; images can still be sent to its native image queue.

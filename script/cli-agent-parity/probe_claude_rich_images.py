@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import stat
 import subprocess
 import tempfile
 import threading
@@ -17,6 +18,7 @@ import uuid
 
 import prepare_claude_cli
 import run_claude_adapter_live as adapter
+from run_claude_image_skill_live import private_macos_root
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -144,14 +146,53 @@ class NativeSession:
                 "stderr_sha256": digest(self.stderr), "raw_fixture_frames": len(self.frames)}
 
 
+def registered_macos_root(path):
+    root = private_macos_root(path)
+    records = root.parent / "records"
+    metadata = records.lstat()
+    if (not stat.S_ISDIR(metadata.st_mode) or records.is_symlink()
+            or metadata.st_uid != os.getuid() or metadata.st_mode & 0o022
+            or metadata.st_dev != root.stat().st_dev):
+        raise ValueError("逐轮记录目录身份或权限不符合本机测试约定")
+    record = records / f"{root.name}.json"
+    metadata = record.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or record.is_symlink()
+            or metadata.st_uid != os.getuid() or metadata.st_mode & 0o022
+            or metadata.st_dev != root.stat().st_dev or metadata.st_size > 64 * 1024):
+        raise ValueError("本轮登记文件身份或权限不符合本机测试约定")
+    registered = json.loads(record.read_text(encoding="utf-8"))
+    directory = root.stat()
+    expected = {
+        "run_id": root.name,
+        "status": "running",
+        "temporary_directory": str(root),
+        "temporary_realpath": str(root.resolve(strict=True)),
+        "directory_device": directory.st_dev,
+        "directory_inode": directory.st_ino,
+        "directory_owner": directory.st_uid,
+        "directory_mode": stat.S_IMODE(directory.st_mode),
+        "cleanup_ready": False,
+    }
+    if (not isinstance(registered, dict)
+            or any(registered.get(key) != value for key, value in expected.items())
+            or registered.get("cleanup_ready") is not False):
+        raise ValueError("本轮登记状态或目录身份不匹配，禁止启动验收")
+    return root
+
+
 def run_production(args, contract):
     if args.supervisor is None or args.case is None:
         raise ValueError("生产校准需要监督者和明确用例")
+    macos = prepare_claude_cli.current_platform().startswith("darwin-")
+    if macos:
+        root = registered_macos_root(args.private_root)
+    else:
+        root = Path(tempfile.mkdtemp(prefix="infinishell-claude-rich-product-"))
     args.output.mkdir(parents=True, exist_ok=False)
-    root = Path(tempfile.mkdtemp(prefix="infinishell-claude-rich-product-",
-                                 dir="/private/tmp" if Path("/private/tmp").is_dir() else None))
     settings = adapter.prepare_project(root)
     environment = adapter.authorized_default_account_environment(root)
+    if macos:
+        environment.update({"TMPDIR": str(root), "TMP": str(root), "TEMP": str(root)})
     evidence = args.output.resolve() / "events.ndjson"
     environment.update({
         "INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
@@ -163,6 +204,8 @@ def run_production(args, contract):
         "INFINISHELL_CLAUDE_LIVE_MODEL": args.model,
         "INFINISHELL_CLAUDE_RICH_IMAGE_CASE": args.case,
     })
+    account = adapter.probe_authorized_default_account(
+        args.executable.resolve(), environment, root / "project")
     name = "ai::cli_agent_runtime::claude::live_tests::managed_image_live_tests::real_claude_managed_rich_image_lifecycle"
     settings_sha = digest(settings.read_bytes())
     binding = source_binding()
@@ -198,6 +241,7 @@ def run_production(args, contract):
                "exit_code": result.returncode, "native_image_replay_matches_prepared_bytes": exact_replay,
                "timed_out": timed_out, "critical_sources_unchanged_during_run": sources_unchanged,
                "acceptance_passed": passed, "credential_material_read": False,
+               "authorized_default_account": account,
                "app_restart_or_gui_verified": False, "workspace": str(root)}
     receipt.update(binding)
     (args.output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n")
@@ -225,6 +269,7 @@ def main():
     parser.add_argument("--explicit-skill-tool", action="store_true")
     parser.add_argument("--test-binary", type=Path)
     parser.add_argument("--supervisor", type=Path)
+    parser.add_argument("--private-root", type=Path, help="本机 macOS 生产验收已登记的 r- 轮次目录")
     parser.add_argument("--case", choices=("jpeg", "webp", "gif", "pure-png"))
     parser.add_argument("--model", default="claude-opus-5-5")
     args = parser.parse_args()
@@ -232,11 +277,13 @@ def main():
                     if args.explicit_skill_tool else "/infinishell-local-skills:inspect-picture")
     contract = prepare_claude_cli.verify_binary(args.executable, prepare_claude_cli.current_platform(), "2.1.280")
     version = subprocess.check_output([str(args.executable), "--version"], text=True, encoding="utf-8").strip()
-    status = json.loads(subprocess.check_output([str(args.executable), "auth", "status"], text=True, encoding="utf-8"))
-    if version != "2.1.280 (Claude Code)" or status.get("loggedIn") is not True:
-        raise ValueError("需要固定已认证 Claude 2.1.280")
+    if version != "2.1.280 (Claude Code)":
+        raise ValueError("需要固定 Claude 2.1.280")
     if args.test_binary is not None:
         return run_production(args, contract)
+    status = json.loads(subprocess.check_output([str(args.executable), "auth", "status"], text=True, encoding="utf-8"))
+    if status.get("loggedIn") is not True:
+        raise ValueError("需要已认证 Claude 2.1.280")
     # 生产适配器由 Rust 生成图片；只有下方原生校准需要 Pillow。
     from PIL import Image
 

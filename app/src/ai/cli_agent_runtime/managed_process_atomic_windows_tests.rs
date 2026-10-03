@@ -1374,9 +1374,12 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         held_package_processes: Vec::new(),
         initial_breakpoints: HashSet::new(),
         pending_event: None,
+        station_debugger: None,
         root_exit_observed: false,
         cancellation: None,
         npm_diagnostics: None,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        native_witness: None,
         loader_trace: None,
     };
     assert!(session.verify_root_image(&file).is_ok());
@@ -1421,6 +1424,80 @@ fn package_image_rejection_diagnostics_hide_unknown_paths() {
 }
 
 #[test]
+fn debug_backend_cannot_change_while_an_event_is_pending() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    session.pending_event = Some((41, 43, CREATE_PROCESS_DEBUG_EVENT));
+
+    assert!(session.bind_station_debugger(None).is_err());
+    assert_eq!(
+        session.pending_event,
+        Some((41, 43, CREATE_PROCESS_DEBUG_EVENT))
+    );
+    assert!(session.station_debugger.is_none());
+}
+
+#[test]
+fn debug_backend_cannot_change_after_the_root_was_bound() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    session.root_process_id = 41;
+
+    assert!(session.bind_station_debugger(None).is_err());
+    assert_eq!(session.root_process_id, 41);
+    assert!(session.station_debugger.is_none());
+}
+
+#[test]
+fn debug_wait_cancellation_precedes_the_deadline_without_consuming_an_event() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let failure = wait_for_cancellable_debug_event(
+        Instant::now(),
+        "已到原截止时间",
+        &AtomicBool::new(true),
+        Some(&mut trace),
+        None,
+    )
+    .unwrap_err();
+
+    assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    assert_eq!(trace.last_boundary, "wait_cancelled");
+    assert_eq!(trace.wait_calls, 0);
+    assert_eq!(trace.received, 0);
+}
+
+#[test]
+fn debug_wait_deadline_does_not_start_another_wait() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let failure = wait_for_cancellable_debug_event(
+        Instant::now(),
+        "已到原截止时间",
+        &AtomicBool::new(false),
+        Some(&mut trace),
+        None,
+    )
+    .unwrap_err();
+
+    assert_eq!(failure.kind(), io::ErrorKind::TimedOut);
+    assert_eq!(trace.last_boundary, "wait_deadline");
+    assert_eq!(trace.wait_calls, 0);
+    assert_eq!(trace.received, 0);
+}
+
+#[test]
+fn debug_wait_preserves_native_errors_without_treating_transport_failure_as_timeout() {
+    let timeout = io::Error::other(WindowsError::from_hresult(HRESULT::from_win32(121)));
+    let denied = io::Error::from_raw_os_error(5);
+    let transport = io::Error::new(io::ErrorKind::TimedOut, "有界协议未确认");
+
+    assert_eq!(debug_error_code(&timeout), Some(HRESULT::from_win32(121)));
+    assert_eq!(debug_error_code(&denied), Some(HRESULT::from_win32(5)));
+    assert_eq!(debug_error_code(&transport), None);
+}
+
+#[test]
 fn failed_exit_continue_keeps_process_and_pending_event() {
     let fixture = Fixture::new();
     let lease = prepare(&fixture.expected()).unwrap();
@@ -1441,8 +1518,28 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
     diagnostics.roles.insert(process_id, NpmProcessRole::Root);
     diagnostics.received(process_id, EXIT_PROCESS_DEBUG_EVENT, Some(17));
     session.npm_diagnostics = Some(diagnostics);
+    session.bind_package_diagnostics(Uuid::new_v4());
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .as_mut()
+        .unwrap()
+        .received(
+            &DEBUG_EVENT {
+                dwDebugEventCode: EXIT_PROCESS_DEBUG_EVENT,
+                dwProcessId: process_id,
+                ..Default::default()
+            },
+            0,
+            unsafe { GetCurrentThreadId() },
+            false,
+        );
 
-    assert!(session.continue_pending(DBG_CONTINUE).is_err());
+    let failure = session
+        .continue_pending(DBG_CONTINUE, Instant::now() + DEBUG_DRAIN_TIMEOUT)
+        .unwrap_err();
 
     assert_eq!(
         session.pending_event,
@@ -1456,6 +1553,15 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
         Some(&NpmProcessRole::Root)
     );
     assert_eq!(diagnostics.pending_exit_code, Some(17));
+    let fields = session.package_debug_summary(Err(&failure)).unwrap();
+    assert_eq!(fields["last_boundary"], "continue_failed");
+    assert_eq!(fields["continued"], 0);
+    assert_eq!(fields["recent"][0]["continuation"]["ok"], false);
+    assert!(fields["recent"][0]["continuation"]["hresult"].is_i64());
+    assert_eq!(
+        fields["pending_event"],
+        serde_json::json!([process_id, 0, EXIT_PROCESS_DEBUG_EVENT.0])
+    );
 }
 
 struct PackageProbeFixture {
@@ -1558,7 +1664,12 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
     let (failure, rejected_identity) = loop {
         let event = fixture
             .debugger
-            .next_event(deadline, "测试未收到子映像事件")
+            .next_event(
+                deadline,
+                "测试未收到子映像事件",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                None,
+            )
             .unwrap();
         let image = (event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT).then(|| {
             // 复制 hFile，仅供断言；实际事件所有权仍由 validate_event 接管。
@@ -1571,7 +1682,7 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
             .debugger
             .validate_event_in_container(&event, Some(&fixture.process))
         {
-            Ok(status) => fixture.debugger.continue_pending(status).unwrap(),
+            Ok(status) => fixture.debugger.continue_pending(status, deadline).unwrap(),
             Err(failure) => break (failure, image),
         }
     };
@@ -1620,6 +1731,8 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
         .next_event(
             Instant::now() + DEBUG_DRIVER_TIMEOUT,
             "测试未收到 loader 事件",
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            None,
         )
         .unwrap();
     fixture

@@ -236,6 +236,42 @@ fn fixed_new_draft_can_stage_two_skills_for_native_validation() {
 }
 
 #[test]
+fn fixed_grok_skill_policies_expose_selectable_skills_in_the_composer() {
+    App::test((), |mut app| async move {
+        let project = tempfile::tempdir().unwrap();
+        let manager = manager_view(&mut app);
+        let alpha = register_skill(&mut app, project.path(), "alpha");
+        installation(&mut app, "1.0.41");
+        manager.update(&mut app, |view, ctx| {
+            view.harness = Harness::Grok;
+            view.directory.update(ctx, |editor, ctx| {
+                editor.set_buffer_text(&project.path().to_string_lossy(), ctx)
+            });
+            for policy in [
+                PermissionPolicy::GrokRestrictedSkillsV1,
+                PermissionPolicy::GrokReviewedCommandsSkillsV1,
+            ] {
+                view.permission = policy;
+                view.refresh_managed_input(ctx);
+                assert!(view.managed_input.available_skills);
+                view.select_composer_skill(&alpha, view.input_generation, ctx)
+                    .unwrap();
+                assert_eq!(view.parsed_composer_skills(ctx).unwrap().len(), 1);
+            }
+        });
+        installation(&mut app, "1.0.42");
+        manager.update(&mut app, |view, ctx| {
+            view.refresh_managed_input(ctx);
+            assert!(!view.managed_input.available_skills);
+            assert!(
+                view.select_composer_skill(&alpha, view.input_generation, ctx)
+                    .is_err()
+            );
+        });
+    });
+}
+
+#[test]
 fn legacy_grok_draft_keeps_the_single_skill_limit() {
     App::test((), |mut app| async move {
         let project = tempfile::tempdir().unwrap();

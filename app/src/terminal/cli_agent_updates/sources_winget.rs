@@ -9,8 +9,8 @@ use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ArtifactRole, BoundInvocation, CLIAgent, Channel, Error, Installation, Source, absolute_env,
-    brew,
+    ArtifactRole, BoundInvocation, CLIAgent, Channel, ConfigKind, Error, Installation, Source,
+    absolute_env, brew,
 };
 
 pub(super) const SOURCE: &str = "Microsoft.Winget.Source_8wekyb3d8bbwe";
@@ -26,12 +26,30 @@ pub(super) fn supports(agent: CLIAgent, target: &str) -> Result<(), Error> {
         return super::winget_grok::supports(agent, target);
     }
     if agent == CLIAgent::Claude
-        && target == "2.1.280"
-        && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
+        && (target == "2.1.280" && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
+            || target == "2.1.285" && cfg!(target_arch = "x86_64"))
     {
         Ok(())
     } else {
         Err(Error::UnsupportedSource)
+    }
+}
+
+pub(super) fn supports_transition(
+    agent: CLIAgent,
+    installed: &str,
+    target: &str,
+) -> Result<(), Error> {
+    if agent != CLIAgent::Claude || target == "2.1.280" {
+        return Ok(());
+    }
+    if cfg!(target_arch = "x86_64")
+        && target == "2.1.285"
+        && matches!(installed, "2.1.285" | "2.1.286")
+    {
+        Ok(())
+    } else {
+        Err(Error::InvalidRelease)
     }
 }
 
@@ -209,5 +227,35 @@ pub(super) fn discover(
     } else {
         Some(Error::ChannelMismatch)
     };
+    if cfg!(target_arch = "x86_64") && matches!(installed, "2.1.285" | "2.1.286") {
+        let (length, digest) = super::winget_claude_contract::native(installed)?;
+        if installation.stamp.digest != digest
+            || std::fs::metadata(&installation.stamp.canonical)
+                .map_err(|_| Error::SourceChanged)?
+                .len()
+                != length
+        {
+            return Err(Error::UnsupportedSource);
+        }
+        let config = absolute_env("CLAUDE_CONFIG_DIR")
+            .or_else(|| super::user_home().map(|home| home.join(".claude")))
+            .ok_or(Error::UnsupportedSource)?
+            .join("settings.json");
+        found.channel = if requested == Channel::FollowInstallation {
+            super::claude_channel(&config)?
+        } else {
+            requested
+        };
+        found.config = Some((config, ConfigKind::Claude));
+        found.error = if matches!(found.channel, Channel::Latest | Channel::Stable) {
+            None
+        } else {
+            Some(Error::ChannelMismatch)
+        };
+    }
     Ok(Some(found))
 }
+
+#[cfg(test)]
+#[path = "sources_winget_tests.rs"]
+mod tests;

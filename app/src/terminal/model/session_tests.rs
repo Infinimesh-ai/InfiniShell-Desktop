@@ -409,3 +409,20 @@ fn powershell_read_command_embeds_escaped_path_without_args() {
         OsString::from(r"[System.IO.File]::ReadAllText('C:\o''brien\history.txt')")
     );
 }
+
+
+#[test]
+fn terminal_candidate_is_replaced_not_inherited_on_rebootstrap() {
+    let info = SessionInfo::new_for_test().with_shell_type(ShellType::Bash)
+        .merge_from_bootstrapped_value(BootstrappedValue {
+            shell: "bash".into(), shell_pid: Some(1234), shell_tty: Some("/dev/pts/7".into()),
+            ..Default::default()
+        });
+    assert_eq!(info.shell_pid, Some(1234));
+    assert_eq!(info.shell_tty.as_deref(), Some("/dev/pts/7"));
+    let info = info.merge_from_bootstrapped_value(BootstrappedValue {
+        shell: "bash".into(), ..Default::default()
+    });
+    assert_eq!(info.shell_pid, None);
+    assert_eq!(info.shell_tty, None);
+}

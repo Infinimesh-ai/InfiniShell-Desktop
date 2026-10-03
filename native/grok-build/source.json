@@ -1,0 +1,1815 @@
+{
+  "schema_version": 1,
+  "upstream": "https://github.com/xai-org/grok-build",
+  "base_commit": "07e35a3dfeed2f200d319ef6c893b5ea286d9a51",
+  "upstream_source_rev": "84745de98b3d3996729aefcefd518890ffb73930",
+  "upstream_license": "Apache-2.0",
+  "modification_license": "AGPL-3.0-only",
+  "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+  "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+  "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+  "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
+  "patch_reconstruction": "公开基线加补丁的独立索引 tree 与已测源码 tree 完全一致",
+  "source_files_sha256": {
+    "Cargo.lock": "d32a2e89a0c347ed9bbc2f385e3a202b45ac04e17f31f3e8d3e452304ac49df8",
+    "crates/build/xai-proto-build/src/lib.rs": "5cbff31f1b351002c68a99ce8c8a54c57bd39d52ba2c1162ae2abff0f7ef4abf",
+    "crates/build/xai-proto-build/src/lib_tests.rs": "34bd7d244a235a1379b9bdcd651290be8887040ff866671ec2fa1888a8382bbf",
+    "crates/codegen/xai-grok-pager-bin/build.rs": "21e1204e8e4978d34ddb94c798576f0dd3b3f2cb438391a99b2ade27f7553a6c",
+    "crates/codegen/xai-grok-pager/Cargo.toml": "469aead8022b1225a73e23b6c143c6c0cbf6cb324ff984b9a2dbd32015335413",
+    "crates/codegen/xai-grok-pager/src/app/actions.rs": "a2352630ee814d17f55919b6a707a05b411908a6df86f378d17348a84b69b20a",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs": "c9955be15224677752c8c8e43e32527312f3ca3e92b025b5831c4f417a32b0a3",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs": "f2514130e5b8c1e1fac594db3cba240c75bbb5527bc465965de8db78a071a2eb",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs": "70ab3efa5e6678dc1abce5097bc64d79670900b8ce1fd0b73e25f68f1618cdee",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs": "8bf68c39b54091089953d92b18dd8a09d9d4345d05f9baa98ae55d0c6136a0dc",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs": "c34be142983f24c5e9401c711388aad81ad57b1f9ec579be3eb22fef8ccad00e",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs": "49500738d266903b272079501cec095a8ee07ffa69a9fa727e4bd6cb25bd65f7",
+    "crates/codegen/xai-grok-pager/src/app/effects/mod.rs": "3d56f4538bfbab440fe8a4ec90d3c0156518770b353bd8af785da53c10e53424",
+    "crates/codegen/xai-grok-pager/src/app/event_loop.rs": "c3d7204f9c31a23db9c0ea49cfcb90cea08d49186a17452fe26fe61a607538a2",
+    "crates/codegen/xai-grok-pager/src/app/mod.rs": "9faab617d56c1cb3fbb470ae63e9999c32628b8c3fc3f44ed600f9ed1a947c54",
+    "crates/codegen/xai-grok-pager/src/app/status_line_policy.rs": "fb2f7cd27f6ac31cacb321ec8e1aa33af6c9bb3b758e33c6c72dc0a4d9155ac7",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs": "f28a29acd7d7a2fe3c93eef383c89b4b9d4bcb1ee82abbbce76af40caa36636b",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs": "f4e72e85abd4bff88a1e3fc6c9ef137146f1dbfbd75401dda99228b8e3d4fa48",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs": "468a2dfe7ac57b8dd40bcd28e0c1841081f3265e38f1c91461dbb0c0c6a7dac6",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs": "dda5995a498e666b65595b697d56c0a396eebd1664e9ca59f526b1bb1c43948a",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs": "a29195940ba39a2a15922dc0e09a160c12cdb6b799f444abfe0da8707f32249b",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs": "6479d7adab01500d6e81c0a8c15b1c869b9b3ae8c873a58b63dd6325e30c05ab",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs": "13e8c4588f066e4076ac1a3110758628b340117bc8b58306db6b81e1c3e800a6",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux.rs": "afba70b88b563eb6be25cadfe8e08865e70420ff25336a875bfaa822780af448",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux_tests.rs": "1bab2a010a873b4792504be73ff349a3dfe48c2f490b1490a550606d7da0f6cb",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs": "e6cdae95ca723cd65fa8aea39a930b88038ce2ca2514fb9d48e00eeedd38de52",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs": "f3cadbb69c7683c741212db63e759727782c3f42ad547914e26444e986fb502f",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs": "98c30b6d03a863d2d9ceb2bc57525b4347214b96965c9b2cae8ebc49a5f107fc",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs": "1afa88f95cce60952be4dcaadd5b7431e18bf5acd90e70342fcfedc1b3518c2b",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs": "e2c94e7f1190c4052ff4e48ff1a7087dade7f8e9c4df0175ba9e345bdde0b2c3",
+    "crates/codegen/xai-grok-pager/src/client_identity.rs": "ce54c9b3181b637dad9490ad28f14d55409101ec9ec2ffe08014c04dce90e8df",
+    "crates/codegen/xai-grok-shell-terminal/src/adapter.rs": "556eca3a8e06b2d74d08f92af6b1a09ee0aba0fca3a7c289611dd8eac164efe9",
+    "crates/codegen/xai-grok-shell-terminal/src/lib.rs": "444bac0011ca6158bc03cd07d9881f34bed33761b7ca61c6c1dc4a9b94a49613",
+    "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "0d5c8fedbe8e1f0513e27cf85ddbf4cf53a62c36cea4747443566ee975b50336",
+    "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "beaf1225d996a98500a0b480e704a81bea0293368c19f70e9d8a5a81ca3c38d3",
+    "crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs": "4fcf53df3fd41951668eb06d3da8780accd14a9cb5cb8addc11aa2db831c3c78",
+    "crates/codegen/xai-grok-shell/src/extensions/mod.rs": "dad3a008be51b6343a4095c60140a35d7f8c79c91e024f19f38873451614015a",
+    "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs": "acc73086c476fd9f51c2284bb6e88b8293e6d2823bb6a27e26ee6f8a49615ad1",
+    "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs": "65fdc9584a68156540efb0dfdd12d4bc89d42d368777c9ad50c383383dab8da9",
+    "crates/codegen/xai-grok-shell/src/leader/client.rs": "0ec461cbdc2c646c11ba12e7f7c2567d25c66e317dba742377f046cb3011aae8",
+    "crates/codegen/xai-grok-shell/src/leader/lock.rs": "424c4124ca1f1d989db971d3b303edf4161bb42fe58ff60846ffb83c60e1700c",
+    "crates/codegen/xai-grok-shell/src/leader/mod.rs": "b00c634d94f129e03042551348bdeda4918496b5ee6a0f4682d13c9e177783ef",
+    "crates/codegen/xai-grok-shell/src/leader/protocol.rs": "03f84a141fba28a99bd5e234f1d04e1b23090eff74055fc8983ed53edc9c0081",
+    "crates/codegen/xai-grok-shell/src/leader/server.rs": "e1acd2d8dfaabc6878d550b774e3438a906d7051d6cffa129f0e15301be5c55a",
+    "crates/codegen/xai-grok-shell/src/leader/server_tests.rs": "60ce1e2d6e525f21ce1adb2e5ea0d5a39728c47cdd8e30a222fdeecfa2c00492",
+    "crates/codegen/xai-grok-shell/src/leader/transport.rs": "04adc5ac4e20afdd269c111335ca0b98768e803db1438b096312c08f6bea05b2",
+    "crates/codegen/xai-grok-shell/src/session/acp_session.rs": "9c25f28e352d206859d77a58f3793cc5ae734558fa30357fa9ab0bef456b32de",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs": "aae845d873cb2c5c9a6c9839e765cd8d7b6fb9d7a3c996f1c12f2f14c4574e4a",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs": "64c026080dfda5ba3468a231a7f3ea2cc978192bca94cb9ffc3313c9f76619f8",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs": "2cba092cbaa381131bdaa4fae58f1cd88611a97377db1ea520e2116643828a3c",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs": "225f962bd52c548189b9a314bb1b8e847b1fadb540be61e2c9cd8c1e6b367ea7",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs": "93b9bfc85d33e102b24627a1550ae3df298b6d2493562482db2d324c2fd1b1cd",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs": "91093677566edd9bea8005d4a20e680cc6a6bd66410f8b7c20d35c21424e9ab1",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs": "bdbc9c28433cf335af8be4c4ac8ee7da6e450080fe0cefccd5a1da060afe27a8",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs": "1630ec09ad6d3d3ee5df0628ca36cc98fe4865131e3cacb58188f7ddb43b8bf8",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs": "b86307116033c86f94a34dedabee32c200516515319699de865e176ba2e775e4",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs": "77e60ffefe8152da795bb12e14f5c35b15c8e4ffa46d7330c169868ddb0625d2",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "8abbc50f79ab008180cf3073942ac927acf96969fe6ee33bb5f39f23c249624f",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs": "aa950a21d5d6593c5df0c723a02e7d91c3585817f3ebc89a3e76ca2783655892",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs": "f4bd7cf138b5c96966eacb5ee853f8c05d4bc268529b3c75979a8c83eb93a2ee",
+    "crates/codegen/xai-grok-shell/src/session/commands.rs": "b5a261c8744dd1842224493ca51260bb6a4d487ca5a88df45b4320c0f4389a00",
+    "crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs": "918fa6dab1c5e980890a592b257e2b89b708942ac6799b004d4bbc6f95a5608f",
+    "crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
+    "crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs": "4bc69f54cf74390d8fa2c2a1daa5f368dae7c478e2e9a80bc88ffb69bce9ff77",
+    "crates/codegen/xai-grok-tools/src/bridge.rs": "48100e6c902cac75f033004e335eb30053ee0165f814f6ba25a833ce6a7e3808",
+    "crates/codegen/xai-grok-tools/src/computer/local/terminal.rs": "88927a1decf45982093a23abcc35434b54d6aa70d6f7812a0da095bc5b63f9b6",
+    "crates/codegen/xai-grok-tools/src/computer/types.rs": "6ec9e816533dd83172fcee97a1fa77f897066f8cffd283af9319290546c28522",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs": "506177584765643bb8a10913e1963d30b4e93ddb54a0ef1a02c8ed5889d80efe",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs": "29753dd8087831bfa3c807eb55f98bb61e141115f901fc8fb24eae0d4ebca036",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs": "e56cfed9c12eba1f31dbb886ac0c47a8f6b2cc73dc9f13f025b74e62e589fecc",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs": "49f384bb0530fe7b741d8ae225087e89d1807a663c91b63e85900d70d49d7271",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs": "1a223cc7d8b1d8fdac2123e665db00017149518b2271d094013c9b86b6cbf05e",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
+    "crates/codegen/xai-grok-version/src/lib.rs": "004debf4180bbe8d36b10fc981c188c8002d5cb7f6ad56de40b08f22f2627e35"
+  },
+  "source_digest": "1b11691384594a1105ed2e6e06a2b5540116928aea93cb02564209f339376efa",
+  "local_validation": {
+    "platform": "macOS arm64",
+    "rust_toolchain": "1.94.0",
+    "grok_version_environment": "1.0.41+infinishell.terminal-bridge.11",
+    "source_binding": {
+      "final_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+      "final_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+      "build_base_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f"
+    },
+    "native_suite": {
+      "run_id": "r-pr0y8law",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "52c0d97d4ceafaf73314c2b4bb8b6aa152a203fc97904b0a5c9020af63243dcf",
+      "native_check": "passed",
+      "native_build": "passed",
+      "native_tests_passed": 74,
+      "per_library": [
+        46,
+        20,
+        4,
+        4
+      ],
+      "startup_smoke": [
+        "version",
+        "help",
+        "async_completions"
+      ],
+      "model_inputs": 0
+    },
+    "host_check_and_i18n": {
+      "run_id": "r-e2coze3m",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "be16cab5a35a093d8633fec60473ddef27032ffdaf37c7a2818cb2675020850d",
+      "host_check": "passed",
+      "i18n_tests_passed": 11
+    },
+    "boundary": "提交前工作区完整check、四库74项、build及3项零模型启动检查通过；最终源码与提交逐文件匹配。Mac正式信任工件仍为原.3，不将本轮Mac .11构建记为GUI验收；Windows栈与子进程回归待目标执行。"
+  },
+  "limitations": [
+    "Mac G01原.3功能与双语审计已满足；Linux宿主和Windows原生/宿主已实现，分别绑定.6与实际可用的.11工件。绑定后的精确最终宿主源码门禁待验，G01仍开放。",
+    "普通 GUI、粘贴增量与最终中文布局分别绑定 r-wudipm8z、r-g91qynam、r-ni936aln；最后仅 zh-CN FTL 变化已核验，历史模型输入不重跑或重计。",
+    "旧 .1 英文立即断连 Unknown／零输入及恢复后旧 query Unknown 保留失败；.3 不声称旧 Unknown 跨原生实例自动转 ACK。",
+    "其他平台实机验收移交用户；Linux／Windows 实现缺项没有移交，源码 CI 也不代替实现。",
+    "上游完整 --tests 因未公开的两份 docs/internal 文件缺失而失败，未伪造文档。",
+    "定制构建不继承官方发行版 1.0.41 (4220f3b224a6) 的验收。"
+  ],
+  "ordinary_pty_validation": {
+    "platform": "macOS arm64",
+    "native_commit": "2a13b48618b93dea773953e835e74f4fd7a31429",
+    "run_id": "r-7j9xe_3c",
+    "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/ordinary-pty-validation.safe.json",
+    "sha256": "fdfb486c7a14088b7db28d92184c77144300fb6d90ec1f7a537213b5af3c441f",
+    "accepted": "普通未绑定 TUI 三条真实用户输入：中文长文本 26,597 字节精确一次、原生审批明确拒绝且零目标文件、同原生会话重启后新输入及精确答案；原文/回执/原生结果分别核验，两代自然退出并清理。",
+    "not_accepted": "英文首次立即断连请求 Unknown 且原生输入零次；恢复后的旧 query Unknown。不覆盖 InfiniShell GUI、ACP 运行中断线及英中布局。",
+    "gap_closed": false
+  },
+  "host_artifact_binding": {
+    "platform": "macOS arm64",
+    "sha256": "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+    "cdhash": "356fe77c29f339fcaa90e48094fc7af7e0571ec5",
+    "boundary": "宿主仅接受这个独立构建；其他源码重建不得继承工件或实测身份。",
+    "custom_version": "1.0.41+infinishell.terminal-bridge.3",
+    "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+    "archive_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok",
+    "archive_receipt_sha256": "791a420f10db76e805bfc1ab90b089dcf4c328fb19ac8383681cd19aa30ba2fe"
+  },
+  "standard_home_followup": {
+    "status": "historical_failures_preserved_current_gui_positive_below",
+    "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-8fh747ei-gui/acceptance-failed.safe.json",
+    "sha256": "e8978af44a79234a84db5b3b770c45d40737c0dc55fe4471b3febd9a2809d973",
+    "home_reason": "no_active_agent",
+    "host_messages": 0,
+    "native_receipts": 0,
+    "model_reply_boundary": "英文回合未经过桥账本，不能计宿主发送正例；后续输入驱动及运行中设置混合，不推断产品成功。",
+    "fix": "显式用户提交触发首页准备；State只读；固定agent/session/binding后再领取与原子提交；保留原生确认和输入守卫。",
+    "localization": "更新英中富输入提示，去掉普通会话一律需复制的旧表述；新构建双语布局待验。",
+    "cleanup": "测试App与原生退出；认证副本删除，原输入法及剪贴板恢复；系统自动化基础服务核明不持有本轮目录，短TMPDIR已清理。",
+    "gap_closed": false,
+    "native_commit": "8948fc8c2c15318f7025f55fda5a9f1e01d390e3",
+    "native_focused_tests_passed": 68,
+    "animation_followup": {
+      "status": "native_source_gates_passed_current_gui_positive_below",
+      "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+      "focused_tests_passed": 74,
+      "change": "首页与 Agent 纯显示 tick 前后证明身份和输入状态不变时保留 epoch；输入、审批、异步待处理及恢复 marker 仍撤销旧观察，含 ABA 回归。",
+      "gap_closed": false
+    },
+    "latest_gui_before_animation_fix": {
+      "status": "failed_no_host_delivery",
+      "native_commit": "8948fc8c2c15318f7025f55fda5a9f1e01d390e3",
+      "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-_b9gy4r4-gui/acceptance-failed.safe.json",
+      "sha256": "f24705326cf58863ed81ec300f0229d182d917f23bc71443b8ddd771feb68c13",
+      "host_messages": 0,
+      "native_receipts": 0,
+      "input": "英文171字节两行已完整粘贴到富输入；Return及ABC对照未观察到投递，原拼音与剪贴板已恢复。",
+      "native_state": "标准首页no_active_agent，闲置input_epoch持续递增；尚不认定其为本次GUI失败唯一原因。",
+      "localization": "新版英文placeholder无遮挡；中文布局待验。",
+      "cleanup": "App及原生自然退出，认证副本删除，证据归档；Apple基础服务核明未持有本轮目录后短TMPDIR已清理。",
+      "gap_closed": false
+    }
+  },
+  "previous_native_artifacts": [
+    {
+      "custom_version": "1.0.41+infinishell.terminal-bridge.1",
+      "native_commit": "2a13b48618b93dea773953e835e74f4fd7a31429",
+      "native_tree": "c3b5294dea04615c69c2ae62c7346016f096264a",
+      "patch_sha256": "2d06b640fe3b7f66f8df0ea690388cd8231c89abc88eb4ddbf282fffea26138c",
+      "local_validation": {
+        "platform": "macOS arm64",
+        "rust_toolchain": "1.94.0",
+        "grok_version_environment": "1.0.41+infinishell.terminal-bridge.1",
+        "suite_archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-cidusm0v-suite.safe.json",
+        "suite_sha256": "d9a98515714cadbabfd5216cdd1232d08338cbf75cfe9ca5825776790c0a7e98",
+        "log_sha256": "9ccca3c90a55898ad781c3c2b66ecbd952cb0a4e6204152e1df0b84e4145fabd",
+        "run_record_sha256": "9d5db8b07a09edf742a0a5e44a480759122e1af616e0e94f2e9c70eec9dded76",
+        "commands": [
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "xai-grok-pager-bin"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 45.966
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "xai-grok-pager",
+              "-p",
+              "xai-grok-shell",
+              "-p",
+              "xai-grok-tools",
+              "-p",
+              "xai-grok-shell-terminal",
+              "--lib",
+              "terminal_bridge",
+              "--",
+              "--test-threads=1"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 122.677
+          },
+          {
+            "command": [
+              "cargo",
+              "build",
+              "--locked",
+              "-p",
+              "xai-grok-pager-bin"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 74.462
+          }
+        ],
+        "binary": {
+          "path": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native/target/debug/xai-grok-pager",
+          "sha256": "1da3cf195aa3ed2778fa2efe05fa211f21d6520514ef776fc5a6e6b53739568f"
+        },
+        "focused_library_tests": {
+          "passed": 61,
+          "failed": 0,
+          "module_counts": [
+            33,
+            20,
+            4,
+            4
+          ]
+        },
+        "boundary": "离线源码门禁与独立构建，不代表普通 PTY、模型、GUI 或跨平台验收"
+      }
+    },
+    {
+      "custom_version": "1.0.41+infinishell.terminal-bridge.2",
+      "native_commit": "8948fc8c2c15318f7025f55fda5a9f1e01d390e3",
+      "native_tree": "d0076d1016efab3478a324878d318ab89a134387",
+      "patch_sha256": "150e7947d03e8601c3bbdbd910840a2c44b07494884125d393812593727235ec",
+      "local_validation": {
+        "platform": "macOS arm64",
+        "rust_toolchain": "1.94.0",
+        "grok_version_environment": "1.0.41+infinishell.terminal-bridge.2",
+        "suite_archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-hw6dp4py-suite.safe.json",
+        "suite_sha256": "2eb5913061d6b53a857db0bfdc40f71225d5f13383c2d6fba2154887306120ee",
+        "log_sha256": "96cf5cbd99a22309860249285eb5a5a79caebea3b7cda5eea6ef5138fcbe9ac5",
+        "run_record_sha256": "99d0bab18db27dc18883e8277f88985967e5aaa65534168cb6cb1bfc0b938cf6",
+        "commands": [
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "xai-grok-pager-bin"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 51.184
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "xai-grok-pager",
+              "-p",
+              "xai-grok-shell",
+              "-p",
+              "xai-grok-tools",
+              "-p",
+              "xai-grok-shell-terminal",
+              "--lib",
+              "terminal_bridge",
+              "--",
+              "--test-threads=1"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 125.35
+          },
+          {
+            "command": [
+              "cargo",
+              "build",
+              "--locked",
+              "-p",
+              "xai-grok-pager-bin"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 81.589
+          }
+        ],
+        "source_unchanged": true,
+        "focused_library_tests": {
+          "passed": 68,
+          "failed": 0,
+          "module_counts": [
+            40,
+            20,
+            4,
+            4
+          ]
+        },
+        "final_commit_build": {
+          "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-c9sfkze9-final-native-build.safe.json",
+          "sha256": "4ad47ec1b0f8f084741cc7af70efb2aacddbe9e27cf45f887127215bc1ad5ed8",
+          "log_sha256": "614cbe3453c189b2965fa787be7ba3e06ae0f3dda885d74e6e82cf2c35dbcdc6",
+          "source_commit": "8948fc8c2c15318f7025f55fda5a9f1e01d390e3",
+          "source_tree": "d0076d1016efab3478a324878d318ab89a134387",
+          "version": "grok 1.0.41+infinishell.terminal-bridge.2 (8948fc8c2c15)"
+        },
+        "binary": {
+          "path": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native/target/debug/xai-grok-pager",
+          "sha256": "51c152147fe4c611010e37c798a82165a5997a461d9f7672911a580014a6e28b",
+          "bytes": 511722896,
+          "cdhash": "6114b8e47a0bb2aad742ed04c4916bac25031e0d"
+        },
+        "boundary": "同源码提交前check与68项库回归，提交后重建最终版本标记；不代表普通PTY、模型、GUI或跨平台验收。"
+      }
+    },
+    {
+      "custom_version": "1.0.41+infinishell.terminal-bridge.3",
+      "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+      "native_tree": "2aee3a25bcdfe6590e6d96b361ab7bb081d6a186",
+      "patch_sha256": "dc34f9c4f7947d95f02e6dea7096a85f1d16ef6bb4e0b4afdcf7eb4bf7fa515b",
+      "local_validation": {
+        "platform": "macOS arm64",
+        "rust_toolchain": "1.94.0",
+        "grok_version_environment": "1.0.41+infinishell.terminal-bridge.3",
+        "suite_archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-gxtokigl-suite.safe.json",
+        "suite_sha256": "481ad27382ac47df7f1e3d52d6a085273c427ea9d43ae62e5c4ac0fa04d949f1",
+        "log_sha256": "901e453b9e575d60d2307e4d5c2011626ded77e8c635ec4cede4495a18285015",
+        "run_record_sha256": "a2f142029c5fc8a232b201cf403e6bf84b4b7dafd424093a01a06e7a2f8d2284",
+        "commands": [
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "xai-grok-pager-bin"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 37.455
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "xai-grok-pager",
+              "-p",
+              "xai-grok-shell",
+              "-p",
+              "xai-grok-tools",
+              "-p",
+              "xai-grok-shell-terminal",
+              "--lib",
+              "terminal_bridge",
+              "--",
+              "--test-threads=1"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 106.79
+          },
+          {
+            "command": [
+              "cargo",
+              "build",
+              "--locked",
+              "-p",
+              "xai-grok-pager-bin"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 64.982
+          }
+        ],
+        "source_unchanged": true,
+        "focused_library_tests": {
+          "passed": 74,
+          "failed": 0,
+          "module_counts": [
+            46,
+            20,
+            4,
+            4
+          ]
+        },
+        "final_commit_build": {
+          "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-bpvw_fss-final-native-build.safe.json",
+          "sha256": "fc89dee2406ddddce8381990e4675f8da83902404f39583d6f679977fb2a1312",
+          "log_sha256": "af5e46fe9f330faa6d1088c04585e4631a91eb2c6ad6d72696bdbfb38ec3be63",
+          "source_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+          "source_tree": "2aee3a25bcdfe6590e6d96b361ab7bb081d6a186",
+          "version": "grok 1.0.41+infinishell.terminal-bridge.3 (1491b486fbaa)"
+        },
+        "binary": {
+          "path": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native/target/debug/xai-grok-pager",
+          "sha256": "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+          "bytes": 511752064,
+          "cdhash": "356fe77c29f339fcaa90e48094fc7af7e0571ec5"
+        },
+        "boundary": "同源码提交前 check 与 74 项库回归，提交后重建最终版本标记；不继承 .2 或 .1 的普通 PTY、模型、GUI 或跨平台验收。"
+      },
+      "host_artifact_binding": {
+        "platform": "macOS arm64",
+        "sha256": "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+        "cdhash": "356fe77c29f339fcaa90e48094fc7af7e0571ec5",
+        "boundary": "宿主仅接受这个独立构建；其他源码重建不得继承工件或实测身份。",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.3",
+        "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd"
+      },
+      "source_files_sha256": {
+        "crates/codegen/xai-grok-pager/src/app/actions.rs": "a2352630ee814d17f55919b6a707a05b411908a6df86f378d17348a84b69b20a",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs": "4bab42c2386d2fc9dc33271295991f557e0ab7f327c4f4210fd390f73b7e3c5a",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs": "34866c59e2e69e2aecd8e05ed11da9aa62260f78cf34ed3fd47ee4376126f861",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs": "70ab3efa5e6678dc1abce5097bc64d79670900b8ce1fd0b73e25f68f1618cdee",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs": "8bf68c39b54091089953d92b18dd8a09d9d4345d05f9baa98ae55d0c6136a0dc",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs": "5038ba3822c93886b12aacfecc37f749086208a223a8c4350136a06a2b9ca36c",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs": "49500738d266903b272079501cec095a8ee07ffa69a9fa727e4bd6cb25bd65f7",
+        "crates/codegen/xai-grok-pager/src/app/effects/mod.rs": "3d56f4538bfbab440fe8a4ec90d3c0156518770b353bd8af785da53c10e53424",
+        "crates/codegen/xai-grok-pager/src/app/event_loop.rs": "05f63586fbc296f45b8c52d2eaca84e9ef06b821f95fede94b9294994aa09e36",
+        "crates/codegen/xai-grok-pager/src/app/mod.rs": "02bc1288d8b99a4007c8033317d262c730c85154392954579381547216210113",
+        "crates/codegen/xai-grok-pager/src/app/status_line_policy.rs": "45a4eee9883b72e24f27fc12345ad1e1a7579bc05c9ec200b421b070abbf50dc",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs": "ba6ecce16646e15083d9032561c4855206d67846543d370a17018f0c59e55e91",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs": "b96a5c40cbfff76621daeac60511c3d0684ea58cbab071f2a875d81a2d75de8a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs": "3df24158da9017a7af6760717ec5b2e6aaf1a004ed1f3e14f67dcd25ae33fc3a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs": "6479d7adab01500d6e81c0a8c15b1c869b9b3ae8c873a58b63dd6325e30c05ab",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs": "85f29006b6b0aa084c960bc5e69a8924b76b33ca0e9489914b9b5205c2d39d6f",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs": "e6cdae95ca723cd65fa8aea39a930b88038ce2ca2514fb9d48e00eeedd38de52",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs": "f3cadbb69c7683c741212db63e759727782c3f42ad547914e26444e986fb502f",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs": "8a201755a27b4a43c473ab707400613cd4ddf7b263e2147fd18d686409d300b0",
+        "crates/codegen/xai-grok-pager/src/client_identity.rs": "ce54c9b3181b637dad9490ad28f14d55409101ec9ec2ffe08014c04dce90e8df",
+        "crates/codegen/xai-grok-shell-terminal/src/adapter.rs": "556eca3a8e06b2d74d08f92af6b1a09ee0aba0fca3a7c289611dd8eac164efe9",
+        "crates/codegen/xai-grok-shell-terminal/src/lib.rs": "444bac0011ca6158bc03cd07d9881f34bed33761b7ca61c6c1dc4a9b94a49613",
+        "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "3302db3a3be12af83cdc4eaf48d1ed38e48fc4d7f7ed9bf2d13b16170df17099",
+        "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "4c71cf32ba12c6226cbf3ff5e2d11b2c2451bcfcdfebae5f2d6b1aff2216893d",
+        "crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs": "4fcf53df3fd41951668eb06d3da8780accd14a9cb5cb8addc11aa2db831c3c78",
+        "crates/codegen/xai-grok-shell/src/extensions/mod.rs": "dad3a008be51b6343a4095c60140a35d7f8c79c91e024f19f38873451614015a",
+        "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs": "acc73086c476fd9f51c2284bb6e88b8293e6d2823bb6a27e26ee6f8a49615ad1",
+        "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs": "65fdc9584a68156540efb0dfdd12d4bc89d42d368777c9ad50c383383dab8da9",
+        "crates/codegen/xai-grok-shell/src/leader/client.rs": "0ec461cbdc2c646c11ba12e7f7c2567d25c66e317dba742377f046cb3011aae8",
+        "crates/codegen/xai-grok-shell/src/leader/lock.rs": "424c4124ca1f1d989db971d3b303edf4161bb42fe58ff60846ffb83c60e1700c",
+        "crates/codegen/xai-grok-shell/src/leader/mod.rs": "b00c634d94f129e03042551348bdeda4918496b5ee6a0f4682d13c9e177783ef",
+        "crates/codegen/xai-grok-shell/src/leader/protocol.rs": "03f84a141fba28a99bd5e234f1d04e1b23090eff74055fc8983ed53edc9c0081",
+        "crates/codegen/xai-grok-shell/src/leader/server.rs": "e1acd2d8dfaabc6878d550b774e3438a906d7051d6cffa129f0e15301be5c55a",
+        "crates/codegen/xai-grok-shell/src/leader/server_tests.rs": "60ce1e2d6e525f21ce1adb2e5ea0d5a39728c47cdd8e30a222fdeecfa2c00492",
+        "crates/codegen/xai-grok-shell/src/session/acp_session.rs": "9c25f28e352d206859d77a58f3793cc5ae734558fa30357fa9ab0bef456b32de",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs": "aae845d873cb2c5c9a6c9839e765cd8d7b6fb9d7a3c996f1c12f2f14c4574e4a",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs": "64c026080dfda5ba3468a231a7f3ea2cc978192bca94cb9ffc3313c9f76619f8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs": "2cba092cbaa381131bdaa4fae58f1cd88611a97377db1ea520e2116643828a3c",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs": "225f962bd52c548189b9a314bb1b8e847b1fadb540be61e2c9cd8c1e6b367ea7",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs": "93b9bfc85d33e102b24627a1550ae3df298b6d2493562482db2d324c2fd1b1cd",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs": "91093677566edd9bea8005d4a20e680cc6a6bd66410f8b7c20d35c21424e9ab1",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs": "bdbc9c28433cf335af8be4c4ac8ee7da6e450080fe0cefccd5a1da060afe27a8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs": "1630ec09ad6d3d3ee5df0628ca36cc98fe4865131e3cacb58188f7ddb43b8bf8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs": "b86307116033c86f94a34dedabee32c200516515319699de865e176ba2e775e4",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs": "77e60ffefe8152da795bb12e14f5c35b15c8e4ffa46d7330c169868ddb0625d2",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "c36be93342cda8177d9aa64606e21cc37afcfa593425bbee4a52ba61f84fa442",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs": "aa950a21d5d6593c5df0c723a02e7d91c3585817f3ebc89a3e76ca2783655892",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs": "f4bd7cf138b5c96966eacb5ee853f8c05d4bc268529b3c75979a8c83eb93a2ee",
+        "crates/codegen/xai-grok-shell/src/session/commands.rs": "b5a261c8744dd1842224493ca51260bb6a4d487ca5a88df45b4320c0f4389a00",
+        "crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs": "918fa6dab1c5e980890a592b257e2b89b708942ac6799b004d4bbc6f95a5608f",
+        "crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs": "4bc69f54cf74390d8fa2c2a1daa5f368dae7c478e2e9a80bc88ffb69bce9ff77",
+        "crates/codegen/xai-grok-tools/src/bridge.rs": "48100e6c902cac75f033004e335eb30053ee0165f814f6ba25a833ce6a7e3808",
+        "crates/codegen/xai-grok-tools/src/computer/local/terminal.rs": "b56e65a0a1a87f109493da4971d13ef9c86fe0f02519f437ad398e5f7d200c7a",
+        "crates/codegen/xai-grok-tools/src/computer/types.rs": "6ec9e816533dd83172fcee97a1fa77f897066f8cffd283af9319290546c28522",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs": "506177584765643bb8a10913e1963d30b4e93ddb54a0ef1a02c8ed5889d80efe",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs": "29753dd8087831bfa3c807eb55f98bb61e141115f901fc8fb24eae0d4ebca036",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs": "e56cfed9c12eba1f31dbb886ac0c47a8f6b2cc73dc9f13f025b74e62e589fecc",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs": "49f384bb0530fe7b741d8ae225087e89d1807a663c91b63e85900d70d49d7271",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs": "1a223cc7d8b1d8fdac2123e665db00017149518b2271d094013c9b86b6cbf05e",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
+        "crates/codegen/xai-grok-version/src/lib.rs": "004debf4180bbe8d36b10fc981c188c8002d5cb7f6ad56de40b08f22f2627e35"
+      },
+      "source_digest": "1cc709464f0fa355c92c326db6969121d0884ae5b24a520ed418fb371f404f64"
+    },
+    {
+      "custom_version": "1.0.41+infinishell.terminal-bridge.4",
+      "native_commit": "3d1886b111202215ecfef5d6e41c76b75f0daf36",
+      "native_tree": "3796aaf2ffebab4fe06703025ae8d256c221535d",
+      "patch_sha256": "53953bfd738d279ba0991c0cdc2fc4db18415aaa6b13253a1b0967196de9b04c",
+      "local_validation": {
+        "platform": "macOS arm64",
+        "rust_toolchain": "1.94.0",
+        "grok_version_environment": "1.0.41+infinishell.terminal-bridge.3",
+        "check_run": "r-xrre0iid",
+        "check_log_sha256": "b6edfae03e652a862bfac92fbf435fa8c4c26fc7922865db00b5735dd61deafb",
+        "test_run": "r-fhslz7cj",
+        "test_log_sha256": "c4ffd7aa36fc4cd06e4bf0e81b6e016effc931795daf4212b62dd0e24657e208",
+        "focused_library_tests": {
+          "passed": 74,
+          "failed": 0,
+          "module_counts": [
+            46,
+            20,
+            4,
+            4
+          ]
+        },
+        "source_binding": {
+          "base_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+          "final_tree": "3796aaf2ffebab4fe06703025ae8d256c221535d",
+          "final_commit": "3d1886b111202215ecfef5d6e41c76b75f0daf36"
+        },
+        "boundary": "共享Unix接线回归，不构建或替换Mac原.3工件；Windows专有代码仍待目标编译和执行。"
+      },
+      "source_files_sha256": {
+        "crates/codegen/xai-grok-pager/Cargo.toml": "469aead8022b1225a73e23b6c143c6c0cbf6cb324ff984b9a2dbd32015335413",
+        "crates/codegen/xai-grok-pager/src/app/actions.rs": "a2352630ee814d17f55919b6a707a05b411908a6df86f378d17348a84b69b20a",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs": "c9955be15224677752c8c8e43e32527312f3ca3e92b025b5831c4f417a32b0a3",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs": "f2514130e5b8c1e1fac594db3cba240c75bbb5527bc465965de8db78a071a2eb",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs": "70ab3efa5e6678dc1abce5097bc64d79670900b8ce1fd0b73e25f68f1618cdee",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs": "8bf68c39b54091089953d92b18dd8a09d9d4345d05f9baa98ae55d0c6136a0dc",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs": "c34be142983f24c5e9401c711388aad81ad57b1f9ec579be3eb22fef8ccad00e",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs": "49500738d266903b272079501cec095a8ee07ffa69a9fa727e4bd6cb25bd65f7",
+        "crates/codegen/xai-grok-pager/src/app/effects/mod.rs": "3d56f4538bfbab440fe8a4ec90d3c0156518770b353bd8af785da53c10e53424",
+        "crates/codegen/xai-grok-pager/src/app/event_loop.rs": "c3d7204f9c31a23db9c0ea49cfcb90cea08d49186a17452fe26fe61a607538a2",
+        "crates/codegen/xai-grok-pager/src/app/mod.rs": "9faab617d56c1cb3fbb470ae63e9999c32628b8c3fc3f44ed600f9ed1a947c54",
+        "crates/codegen/xai-grok-pager/src/app/status_line_policy.rs": "fb2f7cd27f6ac31cacb321ec8e1aa33af6c9bb3b758e33c6c72dc0a4d9155ac7",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs": "f28a29acd7d7a2fe3c93eef383c89b4b9d4bcb1ee82abbbce76af40caa36636b",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs": "b96a5c40cbfff76621daeac60511c3d0684ea58cbab071f2a875d81a2d75de8a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs": "3df24158da9017a7af6760717ec5b2e6aaf1a004ed1f3e14f67dcd25ae33fc3a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs": "dda5995a498e666b65595b697d56c0a396eebd1664e9ca59f526b1bb1c43948a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs": "a29195940ba39a2a15922dc0e09a160c12cdb6b799f444abfe0da8707f32249b",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs": "6479d7adab01500d6e81c0a8c15b1c869b9b3ae8c873a58b63dd6325e30c05ab",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs": "13e8c4588f066e4076ac1a3110758628b340117bc8b58306db6b81e1c3e800a6",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs": "e6cdae95ca723cd65fa8aea39a930b88038ce2ca2514fb9d48e00eeedd38de52",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs": "f3cadbb69c7683c741212db63e759727782c3f42ad547914e26444e986fb502f",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs": "944b055e5383892a97f1e947425d1732d8545cc0c50e5e7c99630e5359a7f806",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs": "7f85e515aaf6fdca19839c82053046e47a37aaf5c5ed9e59af9a678dfc231a37",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs": "1703cc50241eb932b18ae7e1c0fa595e1ad3ba42fea770a937a99524cd888de8",
+        "crates/codegen/xai-grok-pager/src/client_identity.rs": "ce54c9b3181b637dad9490ad28f14d55409101ec9ec2ffe08014c04dce90e8df",
+        "crates/codegen/xai-grok-shell-terminal/src/adapter.rs": "556eca3a8e06b2d74d08f92af6b1a09ee0aba0fca3a7c289611dd8eac164efe9",
+        "crates/codegen/xai-grok-shell-terminal/src/lib.rs": "444bac0011ca6158bc03cd07d9881f34bed33761b7ca61c6c1dc4a9b94a49613",
+        "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "3302db3a3be12af83cdc4eaf48d1ed38e48fc4d7f7ed9bf2d13b16170df17099",
+        "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "4c71cf32ba12c6226cbf3ff5e2d11b2c2451bcfcdfebae5f2d6b1aff2216893d",
+        "crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs": "4fcf53df3fd41951668eb06d3da8780accd14a9cb5cb8addc11aa2db831c3c78",
+        "crates/codegen/xai-grok-shell/src/extensions/mod.rs": "dad3a008be51b6343a4095c60140a35d7f8c79c91e024f19f38873451614015a",
+        "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs": "acc73086c476fd9f51c2284bb6e88b8293e6d2823bb6a27e26ee6f8a49615ad1",
+        "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs": "65fdc9584a68156540efb0dfdd12d4bc89d42d368777c9ad50c383383dab8da9",
+        "crates/codegen/xai-grok-shell/src/leader/client.rs": "0ec461cbdc2c646c11ba12e7f7c2567d25c66e317dba742377f046cb3011aae8",
+        "crates/codegen/xai-grok-shell/src/leader/lock.rs": "424c4124ca1f1d989db971d3b303edf4161bb42fe58ff60846ffb83c60e1700c",
+        "crates/codegen/xai-grok-shell/src/leader/mod.rs": "b00c634d94f129e03042551348bdeda4918496b5ee6a0f4682d13c9e177783ef",
+        "crates/codegen/xai-grok-shell/src/leader/protocol.rs": "03f84a141fba28a99bd5e234f1d04e1b23090eff74055fc8983ed53edc9c0081",
+        "crates/codegen/xai-grok-shell/src/leader/server.rs": "e1acd2d8dfaabc6878d550b774e3438a906d7051d6cffa129f0e15301be5c55a",
+        "crates/codegen/xai-grok-shell/src/leader/server_tests.rs": "60ce1e2d6e525f21ce1adb2e5ea0d5a39728c47cdd8e30a222fdeecfa2c00492",
+        "crates/codegen/xai-grok-shell/src/session/acp_session.rs": "9c25f28e352d206859d77a58f3793cc5ae734558fa30357fa9ab0bef456b32de",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs": "aae845d873cb2c5c9a6c9839e765cd8d7b6fb9d7a3c996f1c12f2f14c4574e4a",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs": "64c026080dfda5ba3468a231a7f3ea2cc978192bca94cb9ffc3313c9f76619f8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs": "2cba092cbaa381131bdaa4fae58f1cd88611a97377db1ea520e2116643828a3c",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs": "225f962bd52c548189b9a314bb1b8e847b1fadb540be61e2c9cd8c1e6b367ea7",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs": "93b9bfc85d33e102b24627a1550ae3df298b6d2493562482db2d324c2fd1b1cd",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs": "91093677566edd9bea8005d4a20e680cc6a6bd66410f8b7c20d35c21424e9ab1",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs": "bdbc9c28433cf335af8be4c4ac8ee7da6e450080fe0cefccd5a1da060afe27a8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs": "1630ec09ad6d3d3ee5df0628ca36cc98fe4865131e3cacb58188f7ddb43b8bf8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs": "b86307116033c86f94a34dedabee32c200516515319699de865e176ba2e775e4",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs": "77e60ffefe8152da795bb12e14f5c35b15c8e4ffa46d7330c169868ddb0625d2",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "c36be93342cda8177d9aa64606e21cc37afcfa593425bbee4a52ba61f84fa442",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs": "aa950a21d5d6593c5df0c723a02e7d91c3585817f3ebc89a3e76ca2783655892",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs": "f4bd7cf138b5c96966eacb5ee853f8c05d4bc268529b3c75979a8c83eb93a2ee",
+        "crates/codegen/xai-grok-shell/src/session/commands.rs": "b5a261c8744dd1842224493ca51260bb6a4d487ca5a88df45b4320c0f4389a00",
+        "crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs": "918fa6dab1c5e980890a592b257e2b89b708942ac6799b004d4bbc6f95a5608f",
+        "crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs": "4bc69f54cf74390d8fa2c2a1daa5f368dae7c478e2e9a80bc88ffb69bce9ff77",
+        "crates/codegen/xai-grok-tools/src/bridge.rs": "48100e6c902cac75f033004e335eb30053ee0165f814f6ba25a833ce6a7e3808",
+        "crates/codegen/xai-grok-tools/src/computer/local/terminal.rs": "b56e65a0a1a87f109493da4971d13ef9c86fe0f02519f437ad398e5f7d200c7a",
+        "crates/codegen/xai-grok-tools/src/computer/types.rs": "6ec9e816533dd83172fcee97a1fa77f897066f8cffd283af9319290546c28522",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs": "506177584765643bb8a10913e1963d30b4e93ddb54a0ef1a02c8ed5889d80efe",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs": "29753dd8087831bfa3c807eb55f98bb61e141115f901fc8fb24eae0d4ebca036",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs": "e56cfed9c12eba1f31dbb886ac0c47a8f6b2cc73dc9f13f025b74e62e589fecc",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs": "49f384bb0530fe7b741d8ae225087e89d1807a663c91b63e85900d70d49d7271",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs": "1a223cc7d8b1d8fdac2123e665db00017149518b2271d094013c9b86b6cbf05e",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
+        "crates/codegen/xai-grok-version/src/lib.rs": "004debf4180bbe8d36b10fc981c188c8002d5cb7f6ad56de40b08f22f2627e35"
+      },
+      "source_digest": "4a58f2d980b76e757321d0daddf72bd6dc15e45b83fc32c211122958e3f6d54a",
+      "target_ci": {
+        "run_id": 36741541617,
+        "host_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+        "linux_native_build": "success",
+        "windows_native_build": "failed",
+        "windows_failure": "cc1.2.48读取find-msvc-tools0.1.13的i32常量，custom_flags要求u32",
+        "windows_failure_log_sha256": "69df4222e816fdd6d948eac7c5c250ae5359323f17c75e1ffa77b8a33f3f76ae",
+        "boundary": "宿主两平台check及Windows真实ConPTY通过；其余宿主门禁尚在运行，不能作为最终整套通过。",
+        "linux_native_artifact": {
+          "run_id": 36741541617,
+          "host_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+          "native_tree": "3796aaf2ffebab4fe06703025ae8d256c221535d",
+          "patch_sha256": "53953bfd738d279ba0991c0cdc2fc4db18415aaa6b13253a1b0967196de9b04c",
+          "custom_version": "1.0.41+infinishell.terminal-bridge.4",
+          "binary": {
+            "file": "xai-grok-pager",
+            "bytes": 607932184,
+            "sha256": "d36be84fc25eb726e51456e644c18ee98f886e99bb5fda8361d828de59a33615"
+          },
+          "build_receipt_sha256": "cb67cedd956d8407272e5b659e8ebb9ad8f0cc9d6747ad789e941226b1f285f7",
+          "commands_verified": 15,
+          "tests_passed": 74,
+          "temporary_directory": {
+            "status": "retained",
+            "cleanup_ready": false,
+            "command_exit_code": 0,
+            "reason": "proc_reference_visibility_incomplete",
+            "observation_failure_count": 286,
+            "boundary": "非root runner不能证明所有系统进程均无打开引用，私有临时目录保留；命令仍按真实exit0记录。"
+          },
+          "boundary": "Linux .4独立原生编译/74回归/构建/version通过；未绑定宿主、不覆盖.5或模型功能。"
+        }
+      }
+    },
+    {
+      "custom_version": "1.0.41+infinishell.terminal-bridge.5",
+      "native_commit": "732b0e1ee435f265d6e98a51668afb2e214a1a08",
+      "native_tree": "86f266f0067130525e3dac7b08b78178dad85637",
+      "patch_sha256": "c4f1a024f9d2f0a2ca5fc8f6be7ea2fc2a48f94f12e9d1bd89f1797ffb3c8b1a",
+      "local_validation": {
+        "platform": "macOS arm64",
+        "rust_toolchain": "1.94.0",
+        "grok_version_environment": "1.0.41+infinishell.terminal-bridge.5",
+        "check_run": "r-b1xsixg5",
+        "check_log_sha256": "ab8d4339aa3034f0596589a6ae9bf6653e374f44f7ed859f7962697b17d79f48",
+        "test_run": "r-kikrupx3",
+        "test_log_sha256": "d07e55df10a505a3b81f3856e95f59aae3de47c504c9e95b87e4a340d55387fa",
+        "focused_library_tests": {
+          "passed": 74,
+          "failed": 0,
+          "module_counts": [
+            46,
+            20,
+            4,
+            4
+          ]
+        },
+        "source_binding": {
+          "base_commit": "3d1886b111202215ecfef5d6e41c76b75f0daf36",
+          "final_tree": "86f266f0067130525e3dac7b08b78178dad85637",
+          "final_commit": "732b0e1ee435f265d6e98a51668afb2e214a1a08"
+        },
+        "boundary": "仅构建依赖锁定与Windows测试夹具修正；Mac旧.3功能工件不变，Windows修复仍待目标门禁。"
+      },
+      "source_files_sha256": {
+        "Cargo.lock": "d32a2e89a0c347ed9bbc2f385e3a202b45ac04e17f31f3e8d3e452304ac49df8",
+        "crates/codegen/xai-grok-pager/Cargo.toml": "469aead8022b1225a73e23b6c143c6c0cbf6cb324ff984b9a2dbd32015335413",
+        "crates/codegen/xai-grok-pager/src/app/actions.rs": "a2352630ee814d17f55919b6a707a05b411908a6df86f378d17348a84b69b20a",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs": "c9955be15224677752c8c8e43e32527312f3ca3e92b025b5831c4f417a32b0a3",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs": "f2514130e5b8c1e1fac594db3cba240c75bbb5527bc465965de8db78a071a2eb",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs": "70ab3efa5e6678dc1abce5097bc64d79670900b8ce1fd0b73e25f68f1618cdee",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs": "8bf68c39b54091089953d92b18dd8a09d9d4345d05f9baa98ae55d0c6136a0dc",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs": "c34be142983f24c5e9401c711388aad81ad57b1f9ec579be3eb22fef8ccad00e",
+        "crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs": "49500738d266903b272079501cec095a8ee07ffa69a9fa727e4bd6cb25bd65f7",
+        "crates/codegen/xai-grok-pager/src/app/effects/mod.rs": "3d56f4538bfbab440fe8a4ec90d3c0156518770b353bd8af785da53c10e53424",
+        "crates/codegen/xai-grok-pager/src/app/event_loop.rs": "c3d7204f9c31a23db9c0ea49cfcb90cea08d49186a17452fe26fe61a607538a2",
+        "crates/codegen/xai-grok-pager/src/app/mod.rs": "9faab617d56c1cb3fbb470ae63e9999c32628b8c3fc3f44ed600f9ed1a947c54",
+        "crates/codegen/xai-grok-pager/src/app/status_line_policy.rs": "fb2f7cd27f6ac31cacb321ec8e1aa33af6c9bb3b758e33c6c72dc0a4d9155ac7",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs": "f28a29acd7d7a2fe3c93eef383c89b4b9d4bcb1ee82abbbce76af40caa36636b",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs": "b96a5c40cbfff76621daeac60511c3d0684ea58cbab071f2a875d81a2d75de8a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs": "3df24158da9017a7af6760717ec5b2e6aaf1a004ed1f3e14f67dcd25ae33fc3a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs": "dda5995a498e666b65595b697d56c0a396eebd1664e9ca59f526b1bb1c43948a",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs": "a29195940ba39a2a15922dc0e09a160c12cdb6b799f444abfe0da8707f32249b",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs": "6479d7adab01500d6e81c0a8c15b1c869b9b3ae8c873a58b63dd6325e30c05ab",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs": "13e8c4588f066e4076ac1a3110758628b340117bc8b58306db6b81e1c3e800a6",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs": "e6cdae95ca723cd65fa8aea39a930b88038ce2ca2514fb9d48e00eeedd38de52",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs": "f3cadbb69c7683c741212db63e759727782c3f42ad547914e26444e986fb502f",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs": "98c30b6d03a863d2d9ceb2bc57525b4347214b96965c9b2cae8ebc49a5f107fc",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs": "7f85e515aaf6fdca19839c82053046e47a37aaf5c5ed9e59af9a678dfc231a37",
+        "crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs": "1703cc50241eb932b18ae7e1c0fa595e1ad3ba42fea770a937a99524cd888de8",
+        "crates/codegen/xai-grok-pager/src/client_identity.rs": "ce54c9b3181b637dad9490ad28f14d55409101ec9ec2ffe08014c04dce90e8df",
+        "crates/codegen/xai-grok-shell-terminal/src/adapter.rs": "556eca3a8e06b2d74d08f92af6b1a09ee0aba0fca3a7c289611dd8eac164efe9",
+        "crates/codegen/xai-grok-shell-terminal/src/lib.rs": "444bac0011ca6158bc03cd07d9881f34bed33761b7ca61c6c1dc4a9b94a49613",
+        "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "3302db3a3be12af83cdc4eaf48d1ed38e48fc4d7f7ed9bf2d13b16170df17099",
+        "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "4c71cf32ba12c6226cbf3ff5e2d11b2c2451bcfcdfebae5f2d6b1aff2216893d",
+        "crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs": "4fcf53df3fd41951668eb06d3da8780accd14a9cb5cb8addc11aa2db831c3c78",
+        "crates/codegen/xai-grok-shell/src/extensions/mod.rs": "dad3a008be51b6343a4095c60140a35d7f8c79c91e024f19f38873451614015a",
+        "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs": "acc73086c476fd9f51c2284bb6e88b8293e6d2823bb6a27e26ee6f8a49615ad1",
+        "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs": "65fdc9584a68156540efb0dfdd12d4bc89d42d368777c9ad50c383383dab8da9",
+        "crates/codegen/xai-grok-shell/src/leader/client.rs": "0ec461cbdc2c646c11ba12e7f7c2567d25c66e317dba742377f046cb3011aae8",
+        "crates/codegen/xai-grok-shell/src/leader/lock.rs": "424c4124ca1f1d989db971d3b303edf4161bb42fe58ff60846ffb83c60e1700c",
+        "crates/codegen/xai-grok-shell/src/leader/mod.rs": "b00c634d94f129e03042551348bdeda4918496b5ee6a0f4682d13c9e177783ef",
+        "crates/codegen/xai-grok-shell/src/leader/protocol.rs": "03f84a141fba28a99bd5e234f1d04e1b23090eff74055fc8983ed53edc9c0081",
+        "crates/codegen/xai-grok-shell/src/leader/server.rs": "e1acd2d8dfaabc6878d550b774e3438a906d7051d6cffa129f0e15301be5c55a",
+        "crates/codegen/xai-grok-shell/src/leader/server_tests.rs": "60ce1e2d6e525f21ce1adb2e5ea0d5a39728c47cdd8e30a222fdeecfa2c00492",
+        "crates/codegen/xai-grok-shell/src/session/acp_session.rs": "9c25f28e352d206859d77a58f3793cc5ae734558fa30357fa9ab0bef456b32de",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs": "aae845d873cb2c5c9a6c9839e765cd8d7b6fb9d7a3c996f1c12f2f14c4574e4a",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs": "64c026080dfda5ba3468a231a7f3ea2cc978192bca94cb9ffc3313c9f76619f8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs": "2cba092cbaa381131bdaa4fae58f1cd88611a97377db1ea520e2116643828a3c",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs": "225f962bd52c548189b9a314bb1b8e847b1fadb540be61e2c9cd8c1e6b367ea7",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs": "93b9bfc85d33e102b24627a1550ae3df298b6d2493562482db2d324c2fd1b1cd",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs": "91093677566edd9bea8005d4a20e680cc6a6bd66410f8b7c20d35c21424e9ab1",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs": "bdbc9c28433cf335af8be4c4ac8ee7da6e450080fe0cefccd5a1da060afe27a8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs": "1630ec09ad6d3d3ee5df0628ca36cc98fe4865131e3cacb58188f7ddb43b8bf8",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs": "b86307116033c86f94a34dedabee32c200516515319699de865e176ba2e775e4",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs": "77e60ffefe8152da795bb12e14f5c35b15c8e4ffa46d7330c169868ddb0625d2",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "c36be93342cda8177d9aa64606e21cc37afcfa593425bbee4a52ba61f84fa442",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs": "aa950a21d5d6593c5df0c723a02e7d91c3585817f3ebc89a3e76ca2783655892",
+        "crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs": "f4bd7cf138b5c96966eacb5ee853f8c05d4bc268529b3c75979a8c83eb93a2ee",
+        "crates/codegen/xai-grok-shell/src/session/commands.rs": "b5a261c8744dd1842224493ca51260bb6a4d487ca5a88df45b4320c0f4389a00",
+        "crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs": "918fa6dab1c5e980890a592b257e2b89b708942ac6799b004d4bbc6f95a5608f",
+        "crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs": "4bc69f54cf74390d8fa2c2a1daa5f368dae7c478e2e9a80bc88ffb69bce9ff77",
+        "crates/codegen/xai-grok-tools/src/bridge.rs": "48100e6c902cac75f033004e335eb30053ee0165f814f6ba25a833ce6a7e3808",
+        "crates/codegen/xai-grok-tools/src/computer/local/terminal.rs": "b56e65a0a1a87f109493da4971d13ef9c86fe0f02519f437ad398e5f7d200c7a",
+        "crates/codegen/xai-grok-tools/src/computer/types.rs": "6ec9e816533dd83172fcee97a1fa77f897066f8cffd283af9319290546c28522",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs": "506177584765643bb8a10913e1963d30b4e93ddb54a0ef1a02c8ed5889d80efe",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs": "29753dd8087831bfa3c807eb55f98bb61e141115f901fc8fb24eae0d4ebca036",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs": "e56cfed9c12eba1f31dbb886ac0c47a8f6b2cc73dc9f13f025b74e62e589fecc",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs": "49f384bb0530fe7b741d8ae225087e89d1807a663c91b63e85900d70d49d7271",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs": "1a223cc7d8b1d8fdac2123e665db00017149518b2271d094013c9b86b6cbf05e",
+        "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
+        "crates/codegen/xai-grok-version/src/lib.rs": "004debf4180bbe8d36b10fc981c188c8002d5cb7f6ad56de40b08f22f2627e35"
+      },
+      "source_digest": "37eec83b1d363480023885b342b71683bbf8dab9bc399ec57e476aebedaa2a60",
+      "target_validation": "未单独运行目标门禁；后续.6保留依赖修复并追加身份和目录修复"
+    },
+    {
+      "custom_version": "1.0.41+infinishell.terminal-bridge.6",
+      "native_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+      "native_tree": "be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9",
+      "patch_sha256": "6e378a1ebd7214e502d17ae0476a482d6f04e2e35e3a62cab7499e0091248912",
+      "local_validation": {
+        "platform": "macOS arm64",
+        "rust_toolchain": "1.94.0",
+        "grok_version_environment": "1.0.41+infinishell.terminal-bridge.6",
+        "check_run": "r-5vdjc0cw",
+        "check_log_sha256": "6552502e0a2fccd018dcb45cd2e654eaa8262c41c3079a3f06952be85f40db12",
+        "test_run": "r-lww6dm8k",
+        "test_log_sha256": "0c381a5f3a6ca37336dbcd9177632eb9d9fb01822917ca45a78d91fb8558b4f2",
+        "focused_library_tests": {
+          "passed": 74,
+          "failed": 0,
+          "module_counts": [
+            46,
+            20,
+            4,
+            4
+          ]
+        },
+        "source_binding": {
+          "base_commit": "732b0e1ee435f265d6e98a51668afb2e214a1a08",
+          "final_tree": "be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9",
+          "final_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d"
+        },
+        "boundary": "Mac原生编译及共享原子事务74项回归通过；新增Linux pidfd握手及Windows目录句柄待目标平台实际执行，未继承旧工件验收。"
+      },
+      "cross_platform_build": {
+        "custom_version": "1.0.41+infinishell.terminal-bridge.6",
+        "native_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+        "native_tree": "be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9",
+        "patch_sha256": "6e378a1ebd7214e502d17ae0476a482d6f04e2e35e3a62cab7499e0091248912",
+        "status": "corrected_source_awaiting_target_build",
+        "linux_artifact_sha256": null,
+        "windows_artifact_sha256": null,
+        "boundary": "Linux/Windows新源码版本独立构建；Mac继续只信任原.3固定工件，不从旧功能证据继承新工件身份。"
+      }
+    }
+  ],
+  "previous_host_validation": {
+    "status": "source_gates_passed_gui_pending",
+    "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-e8nhc_09-host-suite.safe.json",
+    "sha256": "c7e69cac0551f3f48b39b8cc90d5497972413dcb205a7a83fb2b96bf935c302f",
+    "log_sha256": "2e0bc3567c46ac8b13ea266c3a9d477617e0d41cdb0e00d7ca98f3ba6daa0652",
+    "binary": {
+      "path": "/Volumes/SanDisk/github/InfiniShell-Desktop/target/debug/infinishell",
+      "sha256": "2fb24a98590be124b5dc932cd353d7dea3fdcca68feea96d7cf34afa1539aa07"
+    },
+    "counts": {
+      "grok_native_bridge": 39,
+      "persistence_without_new_bridge": 82,
+      "cli_sessions_without_new_bridge": 441,
+      "cli_sessions_ignored": 9,
+      "use_agent_footer": 54,
+      "i18n": 11
+    },
+    "command_tests": {
+      "passed": 20,
+      "ignored": 3,
+      "log_sha256": "ddd996f8382ee0f45d391ec2301d9e5cd53ce150fc7e7994e7fda5376e2d5c3b"
+    },
+    "source_unchanged": true,
+    "cleanup_ready": true,
+    "gap_closed": false,
+    "failures_preserved": [
+      "r-xv5b05z8 test compile Cow type inference",
+      "r-8134qlrn same-session restarted-instance unique ownership collision; fixed by keeping ledger session binding outside task ownership field"
+    ]
+  },
+  "host_validation": {
+    "status": "mac_function_and_bilingual_passed_cross_platform_implementation_open",
+    "source_commit": "c3b509622542efb529fd92af2645ebc938e55bcb",
+    "source_binding": "c3b509622 基线加冻结源码摘要；较 r-zxk8iqk7 仅中文一条回退文案改变，已对照资源差异，不冒称干净 HEAD 构建。",
+    "run_id": "r-fdaad6hh",
+    "suite": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-fdaad6hh-host-suite.safe.json",
+    "suite_sha256": "05ed738634c73dae51643bc619ffad1efcbdc9fdbb45733cd642a40c87365bfa",
+    "log_sha256": "645b7d1f916bb27c5f89d9241537641cacbf1d8c9703a994274faba3af307c90",
+    "binary_sha256": "90cd57c7813c4dbe2d34c92adc68de7d61c1756db56f7020f59b8fa0fdf76bf2",
+    "cargo_check": true,
+    "native_bridge_tests_passed": 52,
+    "peer_handle_tests_passed": 2,
+    "existing_paste_tests_passed": 2,
+    "i18n_tests_passed": 11,
+    "build_passed": true,
+    "source_unchanged": true,
+    "cleanup_ready": true,
+    "cross_platform": "5629588b7 的 CI 36714435483 运行中；Linux 宿主接入／Windows 原生传输和宿主接入仍缺，CI 通过不能替代实现。",
+    "gap_closed": false
+  },
+  "keymap_regression": {
+    "run_id": "r-dcatsb5g",
+    "passed": 1,
+    "log_sha256": "06fd6fc7c66763c3d5e7dcf18742281ef04e39fb2577e4df43cde816a5aedb2e",
+    "boundary": "窗口事件经生产 keymap 和开框焦点链发出一次 Enter 与完整中文多行 Submit；不证明 Cocoa 按键或原生投递。"
+  },
+  "historical_host_validations": [
+    {
+      "status": "source_gates_passed_gui_delivery_not_confirmed",
+      "source_commit": "60c4719d9b0e381196074b06d8593b30a3e85336",
+      "source_binding": "基线加收据逐文件摘要冻结的未提交源码；不冒称干净HEAD构建。",
+      "suite": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-9t4medj5-host-suite.safe.json",
+      "suite_sha256": "70c425b96d38fab4ef525c586c3c1f14330326ec6e4cf51386efce227df62c48",
+      "log_sha256": "bf5c5f3e1e6abed778474a002015cda0e07c84223afc6e5a19ecbd11c1095b69",
+      "binary_sha256": "2a49869cf177d429795e49ccd196d3997c970dd4a1e1ef52c7ad3a1a4a6d6c30",
+      "cargo_check": true,
+      "native_bridge_tests_passed": 45,
+      "persistence_tests_passed": 82,
+      "session_tests_passed": 441,
+      "session_tests_ignored": 9,
+      "rich_input_tests_passed": 54,
+      "i18n_tests_passed": 11,
+      "build_passed": true,
+      "source_unchanged": true,
+      "cleanup_ready": true,
+      "cross_platform": "新源码Linux/Windows门禁待运行；实机验收移交不替代源码门禁。",
+      "gap_closed": false
+    },
+    {
+      "status": "source_gates_passed_pre_paste_gui_positive",
+      "source_commit": "c3b509622542efb529fd92af2645ebc938e55bcb",
+      "source_binding": "基线加收据逐文件摘要冻结的未提交源码；不冒称干净 HEAD 构建，不包含后续本地草稿粘贴修复。",
+      "suite": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-hgmsd_pn-host-suite.safe.json",
+      "suite_sha256": "c0b6dedf24299269128c88a72c9f6512d74aaae8f09f8a8ddd121fc3878c38ac",
+      "log_sha256": "a87978cd1e845e1daefa18be25cd2db3b567c28b8dcc50276a330eaf0fbee9b4",
+      "binary_sha256": "5aaac1b40db8c446d7ae2746dff69b67f8d2ece1beae8dac4395cfc361e616a4",
+      "cargo_check": true,
+      "native_bridge_tests_passed": 48,
+      "i18n_tests_passed": 11,
+      "build_passed": true,
+      "peer_handle_regression": {
+        "run_id": "r-joflf1h5",
+        "passed": 2,
+        "log_sha256": "0d7dd80266ee4522c6502bd4f37fdc7b2073e77a8962d13c68b199b43c8b8fa9"
+      },
+      "initial_peer_filter_matched_zero": true,
+      "source_unchanged": true,
+      "cleanup_ready": true,
+      "cross_platform": "CI 36699745396 仅绑定旧 c3b509622；当前源码及后续粘贴修复不得继承。外平台实机移交不替代源码门禁。",
+      "gap_closed": false
+    },
+    {
+      "status": "source_gates_passed_paste_gui_positive_chinese_fallback_layout_failed",
+      "source_commit": "c3b509622542efb529fd92af2645ebc938e55bcb",
+      "source_binding": "基线加冻结源码摘要，包含本地草稿粘贴修复；不冒称干净 HEAD 构建。",
+      "run_id": "r-zxk8iqk7",
+      "suite": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-zxk8iqk7-host-suite.safe.json",
+      "suite_sha256": "e73eda855d6b092c8320e3af80e81f62067f73b64742f33cd004b7b93e73d66c",
+      "log_sha256": "5fa771ea97816f57a474b4f5949c618f82916efa170809b699371664f27ecc78",
+      "binary_sha256": "40d27692222d470ee3c9f65e9d033f0f83f4efccd69f4de313d1ccc88a818ed9",
+      "cargo_check": true,
+      "native_bridge_tests_passed": 52,
+      "peer_handle_tests_passed": 2,
+      "existing_paste_tests_passed": 2,
+      "i18n_tests_passed": 11,
+      "build_passed": true,
+      "source_unchanged": true,
+      "cleanup_ready": true,
+      "cross_platform": "当前源码同提交平台门禁待完成，旧 c3b509622 CI 不继承。",
+      "gap_closed": false
+    }
+  ],
+  "current_gui_validation": {
+    "run_id": "r-wudipm8z",
+    "status": "ordinary_gui_positive_paste_delta_pending",
+    "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-wudipm8z-gui/acceptance-summary.safe.json",
+    "sha256": "3c72d7d6bd6496ea5537b30e3cda385aa98afbd5875429f477e6b90aa47b63fa",
+    "source_commit": "c3b509622542efb529fd92af2645ebc938e55bcb",
+    "source_binding": "基线加冻结源码摘要，不是干净 HEAD；不包含后续本地草稿粘贴修复。",
+    "signed_host_binary_sha256": "d52e438de1cd2790ab0f38a33b38562c21ff502b26b9d637f86c19c6ce587958",
+    "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+    "native_binary_sha256": "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+    "counts": {
+      "host_messages": 8,
+      "unique_message_ids": 8,
+      "host_acknowledged": 8,
+      "native_indexed_human_inputs": 8,
+      "unique_native_acknowledged_receipts": 8,
+      "completed_end_turn": 7,
+      "completed_cancelled": 1,
+      "unclassified_native_user_rows": 0,
+      "legacy_environment_prefix_excluded": 1,
+      "exact_requested_marker_results": 5
+    },
+    "session_recovery": {
+      "session_id": "01a0f211-1e6b-71b1-a8b2-7c0e6d62dc95",
+      "native_instance_ids": [
+        "747fc36a-d98f-46d1-a44c-1f069a1a30c2",
+        "d3baa1b0-742b-428f-8d31-f7b0fd1df15a"
+      ],
+      "old_instance_inputs": 7,
+      "new_instance_inputs": 1,
+      "old_message_after_restart_did_not_replay": true,
+      "new_message_after_restart_completed": true,
+      "boundary": "覆盖已 ACK 旧正文防重及新输入；不声称旧 Unknown 在新原生 instance 自动恢复成 ACK。"
+    },
+    "accepted": "标准首页普通 TUI 的英文两行、41,751 字节中文 400 行双 Return 一次接收、非空原生草稿拒绝后明确发送、审批拒绝后保留稿发送、同文防重及明确新一轮、编辑期间取消后明确发送、宿主与原生同 SID 冷恢复零重投及新输入；逐项原文、ACK 与结果分别计证。",
+    "localization": "英文提示及简体中文 AlreadyReceived、保留草稿、新回合结果可读；仅所存视口，不覆盖后续粘贴文案。",
+    "boundaries": [
+      "第 39 张截图为坐标误点，不能作 AlreadyReceived 正例；第 41 张与独立账本审计补正。",
+      "五个预设精确标记结果通过；两条无预设标记的普通输入取得非空结果及 end_turn，不虚报标记断言。",
+      "已 ACK 旧正文在新 instance 防重；不声称旧 Unknown 在新 instance 自动转为 ACK。",
+      "关闭富输入后的文本粘贴回退存在缺陷；已修源码尚待新工件 GUI 与最终门禁。",
+      "旧 owned、.1、.2 及官方发行版证据不移植到本工件。"
+    ],
+    "approval_file_created": false,
+    "cleanup": "两代 App 与原生退出、原认证及配置未变、私有认证副本删除，小证据归档；外层 cleanup_ready=true、状态 cleaned，短目录已不存在。",
+    "gap_closed": false
+  },
+  "paste_followup": {
+    "status": "mac_function_and_bilingual_passed_cross_platform_implementation_open",
+    "patch_archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/grok-paste-local-draft.patch",
+    "patch_sha256": "07ada51a7aada94a218320eb52949c221f70b6d7d312ecb53bda553078bd22f4",
+    "scope": "关闭富输入后的 Grok 文本粘贴只打开并恢复／追加本地草稿，不写 PTY/socket、不自动提交；旧目标守卫、图片及其他 CLI 路径不变。",
+    "localization": "英中粘贴仅存草稿与英文回退提示通过；中文回退单行缩短后 r-ni936aln 显示完整含句号，占位提示完整，Mac 双语审计满足。",
+    "remaining": [
+      "Linux 宿主普通 Grok 原生桥发现、可信进程／PTY 绑定与提交／恢复接入实现",
+      "Windows Grok 原生桥传输及宿主发现、可信进程／ConPTY 绑定与提交／恢复接入实现",
+      "上述实现的目标平台源码门禁；其他平台实机功能验收仍由用户后续执行"
+    ],
+    "gap_closed": false,
+    "validation_run": "r-fdaad6hh",
+    "validation_suite_sha256": "05ed738634c73dae51643bc619ffad1efcbdc9fdbb45733cd642a40c87365bfa",
+    "gui_validation": {
+      "run_id": "r-g91qynam",
+      "status": "paste_function_passed_chinese_fallback_layout_failed",
+      "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-g91qynam-gui/acceptance-summary.safe.json",
+      "sha256": "5576b8c0b7378cbf7556a71b5b758fe70a0aa2da9b5844892b114a719620bd6b",
+      "source_commit": "c3b509622542efb529fd92af2645ebc938e55bcb",
+      "source_binding": "基线加冻结源码摘要，并非干净 HEAD 构建",
+      "source_binary_sha256": "40d27692222d470ee3c9f65e9d033f0f83f4efccd69f4de313d1ccc88a818ed9",
+      "signed_gui_binary_sha256": "666bd7c472303f16f62ac7cab27e5d07178f6faa715750fbe65c76bf9ecf41a4",
+      "native_binary_sha256": "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+      "counts": {
+        "host_messages": 2,
+        "native_indexed_inputs": 2,
+        "native_acknowledged": 2,
+        "exact_expected_answers": 2,
+        "end_turn": 2,
+        "unclassified_user_rows": 0
+      },
+      "accepted": "关闭富输入后分两次粘贴恢复／追加草稿，英文 131 字节及中文 128 字节原文／ACK／精确答案／end_turn 各一次；原生字面草稿 123 未被覆盖，用户清空后明确发送。私有 shell 关闭桥后直接启动同一原生，回退保留稿且两侧计数不增。",
+      "localization": {
+        "bilingual_acceptance_passed": false,
+        "english": "第 12 张截图原生键入回退提示完整；粘贴仅存草稿提示可读。",
+        "simplified_chinese": "粘贴仅存草稿提示及原生草稿保护提示可读；第 20 张截图手动回退提示末尾内容截断，因此不记整体验收通过。",
+        "repair_pending": "仅中文 cli-agent-grok-input-manual-copy-required 缩短为“未发送，草稿已保留。关闭富输入后可在 Grok 中键入。”；新 r-fdaad6hh 工件需复验受影响布局，不把旧截图计为修复后通过。"
+      },
+      "boundaries": [
+        "英文曾通过 env -u 包装启动，截图 10 未识别 CLI；未投正文，退出后改为私有 shell 独立 unset 再直接启动，只有后者计回退验收。",
+        "旧只读审计器两次因首页 updates.jsonl 不存在而失败，不计产品失败；gui_live_audit_v2.py 明确记录 updates_file_exists=false 与摘要 null，v1 原件未改。",
+        "本轮五个原生 session 中只有两个有 indexed human input；其余首页初始记录没有用户输入，不能算回合。",
+        "App stdout 的 EditorAction 计数为零，不作为 Cocoa 键路由证明；由 GUI 操作和真实原文／回执／结果证明产品链。",
+        "当前摘要不新增关闭缺口；中文布局修复及最终同提交 CI 尚未完成。"
+      ],
+      "cleanup": "两代 App 自然退出 0，全部本轮进程退出、打开文件 0；私有认证副本删除，11 件原件摘要核验，短目录已清理。",
+      "gap_closed": false
+    },
+    "layout_repair_followup": {
+      "changed_file": "app/i18n/zh-CN/warp.ftl",
+      "message_id": "cli-agent-grok-input-manual-copy-required",
+      "scope": "仅缩短一条中文文案，不改提交语义",
+      "gate_run": "r-fdaad6hh",
+      "status": "gate_and_affected_layout_passed",
+      "gap_closed": false,
+      "gate_suite_sha256": "05ed738634c73dae51643bc619ffad1efcbdc9fdbb45733cd642a40c87365bfa",
+      "layout_validation": {
+        "status": "passed",
+        "run_id": "r-ni936aln",
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-ni936aln-gui/acceptance-summary.safe.json",
+        "sha256": "0185ced924964c2fc47871344dad2796128079278a4338000ced2c8045855702",
+        "source_binary_sha256": "90cd57c7813c4dbe2d34c92adc68de7d61c1756db56f7020f59b8fa0fdf76bf2",
+        "signed_gui_binary_sha256": "6d62181f47a9e49fb1c8b4c69d9e3c36d89ae27fb437b10d988a4862f9d661f5",
+        "source_gate_run": "r-fdaad6hh",
+        "resource_only_change_sha256": "e5499b73fcd72bf643056bee44569935f46bb9d3efb2aee8c0a48ef867ee3874",
+        "affected_layout_passed": true,
+        "host_messages": 0,
+        "native_inputs": 0,
+        "model_turns": 0,
+        "scope": "仅中文一条文案缩短，提示含句号及占位文本完整；两轮模型正例按原工件计证，不重复执行或计数。",
+        "cleanup": "App 1912 自然退出 0，本轮进程与打开文件清理确认，认证副本删除，小证据归档后短目录已清理。",
+        "gap_closed": false
+      }
+    }
+  },
+  "scope_correction": {
+    "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/scope-correction.safe.json",
+    "sha256": "33411686223414380743cc838f1d1179cc578d315c740a75ef486476449ae863",
+    "bytes": 3851
+  },
+  "remaining_implementation": [
+    "三平台工件摘要已绑定；Linux/Windows绑定后的精确最终宿主源码门禁仍待验",
+    "其他平台实机验收仍由用户后续执行；旧Mac .3功能及双语证据不改写"
+  ],
+  "commit_binding": {
+    "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/commit-5629588b7-binding.safe.json",
+    "sha256": "812edfc3c49188b00b5edce62cfa4af1e463ec762755a3686271a4cbedf4daf6",
+    "bytes": 3014
+  },
+  "current_cross_platform_ci": {
+    "run_id": 36780256382,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382",
+    "source_commit": "8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66",
+    "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "native_check": "passed",
+    "native_build": "passed",
+    "bridge_passed": 81,
+    "bridge_per_library": [
+      53,
+      20,
+      4,
+      4
+    ],
+    "startup_smoke": {
+      "version": "passed",
+      "help": "passed",
+      "async_completions": "passed",
+      "model_inputs": 0
+    },
+    "windows_stack": {
+      "reserve_bytes": 8388608,
+      "commit_bytes": 4096
+    },
+    "binary": {
+      "file": "xai-grok-pager.exe",
+      "bytes": 245529600,
+      "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"
+    },
+    "binary_usable": true,
+    "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+    "archive_summary_sha256": "90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062",
+    "logs_zip_sha256": "4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703",
+    "boundary": "21条原生命令均成功，四库均真实非零命中，版本/帮助/异步补全入口通过。独立归档后停止剩余重复验证，整个workflow为cancelled；摘要绑定后的最终两平台宿主门禁仍待验。"
+  },
+  "cross_platform_implementation_feasibility": {
+    "product_commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
+    "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+    "status": "read_only_contract_review_not_implementation",
+    "linux_receipt_sha256": "d470d2733a1def2773f09e27d0d53785affca42695bb93a2883c7731736b583d",
+    "windows_receipt_sha256": "f0ba319f35014a1cfe080bf14e99693e65e8e29681d14414e23851e2d72fa223",
+    "linux": "现有SO_PEERPIDFD、运行映像dev/inode及TIOCGPTPEER可复用；须补Linux映像FD绑定、独立持久身份形状、宿主接线和定制ELF工件。旧Mac序列化及task_id必须兼容。",
+    "windows": "官方调试API提供实际映像hFile。专用线程须先连接私有helper并确认关闭kill-on-exit，再附加用户CLI；保持helper到目标脱离，NULL hFile拒绝。不复用会终止所有debuggee的owned控制器。该方案为文档支持的合同推导，尚未实现或实机验证。",
+    "native_transport": "原生1491桥仅Unix；Windows须补named pipe及事件循环接线，不能用自报SHA代替宿主映像核验。",
+    "gap_closed": false
+  },
+  "cross_platform_build": {
+    "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+    "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+    "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+    "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
+    "status": "platform_artifacts_bound_final_host_source_gate_pending",
+    "linux_artifact_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
+    "windows_artifact_sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc",
+    "boundary": "Mac继续绑定已验.3，Linux绑定已验.6，Windows绑定实际启动与81项桥回归通过的.11；保留.10栈溢出及旧失败，绑定后的最终两平台宿主源码门禁待完成。",
+    "linux_artifact_binding": {
+      "platform": "Linux x64",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.6",
+      "native_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+      "native_tree": "be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9",
+      "source_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36752136629/linux-native/grok-terminal-bridge-source/artifacts/xai-grok-pager",
+      "archive_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok",
+      "sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
+      "bytes": 607794336,
+      "mode": "0700",
+      "ci_run_id": 36752136629,
+      "artifact_id": 11115938907,
+      "scope": "已核验CI工件的独立命名副本；未在Mac运行ELF，也不计为Linux模型/桌面验收。",
+      "verification_summary_sha256": "173d261abcb1ad1de321a795334039a68911aad76336561f834a4e0f9911fdba",
+      "archive_receipt_sha256": "b2035f23213f7b2c428d5a780559cf9501dfa7f0cba62e52109e5994387cf71c",
+      "post_binding_source_gate": "pending",
+      "boundary": "绑定独立Linux .6工件，不冒充当前.9源码构建；绑定后源码门禁待与Windows工件统一完成。"
+    },
+    "windows_artifact_binding": {
+      "platform": "Windows x64",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+      "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+      "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+      "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
+      "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc",
+      "bytes": 245529600,
+      "archive_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/windows-terminal-bridge.11/grok.exe",
+      "ci_run_id": 36780256382,
+      "artifact_id": 11128666865,
+      "verification_summary": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36780256382/windows-native-verified.safe.json",
+      "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+      "build_receipt_sha256": "c27e5f47743c5051c1b1c5715e693abb069f39581c9e52a0204611093e0b7bfb",
+      "version_output": "grok 1.0.41+infinishell.terminal-bridge.11 (07e35a3dfeed)",
+      "post_binding_source_gate": "pending",
+      "boundary": "绑定已独立核验的 Windows .11 工件；构建与上传步骤成功，整轮主动取消而非通过，不计其他平台模型或交互桌面验收。"
+    }
+  },
+  "windows_build_dependency_fix": {
+    "dependency": "find-msvc-tools",
+    "previous_version": "0.1.13",
+    "fixed_version": "0.1.10",
+    "lock_sha256": "d32a2e89a0c347ed9bbc2f385e3a202b45ac04e17f31f3e8d3e452304ac49df8",
+    "scope": "Cargo.lock仅此包版本与checksum变化；未修改注册缓存、未放宽--locked",
+    "test_fix": "Windows真实Journal权限变化替代Unix File赋值，保留Unknown/零派发/同ID拒重断言",
+    "receipt_sha256": "b55627f26b7e5eb2dd36ab241f3d3203f891ccd2722aa2bde9d1f9664b26b868"
+  },
+  "historical_cross_platform_ci": [
+    {
+      "run_id": 36714435483,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483",
+      "source_commit": "5629588b77b15e27c9e046cc6326171370297dc6",
+      "status": "completed",
+      "conclusion": "success",
+      "linux": "success",
+      "windows": "success",
+      "macos_intel": "skipped",
+      "summary_sha256": "f98ece1d688d03a39a9c00eac056258c65440dde36a9002894b75b80f5ebef62",
+      "archive_index_sha256": "91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622",
+      "logs_zip_sha256": "1ee16db7f9fa7cfe5b5113d69f78372a47d947771ce0311c7e85a0d43d077ad0",
+      "boundary": "只覆盖5629588b7已编译路径；不覆盖后续G06源码、其他平台实机或被cfg排除的普通桥实现。Windows部分步骤元数据滞后，原件保留并按完整日志核验。"
+    },
+    {
+      "run_id": 36741541617,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617",
+      "source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+      "status": "completed",
+      "known_failure": "Linux SO_PEERPIDFD errno92；Windows目录已存在HRESULT与属性句柄不能阻止重命名；Windows原生公开锁文件类型不匹配",
+      "host_checks": {
+        "linux": "passed",
+        "windows": "passed"
+      },
+      "windows_real_conpty": "passed",
+      "boundary": "仅覆盖9fdce3e3e和.4；已有失败触发停止后续作业，取消不计通过。Linux普通桥将改为原生发送自有pidfd及内核凭据，Windows宿主与原生目录句柄须同步修复；新源门禁待运行。",
+      "conclusion": "cancelled",
+      "host_regressions": {
+        "linux": {
+          "passed": 3346,
+          "failed": 1,
+          "failure": "terminal_bridge_same_owner_socket_does_not_authorize_an_unlisted_image：ENOPROTOOPT"
+        },
+        "windows": {
+          "passed": 3151,
+          "failed": 2,
+          "failures": [
+            "native_bridge_root_windows_is_private_and_stable：0x800700B7",
+            "native_bridge_root_windows_pins_ancestor_directories_against_rename：rename实际成功"
+          ],
+          "attempts_per_failure": 3
+        }
+      },
+      "command_regressions": {
+        "linux": {
+          "passed": 5,
+          "failed": 1,
+          "failure": "terminal_bridge_connected_pidfd_survives_socket_close_without_pid_fallback：ENOPROTOOPT"
+        },
+        "windows": {
+          "passed": 36,
+          "failed": 0
+        }
+      },
+      "linux_desktop_tui": {
+        "passed": 660,
+        "failed": 0
+      },
+      "failure_summary_sha256": "3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f",
+      "logs_zip_sha256": "923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2",
+      "cancelled_remaining_steps": {
+        "linux": "Test rust-genai",
+        "windows": "Build CLI process supervisor"
+      }
+    },
+    {
+      "run_id": 36752136629,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36752136629",
+      "source_commit": "9f7962626836cea000c93da43656d47480c18ebf",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "host_checks": {
+        "linux": "passed",
+        "windows": "passed"
+      },
+      "native_windows": {
+        "status": "failed",
+        "step": "cargo check -p xai-grok-pager-bin",
+        "cause": "xai-proto-build将依赖输出及描述符输出硬编码为/dev/stdout与/dev/null",
+        "failure_summary_sha256": "d2160647e20df2b07b86d7004f9c1f58ccbfddf066b593948b2431bd42b97ca3",
+        "log_sha256": "ee50ae82a4c51fb6ad2d8365b861c4931c8aa7a899f76970a43196fe36cb5fe5"
+      },
+      "boundary": ".6原生Linux78项和两平台相关宿主回归均通过；Windows原生protobuf构建失败后，完成相关回归再停止两平台剩余Build CLI process supervisor。整轮取消不计通过，其他平台模型/桌面未验。",
+      "host_regressions": {
+        "linux": {
+          "passed": 1469,
+          "failed": 0
+        },
+        "windows": {
+          "passed": 1308,
+          "failed": 0
+        }
+      },
+      "command_regressions": {
+        "linux": {
+          "passed": 14,
+          "failed": 0
+        },
+        "windows": {
+          "passed": 36,
+          "failed": 0
+        }
+      },
+      "windows_real_conpty": "passed",
+      "native_linux": {
+        "passed": true,
+        "tests_passed": 78,
+        "artifact_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
+        "summary_sha256": "173d261abcb1ad1de321a795334039a68911aad76336561f834a4e0f9911fdba"
+      },
+      "results_summary_sha256": "dd304bdf3573ce4e26c05a17d565d39553a2a007e07ced722e7d1eb102506b61",
+      "logs_zip_sha256": "c1374379f5c7687c89135179a456b7b6d4414b72d953e015b3679eff12eb1331"
+    },
+    {
+      "run_id": 36756854606,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36756854606",
+      "source_commit": "668cb9fcba293391513275844d0658001eeb20d5",
+      "platforms": [
+        "windows-x64"
+      ],
+      "custom_version": "1.0.41+infinishell.terminal-bridge.7",
+      "status": "completed",
+      "boundary": "Windows protobuf修复与完整原生check实际通过；库测试编译失败，没有Windows二进制。停止剩余通用构建，不计整轮通过。",
+      "conclusion": "cancelled",
+      "native_check": "passed",
+      "protobuf_tests_passed": 6,
+      "native_tests": "compile_failed_parse_login_env_capture_unix_cfg",
+      "native_artifact": null,
+      "failure_summary_sha256": "1b2e5d350dd31a76fdc31cd36404d3a7730195d568e87c28a18b1041c86d2432",
+      "archive_summary_sha256": "6660a594b6b07576a25840da1ae3c1ccd5273e74e09e6f2d86dcddb39d3ec4ec",
+      "logs_zip_sha256": "fba238b802e2107c84a8ab31ca3d9ecc2e9bd8a06f094a16b84af9b04cdd17d3",
+      "cancelled_step": "Build InfiniShell SSH worker"
+    },
+    {
+      "run_id": 36763693789,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36763693789",
+      "source_commit": "8f0b956b2dc729374dc852c47de7ca20ccee75fc",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.8",
+      "platform": "windows-x64",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "host_check": "passed",
+      "protobuf_tests_passed": 6,
+      "login_parser_tests_passed": 2,
+      "session_asset_tests": "not_executed_library_compile_failed",
+      "native_artifact": null,
+      "failure": "Windows leader/transport.rs:256 测试 String + &String 不满足 Add，E0277",
+      "failure_summary_sha256": "f5145810fba5cbf60cfdabe0f695cef5edcfd256fdf73f0ed5ea59f83b045ada",
+      "archive_summary_sha256": "3fcb1aa9fc9cf910a4706c2648bbb7b13e7ce199ecdfa8781130a060da0ab1d7",
+      "cancelled_step": "Build InfiniShell SSH worker",
+      "boundary": "资源测试未执行，native check/桥回归/构建未执行；已停止余下重复通用构建，整轮取消不计通过。"
+    },
+    {
+      "run_id": 36766846873,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36766846873",
+      "source_commit": "c0a3c705c6dfcf4c1aac42c97639a820c8e7f136",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.9",
+      "platform": "windows-x64",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "host_check": "passed",
+      "protobuf_tests_passed": 6,
+      "login_parser_tests_passed": 2,
+      "session_asset_tests": {
+        "passed": 2,
+        "failed": 1,
+        "win32_error": 1314
+      },
+      "native_artifact": null,
+      "failure_summary_sha256": "7182a475d2b9d0b2cf1c684b04ee63e94ef74856a096bfcc7d55685a97e95e31",
+      "cancelled_step": "Build InfiniShell SSH worker",
+      "boundary": "shell库测试已编译并执行；额外符号链接场景缺权限失败。管道上界、完整native check、桥回归和构建未执行。余下通用构建主动停止，取消不计整轮通过。",
+      "archive_summary_sha256": "1dedf0748fca213835390999832efbca4666dd64ac192ca0db8fb5154f6e190f",
+      "logs_zip_sha256": "a356d0fcc5db2d0446910675f6a256511aa4c898ed7fa7511885fed84807ba54"
+    },
+    {
+      "run_id": 36770502561,
+      "source_commit": "582596a090f9b0042ccc349fc9568e3fe072e6d1",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.9",
+      "native_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f",
+      "patch_sha256": "1b626e3fc1ef6e008b1d9993a9fe0056acb04dce4172aceeec8d85f648bd583b",
+      "artifact_id": 11123644065,
+      "artifact_bytes": 145431,
+      "build_receipt_sha256": "b4c18392d473a6c1a407fde8e5579bda990c0ed2783f88de6413a8bdde8a8284",
+      "steps_verified": 15,
+      "native_check": "passed",
+      "protobuf_passed": 6,
+      "login_parser_passed": 2,
+      "resource_tests_passed": 2,
+      "resource_deferred": [
+        {
+          "test": "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir",
+          "source_sha256": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
+          "status": "deferred_not_passed",
+          "prior_run_id": 36766846873,
+          "win32_error": 1314,
+          "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
+          "scope": "额外资源整理测试；Mac三项已通过。Windows真实符号链接验证移交后续环境，不属于G01文本原子桥验收。"
+        }
+      ],
+      "pipe_name_bound_passed": 1,
+      "native_bridge_results": {
+        "pager": {
+          "passed": 53,
+          "failed": 0
+        },
+        "shell": {
+          "passed": 15,
+          "failed": 5
+        },
+        "tools": "not_executed_after_shell_failure",
+        "shell_terminal": "not_executed_after_shell_failure"
+      },
+      "failed_cases": [
+        "session::acp_session::terminal_bridge_tests::child_work_and_unavailable_coordinator_cannot_look_idle",
+        "session::acp_session::terminal_bridge_tests::competing_bridge_requests_admit_exactly_one_and_remain_uncommitted",
+        "session::acp_session::terminal_bridge_tests::duplicate_after_queue_removal_is_unknown_and_cannot_be_resubmitted",
+        "session::acp_session::terminal_bridge_tests::ordinary_queue_running_turn_and_edit_hold_are_never_displaced",
+        "session::acp_session::terminal_bridge_tests::pending_permission_and_work_block_without_recording_a_message"
+      ],
+      "failure": "actor测试夹具 support.rs:287 硬编码/tmp，Windows AbsPathBuf返回NotAbsolute；五项在入口断言前共同失败。",
+      "failure_log_sha256": "29e8939c615e0a6694a8db4795746126dcee6bd179555174bb4dbbddd5e8ed6a",
+      "binary": null,
+      "boundary": "实际Windows桥53+15通过，五项失败，不能记桥全验收或工件构建通过。",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561",
+      "archive_summary_sha256": "f315e5d86408d41c61b2a8974611a38b296571c92f20a14e12e02361525f7b11",
+      "logs_zip_sha256": "b69d5bf8e3f8d6ca352d0fb0a00e3dcc58f356af294ed3d68a5934e13214162a",
+      "cancelled_step": "Build InfiniShell SSH worker",
+      "failure_summary_sha256": "8647c7fc4871b2a88c53755f7ccf9a3d9cb4e464e8531fe27785f45c8c5a9da3"
+    },
+    {
+      "run_id": 36774428641,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641",
+      "source_commit": "08f2fff8dc5a1b8502b0cfb7750a0a1a5c064ba8",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.10",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "cancelled_step": "Build InfiniShell SSH worker",
+      "native_check": "passed",
+      "native_build": "passed",
+      "bridge_passed": 77,
+      "bridge_per_library": [
+        53,
+        20,
+        0,
+        4
+      ],
+      "zero_test_library": "shell-terminal: Unix cfg excluded 4 tests",
+      "failure": "--version main stack overflow",
+      "failure_exit_code": 3221225725,
+      "failure_log_sha256": "65b2e49c9379bd4ccd37808b115a6af2eb8a80eb7c66a64423d87aa308c3a564",
+      "binary": {
+        "file": "xai-grok-pager.exe",
+        "bytes": 245529600,
+        "sha256": "3bec46f7f0941f3b5070600ae19605d53ce5043273ae705074963306ab3164f2"
+      },
+      "binary_usable": false,
+      "failure_summary_sha256": "962579e3bb012abd053df6d1c0c2cbc2a1e35200b3bd66434b58cdf68f052278",
+      "archive_summary_sha256": "85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268",
+      "logs_zip_sha256": "eba7f1c433b03f38cdbbb6372222011eb48c2fcc1e22adc35dadaafd6597c7e2",
+      "boundary": "实际PE存在但启动失败，不绑定；零命中不计通过。取消不计整轮成功。"
+    }
+  ],
+  "linux_pidfd_identity_handshake": {
+    "version": "1.0.41+infinishell.terminal-bridge.6",
+    "marker": 1,
+    "protocol": "单次sendmsg传递自身pidfd SCM_RIGHTS与SCM_CREDENTIALS；宿主recvmsg仅一字节，核SO_PEERCRED、pidfd生存期及原实际映像/PTY",
+    "forbidden_fallback": "不按收到的数字PID重新open授权句柄",
+    "boundary": "只在普通非提权同用户进程合同内；Mac/Windows JSON字节流及原子领取不变；目标门禁待运行",
+    "source_failure_run": 36741541617
+  },
+  "windows_directory_binding_fix": {
+    "version": "1.0.41+infinishell.terminal-bridge.6",
+    "change": "原生和宿主固定目录句柄请求FILE_LIST_DIRECTORY，保留不共享DELETE及全部身份/ACL/reparse验证；宿主精确识别已存在目录HRESULT",
+    "target_validation": "pending"
+  },
+  "current_host_source_validation": {
+    "gates": {
+      "host_check": {
+        "run_id": "r-c3k6m7t_",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "59da48234f02b9448e5682a99eaddfcb50b416f663b1cec2e0009eb4dd07b01b"
+      },
+      "host_tests": {
+        "run_id": "r-0ivgf3ax",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "229ba74b9dd91ed7ff28599e35154a726183850ac57c3de6426ec96ba49a610e"
+      },
+      "i18n": {
+        "run_id": "r-47_aku1y",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "fa59f1686024cb09a222793bc299a0ff0f8b81b54d20d56c95467d3ac04f5b08"
+      },
+      "native_check": {
+        "run_id": "r-5vdjc0cw",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "6552502e0a2fccd018dcb45cd2e654eaa8262c41c3079a3f06952be85f40db12"
+      },
+      "native_tests": {
+        "run_id": "r-lww6dm8k",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "0c381a5f3a6ca37336dbcd9177632eb9d9fb01822917ca45a78d91fb8558b4f2"
+      }
+    },
+    "host_tests_passed": 55,
+    "native_tests_passed": 74,
+    "i18n_passed": 11,
+    "target_validation": "pending",
+    "gap_closed": false,
+    "localization": "无需本地化变更",
+    "summary_sha256": "1f71332b09761c6ad11f4e8ef3180aefbe4210f6419b04568ef4bd3c9d0d8ec4"
+  },
+  "windows_protobuf_build_fix": {
+    "native_commit": "d3986df9c7155d7a0f83e82afe3a094bee2b6640",
+    "native_tree": "db881bc5b8ccb171deb7421e133d978090ca93de",
+    "source_reconstruction_sha256": "95b2872e04ee56d8e86eb48905439e86f595fee3de5abb898f09b519a11669be",
+    "change": "用临时实体文件替换Unix设备路径；精确目标前缀解析依赖，保留Windows盘符、空格和逐项存在性校验。",
+    "tests": "真实protoc含空格目录与跨文件import正例，缺失import拒绝，Windows CRLF与盘符等6项本机通过。",
+    "target_status": "passed_windows_36756854606",
+    "localization": "无需本地化变更",
+    "host_check": {
+      "run_id": "r-ombzj5vv",
+      "status": "passed",
+      "log_sha256": "57eec8d565eb482f20c5187fc9a286e473c7662a683a0e4f2a25803bcab9f602",
+      "temporary_directory": "cleaned",
+      "i18n": "提交前另运行r-_omolrwm，11项通过；无文案变化。"
+    },
+    "i18n": {
+      "run_id": "r-_omolrwm",
+      "passed": 11,
+      "failed": 0,
+      "temporary_directory": "cleaned",
+      "log_sha256": "319d29668b22d74a38ac7779563e92db270fa39e4e614e85131aa216bbc561d4"
+    },
+    "target_proof": {
+      "run_id": 36756854606,
+      "tests_passed": 6,
+      "test_log_sha256": "8fe225859941f6bc4ed9970cc4fca1935afb3b846fbaf9fd219f41ffc7bcad17",
+      "check_log_sha256": "444aadc227bfeb0ea3b5def60401360555e05c7190d44371b64e16ad2f151ec9"
+    }
+  },
+  "historical_local_validations": [
+    {
+      "platform": "macOS arm64",
+      "rust_toolchain": "1.94.0",
+      "grok_version_environment": "1.0.41+infinishell.terminal-bridge.7",
+      "check_run": "r-vxzrj508",
+      "check_log_sha256": "400779ca56f8eecfe98261729e09054fe4fe4a8137e0de2886d0c7a3c560aeb7",
+      "protobuf_test_run": "r-z0k806ej",
+      "protobuf_test_log_sha256": "a6732643c306ef40f51418638e619171ff638d558f3172d06ffa6dc33e27a58c",
+      "protobuf_tests": {
+        "passed": 6,
+        "failed": 0
+      },
+      "source_binding": {
+        "base_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+        "final_tree": "db881bc5b8ccb171deb7421e133d978090ca93de",
+        "final_commit": "d3986df9c7155d7a0f83e82afe3a094bee2b6640"
+      },
+      "boundary": "仅构建辅助及其测试变化，普通桥运行时未变；本轮真实protoc回归6项和完整pager-bin检查通过。共享原子事务74项按原.6门禁计证，没有重复计为.7新验收。Windows目标执行待验。"
+    },
+    {
+      "platform": "macOS arm64",
+      "rust_toolchain": "1.94.0",
+      "grok_version_environment": "1.0.41+infinishell.terminal-bridge.8",
+      "gates": {
+        "login_parser": {
+          "run_id": "r-jhhv50tx",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "dfc4bab9e529215de631548719aed274e8cbb446c71e118b1ed2d7f7118b05cf"
+        },
+        "session_asset_files": {
+          "run_id": "r-nrzw1sgl",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "2f90cf1840b7b693a8b33148a684d68d07acc16c61a8ab04607749ba6bea94a8"
+        },
+        "native_check": {
+          "run_id": "r-sd6a2y5f",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "06360788658b34581e35cc5a7c6c9ec856820ab7e3ff03c60c6a82245aeab1d2"
+        },
+        "host_check": {
+          "run_id": "r-kfxlggxy",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27"
+        },
+        "i18n": {
+          "run_id": "r-jesnwmuf",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "ada32a48e05cdff71ea1eea3bd7ba03f3271ea0cbceeb921e08675157f826bca",
+          "passed": 11
+        }
+      },
+      "login_parser_tests_passed": 2,
+      "session_asset_tests_passed": 3,
+      "source_binding": {
+        "final_commit": "6230c83eed629901b2a713643208d97f9daadf54",
+        "final_tree": "3226eb05d5a899db90215676c1ed8ecaa5c903cf"
+      },
+      "boundary": "仅原生测试可移植性改动；库测试实际命中2项和3项，零命中首轮不计。普通桥运行时合同未变，不重复原模型验收。Windows目标仍待验证。"
+    },
+    {
+      "platform": "macOS arm64",
+      "rust_toolchain": "1.94.0",
+      "grok_version_environment": "1.0.41+infinishell.terminal-bridge.9",
+      "native_check": {
+        "run_id": "r-917s8602",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "c32d62165890f16189abcf8173518be3f8ba75d6b0dbaefda5066b2d95cdb0b6"
+      },
+      "source_binding": {
+        "final_commit": "a5d1e2449179bae2f2c51d05120f212f92fa4d03",
+        "final_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f"
+      },
+      "boundary": "只改Windows测试字符串构造，Mac完整check通过但不编译cfg(windows)测试；原8的Mac测试结果按原轮保留。Windows目标断言待实际执行。",
+      "host_check_and_i18n": {
+        "run_id": "r-9inj6l5n",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "289f3865ed327a78e1a5e177900e184eb856cf6eff5c79c43c08892fd7f480dc",
+        "host_check": "passed",
+        "i18n_tests_passed": 11
+      }
+    },
+    {
+      "platform": "macOS arm64",
+      "rust_toolchain": "1.94.0",
+      "grok_version_environment": "1.0.41+infinishell.terminal-bridge.10",
+      "source_binding": {
+        "final_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
+        "final_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754"
+      },
+      "native_check": {
+        "run_id": "r-6_g2n_82",
+        "status": "cleaned",
+        "exit_code": 0,
+        "log_sha256": "dc9a0f53f070caec8b361da31c6bc1387abf40eca6da65bdeaf8aa23245c5b7d"
+      },
+      "native_tests": {
+        "run_id": "r-otw97gga",
+        "status": "cleaned",
+        "exit_code": 0,
+        "log_sha256": "39a666d45fe6b96a54df8482b7a207a0bb596e401cc6d627b9a4b22d1564dd58",
+        "passed": 74,
+        "per_library": [
+          46,
+          20,
+          4,
+          4
+        ]
+      },
+      "boundary": "只修测试夹具绝对路径，Mac四库74项和完整原生check通过；Windows actor五项及全桥门禁仍须实际通过。",
+      "host_check_and_i18n": {
+        "run_id": "r-xh0t_gjl",
+        "exit_code": 0,
+        "status": "cleaned",
+        "cleanup_ready": true,
+        "log_sha256": "6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316",
+        "host_check": "passed",
+        "i18n_tests_passed": 11
+      }
+    }
+  ],
+  "windows_library_test_portability_fix": {
+    "native_commit": "6230c83eed629901b2a713643208d97f9daadf54",
+    "native_tree": "3226eb05d5a899db90215676c1ed8ecaa5c903cf",
+    "source_reconstruction_sha256": "99b27d9120b3cf32a8b54dbb6000aa8789b624ac9d2c018cc7fa74283270cda2",
+    "change": "纯解析函数允许测试编译；资源路径测试按平台创建真实文件/目录符号链接，保留原拒绝断言。真实shell捕获仍仅Unix。",
+    "target_status": "Windows .8 登录解析2项通过；shell库因另一Windows测试E0277而编译失败，资源路径测试尚未执行。",
+    "localization": "无需本地化变更",
+    "gates": {
+      "login_parser": {
+        "run_id": "r-jhhv50tx",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "dfc4bab9e529215de631548719aed274e8cbb446c71e118b1ed2d7f7118b05cf"
+      },
+      "session_asset_files": {
+        "run_id": "r-nrzw1sgl",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "2f90cf1840b7b693a8b33148a684d68d07acc16c61a8ab04607749ba6bea94a8"
+      },
+      "native_check": {
+        "run_id": "r-sd6a2y5f",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "06360788658b34581e35cc5a7c6c9ec856820ab7e3ff03c60c6a82245aeab1d2"
+      },
+      "host_check": {
+        "run_id": "r-kfxlggxy",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27"
+      },
+      "i18n": {
+        "run_id": "r-jesnwmuf",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "ada32a48e05cdff71ea1eea3bd7ba03f3271ea0cbceeb921e08675157f826bca",
+        "passed": 11
+      }
+    }
+  },
+  "windows_pipe_test_fixture_fix": {
+    "native_commit": "a5d1e2449179bae2f2c51d05120f212f92fa4d03",
+    "native_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f",
+    "source_reconstruction_sha256": "dd3368743fd05340d233de02f041ed41c2c6d57b06a3ea9eca6bddb6a23d19d8",
+    "change": "仅用format构造相同501字节长路径，保留原管道名称上界断言；运行时代码未变。",
+    "target_status": "Windows .9管道名称上界测试已实际1项通过（36770502561）；后续actor五项路径夹具失败单列。",
+    "localization": "无需本地化变更",
+    "native_check": {
+      "run_id": "r-917s8602",
+      "exit_code": 0,
+      "status": "cleaned",
+      "log_sha256": "c32d62165890f16189abcf8173518be3f8ba75d6b0dbaefda5066b2d95cdb0b6"
+    },
+    "host_check_and_i18n": {
+      "run_id": "r-9inj6l5n",
+      "exit_code": 0,
+      "status": "cleaned",
+      "log_sha256": "289f3865ed327a78e1a5e177900e184eb856cf6eff5c79c43c08892fd7f480dc",
+      "host_check": "passed",
+      "i18n_tests_passed": 11
+    }
+  },
+  "windows_symlink_environment_deferral": {
+    "test": "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir",
+    "status": "deferred_not_passed",
+    "source_sha256": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
+    "reason": "Windows runner 创建符号链接返回 Win32 1314，未满足系统特权；该额外资源整理测试的 Mac 三项已全部通过。",
+    "scope": "按用户已授权的外平台实机验收后置范围移交这一项；原生桥全部定向测试、完整 check、管道上界测试和二进制构建仍须通过。保留原测试源码及全部断言，不以跳过计通过。",
+    "prior_run_id": 36766846873,
+    "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
+    "mac_evidence": {
+      "run_id": "r-nrzw1sgl",
+      "passed": 3,
+      "log_sha256": "2f90cf1840b7b693a8b33148a684d68d07acc16c61a8ab04607749ba6bea94a8"
+    },
+    "local_gate": {
+      "run_id": "r-f_e0vaas",
+      "host_check": "passed",
+      "i18n_passed": 11,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "dfa9df27ffba8f47b6451f305ee0114a013e0e30f7d72293dfebaeabb3b1bfff"
+    },
+    "localization": "无需本地化变更",
+    "gap_closed": false
+  },
+  "windows_actor_test_path_fix": {
+    "native_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
+    "native_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754",
+    "version": "1.0.41+infinishell.terminal-bridge.10",
+    "change": "将共享actor测试夹具cwd由硬编码/tmp改用系统临时目录，保留AbsPathBuf验证及全部原子准入、队列/审批保护和防重断言；仅测试代码变化。",
+    "target_status": "Windows 36774428641 shell桥20项通过，原5项夹具失败不再出现；独立启动失败另列。",
+    "source_reconstruction_sha256": "64d160d02e6ad4f38f8a32965831706eeb55c9dd37249a567ab7def63f33cb89",
+    "localization": "无需本地化变更",
+    "local_gate": {
+      "run_id": "r-xh0t_gjl",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316",
+      "host_check": "passed",
+      "i18n_tests_passed": 11
+    }
+  },
+  "windows_startup_stack_and_terminal_guard_fix": {
+    "version": "1.0.41+infinishell.terminal-bridge.11",
+    "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+    "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+    "change": "Windows正式CLI映像主线程预留8MiB，保留按需提交；终端守卫四项测试移植真实Windows子进程，不改生产事务或原断言。构建要求四库分别命中并实际通过版本、帮助及异步补全入口。",
+    "target_status": "passed_windows_81_bridge_tests_and_real_startup_final_host_gate_pending",
+    "source_reconstruction_sha256": "beaf4ae673a15573d79c80cf8c06578e99ffaef1ce3bffc22988f264e00c566a",
+    "native_local_gate": {
+      "run_id": "r-pr0y8law",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "52c0d97d4ceafaf73314c2b4bb8b6aa152a203fc97904b0a5c9020af63243dcf",
+      "native_check": "passed",
+      "native_build": "passed",
+      "native_tests_passed": 74,
+      "per_library": [
+        46,
+        20,
+        4,
+        4
+      ],
+      "startup_smoke": [
+        "version",
+        "help",
+        "async_completions"
+      ],
+      "model_inputs": 0
+    },
+    "host_local_gate": {
+      "run_id": "r-e2coze3m",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "be16cab5a35a093d8633fec60473ddef27032ffdaf37c7a2818cb2675020850d",
+      "host_check": "passed",
+      "i18n_tests_passed": 11
+    },
+    "failure_run": 36774428641,
+    "localization": "无需本地化变更",
+    "gap_closed": false,
+    "target_validation": {
+      "run_id": 36780256382,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382",
+      "source_commit": "8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "native_check": "passed",
+      "native_build": "passed",
+      "bridge_passed": 81,
+      "bridge_per_library": [
+        53,
+        20,
+        4,
+        4
+      ],
+      "startup_smoke": {
+        "version": "passed",
+        "help": "passed",
+        "async_completions": "passed",
+        "model_inputs": 0
+      },
+      "windows_stack": {
+        "reserve_bytes": 8388608,
+        "commit_bytes": 4096
+      },
+      "binary": {
+        "file": "xai-grok-pager.exe",
+        "bytes": 245529600,
+        "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"
+      },
+      "binary_usable": true,
+      "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+      "archive_summary_sha256": "90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062",
+      "logs_zip_sha256": "4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703",
+      "boundary": "21条原生命令均成功，四库均真实非零命中，版本/帮助/异步补全入口通过。独立归档后停止剩余重复验证，整个workflow为cancelled；摘要绑定后的最终两平台宿主门禁仍待验。"
+    }
+  }
+}

@@ -905,7 +905,7 @@ fn harness_parse_local_child_harness_accepts_codex() {
 
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 #[test]
-fn cli_agent_notify_has_only_send_and_protocol_query_modes() {
+fn cli_agent_notify_preserves_legacy_send_and_protocol_query_modes() {
     for protocol_version in [false, true] {
         let mut values = vec!["warp", "cli-agent-notify"];
         if protocol_version {
@@ -914,13 +914,51 @@ fn cli_agent_notify_has_only_send_and_protocol_query_modes() {
         let args = Args::try_parse_from(values).unwrap();
         let Some(Command::Worker(WorkerCommand::CliAgentNotify {
             protocol_version: actual,
+            require_protocol,
         })) = args.command()
         else {
             panic!("通知必须进入专属 worker");
         };
         assert_eq!(*actual, protocol_version);
+        assert_eq!(*require_protocol, None);
     }
     for extra in ["payload.json", "--tty", "--execute", "--protocol-version=2"] {
         assert!(Args::try_parse_from(["warp", "cli-agent-notify", extra]).is_err());
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+#[test]
+fn cli_agent_notify_accepts_required_protocol_without_query() {
+    for protocol in ["0", "1", "2", "4294967295"] {
+        let args =
+            Args::try_parse_from(["warp", "cli-agent-notify", "--require-protocol", protocol])
+                .unwrap();
+        let Some(Command::Worker(WorkerCommand::CliAgentNotify {
+            protocol_version,
+            require_protocol,
+        })) = args.command()
+        else {
+            panic!("协议约束发送必须进入专属 worker");
+        };
+        assert!(!protocol_version);
+        assert_eq!(*require_protocol, Some(protocol.parse().unwrap()));
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+#[test]
+fn cli_agent_notify_rejects_conflicting_and_invalid_protocol_modes() {
+    for options in [
+        vec!["--require-protocol"],
+        vec!["--require-protocol", "-1"],
+        vec!["--require-protocol", "4294967296"],
+        vec!["--require-protocol", "invalid"],
+        vec!["--protocol-version", "--require-protocol", "1"],
+        vec!["--require-protocol", "1", "--protocol-version"],
+    ] {
+        assert!(
+            Args::try_parse_from(["warp", "cli-agent-notify"].into_iter().chain(options)).is_err()
+        );
     }
 }

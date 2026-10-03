@@ -195,6 +195,10 @@ def audit_turns(native, events, fixtures, history, output):
         text = sent["input"]["Submit"]["input"][0]["Text"]
         expected_wire = (["/" + fixtures[keys[0]]["name"] + " " + text] if len(keys) == 1
             else ["/" + fixtures[key]["name"] for key in keys] + [text])
+        if len(keys) > 1:
+            expected_wire.append(json.dumps({"selected_skills": [
+                {"qualifiedName": "local:" + fixtures[key]["name"], "path": fixtures[key]["path"]}
+                for key in keys]}, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         require(wire_text == expected_wire, "原生 typed 技能或文字与实际提交不一致")
         calls, expanded = {}, {}
         native_text = "\n".join(item.get("text", "") for item in native_users[position]["content"])

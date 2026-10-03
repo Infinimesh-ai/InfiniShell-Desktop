@@ -5,7 +5,7 @@ use warp_terminal::model::ansi::control_sequence_parameters::*;
 use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
 use warpui::color::ColorU;
 
-use super::ProcessorInput;
+use super::{ProcessorInput, TerminalBindingChallenge};
 use super::dcs_hooks::*;
 use crate::terminal::model::completions::{
     ShellCompletion, ShellCompletionUpdate, ShellData as CompletionsShellData,
@@ -413,4 +413,7 @@ pub trait Handler {
     /// - OSC 9: Simple notification with just a body (iTerm2/Windows Terminal style)
     /// - OSC 777: Notification with title and body (urxvt style)
     fn pluggable_notification(&mut self, _title: Option<String>, _body: String) {}
+
+    /// 独立于插件开关，只将挑战转交到所属 view。
+    fn terminal_binding_challenge(&mut self, _: TerminalBindingChallenge) {}
 }

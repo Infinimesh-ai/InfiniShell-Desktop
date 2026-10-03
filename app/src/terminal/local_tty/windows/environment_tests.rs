@@ -19,10 +19,16 @@ fn local_worker_overrides_stale_environment_and_is_not_forwarded_to_wsl() {
                 Vec::new(),
             )),
             start_dir: None,
-            env_vars: HashMap::from([(
-                WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV.into(),
-                "C:\\old-host\\worker.exe".into(),
-            )]),
+            env_vars: HashMap::from([
+                (
+                    WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV.into(),
+                    "C:\\old-host\\worker.exe".into(),
+                ),
+                (
+                    "grok_terminal_bridge_dir".into(),
+                    "C:\\caller-selected-bridge".into(),
+                ),
+            ]),
             enable_ssh_wrapper: false,
             reuse_ssh_control_master: false,
             shell_debug_mode: false,
@@ -49,10 +55,24 @@ fn local_worker_overrides_stale_environment_and_is_not_forwarded_to_wsl() {
         } else {
             assert_eq!(advertised, None);
         }
+        let bridge_prefix = format!("{GROK_TERMINAL_BRIDGE_DIR}=");
+        let bridge = block
+            .split(|unit| *unit == 0)
+            .filter_map(|entry| String::from_utf16(entry).ok())
+            .find_map(|entry| entry.strip_prefix(&bridge_prefix).map(str::to_owned));
+        assert_ne!(bridge.as_deref(), Some("C:\\caller-selected-bridge"));
+        if !enabled {
+            assert!(bridge.is_none());
+        }
         assert!(
             !wsl_env_allowlist(false)
                 .to_string_lossy()
                 .contains(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV)
+        );
+        assert!(
+            !wsl_env_allowlist(false)
+                .to_string_lossy()
+                .contains(GROK_TERMINAL_BRIDGE_DIR)
         );
     }
 }

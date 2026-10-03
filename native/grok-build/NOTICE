@@ -1,0 +1,13 @@
+Grok Build 原生终端输入桥补丁
+
+上游：xAI，https://github.com/xai-org/grok-build
+本目录 LICENSE 保留上游 Apache License 2.0。
+InfiniShell 新增修改遵循本仓库 AGPL-3.0-only 许可（../../LICENSE-AGPL）；
+未重新许可上游代码。分发含本补丁的代码或二进制时同时保留该许可。
+本目录不是官方 Grok 发行包，也不包含上游完整源码或依赖二进制。
+
+修改说明（2026-09-30，InfiniShell）：
+terminal-bridge.patch 的每个差异文件均由 InfiniShell 修改，新增文件包含原生
+终端桥、认证 IPC、持久回执和测试；已有文件增加原子空闲准入、真实任务检查
+及持久化确认接线。上游原有版权及第三方声明不作修改。构建或分发完整二进制
+时仍须保留上游 LICENSE、THIRD-PARTY-NOTICES 及 third_party/NOTICE。

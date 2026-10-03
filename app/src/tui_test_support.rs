@@ -147,6 +147,8 @@ pub fn add_tui_history_test_models(
     let session = Arc::new(Session::new(
         SessionInfo {
             session_id,
+            shell_pid: None,
+            shell_tty: None,
             shell: Shell::new(ShellType::Zsh, None, None, HashSet::new(), None),
             launch_data: None,
             histfile: None,

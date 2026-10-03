@@ -854,7 +854,7 @@ fn execute(
             )?),
         ),
     };
-    let graceful_deadline = Instant::now() + GRACEFUL_EXIT_TIMEOUT;
+    let mut graceful_deadline = Instant::now() + super::graceful_exit_timeout(manifest, reason);
     while status.is_none() && Instant::now() < graceful_deadline {
         match receiver.recv_timeout(Duration::from_millis(10)) {
             Ok(Event::Native(result)) => {
@@ -864,7 +864,14 @@ fn execute(
                     &native.identity,
                 )?)
             }
-            Ok(Event::Stop(_)) | Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Ok(Event::Stop(ExitReason::HostDisconnected | ExitReason::StopRequested)) => {
+                if manifest.grok_stdio_eof.is_some() {
+                    graceful_deadline =
+                        graceful_deadline.min(Instant::now() + GRACEFUL_EXIT_TIMEOUT);
+                }
+            }
+            Ok(Event::Stop(ExitReason::NativeExit | ExitReason::StdioClosed))
+            | Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }

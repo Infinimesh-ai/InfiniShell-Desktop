@@ -3805,6 +3805,11 @@ impl ansi::Handler for TerminalModel {
         delegate!(self.handle_completed_kitty_action(action, &mut self.image_id_to_metadata))
     }
 
+    fn terminal_binding_challenge(&mut self, challenge: ansi::TerminalBindingChallenge) {
+        self.event_proxy
+            .send_terminal_event(Event::TerminalBindingChallenge(challenge));
+    }
+
     fn pluggable_notification(&mut self, title: Option<String>, body: String) {
         if FeatureFlag::PluggableNotifications.is_enabled() {
             self.event_proxy

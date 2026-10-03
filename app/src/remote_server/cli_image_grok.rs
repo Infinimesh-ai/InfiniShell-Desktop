@@ -4,7 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::Duration;
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -23,6 +25,34 @@ use crate::terminal::cli_agent_sessions::grok_leader_input::{
     GrokLeaderInputEvent, GrokLeaderOutcome, GrokLeaderPrompt,
 };
 
+enum InputAuthority {
+    Hook(Observation),
+    Owned { binding_id: Uuid },
+}
+
+impl InputAuthority {
+    fn binding_id(&self) -> io::Result<Uuid> {
+        let binding_id = match self {
+            Self::Hook(observation) => {
+                if observation.native_session.is_nil()
+                    || observation.permission_revision.is_nil()
+                    || observation.event_id.is_empty()
+                    || observation.event_id.len() > 512
+                    || observation.permission_mode != "default"
+                {
+                    return Err(invalid());
+                }
+                observation.binding_id
+            }
+            Self::Owned { binding_id } => *binding_id,
+        };
+        if binding_id.is_nil() {
+            return Err(invalid());
+        }
+        Ok(binding_id)
+    }
+}
+
 struct Terminal {
     epoch: Uuid,
     revision: u64,
@@ -31,10 +61,38 @@ struct Terminal {
     lease: Option<(Uuid, Arc<AtomicU8>)>,
 }
 
+fn terminal_scope(scope: &Scope) -> super::proto::TerminalBindingScope {
+    super::proto::TerminalBindingScope {
+        host_id: scope.host.clone(),
+        terminal_session_id: scope.terminal_session,
+        terminal_epoch: scope.terminal_epoch.to_string(),
+    }
+}
+
+struct RegisteredLaunch {
+    scope: Scope,
+    ticket: Ticket,
+    cleanup: Sender<(Scope, Ticket)>,
+}
+
+impl RegisteredLaunch {
+    fn request_cleanup(self) {
+        let _ = self.cleanup.send((self.scope, self.ticket));
+    }
+}
+
 pub(super) struct Connection {
     live: AtomicBool,
     initialized: AtomicBool,
     terminals: Mutex<HashMap<u64, Terminal>>,
+    // 启动生命周期独立于输入租约；None 表示断连已封闭登记。
+    launches: Mutex<Option<Vec<RegisteredLaunch>>>,
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        self.disconnect();
+    }
 }
 
 impl Connection {
@@ -43,6 +101,7 @@ impl Connection {
             live: AtomicBool::new(true),
             initialized: AtomicBool::new(false),
             terminals: Mutex::new(HashMap::new()),
+            launches: Mutex::new(Some(Vec::new())),
         }
     }
     pub(super) fn initialize(&self) {
@@ -79,11 +138,33 @@ impl Connection {
     }
     pub(super) fn disconnect(&self) {
         self.live.store(false, Ordering::Release);
+        let launches = self.launches.lock().expect("远端 Grok 启动锁").take();
+        if let Some(launches) = launches {
+            for launch in launches {
+                launch.request_cleanup();
+            }
+        }
         for terminal in self.terminals.lock().expect("远端 Grok 终端锁").values() {
             if let Some((_, lease)) = &terminal.lease {
                 let _ = lease.compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst);
             }
         }
+    }
+
+    fn register_launch(&self, scope: Scope, ticket: Ticket, cleanup: Sender<(Scope, Ticket)>) {
+        let launch = RegisteredLaunch {
+            scope,
+            ticket,
+            cleanup,
+        };
+        let mut launches = self.launches.lock().expect("远端 Grok 启动锁");
+        if let Some(launches) = launches.as_mut() {
+            launches.push(launch);
+            return;
+        }
+        drop(launches);
+        // Reserve 的磁盘写入可晚于 EOF 完成；此时不能把成功票据遗留在已关闭连接。
+        launch.request_cleanup();
     }
     fn current(&self, scope: &Scope) -> bool {
         self.live.load(Ordering::Acquire)
@@ -146,13 +227,8 @@ impl Connection {
 pub(super) struct Service {
     host: String,
     tickets: TicketStore,
-    stop_cleanup: Arc<AtomicBool>,
-}
-
-impl Drop for Service {
-    fn drop(&mut self) {
-        self.stop_cleanup.store(true, Ordering::Release);
-    }
+    cleanup: Sender<(Scope, Ticket)>,
+    tmux_owned: Mutex<Option<Weak<super::tmux_owned::Service>>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -170,27 +246,95 @@ struct Finished {
 }
 
 impl Service {
+    #[cfg(test)]
+    pub(super) fn without_reaper_for_test(host: String, parent: &Path) -> io::Result<Self> {
+        let (cleanup, _) = mpsc::channel();
+        Ok(Self {
+            host,
+            tickets: TicketStore::new(parent)?,
+            cleanup,
+            tmux_owned: Mutex::new(None),
+        })
+    }
+
+    pub(super) fn set_tmux_owned(&self, service: Weak<super::tmux_owned::Service>) {
+        *self.tmux_owned.lock().expect("tmux 图片服务锁") = Some(service);
+    }
+
+    fn tmux_service(&self) -> io::Result<Option<Arc<super::tmux_owned::Service>>> {
+        self.tmux_owned
+            .lock()
+            .map_err(|_| invalid())?
+            .as_ref()
+            .map(|service| service.upgrade().ok_or_else(invalid))
+            .transpose()
+    }
+
+    fn ticket_scope(&self, scope: &Scope, ticket: &Ticket) -> io::Result<Scope> {
+        let mut original = scope.clone();
+        if let Some(service) = self.tmux_service()? {
+            if service.owns_ticket(ticket.id)? {
+                let stored = service.ticket_terminal(
+                    &terminal_scope(scope),
+                    ticket.id,
+                    ticket.key,
+                    super::proto::TerminalBindingOwnedAgent::Grok,
+                )?;
+                original.host = stored.host().to_owned();
+                original.terminal_session = stored.terminal_session();
+            }
+        }
+        Ok(original)
+    }
+
+    /// tmux pane 可跨 SSH 连接存活，不登记到会在连接 EOF 时取消的普通启动列表。
+    pub(super) fn reserve_tmux(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        cwd: &str,
+    ) -> io::Result<Reply> {
+        if scope.host != self.host {
+            return Err(invalid());
+        }
+        let reply = self.tickets.reserve(scope, ticket, cwd)?;
+        let guard = self.tickets.lock(scope, ticket)?;
+        // 仅登记退出后的回收，不写 cancelled；pane 仍可在 SSH 断开后继续运行。
+        write_new(&guard.directory.join("cleanup-requested.json"), &true)?;
+        Ok(reply)
+    }
+
+    pub(super) fn status_tmux(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        original: &super::tmux_owned::OriginalScope,
+    ) -> io::Result<Reply> {
+        if !original.matches(&scope.host, scope.terminal_session) {
+            return Err(invalid());
+        }
+        self.tickets.lock(scope, ticket)?.status(ticket)
+    }
+
+    pub(super) fn cancel_tmux(&self, scope: &Scope, ticket: &Ticket) -> io::Result<Reply> {
+        if scope.host != self.host {
+            return Err(invalid());
+        }
+        cancel_launch(&self.tickets, scope, ticket)
+    }
+
     pub(super) fn new(host: String, parent: &Path) -> io::Result<Self> {
         let tickets = TicketStore::new(parent)?;
-        let stop_cleanup = Arc::new(AtomicBool::new(false));
         let cleanup_tickets = tickets.clone();
-        let cleanup_stop = stop_cleanup.clone();
+        let (cleanup, requested) = mpsc::channel();
         std::thread::Builder::new()
             .name("grok-owned-cleanup".into())
-            .spawn(move || {
-                while !cleanup_stop.load(Ordering::Acquire) {
-                    if let Ok(directories) = cleanup_tickets.reap_requested() {
-                        for directory in directories {
-                            let _ = cleanup_payloads(&directory);
-                        }
-                    }
-                    std::thread::sleep(std::time::Duration::from_secs(5));
-                }
-            })?;
+            .spawn(move || cleanup_worker(cleanup_tickets, requested))?;
         Ok(Self {
             host,
             tickets,
-            stop_cleanup,
+            cleanup,
+            tmux_owned: Mutex::new(None),
         })
     }
 
@@ -216,22 +360,28 @@ impl Service {
     ) -> io::Result<Reply> {
         let scope = request.scope;
         match request.action {
-            Action::Reserve { ticket, cwd } => self.tickets.reserve(&scope, &ticket, &cwd),
-            Action::Status { ticket } => self.tickets.lock(&scope, &ticket)?.status(&ticket),
-            Action::Cancel { ticket } => {
-                let guard = self.tickets.lock(&scope, &ticket)?;
-                let reply = guard.cancel(&ticket)?;
-                if matches!(&reply, Reply::Launch { phase, .. } if phase == "released") {
-                    cleanup_payloads(&guard.directory)?;
-                }
+            Action::Reserve { ticket, cwd } => {
+                let reply = self.tickets.reserve(&scope, &ticket, &cwd)?;
+                connection.register_launch(scope, ticket, self.cleanup.clone());
                 Ok(reply)
             }
+            Action::Status { ticket } => self
+                .tickets
+                .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?
+                .status(&ticket),
+            Action::Observe { ticket } => self.observe(connection, &scope, ticket),
+            Action::Cancel { ticket } => {
+                cancel_launch(&self.tickets, &self.ticket_scope(&scope, &ticket)?, &ticket)
+            }
             Action::Revoke { ticket, .. } => {
-                self.tickets.lock(&scope, &ticket)?;
+                self.tickets
+                    .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?;
                 Ok(Reply::Revoked { ticket })
             }
             Action::InputStatus { ticket, message_id } => {
-                let guard = self.tickets.lock(&scope, &ticket)?;
+                let guard = self
+                    .tickets
+                    .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?;
                 delivery_status(&guard.directory, &ticket, message_id)
             }
             Action::Submit {
@@ -243,10 +393,64 @@ impl Service {
                 scope,
                 request.revision,
                 ticket,
-                observation,
+                InputAuthority::Hook(observation),
+                input,
+            ),
+            Action::SubmitOwned {
+                ticket,
+                binding_id,
+                input,
+            } => self.submit(
+                connection,
+                scope,
+                request.revision,
+                ticket,
+                InputAuthority::Owned { binding_id },
                 input,
             ),
         }
+    }
+
+    /// 重连身份只来自当前 challenge 和 resident actor，不合成或回填 hook 观察。
+    fn observe(&self, connection: &Connection, scope: &Scope, ticket: Ticket) -> io::Result<Reply> {
+        let service = self.tmux_service()?.ok_or_else(invalid)?;
+        let ticket_scope = self.ticket_scope(scope, &ticket)?;
+        let (tmux, _) = service.image_guard(
+            &terminal_scope(scope),
+            ticket.id,
+            super::proto::TerminalBindingOwnedAgent::Grok,
+        )?;
+        tmux.validate_ticket(
+            &ticket_scope.host,
+            ticket_scope.terminal_session,
+            ticket.id,
+            super::proto::TerminalBindingOwnedAgent::Grok,
+        )?;
+        let guard = self.tickets.lock(&ticket_scope, &ticket)?;
+        let mut launch = guard.launch_for_input()?;
+        let target = launch
+            .readonly_target(Uuid::new_v4())
+            .map_err(|_| invalid())?;
+        let terminal = target.terminal_identity().map_err(|_| invalid())?;
+        tmux.validate_process(terminal.0, terminal.1)?;
+        let observer = GrokLeaderInput::connect_observer(target).map_err(|_| invalid())?;
+        tmux.validate_process(terminal.0, terminal.1)?;
+        if !connection.current(scope) {
+            return Err(invalid());
+        }
+        // 只读连接不能提交；结束观察不撤销 pager 路由或重放任何原生通知。
+        let _ = observer.disconnect();
+        Ok(Reply::OwnedIdentity {
+            ticket,
+            native_session: launch.session_id(),
+            cwd: launch
+                .working_directory()
+                .to_str()
+                .ok_or_else(invalid)?
+                .to_owned(),
+            manifest_sha256: launch.manifest_sha256().to_owned(),
+            permission_mode: "default".into(),
+        })
     }
 
     fn submit(
@@ -255,22 +459,17 @@ impl Service {
         scope: Scope,
         revision: u64,
         ticket: Ticket,
-        observation: Observation,
+        authority: InputAuthority,
         input: Input,
     ) -> io::Result<Reply> {
-        if input.message_id.is_nil()
-            || observation.native_session.is_nil()
-            || observation.binding_id.is_nil()
-            || observation.permission_revision.is_nil()
-            || observation.event_id.is_empty()
-            || observation.event_id.len() > 512
-            || observation.permission_mode != "default"
-        {
+        let binding_id = authority.binding_id()?;
+        if input.message_id.is_nil() {
             return Err(invalid());
         }
         let prompt = prompt(&input)?;
         let subject = input_subject(&input)?;
-        let guard = self.tickets.lock(&scope, &ticket)?;
+        let ticket_scope = self.ticket_scope(&scope, &ticket)?;
+        let guard = self.tickets.lock(&ticket_scope, &ticket)?;
         let claim_path = guard
             .directory
             .join(format!("{}-claim.json", input.message_id));
@@ -296,28 +495,62 @@ impl Service {
                 return Err(invalid());
             }
         }
-        let mut launch = guard.launch()?;
-        if launch.session_id() != observation.native_session
-            || launch.working_directory().to_string_lossy() != observation.cwd
-        {
-            return Err(invalid());
-        }
-        let observed = GrokPermissionObservation {
-            session_id: observation.native_session.to_string(),
-            cwd: observation.cwd,
-            session_start_event_id: observation.event_id,
-            mode: observation.permission_mode,
+        let tmux = match self.tmux_service()? {
+            Some(service) if service.owns_ticket(ticket.id)? => Some(
+                service
+                    .image_guard(
+                        &terminal_scope(&scope),
+                        ticket.id,
+                        super::proto::TerminalBindingOwnedAgent::Grok,
+                    )?
+                    .0,
+            ),
+            Some(_) | None => None,
         };
-        let binding = launch
-            .bind(
-                observation.binding_id,
-                observation.permission_revision,
-                &observed,
-            )
-            .map_err(|_| invalid())?;
+        if let Some(tmux) = &tmux {
+            tmux.validate_ticket(
+                &ticket_scope.host,
+                ticket_scope.terminal_session,
+                ticket.id,
+                super::proto::TerminalBindingOwnedAgent::Grok,
+            )?;
+        }
+        let mut launch = guard.launch_for_input()?;
+        let target = match authority {
+            InputAuthority::Hook(observation) => {
+                if launch.session_id() != observation.native_session
+                    || launch.working_directory().to_string_lossy() != observation.cwd
+                {
+                    return Err(invalid());
+                }
+                let observed = GrokPermissionObservation {
+                    session_id: observation.native_session.to_string(),
+                    cwd: observation.cwd,
+                    session_start_event_id: observation.event_id,
+                    mode: observation.permission_mode,
+                };
+                launch
+                    .bind(binding_id, observation.permission_revision, &observed)
+                    .map_err(|_| invalid())?
+                    .into_target()
+            }
+            InputAuthority::Owned { .. } => {
+                if tmux.is_none() {
+                    return Err(invalid());
+                }
+                launch.readonly_target(binding_id).map_err(|_| invalid())?
+            }
+        };
         let lease = connection.permit(&scope, revision)?;
-        let mut sidecar =
-            GrokLeaderInput::connect(binding.into_target(), None).map_err(|_| invalid())?;
+        let terminal = match &tmux {
+            Some(tmux) => {
+                let terminal = target.terminal_identity().map_err(|_| invalid())?;
+                tmux.validate_process(terminal.0, terminal.1)?;
+                Some(terminal)
+            }
+            None => None,
+        };
+        let mut sidecar = GrokLeaderInput::connect(target, None).map_err(|_| invalid())?;
         let body_path = guard
             .directory
             .join(format!("{}-input.json", input.message_id));
@@ -325,7 +558,7 @@ impl Service {
         let claim_subject = subject.clone();
         // 原图的持久内容先写，原生 RPC ID/Unknown 后写，最后领取当前连接/输入代际。
         let submitted = sidecar.submit_prompt_once_checked(
-            observation.binding_id,
+            binding_id,
             input.message_id,
             &prompt,
             |delivery| {
@@ -338,6 +571,10 @@ impl Service {
                 )
             },
             || {
+                if let (Some(tmux), Some(terminal)) = (&tmux, terminal) {
+                    tmux.validate_process(terminal.0, terminal.1)
+                        .map_err(|_| GrokLeaderInputError::StaleBinding)?;
+                }
                 if !connection.current(&scope) {
                     return Err(GrokLeaderInputError::StaleBinding);
                 }
@@ -348,12 +585,17 @@ impl Service {
             },
         );
         if submitted.is_err() {
+            // 最后只读查询也可能拒绝；只有尚未创建claim时才清理本次自有副本。
+            // 已创建或损坏的claim仍按Unknown保留，不能从一般RPC错误推断未入队。
+            if optional_json::<Claim>(&claim_path)?.is_none() {
+                remove_payload(&body_path, &subject)?;
+                return Err(invalid());
+            }
             return delivery_status(&guard.directory, &ticket, input.message_id);
         }
         let service = self.clone();
         let directory = guard.directory.clone();
         let message = input.message_id;
-        let binding_id = observation.binding_id;
         let reply_ticket = ticket.clone();
         drop(guard);
         // 断连后仅继续收取已领取请求的精确 ACK；本线程没有恢复、重投或答复审批入口。
@@ -363,8 +605,11 @@ impl Service {
                 loop {
                     match sidecar.poll(binding_id) {
                         Ok(Some(GrokLeaderInputEvent::Delivery(delivery))) => {
-                            if !matches!(delivery.status, GrokLeaderDeliveryStatus::Finished { .. })
-                            {
+                            if !matches!(
+                                delivery.status,
+                                GrokLeaderDeliveryStatus::Finished { .. }
+                                    | GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { .. }
+                            ) {
                                 continue;
                             }
                             let Some(raw) = sidecar.take_final_response() else {
@@ -373,7 +618,7 @@ impl Service {
                             let Ok(bytes) = serde_json::to_vec(&raw) else {
                                 break;
                             };
-                            let Ok(guard) = service.tickets.lock(&scope, &ticket) else {
+                            let Ok(guard) = service.tickets.lock(&ticket_scope, &ticket) else {
                                 break;
                             };
                             let Ok(claim) = read_json::<Claim>(
@@ -426,6 +671,33 @@ impl Service {
     }
 }
 
+fn cleanup_worker(tickets: TicketStore, requested: Receiver<(Scope, Ticket)>) {
+    loop {
+        if let Ok(directories) = tickets.reap_requested() {
+            for directory in directories {
+                let _ = cleanup_payloads(&directory);
+            }
+        }
+        match requested.recv_timeout(Duration::from_secs(5)) {
+            Ok((scope, ticket)) => {
+                let _ = cancel_launch(&tickets, &scope, &ticket);
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            // Service 与登记的连接均释放发送端后，排空已关闭连接的回收请求才退出。
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+}
+
+fn cancel_launch(tickets: &TicketStore, scope: &Scope, ticket: &Ticket) -> io::Result<Reply> {
+    let guard = tickets.lock(scope, ticket)?;
+    let reply = guard.cancel(ticket)?;
+    if matches!(&reply, Reply::Launch { phase, .. } if phase == "released") {
+        cleanup_payloads(&guard.directory)?;
+    }
+    Ok(reply)
+}
+
 fn prompt(input: &Input) -> io::Result<GrokLeaderPrompt> {
     if input.images.is_empty() {
         return GrokLeaderPrompt::text(&input.text).map_err(|_| invalid());
@@ -458,23 +730,28 @@ fn delivery_status(directory: &Path, ticket: &Ticket, message_id: Uuid) -> io::R
     if let Some(record) =
         optional_json::<Finished>(&directory.join(format!("{message_id}-finished.json")))?
     {
-        let GrokLeaderDeliveryStatus::Finished {
-            native_prompt_id,
-            outcome,
-        } = record.claim.delivery.status
-        else {
-            return Err(invalid());
+        let (state, native_prompt_id) = match record.claim.delivery.status {
+            GrokLeaderDeliveryStatus::Finished {
+                native_prompt_id,
+                outcome,
+            } => (
+                match outcome {
+                    GrokLeaderOutcome::EndTurn => "finished",
+                    GrokLeaderOutcome::Cancelled => "cancelled",
+                },
+                Some(native_prompt_id),
+            ),
+            GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { .. } => {
+                ("rejected_before_enqueue", None)
+            }
+            GrokLeaderDeliveryStatus::Unknown => return Err(invalid()),
         };
         return Ok(Reply::Input {
             ticket: ticket.clone(),
             message_id,
             subject_sha256: record.claim.subject,
-            state: match outcome {
-                GrokLeaderOutcome::EndTurn => "finished",
-                GrokLeaderOutcome::Cancelled => "cancelled",
-            }
-            .into(),
-            native_prompt_id: Some(native_prompt_id),
+            state: state.into(),
+            native_prompt_id,
             native_ack_sha256: Some(record.native_ack_sha256),
         });
     }
@@ -542,3 +819,7 @@ pub(crate) fn input_subject(input: &Input) -> io::Result<String> {
         &encode(&(&input.text, &input.images)).map_err(|_| invalid())?,
     ))
 }
+
+#[cfg(test)]
+#[path = "cli_image_grok_tests.rs"]
+mod tests;

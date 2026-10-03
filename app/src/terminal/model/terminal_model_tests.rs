@@ -370,6 +370,8 @@ fn ssh_bootstraps_if_blocklist_empty_and_reconciles_parent_return() {
 
     let bootstrapped_value = BootstrappedValue {
         session_id: None,
+        shell_pid: None,
+        shell_tty: None,
         histfile: None,
         shell: String::from("bash"),
         home_dir: None,

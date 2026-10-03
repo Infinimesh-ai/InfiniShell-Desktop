@@ -198,6 +198,33 @@ pub struct MacosProcessIdentity {
     pub resource_cid: u64,
 }
 
+/// 从已连接 socket 首次读取的内核凭据快照；后续仍须核对进程代际与映像，不从 PID 重建 token。
+#[derive(Clone, Copy)]
+pub struct MacosPeerHandle {
+    identity: MacosProcessIdentity,
+    audit_token: [u32; 8],
+}
+
+impl MacosPeerHandle {
+    pub fn identity(&self) -> MacosProcessIdentity {
+        self.identity
+    }
+
+    pub fn audit_token(&self) -> &[u32; 8] {
+        &self.audit_token
+    }
+}
+
+/// 只读内核快照；调用方仍须核对自己的 PTY 设备及有效的前台进程组。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MacosTerminalSnapshot {
+    pub identity: MacosProcessIdentity,
+    pub uid: u32,
+    pub tty_device: u64,
+    pub process_group: i32,
+    pub foreground_group: i32,
+}
+
 pub fn macos_boot_session() -> io::Result<String> {
     let mut buffer = [0u8; 128];
     let mut size = buffer.len();
@@ -225,9 +252,13 @@ pub fn macos_boot_session() -> io::Result<String> {
 }
 
 pub fn macos_peer_identity(stream: &UnixStream) -> io::Result<MacosProcessIdentity> {
+    macos_peer_handle(stream).map(|peer| peer.identity())
+}
+
+pub fn macos_peer_handle(stream: &UnixStream) -> io::Result<MacosPeerHandle> {
     let mut token = [0u32; 8];
     let mut size = mem::size_of_val(&token) as libc::socklen_t;
-    // LOCAL_PEERTOKEN 在连接建立时由内核固定，不能相信握手中自报的 PID。
+    // LOCAL_PEERTOKEN 读取当前连接对端的内核凭据；断连后不可重读，不能相信握手中自报的 PID。
     let result = unsafe {
         libc::getsockopt(
             stream.as_raw_fd(),
@@ -247,11 +278,36 @@ pub fn macos_peer_identity(stream: &UnixStream) -> io::Result<MacosProcessIdenti
     if identity.pid_version != token[7] {
         return Err(io::Error::other("托管 IPC 对端 PID 已失效"));
     }
-    Ok(identity)
+    Ok(MacosPeerHandle {
+        identity,
+        audit_token: token,
+    })
 }
 
 pub fn macos_process_identity(pid: i32) -> io::Result<MacosProcessIdentity> {
     Api::load()?.identity(pid)
+}
+
+pub fn macos_process_terminal(expected: MacosProcessIdentity) -> io::Result<MacosTerminalSnapshot> {
+    let api = Api::load()?;
+    if api.identity(expected.pid)? != expected {
+        return Err(io::Error::other("终端进程代际已改变"));
+    }
+    // 使用 libc 的完整 proc_bsdinfo ABI；必须读取完整结构，不能只猜测字段偏移。
+    let info: libc::proc_bsdinfo = api.read(expected.pid, libc::PROC_PIDTBSDINFO)?;
+    if info.pbi_pid != expected.pid as u32
+        || info.pbi_uid != unsafe { libc::geteuid() }
+        || api.identity(expected.pid)? != expected
+    {
+        return Err(io::Error::other("终端进程身份或所属用户已改变"));
+    }
+    Ok(MacosTerminalSnapshot {
+        identity: expected,
+        uid: info.pbi_uid,
+        tty_device: u64::from(info.e_tdev),
+        process_group: info.pbi_pgid as i32,
+        foreground_group: info.e_tpgid as i32,
+    })
 }
 
 /// 调用方必须先证明此进程归本次任务所有；内核 token 只解决身份重用，不能授予所有权。

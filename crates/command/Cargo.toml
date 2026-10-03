@@ -5,7 +5,12 @@ edition = "2024"
 publish.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "infinishell-station-bootstrap"
+path = "src/bin/infinishell-station-bootstrap.rs"
+
 [features]
+native-probe-witness = []
 test-util = ["windows/Win32_System_StationsAndDesktops", "windows/Win32_Graphics_Gdi"]
 
 [dependencies]
@@ -16,7 +21,9 @@ log.workspace = true
 tempfile = "3.8.0"
 
 [target.'cfg(windows)'.dev-dependencies]
-windows = { workspace = true, features = ["Win32_System_StationsAndDesktops", "Win32_Graphics_Gdi"] }
+sha2.workspace = true
+serde_json.workspace = true
+windows = { workspace = true, features = ["Win32_System_StationsAndDesktops", "Win32_Graphics_Gdi", "Win32_Security_Authentication_Identity"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-process = { workspace = true }
@@ -25,19 +32,31 @@ futures-lite.workspace = true
 [target.'cfg(windows)'.dependencies]
 anyhow.workspace = true
 lazy_static.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
+uuid.workspace = true
 win32job = "2.0.2"
 windows = { workspace = true, features = [
     "Win32_Foundation",
+    "Win32_Graphics_Gdi",
     "Win32_Security",
     "Win32_Security_Authorization",
+    "Win32_Security_Authentication_Identity",
     "Win32_Security_Isolation",
     "Win32_Storage_FileSystem",
+    "Win32_System_Com",
     "Win32_System_Console",
+    "Win32_System_Diagnostics_Debug",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_IO",
     "Win32_System_JobObjects",
     "Win32_System_Pipes",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_SystemInformation",
     "Win32_System_Threading",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
 

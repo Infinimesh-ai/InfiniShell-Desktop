@@ -1816,6 +1816,155 @@ fn sdk_tool_calls_require_active_turn_and_single_bound_response() {
     );
 }
 
+fn reviewed_host_reply_fixture() -> (ClaudeProtocol, Uuid, RuntimeCommand) {
+    let (mut protocol, turn_id) = running_protocol();
+    let call_id = "reviewed-host-call";
+    protocol.local_tools.insert(
+        call_id.into(),
+        PendingLocalTool {
+            fingerprint: [0; 32],
+            request: NativeLocalToolRequest {
+                reply_target: local_tools::LocalToolReplyTarget::Claude {
+                    request_id: call_id.into(),
+                    mcp_id: json!(3),
+                },
+                call_id: call_id.into(),
+                turn_id: turn_id.to_string(),
+                tool: REVIEWED_COMMAND_TOOL.into(),
+                arguments: json!({}),
+            },
+            response: None,
+            cancelled: false,
+        },
+    );
+    let reply = command(
+        Uuid::from_u128(91),
+        RuntimeAction::RespondLocalTool {
+            turn_id: turn_id.to_string(),
+            call_id: call_id.into(),
+            result: Err("reviewed_command_cancelled".into()),
+        },
+    );
+    (protocol, turn_id, reply)
+}
+
+#[test]
+fn reviewed_host_cleanup_keeps_cancelled_terminal_without_late_reply_failure() {
+    let (mut protocol, turn_id, reply) = reviewed_host_reply_fixture();
+    let mut terminal = Vec::new();
+    protocol.finish_turn(turn_id, TurnOutcome::Cancelled, None, &mut terminal);
+    let effects = protocol.host_command_reply(reply.clone(), terminal.clone());
+    assert!(effects.writes.is_empty());
+    assert_eq!(effects.events, terminal);
+    assert!(
+        matches!(effects.events.as_slice(), [RuntimeEventKind::TurnFinished {
+        turn_id: finished, outcome: TurnOutcome::Cancelled, ..
+    }] if finished == &turn_id.to_string())
+    );
+    // 外部迟到回复仍被拒绝，不能借内部清理路径恢复已结束的调用。
+    assert!(matches!(
+        protocol.command(reply).events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+}
+
+#[test]
+fn reviewed_host_native_cancel_drops_only_internal_reply() {
+    let (mut protocol, _, reply) = reviewed_host_reply_fixture();
+    let effects = protocol
+        .receive(json!({"type":"control_cancel_request",
+        "request_id":"reviewed-host-call"}))
+        .unwrap();
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::LocalToolCancelled { .. }]
+    ));
+    let effects = protocol.host_command_reply(reply.clone(), Vec::new());
+    assert!(effects.writes.is_empty() && effects.events.is_empty());
+    assert!(matches!(
+        protocol.command(reply).events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+}
+
+#[test]
+fn reviewed_host_active_reply_still_dispatches_once() {
+    let (mut protocol, _, reply) = reviewed_host_reply_fixture();
+    let effects = protocol.host_command_reply(reply.clone(), Vec::new());
+    assert_eq!(effects.writes.len(), 1);
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::CommandDispatched { .. }]
+    ));
+    let mut duplicate = reply;
+    duplicate.message_id = Uuid::from_u128(92);
+    assert!(matches!(
+        protocol
+            .host_command_reply(duplicate, Vec::new())
+            .events
+            .as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+}
+
+#[test]
+fn reviewed_host_late_reply_requires_exact_cancelled_identity() {
+    for (call_id, reply_turn, generation) in [
+        ("unknown-call", Uuid::from_u128(10), Uuid::from_u128(1)),
+        (
+            "reviewed-host-call",
+            Uuid::from_u128(11),
+            Uuid::from_u128(1),
+        ),
+        (
+            "reviewed-host-call",
+            Uuid::from_u128(10),
+            Uuid::from_u128(2),
+        ),
+    ] {
+        let (mut protocol, turn_id, mut reply) = reviewed_host_reply_fixture();
+        let mut terminal = Vec::new();
+        protocol.finish_turn(turn_id, TurnOutcome::Cancelled, None, &mut terminal);
+        reply.generation = generation;
+        reply.action = RuntimeAction::RespondLocalTool {
+            turn_id: reply_turn.to_string(),
+            call_id: call_id.into(),
+            result: Err("reviewed_command_cancelled".into()),
+        };
+        let effects = protocol.host_command_reply(reply, terminal.clone());
+        assert!(effects.writes.is_empty());
+        assert!(matches!(
+            effects.events.first(),
+            Some(RuntimeEventKind::RequestFailed { .. })
+        ));
+        assert_eq!(&effects.events[1..], terminal);
+    }
+    let (mut protocol, turn_id, reply) = reviewed_host_reply_fixture();
+    let mut terminal = Vec::new();
+    protocol.finish_turn(turn_id, TurnOutcome::Cancelled, None, &mut terminal);
+    // 已结束但没有本次清理释放的取消证据，不能静默吞掉回复。
+    assert!(matches!(
+        protocol
+            .host_command_reply(reply, Vec::new())
+            .events
+            .as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    let (mut protocol, turn_id, reply) = reviewed_host_reply_fixture();
+    let mut terminal = Vec::new();
+    protocol.finish_turn(turn_id, TurnOutcome::Cancelled, None, &mut terminal);
+    protocol
+        .local_tools
+        .get_mut("reviewed-host-call")
+        .unwrap()
+        .request
+        .tool = "inspect_local_tasks".into();
+    assert!(matches!(
+        protocol.host_command_reply(reply, terminal).events.first(),
+        Some(RuntimeEventKind::RequestFailed { .. })
+    ));
+}
+
 #[test]
 fn captured_native_skill_arguments_replay_exactly_and_auth_failure_stays_failed() {
     let fixture = include_str!(
@@ -2009,6 +2158,33 @@ fn ready_observation(effects: &Effects) -> &Value {
         panic!("expected one session-ready event");
     };
     &effective_permissions["permissionObservation"]
+}
+
+#[test]
+fn unpaired_claude_session_does_not_expose_native_id() {
+    let mut protocol = ClaudeProtocol::new(options());
+    protocol.session_id = Some("native-before-init".into());
+
+    let early = protocol.event(protocol.ready_event());
+    assert_eq!(early.native_session_id, None);
+    assert!(matches!(
+        early.kind,
+        RuntimeEventKind::SessionReady {
+            verified_cli_version: None,
+            ..
+        }
+    ));
+
+    protocol.paired_version = Some("2.1.280");
+    let paired = protocol.event(protocol.ready_event());
+    assert_eq!(paired.native_session_id.as_deref(), Some("native-before-init"));
+    assert!(matches!(
+        paired.kind,
+        RuntimeEventKind::SessionReady {
+            verified_cli_version: Some(version),
+            ..
+        } if version == "2.1.280"
+    ));
 }
 
 #[test]

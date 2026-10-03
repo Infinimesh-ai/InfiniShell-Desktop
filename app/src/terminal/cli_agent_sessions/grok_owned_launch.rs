@@ -5,6 +5,24 @@
 use super::grok_owned_history::HistorySource;
 use std::io;
 
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+#[path = "grok_notification_plan.rs"]
+mod notification_plan;
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(crate) use notification_plan::NotificationPlan;
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+#[path = "grok_notification_artifact.rs"]
+pub(crate) mod notification_artifact;
+
 pub const OWNED_GROK_COMMAND: &str = "--infinishell-owned-grok-tui";
 
 /// 远端 wrapper 已取得独占 ticket 后复用同一 exec 检查；不会派生第二个会话。
@@ -211,6 +229,8 @@ mod native {
         session_id: Uuid,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         history: Option<HistorySource>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        notifications: Option<NotificationPlan>,
         executable: PathBuf,
         app_executable: PathBuf,
         cwd: PathBuf,
@@ -351,7 +371,15 @@ mod native {
             state_directory: &Path,
             pty: GrokOwnedPty,
         ) -> io::Result<Self> {
-            Self::prepare_with_history(executable, app_executable, cwd, state_directory, pty, None)
+            Self::prepare_with_history(
+                executable,
+                app_executable,
+                cwd,
+                state_directory,
+                pty,
+                None,
+                None,
+            )
         }
 
         pub(crate) fn prepare_history(
@@ -364,7 +392,37 @@ mod native {
         ) -> io::Result<Self> {
             history.validate_target(cwd, history.session_id)?;
             history.verify_exited()?;
-            Self::prepare_with_history(executable, app_executable, cwd, state_directory, pty, Some(history))
+            Self::prepare_with_history(
+                executable,
+                app_executable,
+                cwd,
+                state_directory,
+                pty,
+                Some(history),
+                None,
+            )
+        }
+
+        /// 远端只接受本次 ticket 冻结的通知能力，不提升旧本地启动清单。
+        pub(crate) fn prepare_remote(
+            executable: &Path,
+            app_executable: &Path,
+            cwd: &Path,
+            state_directory: &Path,
+            pty: GrokOwnedPty,
+            notifications: NotificationPlan,
+        ) -> io::Result<Self> {
+            notifications.verify_parent(state_directory)?;
+            notifications.verify(notifications.session_id, cwd, app_executable)?;
+            Self::prepare_with_history(
+                executable,
+                app_executable,
+                cwd,
+                state_directory,
+                pty,
+                None,
+                Some(notifications),
+            )
         }
 
         fn prepare_with_history(
@@ -374,16 +432,22 @@ mod native {
             state_directory: &Path,
             pty: GrokOwnedPty,
             history: Option<HistorySource>,
+            notifications: Option<NotificationPlan>,
         ) -> io::Result<Self> {
             let executable = executable.canonicalize()?;
-            verify_binary(&executable)?;
+            verify_binary(&executable, notifications.as_ref())?;
             let output = Command::new(&executable).arg("--version").output()?;
             if !output.status.success()
-                || String::from_utf8_lossy(&output.stdout).trim() != CLI_VERSION_OUTPUT
+                || String::from_utf8_lossy(&output.stdout).trim()
+                    != if notifications.is_some() {
+                        notification_artifact::version_output()?
+                    } else {
+                        CLI_VERSION_OUTPUT
+                    }
             {
                 return Err(io::Error::other("Grok 固定版本不匹配"));
             }
-            verify_binary(&executable)?;
+            verify_binary(&executable, notifications.as_ref())?;
             let cwd = cwd.canonicalize()?;
             if !cwd.is_dir() {
                 return Err(io::Error::other("Grok 工作目录无效"));
@@ -393,10 +457,18 @@ mod native {
             let socket_root = socket_directory.path().canonicalize()?;
             let socket_metadata = fs::symlink_metadata(&socket_root)?;
             let manifest = LaunchManifest {
-                version: 2,
+                version: if notifications.is_some() { 4 } else { 2 },
                 launch_id: Uuid::new_v4(),
-                session_id: history.as_ref().map_or_else(Uuid::new_v4, |source| source.session_id),
+                session_id: notifications.as_ref().map_or_else(
+                    || {
+                        history
+                            .as_ref()
+                            .map_or_else(Uuid::new_v4, |source| source.session_id)
+                    },
+                    |plan| plan.session_id,
+                ),
                 history,
+                notifications,
                 executable,
                 app_executable: app_executable.canonicalize()?,
                 cwd,
@@ -459,7 +531,10 @@ mod native {
             if self.phase != LaunchPhase::Reserved {
                 return Err(io::Error::other("owned Grok 启动尚未占用或已派发"));
             }
-            verify_binary(&self.manifest.executable)?;
+            verify_binary(
+                &self.manifest.executable,
+                self.manifest.notifications.as_ref(),
+            )?;
             write_new(
                 &self.directory.join("dispatched"),
                 self.manifest_sha256.as_bytes(),
@@ -475,16 +550,39 @@ mod native {
         /// 调用方先持有远端 ticket 排他锁，并持久化本清单及 Unknown 派发记录。
         /// 远端占用独立于本机更新模型；恢复对象永远不能取得此一次派发资格。
         pub(crate) fn dispatch_remote_reserved(&mut self) -> io::Result<PathBuf> {
-            if self.phase != LaunchPhase::Prepared || self.reservation.is_some() {
+            if self.phase != LaunchPhase::Prepared
+                || self.reservation.is_some()
+                || self.manifest.notifications.is_none()
+            {
                 return Err(io::Error::other("远端 Grok 启动已领取或属于本地占用"));
             }
-            verify_binary(&self.manifest.executable)?;
+            verify_binary(
+                &self.manifest.executable,
+                self.manifest.notifications.as_ref(),
+            )?;
             write_new(
                 &self.directory.join("dispatched"),
                 self.manifest_sha256.as_bytes(),
             )?;
             self.phase = LaunchPhase::Dispatched;
             Ok(self.manifest_path())
+        }
+
+        /// 旧远端清单仅供查询和回收，不接受由新入口发起的输入。
+        pub(crate) fn verify_remote_input(
+            &self,
+            notifications: &NotificationPlan,
+        ) -> io::Result<()> {
+            if self.phase != LaunchPhase::Dispatched
+                || self.manifest.notifications.as_ref() != Some(notifications)
+            {
+                return Err(io::Error::other("远端 Grok 输入缺少本次通知能力绑定"));
+            }
+            notifications.verify(
+                self.manifest.session_id,
+                &self.manifest.cwd,
+                &self.manifest.app_executable,
+            )
         }
 
         pub(crate) fn launch_id(&self) -> Uuid {
@@ -537,6 +635,39 @@ mod native {
             {
                 return Err(GrokLeaderInputError::InvalidTarget);
             }
+            let target = self.capture_target(binding_id, Some(&observation.mode))?;
+            Ok(GrokOwnedBinding {
+                target,
+                launch_id: self.manifest.launch_id,
+                binding_id,
+                session_id: self.manifest.session_id,
+                permission_revision,
+                working_directory: self.manifest.cwd.clone(),
+            })
+        }
+
+        /// 只允许带冻结通知资源的远端自有启动取得只读目标，不合成 SessionStart。
+        pub(crate) fn readonly_target(
+            &mut self,
+            binding_id: Uuid,
+        ) -> Result<GrokLeaderTarget, GrokLeaderInputError> {
+            if self.phase != LaunchPhase::Dispatched || binding_id.is_nil() {
+                return Err(GrokLeaderInputError::InvalidTarget);
+            }
+            let notifications = self
+                .manifest
+                .notifications
+                .as_ref()
+                .ok_or(GrokLeaderInputError::InvalidTarget)?;
+            self.verify_remote_input(notifications)?;
+            self.capture_target(binding_id, None)
+        }
+
+        fn capture_target(
+            &mut self,
+            binding_id: Uuid,
+            observed_permission_mode: Option<&str>,
+        ) -> Result<GrokLeaderTarget, GrokLeaderInputError> {
             let receipt = self.exec_receipt()?;
             let actual = macos_process_identity(receipt.process.pid)?;
             if receipt.version != 1
@@ -555,16 +686,33 @@ mod native {
             let peer = UnixStream::connect(&self.manifest.socket_path)?;
             let leader = macos_peer_identity(&peer)?;
             drop(peer);
-            let target = GrokLeaderTarget::capture(
-                binding_id,
-                self.manifest.session_id,
-                &self.manifest.cwd,
-                &self.manifest.socket_path,
-                &self.manifest.executable,
-                actual.pid,
-                leader.pid,
-                &observation.mode,
-            )?;
+            let target = match observed_permission_mode {
+                Some(mode) => GrokLeaderTarget::capture_with_notifications(
+                    binding_id,
+                    self.manifest.session_id,
+                    &self.manifest.cwd,
+                    &self.manifest.socket_path,
+                    &self.manifest.executable,
+                    actual.pid,
+                    leader.pid,
+                    mode,
+                    self.manifest.notifications.clone(),
+                )?,
+                None => GrokLeaderTarget::capture_remote_identity(
+                    binding_id,
+                    self.manifest.session_id,
+                    &self.manifest.cwd,
+                    &self.manifest.socket_path,
+                    &self.manifest.executable,
+                    actual.pid,
+                    leader.pid,
+                    self.manifest
+                        .notifications
+                        .clone()
+                        .ok_or(GrokLeaderInputError::InvalidTarget)?,
+                )?,
+            };
+
             let bound = BoundProcesses {
                 version: 1,
                 launch_id: self.manifest.launch_id,
@@ -575,14 +723,7 @@ mod native {
             validate_bound_processes(&bound, &receipt)?;
             self.record_owned_processes(&bound, &receipt)?;
             self.processes = Some((actual, leader));
-            Ok(GrokOwnedBinding {
-                target,
-                launch_id: self.manifest.launch_id,
-                binding_id,
-                session_id: self.manifest.session_id,
-                permission_revision,
-                working_directory: self.manifest.cwd.clone(),
-            })
+            Ok(target)
         }
 
         fn record_owned_processes(
@@ -960,9 +1101,16 @@ mod native {
         {
             return Err(io::Error::other("owned Grok 启动清单无效"));
         }
+        match (manifest.version, &manifest.notifications) {
+            (4, Some(plan)) => {
+                plan.validate_binding(manifest.session_id, &manifest.cwd, &manifest.app_executable)?
+            }
+            (1 | 2, None) => {}
+            _ => return Err(io::Error::other("owned Grok 通知清单版本不匹配")),
+        }
         match (manifest.version, &manifest.socket_directory) {
             (1, None) if manifest.socket_path == directory.join("leader.sock") => Ok(()),
-            (2, Some(identity))
+            (2 | 4, Some(identity))
                 if identity.inode != 0
                     && manifest.socket_path.file_name()
                         == Some(std::ffi::OsStr::new("leader.sock"))
@@ -1056,13 +1204,52 @@ mod native {
         }
         validate_socket_directory(manifest)?;
         let lock = root.join("leader.lock");
-        if let Some(bytes) = read_optional_private(&lock)? {
-            // 固定 1.0.41 留下只含 leader PID 的私有锁文件。只有已绑定进程退出，且
-            // 原始字节与该 leader 完全一致时才清理；文件名或可复用的 PID 单独均不够。
+        let lock_metadata = match fs::symlink_metadata(&lock) {
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(metadata) = lock_metadata {
+            // 原生锁按默认 OpenOptions 与 umask 创建，允许 0644；其 0700 父目录已经核验。
+            // 此合同仅适用于原生 PID 锁，启动清单等私有 JSON 仍要求 0600。
+            let uid = unsafe { libc::geteuid() };
+            if !metadata.is_file()
+                || metadata.uid() != uid
+                || metadata.mode() & 0o022 != 0
+                || metadata.nlink() != 1
+                || metadata.len() > 10
+            {
+                return Err(io::Error::other("原生 leader 锁权限或类型无效"));
+            }
             let expected = leader.ok_or_else(|| io::Error::other("缺少原生 leader 锁归属"))?;
+            let file = OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+                .open(&lock)?;
+            let opened = file.metadata()?;
+            if opened.dev() != metadata.dev()
+                || opened.ino() != metadata.ino()
+                || !opened.is_file()
+                || opened.uid() != uid
+                || opened.mode() & 0o022 != 0
+                || opened.nlink() != 1
+            {
+                return Err(io::Error::other("原生 leader 锁已替换"));
+            }
+            let mut bytes = Vec::new();
+            (&file).take(11).read_to_end(&mut bytes)?;
+            // 删除前复核目录与所读 inode；PID 字节匹配也不能代替绑定生存期已退出的证明。
+            validate_socket_directory(manifest)?;
+            let current = fs::symlink_metadata(&lock)?;
             if !identity_exited(expected)
                 || bytes != expected.pid.to_string().as_bytes()
-                || fs::symlink_metadata(&lock)?.nlink() != 1
+                || current.dev() != opened.dev()
+                || current.ino() != opened.ino()
+                || !current.is_file()
+                || current.uid() != uid
+                || current.mode() & 0o022 != 0
+                || current.nlink() != 1
+                || current.len() != bytes.len() as u64
             {
                 return Err(io::Error::other("原生 leader 锁归属或退出状态不匹配"));
             }
@@ -1083,7 +1270,7 @@ mod native {
         fs::remove_dir(root)
     }
 
-    fn verify_binary(path: &Path) -> io::Result<()> {
+    fn verify_binary(path: &Path, notifications: Option<&NotificationPlan>) -> io::Result<()> {
         let mut file = File::open(path)?;
         let mut hash = Sha256::new();
         let mut bytes = [0u8; 65536];
@@ -1094,7 +1281,15 @@ mod native {
             }
             hash.update(&bytes[..length]);
         }
-        if format!("{:x}", hash.finalize()) != CLI_SHA256 {
+        if let Some(plan) = notifications {
+            plan.verify_current()?;
+        }
+        let expected = if notifications.is_some() {
+            notification_artifact::sha256()?
+        } else {
+            CLI_SHA256
+        };
+        if format!("{:x}", hash.finalize()) != expected {
             return Err(io::Error::other("Grok 可执行文件摘要不匹配"));
         }
         Ok(())
@@ -1162,7 +1357,7 @@ mod native {
     }
 
     fn native_arguments(manifest: &LaunchManifest) -> Vec<OsString> {
-        vec![
+        let mut arguments = vec![
             "--leader".into(),
             "--minimal".into(),
             "--no-alt-screen".into(),
@@ -1170,11 +1365,22 @@ mod native {
             manifest.cwd.as_os_str().to_owned(),
             "--leader-socket".into(),
             manifest.socket_path.as_os_str().to_owned(),
-            if manifest.history.is_some() { "--resume".into() } else { "--session-id".into() },
+            if manifest.history.is_some() {
+                "--resume".into()
+            } else {
+                "--session-id".into()
+            },
             manifest.session_id.to_string().into(),
             "--model".into(),
             MODEL.into(),
-        ]
+        ];
+        if let Some(plan) = &manifest.notifications {
+            arguments.extend([
+                "--infinishell-notification-plugin".into(),
+                plan.descriptor_path().into_os_string(),
+            ]);
+        }
+        arguments
     }
 
     pub(super) fn exec_owned(path: &Path) -> io::Result<()> {
@@ -1211,7 +1417,7 @@ mod native {
             history.validate_target(&manifest.cwd, manifest.session_id)?;
             history.verify_exited()?;
         }
-        verify_binary(&manifest.executable)?;
+        verify_binary(&manifest.executable, manifest.notifications.as_ref())?;
         let receipt = ExecReceipt {
             version: 1,
             launch_id: manifest.launch_id,

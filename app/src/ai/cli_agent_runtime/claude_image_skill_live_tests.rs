@@ -1,20 +1,22 @@
 //! 精确选定单技能与图片同轮的生产适配器验收；不属于默认离线测试。
 
+use std::collections::HashSet;
+
 use ai::skills::parse_skill;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use sha2::{Digest as _, Sha256};
 use warp_cli::agent::Harness;
 
-use super::super::{encode_input, InputProjection};
+use super::super::{InputProjection, encode_input};
 use super::image_probe_live_tests::quadrant_png;
 use super::{
-    env, fs, json, record_permissions, ApprovalDecision, Duration, Evidence, File, InputContent,
-    LiveSession, Path, PathBuf, PermissionPolicy, RuntimeAction, RuntimeEventKind, SessionOptions,
-    SessionTarget, TurnOutcome, Uuid,
+    ApprovalDecision, Duration, Evidence, File, InputContent, LiveSession, Path, PathBuf,
+    PermissionPolicy, RuntimeAction, RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
+    Uuid, env, fs, json, record_permissions,
 };
 use crate::ai::agent::ImageContext;
-use crate::ai::cli_agent_runtime::local_skills::{prepare_claude_skill_plugin, SelectedLocalSkill};
+use crate::ai::cli_agent_runtime::local_skills::{SelectedLocalSkill, prepare_claude_skill_plugin};
 use crate::ai::cli_agent_runtime::managed_input::{
     prepare_managed_input, restore_claude_managed_images,
 };
@@ -23,6 +25,7 @@ use crate::ai::cli_agent_runtime::managed_process::{self, ExitReason};
 const SKILL_NAME: &str = "inspect-managed-image";
 const SKILL_COMMAND: &str = "infinishell-local-skills:inspect-managed-image";
 const PROMPT: &str = "请针对这次附件实际调用所选 Skill，再按技能规定回答。即使历史中用过该技能，也须重新调用一次；不得调用其他工具，不得读取文件或修改任何内容。";
+const MULTI_PROMPT: &str = "请按所选顺序逐个实际调用两个 Skill；每次调用完成后再调用下一个。最终只输出两行技能独有标记，第三行输出本次附件左上、右上、左下、右下的英文大写颜色名，以空格分隔。恢复时也必须重新调用两次；不得调用其他工具、读取文件或修改内容。";
 
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -30,24 +33,28 @@ fn digest(bytes: &[u8]) -> String {
 
 fn prepared_input(
     root: &Path,
-    selected: &SelectedLocalSkill,
+    selected: &[SelectedLocalSkill],
+    prompt: &str,
     seed: Uuid,
     resumed: bool,
     evidence: &mut Evidence,
 ) -> Result<(Vec<InputContent>, String), String> {
     let (bytes, colors) = quadrant_png(seed);
     let store = root.join("local-cli-attachments");
-    let skill = parse_skill(&selected.path).map_err(|_| "所选技能解析失败")?;
+    let skills = selected
+        .iter()
+        .map(|skill| parse_skill(&skill.path).map_err(|_| "所选技能解析失败".to_owned()))
+        .collect::<Result<Vec<_>, _>>()?;
     let input = prepare_managed_input(
         Harness::Claude,
-        PROMPT.into(),
+        prompt.into(),
         &[ImageContext {
             data: STANDARD.encode(&bytes),
             mime_type: "image/png".into(),
             file_name: "本次图片.png".into(),
             is_figma: false,
         }],
-        vec![skill],
+        skills,
         &store,
     )?;
     let image_path = input
@@ -74,7 +81,7 @@ fn prepared_input(
     if restored != input || images.len() != 1 || images[0].data != STANDARD.encode(&bytes) {
         return Err("持久图片或技能引用发生变化".into());
     }
-    let plugin = prepare_claude_skill_plugin(std::slice::from_ref(selected))?;
+    let plugin = prepare_claude_skill_plugin(selected)?;
     let InputProjection::Blocks { content, .. } =
         encode_input(restored.clone(), plugin.as_ref(), &store)?
     else {
@@ -83,7 +90,9 @@ fn prepared_input(
     evidence.record(json!({"event":"attachment_prepared","resumed":resumed,
         "image_sha256":digest(&bytes),"image_bytes":bytes.len(),"media_type":"image/png",
         "native_array_sha256":digest(&serde_json::to_vec(&content).map_err(|_| "数组编码失败")?),
-        "skill_command":SKILL_COMMAND,"selected_skill_path_sha256":digest(selected.path.to_string_lossy().as_bytes()),
+        "skill_command":selected.first().map(|skill| format!("infinishell-local-skills:{}", skill.name)),
+        "selected_skill_path_sha256":selected.first().map(|skill| digest(skill.path.to_string_lossy().as_bytes())),
+        "skill_commands":selected.iter().map(|skill| format!("infinishell-local-skills:{}", skill.name)).collect::<Vec<_>>(),
         "persistent_reference_restored":true}))?;
     Ok((restored, colors))
 }
@@ -92,16 +101,16 @@ async fn image_skill_turn(
     session: &mut LiveSession,
     input: Vec<InputContent>,
     expected: &str,
+    commands: &[String],
     evidence: &mut Evidence,
 ) -> Result<(), String> {
     let id = Uuid::new_v4();
     let turn = id.to_string();
     let mut accepted = false;
     let mut started = false;
-    let mut approval = None;
-    let mut response_id = None;
-    let mut resolved = false;
-    let mut dispatched = false;
+    let mut approved = Vec::new();
+    let mut approvals = HashSet::new();
+    let mut responses = HashSet::new();
     evidence.record(
         json!({"event":"input_submitted","generation":session.generation,
         "message_id":id,"expected_reply_sha256":digest(expected.as_bytes())}),
@@ -148,11 +157,13 @@ async fn image_skill_turn(
                 details,
             } => {
                 let exact = started
-                    && approval.is_none()
+                    && approved.len() < commands.len()
+                    && approvals.is_empty()
+                    && responses.is_empty()
                     && turn_id == turn
                     && method == "can_use_tool"
                     && details["tool_name"] == "Skill"
-                    && details["input"] == json!({"skill":SKILL_COMMAND})
+                    && details["input"] == json!({"skill":commands[approved.len()]})
                     && details["tool_use_id"]
                         .as_str()
                         .is_some_and(|value| !value.is_empty());
@@ -173,38 +184,41 @@ async fn image_skill_turn(
                     .await?;
                 evidence.record(json!({"event":"skill_approval","generation":session.generation,
                     "native_session_id":native,"turn_id":turn_id,"approval_id":approval_id,
+                    "control_message_id":control,
                     "tool_use_id":if exact { details["tool_use_id"].clone() } else { json!(null) },
                     "decision":decision,"exact_registered_command":exact,
                     "input_sha256":if exact { Some(digest(&serde_json::to_vec(&details["input"]).map_err(|_| "工具输入编码失败")?)) } else { None }}))?;
                 if !exact {
                     return Err("非精确所选 Skill 请求已拒绝".into());
                 }
-                approval = Some(approval_id);
-                response_id = Some(control);
+                approved.push(commands[approved.len()].clone());
+                approvals.insert(approval_id);
+                responses.insert(control);
             }
             RuntimeEventKind::ApprovalResolved {
                 approval_id,
                 decision,
             } => {
-                if resolved
-                    || approval.as_ref() != Some(&approval_id)
-                    || decision != ApprovalDecision::AllowOnce
-                {
+                if !approvals.remove(&approval_id) || decision != ApprovalDecision::AllowOnce {
                     return Err("Skill 审批完成身份不匹配".into());
                 }
-                resolved = true;
+                evidence.record(
+                    json!({"event":"skill_approval_resolved","generation":session.generation,
+                    "native_session_id":native,"turn_id":turn,"approval_id":approval_id,
+                    "decision":decision}),
+                )?;
             }
             RuntimeEventKind::CommandDispatched {
                 message_id,
                 turn_id,
             } => {
-                if dispatched
-                    || response_id != Some(message_id)
-                    || turn_id.as_deref() != Some(&turn)
-                {
+                if !responses.remove(&message_id) || turn_id.as_deref() != Some(&turn) {
                     return Err("Skill 审批响应未关联当前回合".into());
                 }
-                dispatched = true;
+                evidence.record(
+                    json!({"event":"skill_response_dispatched","generation":session.generation,
+                    "native_session_id":native,"turn_id":turn,"control_message_id":message_id}),
+                )?;
             }
             RuntimeEventKind::TextDelta { turn_id, .. }
             | RuntimeEventKind::Progress { turn_id, .. } => {
@@ -219,12 +233,13 @@ async fn image_skill_turn(
             } => {
                 evidence.record(json!({"event":"finished","generation":session.generation,
                     "native_session_id":native,"turn_id":turn_id,"outcome":outcome,
-                    "result":output,"expected":expected,"skill_approval_resolved":resolved,
-                    "skill_response_dispatched":dispatched}))?;
+                    "result":output,"expected":expected,"skill_approval_resolved":approvals.is_empty(),
+                    "skill_response_dispatched":responses.is_empty(),"approved_commands":approved}))?;
                 if !accepted
                     || !started
-                    || !resolved
-                    || !dispatched
+                    || !approvals.is_empty()
+                    || !responses.is_empty()
+                    || approved.as_slice() != commands
                     || turn_id != turn
                     || outcome != TurnOutcome::Completed
                     || output.trim() != expected
@@ -251,7 +266,7 @@ async fn image_skill_turn(
             | RuntimeEventKind::LocalToolCancelled { .. }
             | RuntimeEventKind::RequestFailed { .. }
             | RuntimeEventKind::Disconnected { .. } => {
-                return Err("图片技能收到未预期运行时事件".into())
+                return Err("图片技能收到未预期运行时事件".into());
             }
         }
     }
@@ -285,7 +300,9 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     let skill_path = root.join("selected-skill/SKILL.md");
     let prefix = format!("IMAGE_SKILL_{}", Uuid::new_v4().simple());
     fs::create_dir(root.join("selected-skill")).map_err(|_| "技能目录创建失败")?;
-    let body = format!("---\nname: {SKILL_NAME}\ndescription: Inspect this turn's attached image without tools\n---\nInspect only the image in the current user input. Never use another tool. Reply with exactly this prefix: {prefix}, followed by one space and four uppercase color names in top-left, top-right, bottom-left, bottom-right order. Use RED, GREEN, BLUE, YELLOW, without punctuation or explanation.\n");
+    let body = format!(
+        "---\nname: {SKILL_NAME}\ndescription: Inspect this turn's attached image without tools\n---\nInspect only the image in the current user input. Never use another tool. Reply with exactly this prefix: {prefix}, followed by one space and four uppercase color names in top-left, top-right, bottom-left, bottom-right order. Use RED, GREEN, BLUE, YELLOW, without punctuation or explanation.\n"
+    );
     fs::write(&skill_path, &body).map_err(|_| "技能文件保存失败")?;
     let selected = SelectedLocalSkill {
         name: SKILL_NAME.into(),
@@ -318,7 +335,14 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     let mut native_id = None;
     for (index, seed) in seeds.into_iter().enumerate() {
         let resumed = index == 1;
-        let (input, colors) = prepared_input(root, &selected, seed, resumed, evidence)?;
+        let (input, colors) = prepared_input(
+            root,
+            std::slice::from_ref(&selected),
+            PROMPT,
+            seed,
+            resumed,
+            evidence,
+        )?;
         if first_colors.as_ref() == Some(&colors) {
             return Err("恢复图片必须与第一图不同".into());
         }
@@ -329,7 +353,14 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
             "requested_native_session_id":native_id,"cli_version":"2.1.280","model":"claude-opus-5-5",
             "permission_policy":"inherit","selected_skill_command":SKILL_COMMAND,
             "selected_skill_body_sha256":digest(body.as_bytes())}))?;
-        image_skill_turn(&mut session, input, &format!("{prefix} {colors}"), evidence).await?;
+        image_skill_turn(
+            &mut session,
+            input,
+            &format!("{prefix} {colors}"),
+            &[SKILL_COMMAND.into()],
+            evidence,
+        )
+        .await?;
         let current = session.native_id.clone().ok_or("图片技能缺少原生会话 ID")?;
         if native_id
             .as_ref()
@@ -348,6 +379,99 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         json!({"event":"acceptance_passed","native_session_id":native_id,
         "production_adapter":true,"native_inputs":2,"runtime_generations":2,
         "app_restart_or_gui_verified":false,"parent_permission_ceiling_verified":false}),
+    )
+}
+
+async fn exercise_multi(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+    let markers = [
+        format!("IMAGE_ALPHA_{}", Uuid::new_v4().simple()),
+        format!("IMAGE_BETA_{}", Uuid::new_v4().simple()),
+    ];
+    let mut selected = Vec::new();
+    for (name, marker) in ["image-alpha", "image-beta"].into_iter().zip(&markers) {
+        let directory = root.join("selected-skills").join(name);
+        fs::create_dir_all(&directory).map_err(|_| "双技能目录创建失败")?;
+        let path = directory.join("SKILL.md");
+        let body = format!(
+            "---\nname: {name}\ndescription: Apply this skill to the current attached image\n---\nThe private marker for this skill is {marker}. Apply this skill only to the current image. Follow the user's requested three-line final format. Never use another tool.\n"
+        );
+        fs::write(&path, body).map_err(|_| "双技能文件保存失败")?;
+        selected.push(SelectedLocalSkill {
+            name: name.into(),
+            path,
+        });
+    }
+    let commands = selected
+        .iter()
+        .map(|skill| format!("infinishell-local-skills:{}", skill.name))
+        .collect::<Vec<_>>();
+    let mut options = SessionOptions {
+        executable: PathBuf::from(
+            env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").ok_or("缺少固定 CLI")?,
+        ),
+        cwd: root
+            .join("project")
+            .canonicalize()
+            .map_err(|_| "缺少临时项目")?,
+        state_dir: root.to_owned(),
+        target: SessionTarget::New,
+        generation: Uuid::new_v4(),
+        permission_policy: PermissionPolicy::Inherit,
+        permission_ceiling: None,
+        claude_profile: None,
+        grok_profile: None,
+        model: Some("claude-opus-5-5".into()),
+        local_tools: None,
+        selected_skills: selected.clone(),
+    };
+    let seed = Uuid::new_v4();
+    let mut next_seed = *seed.as_bytes();
+    next_seed[3] ^= 1;
+    let mut first_colors = None;
+    let mut native_id = None;
+    for (index, seed) in [seed, Uuid::from_bytes(next_seed)].into_iter().enumerate() {
+        let resumed = index == 1;
+        let (input, colors) =
+            prepared_input(root, &selected, MULTI_PROMPT, seed, resumed, evidence)?;
+        if first_colors.as_ref() == Some(&colors) {
+            return Err("恢复图片必须与第一图不同".into());
+        }
+        first_colors = Some(colors.clone());
+        let mut session = LiveSession::start(options.clone())?;
+        session.ready(evidence).await?;
+        evidence.record(json!({"event":"ready","generation":session.generation,"resumed":resumed,
+            "requested_native_session_id":native_id,"cli_version":"2.1.280","model":"claude-opus-5-5",
+            "permission_policy":"inherit","selected_skill_commands":commands}))?;
+        image_skill_turn(
+            &mut session,
+            input,
+            &format!("{}\n{}\n{colors}", markers[0], markers[1]),
+            &commands,
+            evidence,
+        )
+        .await?;
+        let current = session
+            .native_id
+            .clone()
+            .ok_or("双技能图片缺少原生会话 ID")?;
+        if native_id
+            .as_ref()
+            .is_some_and(|previous| previous != &current)
+        {
+            return Err("双技能图片冷恢复更换了原生会话".into());
+        }
+        native_id = Some(current.clone());
+        close(&mut session, root, evidence).await?;
+        options.generation = Uuid::new_v4();
+        options.target = SessionTarget::Resume {
+            native_session_id: current,
+        };
+    }
+    evidence.record(
+        json!({"event":"acceptance_passed","native_session_id":native_id,
+        "production_adapter":true,"native_inputs":2,"runtime_generations":2,
+        "skills_per_input":2,"app_restart_or_gui_verified":false,
+        "parent_permission_ceiling_verified":false}),
     )
 }
 
@@ -384,5 +508,45 @@ async fn real_claude_managed_image_skill_resume() {
     assert!(
         matches!(result, Ok(Ok(()))),
         "图片加技能的生产适配器验收失败，保留原始结果"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "需要固定已认证 Claude 与真实监督者；两轮图片加双技能逐次审批"]
+async fn real_claude_managed_image_multi_skill_resume() {
+    assert_eq!(
+        env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION").unwrap(),
+        "2.1.280"
+    );
+    let root = PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT").unwrap())
+        .canonicalize()
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join(".infinishell-claude-image-multi-skill-probe")).unwrap(),
+        "isolated production Claude image and two selected skills verification\n"
+    );
+    let mut evidence = Evidence {
+        file: File::create(PathBuf::from(
+            env::var_os("INFINISHELL_CLAUDE_LIVE_ARTIFACT").unwrap(),
+        ))
+        .unwrap(),
+        root: root.clone(),
+    };
+    evidence.record(json!({"event":"acceptance_started","scope":"production_image_two_selected_skills_new_and_resume",
+        "max_native_inputs":2,"credential_files_read_by_probe":false,
+        "app_restart_or_gui_verified":false,"parent_permission_ceiling_verified":false})).unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_secs(480),
+        exercise_multi(&root, &mut evidence),
+    )
+    .await;
+    if let Ok(Err(reason)) = &result {
+        evidence
+            .record(json!({"event":"acceptance_failed","reason":reason}))
+            .unwrap();
+    }
+    assert!(
+        matches!(result, Ok(Ok(()))),
+        "图片加双技能的生产适配器验收失败，保留原始结果"
     );
 }

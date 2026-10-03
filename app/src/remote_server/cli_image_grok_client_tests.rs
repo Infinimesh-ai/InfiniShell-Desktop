@@ -27,6 +27,8 @@ fn journal(directory: &Path) -> Journal {
 
 fn launch() -> Launch {
     Launch {
+        tmux_source: None,
+        tmux_terminal_session: None,
         host: "remote-fixture".into(),
         terminal_session: 7,
         block_id: "block-fixture".into(),
@@ -181,4 +183,115 @@ fn mismatched_not_dispatched_receipt_does_not_unlock_unknown_input() {
     );
     assert!(store.claim_input(&launch, &input()).is_err());
     assert!(store.unknown_inputs(&launch).is_err());
+}
+
+#[test]
+fn tmux_grok_launch_keeps_original_identity_and_does_not_restore_runtime_scope() {
+    let directory = private_directory();
+    let store = journal(directory.path());
+    let mut current = launch();
+    current.tmux_source = Some(current.ticket.id);
+    current.tmux_terminal_session = Some(91);
+    store.remember_tmux(&current).unwrap();
+    let path = directory.path().join(format!("tmux-{}-launch.json", current.ticket.id));
+    let persisted: Launch = store.read(&path).unwrap();
+    assert_eq!(persisted.host, current.host);
+    assert_eq!(persisted.terminal_session, 7);
+    assert_eq!(persisted.tmux_source, current.tmux_source);
+    assert!(persisted.tmux_terminal_session.is_none());
+    assert!(store.known_launches(&current.host, SessionId::from(7), &current.cwd).unwrap().is_empty());
+    let mut mapped_again = current.clone();
+    mapped_again.tmux_terminal_session = Some(92);
+    store.remember_tmux(&mapped_again).unwrap();
+    mapped_again.cwd = "/other".into();
+    assert!(store.remember_tmux(&mapped_again).is_err());
+    let old: Launch = serde_json::from_slice(&encode(&launch()).unwrap()).unwrap();
+    assert!(old.tmux_source.is_none());
+    assert!(old.tmux_terminal_session.is_none());
+}
+
+#[test]
+fn owned_identity_keeps_matching_native_prompt_but_revokes_changed_permission() {
+    let native = Uuid::new_v4();
+    let identity = ActiveIdentity::Owned {
+        native_session: native,
+        cwd: "/fixture/project".into(),
+    };
+    let body = serde_json::json!({"v":1,"agent":"grok","event":"prompt_submit","session_id":native,
+        "cwd":"/fixture/project","event_id":"actual-prompt","permission_mode":"default"})
+    .to_string();
+    let event =
+        crate::terminal::cli_agent_sessions::event::parse_event(Some("warp://cli-agent"), &body)
+            .unwrap();
+    assert!(!identity.invalidated_by(&event));
+    for mode in [None, Some("auto"), Some("plan"), Some("bypassPermissions")] {
+        let mut changed = event.clone();
+        changed.payload.permission_mode = mode.map(str::to_owned);
+        assert!(identity.invalidated_by(&changed));
+    }
+    let mut changed = event.clone();
+    changed.event = CLIAgentEventType::SessionStart;
+    assert!(identity.invalidated_by(&changed));
+    changed = event.clone();
+    changed.session_id = Some(Uuid::new_v4().to_string());
+    assert!(identity.invalidated_by(&changed));
+    changed = event;
+    changed.cwd = Some("/another/project".into());
+    assert!(identity.invalidated_by(&changed));
+}
+
+#[test]
+fn native_pre_enqueue_rejection_is_terminal_but_never_allows_same_message_replay() {
+    let directory = private_directory();
+    let store = journal(directory.path());
+    let launch = launch();
+    let original = input();
+    let subject = store.claim_input(&launch, &original).unwrap();
+    let reply = Reply::Input {
+        ticket: launch.ticket.clone(),
+        message_id: original.message_id,
+        subject_sha256: subject.clone(),
+        state: "rejected_before_enqueue".into(),
+        native_prompt_id: None,
+        native_ack_sha256: Some("b".repeat(64)),
+    };
+    store.record_reply(&launch, &reply).unwrap();
+    assert!(store.unknown_inputs(&launch).unwrap().is_empty());
+    assert!(store.claim_input(&launch, &original).is_err());
+    assert_eq!(store.claim_input(&launch, &input()).unwrap(), subject);
+}
+
+#[test]
+fn native_pre_enqueue_rejection_requires_exact_claim_and_ack() {
+    let directory = private_directory();
+    let store = journal(directory.path());
+    let launch = launch();
+    let original = input();
+    let subject = store.claim_input(&launch, &original).unwrap();
+    for (prompt, ack, hash) in [
+        (Some(Uuid::new_v4()), Some("b".repeat(64)), subject.clone()),
+        (None, None, subject.clone()),
+        (None, Some("not-a-digest".into()), subject.clone()),
+        (None, Some("b".repeat(64)), "different-subject".into()),
+    ] {
+        assert!(
+            store
+                .record_reply(
+                    &launch,
+                    &Reply::Input {
+                        ticket: launch.ticket.clone(),
+                        message_id: original.message_id,
+                        subject_sha256: hash,
+                        state: "rejected_before_enqueue".into(),
+                        native_prompt_id: prompt,
+                        native_ack_sha256: ack,
+                    }
+                )
+                .is_err()
+        );
+    }
+    assert_eq!(
+        store.unknown_inputs(&launch).unwrap(),
+        vec![original.message_id]
+    );
 }

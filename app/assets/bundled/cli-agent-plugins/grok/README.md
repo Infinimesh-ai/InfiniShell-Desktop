@@ -1,6 +1,6 @@
 # InfiniShell Grok 状态插件
 
-原生插件 `0.1.5` 仅转换已知 hook 为 InfiniShell v1 通知，不决定权限或执行工具。管理器的 CLI 精确支持集合为桌面平台上的 `1.0.30` 与 `1.0.41`，不把兼容性推广到其他版本。各平台安装、原生派发和传输证据按对应固定构建分别验收。
+原生插件 `0.1.6` 仅转换已知 hook 为 InfiniShell v1 通知，不决定权限或执行工具。管理器的 CLI 精确支持集合为桌面平台上的 `1.0.30` 与 `1.0.41`，不把兼容性推广到其他版本。各平台安装、原生派发和传输证据按对应固定构建分别验收。
 
 ## 安装、升级与禁用
 
@@ -14,7 +14,7 @@ grok plugin enable infinishell-grok
 grok plugin uninstall infinishell-grok
 ```
 
-真实 1.0.30 的本地插件更新不会可靠替换缓存，管理器继续使用已识别插件的备份、卸载、安装及失败恢复流程。0.1.0/0.1.1 的历史脚本与九项 hooks、0.1.2/0.1.3 的全部四个文件按已保存配方核对；用户改动、混合版本和未知旧版本不取得应用所有权。重复同名注册及已禁用插件不自动升级。
+真实 1.0.30 的本地插件更新不会可靠替换缓存，管理器继续使用已识别插件的备份、卸载、安装及失败恢复流程。0.1.0/0.1.1 的历史脚本与九项 hooks、0.1.2–0.1.5 的全部四个文件按已保存配方核对；用户改动、混合版本和未知旧版本不取得应用所有权。重复同名注册及已禁用插件不自动升级。
 
 升级后在 Grok `/plugins` 的 **Plugins** 页按 `r` 重新加载，再检查 Hooks 页的当前版本与十项 hooks。仅有 `plugin list --json` 的 installed 状态不足以证明启用或发送成功。
 
@@ -27,9 +27,11 @@ grok plugin uninstall infinishell-grok
 
 ## 原生通知 worker
 
-Node 不创建持久状态或锁，也不直接打开、写入 TTY。先调用 `<绝对路径> cli-agent-notify --protocol-version`，仅接受协议 1、最大帧 4096 字节；发送调用只有 `cli-agent-notify` 参数，stdin 为单个紧凑 JSON。使用 `execFileSync`，无 shell 拼接、旧写法回退或自动重投。
+Node 不创建持久状态或锁，也不直接打开、写入 TTY。一次调用 `<绝对路径> cli-agent-notify --require-protocol 1`，stdin 为单个紧凑 JSON。worker 在读取输入或打开终端前拒绝不兼容协议，成功写完后返回协议 1、最大帧 4096 字节的精确 JSON。使用 `execFileSync`，无 shell 拼接、旧写法回退或自动重投；发送期限和帧预算保持不变。
 
-Node 按包含 tmux 包装的完整 OSC 帧预估 4096 字节上限；C1 和分号转义计入预算，超限时省略可选文本字段而不截断身份。最终大小、终端选择、并发写入及取消收尾由 worker 再严格核验。worker 成功且 stdout 为空仅表示写完终端，不是应用接收确认；hook stdout 永远不输出审批决定或模型正文。
+Node 按包含 tmux 包装的完整 OSC 帧预估 4096 字节上限；C1 和分号转义计入预算，超限时省略可选文本字段而不截断身份。最终大小、终端选择、并发写入及取消收尾由 worker 再严格核验。worker 成功且回复精确协议 JSON 仅表示写完终端，不是应用接收确认；hook stdout 永远不输出审批决定或模型正文。旧插件的独立协议查询及空 stdout 发送合同继续受支持。
+
+The plugin sends each notification with one `cli-agent-notify --require-protocol 1` process. The worker rejects incompatible protocols before reading input or opening a terminal, then returns the exact protocol reply only after a successful write. Existing deadlines and frame limits remain unchanged. This confirms a terminal write, not application receipt. Legacy protocol queries and sends remain supported; the plugin does not retry automatically.
 
 ## 验证边界
 

@@ -1,31 +1,43 @@
-//! 固定版本诊断专用私有窗口站与桌面；不修改运行器既有对象，不启用任何特权。
+//! 本轮私有桌面与新登录窗口站授权；不修改运行器既有对象，不启用任何特权。
 
 use std::ffi::c_void;
 use std::io;
 use std::mem::{size_of, size_of_val};
+#[cfg(any(test, feature = "test-util"))]
 use std::sync::Mutex;
 
 use windows::Win32::Foundation::{HANDLE, HLOCAL, LocalFree};
 use windows::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
+use windows::Win32::Security::Isolation::DeriveAppContainerSidFromAppContainerName;
+#[cfg(any(test, feature = "test-util"))]
 use windows::Win32::Security::{
-    CheckTokenMembership, CreateWellKnownSid, DACL_SECURITY_INFORMATION,
-    GetSecurityDescriptorControl, GetTokenInformation, GetUserObjectSecurity,
-    IsValidSecurityDescriptor, LABEL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
+    CheckTokenMembership, CreateWellKnownSid, SECURITY_MAX_SID_SIZE, WinBuiltinAdministratorsSid,
+};
+use windows::Win32::Security::{
+    DACL_SECURITY_INFORMATION, FreeSid, GetSecurityDescriptorControl, GetSecurityDescriptorOwner,
+    GetTokenInformation, GetUserObjectSecurity, IsValidSecurityDescriptor,
+    LABEL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION,
     PSECURITY_DESCRIPTOR, PSID, SE_DACL_PRESENT, SE_DACL_PROTECTED, SE_SACL_PRESENT,
-    SE_SELF_RELATIVE, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR_RELATIVE, SECURITY_MAX_SID_SIZE,
-    TOKEN_QUERY, TOKEN_USER, TokenUser, WinBuiltinAdministratorsSid,
+    SE_SELF_RELATIVE, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR_RELATIVE, SetUserObjectSecurity,
+    TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
 use windows::Win32::System::StationsAndDesktops::{
-    CloseDesktop, CloseWindowStation, CreateDesktopW, CreateWindowStationW, DESKTOP_CONTROL_FLAGS,
-    GetProcessWindowStation, GetThreadDesktop, GetUserObjectInformationW, HDESK, HWINSTA,
-    SetProcessWindowStation, SetThreadDesktop, UOI_FLAGS, USEROBJECTFLAGS,
+    CloseDesktop, CreateDesktopW, DESKTOP_CONTROL_FLAGS, GetProcessWindowStation, GetThreadDesktop,
+    GetUserObjectInformationW, HDESK, HWINSTA, SetThreadDesktop, UOI_FLAGS, UOI_NAME,
+    USEROBJECTFLAGS,
 };
-use windows::Win32::System::Threading::{
-    GetCurrentProcess, GetCurrentThreadId, OpenProcessToken, STARTUPINFOW,
+#[cfg(any(test, feature = "test-util"))]
+use windows::Win32::System::StationsAndDesktops::{
+    CloseWindowStation, CreateWindowStationW, SetProcessWindowStation,
 };
-use windows::Win32::UI::WindowsAndMessaging::{CWF_CREATE_ONLY, WSF_VISIBLE};
+#[cfg(any(test, feature = "test-util"))]
+use windows::Win32::System::Threading::STARTUPINFOW;
+use windows::Win32::System::Threading::{GetCurrentProcess, GetCurrentThreadId, OpenProcessToken};
+#[cfg(any(test, feature = "test-util"))]
+use windows::Win32::UI::WindowsAndMessaging::CWF_CREATE_ONLY;
+use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, WSF_VISIBLE};
 use windows::core::{BOOL, Error as WindowsError, PCWSTR, PWSTR};
 
 use super::{handle, owned, wide};
@@ -36,17 +48,40 @@ const DESKTOP_OWNER_ACCESS: u32 = 0x000f01ff;
 const STATION_CONTAINER_ACCESS: u32 = 0x00020023;
 const DESKTOP_CONTAINER_ACCESS: u32 = 0x00020083;
 const SD_WORDS: usize = 16 * 1024;
+#[cfg(any(test, feature = "test-util"))]
 static CREATION_LOCK: Mutex<()> = Mutex::new(());
 
+#[derive(Debug)]
+struct DesktopApiError {
+    stage: &'static str,
+    hresult: i32,
+}
+impl std::fmt::Display for DesktopApiError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "私有桌面 {} 失败：HRESULT=0x{:08x}",
+            self.stage, self.hresult as u32
+        )
+    }
+}
+impl std::error::Error for DesktopApiError {}
 fn api_error(stage: &'static str, error: WindowsError) -> io::Error {
     // 系统正文可能包含对象名称；只保留固定阶段和完整 HRESULT。
-    io::Error::other(format!(
-        "私有桌面 {stage} 失败：HRESULT=0x{:08x}",
-        error.code().0 as u32
-    ))
+    io::Error::other(DesktopApiError {
+        stage,
+        hresult: error.code().0,
+    })
+}
+pub(in crate::windows) fn diagnostic_code(error: &io::Error) -> Option<(&'static str, i32)> {
+    error
+        .get_ref()?
+        .downcast_ref::<DesktopApiError>()
+        .map(|error| (error.stage, error.hresult))
 }
 
 // NULL token 查询本次调用线程的有效身份，不安装 token 或启用权限。
+#[cfg(any(test, feature = "test-util"))]
 fn calling_thread_administrator_membership() -> Result<bool, u32> {
     let mut sid = [0u32; SECURITY_MAX_SID_SIZE.div_ceil(4) as usize];
     let mut size = size_of_val(&sid) as u32;
@@ -66,6 +101,7 @@ fn calling_thread_administrator_membership() -> Result<bool, u32> {
 }
 
 // 只编码布尔值或数值错误码；API 查询失败不能降为非成员。
+#[cfg(any(test, feature = "test-util"))]
 fn administrator_membership_json(result: Result<bool, u32>) -> String {
     match result {
         Ok(member) => format!(r#"{{"status":"ok","member":{member},"hresult":null}}"#),
@@ -162,6 +198,183 @@ impl Descriptor {
 impl Drop for Descriptor {
     fn drop(&mut self) {
         unsafe { LocalFree(Some(HLOCAL(self.pointer.0))) };
+    }
+}
+
+/// 仅由已核实新 LUID 与原创建父进程的第二段 helper 建立。
+/// 窗口站句柄来自当前进程，始终借用并持有到进程退出，不按名称重开替代。
+pub(in crate::windows) struct NewLogonDesktop {
+    station: HWINSTA,
+    original_desktop: HDESK,
+    desktop: Option<HDESK>,
+    station_sd: Descriptor,
+    desktop_sd: Descriptor,
+}
+
+impl NewLogonDesktop {
+    pub(in crate::windows) fn create(
+        expected_station: &str,
+        profile: &str,
+        container: &str,
+        caller_station: &str,
+    ) -> io::Result<Self> {
+        let profile_name = wide(profile.as_ref())?;
+        let derived =
+            unsafe { DeriveAppContainerSidFromAppContainerName(PCWSTR(profile_name.as_ptr())) }
+                .map_err(|error| api_error("derive_container_sid", error))?;
+        let derived_text = sid_text(derived);
+        unsafe { FreeSid(derived) };
+        if derived_text? != container {
+            return Err(invalid("新站授权 SID 与本轮 profile 不匹配"));
+        }
+        // 在第二段显式触发 USER32 连接，再核对内核返回的新站；不推断 DLL/TLS 前置行为。
+        unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let station = unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("new_logon_station", error))?;
+        let name = object_name(HANDLE(station.0), "new_logon_station_name")?;
+        let name = String::from_utf16(&name).map_err(|_| invalid("新站名称编码无效"))?;
+        if !name.eq_ignore_ascii_case(expected_station)
+            || name.eq_ignore_ascii_case(caller_station)
+            || !station_is_noninteractive(station)?
+        {
+            return Err(invalid("新登录窗口站或 AppContainer SID 不匹配"));
+        }
+        let owner = current_user_sid()?;
+        let mut storage = vec![0u32; SD_WORDS];
+        let mut used = 0;
+        unsafe {
+            GetUserObjectSecurity(
+                HANDLE(station.0),
+                &OWNER_SECURITY_INFORMATION.0,
+                Some(PSECURITY_DESCRIPTOR(storage.as_mut_ptr().cast())),
+                (SD_WORDS * 4) as u32,
+                &mut used,
+            )
+        }
+        .map_err(|error| api_error("new_logon_station_owner", error))?;
+        if used as usize > SD_WORDS * 4 {
+            return Err(invalid("新站 owner 描述符长度越界"));
+        }
+        let mut actual_owner = PSID::default();
+        let mut defaulted = BOOL::default();
+        unsafe {
+            GetSecurityDescriptorOwner(
+                PSECURITY_DESCRIPTOR(storage.as_mut_ptr().cast()),
+                &mut actual_owner,
+                &mut defaulted,
+            )
+        }
+        .map_err(|error| api_error("new_logon_station_owner_sid", error))?;
+        if actual_owner.0.is_null() || sid_text(actual_owner)? != owner || owner == container {
+            return Err(invalid("新站不属于本次本地用户"));
+        }
+        let station_sd = Descriptor::new(
+            &owner,
+            container,
+            STATION_OWNER_ACCESS,
+            STATION_CONTAINER_ACCESS,
+        )?;
+        let desktop_sd = Descriptor::new(
+            &owner,
+            container,
+            DESKTOP_OWNER_ACCESS,
+            DESKTOP_CONTAINER_ACCESS,
+        )?;
+        // 只有 helper 原句柄所持有的新站可以被授权；失败不尝试原站或全局 ACL。
+        let requested = DACL_SECURITY_INFORMATION
+            | PROTECTED_DACL_SECURITY_INFORMATION
+            | LABEL_SECURITY_INFORMATION;
+        unsafe { SetUserObjectSecurity(HANDLE(station.0), &requested, station_sd.pointer) }
+            .map_err(|error| api_error("new_logon_station_authorize", error))?;
+        verify_object(HANDLE(station.0), &station_sd, true)?;
+        let original_desktop = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+            .map_err(|error| api_error("new_logon_original_desktop", error))?;
+        let mut result = Self {
+            station,
+            original_desktop,
+            desktop: None,
+            station_sd,
+            desktop_sd,
+        };
+        let name = wide(profile.as_ref())?;
+        let attributes = result.desktop_sd.attributes();
+        result.desktop = Some(
+            unsafe {
+                CreateDesktopW(
+                    PCWSTR(name.as_ptr()),
+                    None,
+                    None,
+                    DESKTOP_CONTROL_FLAGS(0),
+                    DESKTOP_OWNER_ACCESS,
+                    Some(&attributes),
+                )
+            }
+            .map_err(|error| api_error("new_logon_desktop_create", error))?,
+        );
+        if result.desktop == Some(original_desktop) {
+            return Err(invalid("新建桌面不得复用 helper 初始桌面"));
+        }
+        result.restore()?;
+        result.verify()?;
+        Ok(result)
+    }
+
+    fn restore(&self) -> io::Result<()> {
+        if unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("new_logon_restore_station", error))?
+            != self.station
+        {
+            return Err(invalid("新站桌面恢复前窗口站已变化"));
+        }
+        let current = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+            .map_err(|error| api_error("new_logon_current_desktop", error))?;
+        if current != self.original_desktop {
+            unsafe { SetThreadDesktop(self.original_desktop) }
+                .map_err(|error| api_error("new_logon_restore_desktop", error))?;
+        }
+        if unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+            .map_err(|error| api_error("new_logon_restored_desktop", error))?
+            != self.original_desktop
+        {
+            return Err(invalid("新站 helper 原桌面恢复未确认"));
+        }
+        Ok(())
+    }
+
+    pub(in crate::windows) fn verify(&self) -> io::Result<()> {
+        if unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("new_logon_station_recheck", error))?
+            != self.station
+        {
+            return Err(invalid("新站持有者切换了窗口站"));
+        }
+        verify_object(HANDLE(self.station.0), &self.station_sd, true)?;
+        let desktop = self.desktop.ok_or_else(|| invalid("新登录桌面已关闭"))?;
+        verify_object(HANDLE(desktop.0), &self.desktop_sd, false)
+    }
+
+    #[cfg(feature = "native-probe-witness")]
+    pub(in crate::windows) fn witness_handle(&self) -> io::Result<HDESK> {
+        self.verify()?;
+        self.desktop.ok_or_else(|| invalid("取证桌面已关闭"))
+    }
+
+    pub(in crate::windows) fn close(&mut self) -> io::Result<()> {
+        // 只恢复同一新站的初始桌面；不切换窗口站，也不关闭借用的初始句柄。
+        self.restore()?;
+        if let Some(desktop) = self.desktop {
+            unsafe { CloseDesktop(desktop) }
+                .map_err(|error| api_error("new_logon_desktop_close", error))?;
+            self.desktop = None;
+        }
+        // 系统自动连接的 station 不能 CloseWindowStation；所有者进程退出后再由父核消失。
+        Ok(())
+    }
+}
+
+impl Drop for NewLogonDesktop {
+    fn drop(&mut self) {
+        let _ = self.close();
     }
 }
 
@@ -305,11 +518,254 @@ fn verify_object(object: HANDLE, expected: &Descriptor, station: bool) -> io::Re
     Ok(())
 }
 
+fn object_name(object: HANDLE, stage: &'static str) -> io::Result<Vec<u16>> {
+    let mut name = [0u16; 256];
+    let mut used = 0;
+    unsafe {
+        GetUserObjectInformationW(
+            object,
+            UOI_NAME,
+            Some(name.as_mut_ptr().cast()),
+            size_of_val(&name) as u32,
+            Some(&mut used),
+        )
+    }
+    .map_err(|error| api_error(stage, error))?;
+    if used as usize % size_of::<u16>() != 0 {
+        return Err(invalid("私有桌面对象名称长度无效"));
+    }
+    let units = used as usize / size_of::<u16>();
+    if !(2..=name.len()).contains(&units)
+        || name[units - 1] != 0
+        || name[..units - 1]
+            .iter()
+            .any(|unit| *unit == 0 || *unit == b'\\' as u16)
+    {
+        return Err(invalid("私有桌面对象名称无效"));
+    }
+    Ok(name[..units - 1].to_vec())
+}
+
+fn station_is_noninteractive(station: HWINSTA) -> io::Result<bool> {
+    let mut flags = USEROBJECTFLAGS::default();
+    let mut used = 0;
+    unsafe {
+        GetUserObjectInformationW(
+            HANDLE(station.0),
+            UOI_FLAGS,
+            Some((&mut flags as *mut USEROBJECTFLAGS).cast::<c_void>()),
+            size_of_val(&flags) as u32,
+            Some(&mut used),
+        )
+    }
+    .map_err(|error| api_error("read_existing_station_flags", error))?;
+    if used as usize != size_of_val(&flags) {
+        return Err(invalid("现有窗口站标志长度无效"));
+    }
+    Ok(flags.dwFlags & WSF_VISIBLE as u32 == 0)
+}
+
+#[cfg(any(test, feature = "test-util"))]
+pub(super) enum ProbeDesktop {
+    NewStation(PrivateDesktop),
+    ExistingStation(ExistingStationDesktop),
+}
+
+#[cfg(any(test, feature = "test-util"))]
+impl ProbeDesktop {
+    pub(super) fn verify(&self) -> io::Result<()> {
+        match self {
+            Self::NewStation(desktop) => desktop.verify(),
+            Self::ExistingStation(desktop) => desktop.verify(),
+        }
+    }
+
+    pub(super) fn configure_startup(&mut self, startup: &mut STARTUPINFOW) -> io::Result<()> {
+        match self {
+            Self::NewStation(desktop) => desktop.configure_startup(startup),
+            Self::ExistingStation(desktop) => desktop.configure_startup(startup),
+        }
+    }
+
+    pub(super) fn close(&mut self) -> io::Result<()> {
+        match self {
+            Self::NewStation(desktop) => desktop.close(),
+            Self::ExistingStation(desktop) => desktop.close(),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "test-util"))]
+pub(super) struct ExistingStationDesktop {
+    station: HWINSTA,
+    station_name: Vec<u16>,
+    original_desktop: HDESK,
+    desktop: Option<HDESK>,
+    desktop_name: Vec<u16>,
+    startup_name: Vec<u16>,
+    descriptor: Descriptor,
+    restored: bool,
+}
+
+#[cfg(any(test, feature = "test-util"))]
+impl ExistingStationDesktop {
+    pub(super) fn create(profile_name: &str, sid: PSID) -> io::Result<Self> {
+        let suffix = profile_name
+            .strip_prefix("InfiniShell.Version.")
+            .filter(|value| {
+                value.len() == 36
+                    && value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() || byte == b'-')
+            })
+            .ok_or_else(|| invalid("私有桌面代次名称无效"))?;
+        let _creation = CREATION_LOCK
+            .lock()
+            .map_err(|_| invalid("私有桌面创建锁已损坏"))?;
+        let station = unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("existing_station", error))?;
+        let station_name = object_name(HANDLE(station.0), "read_existing_station_name")?;
+        if !station_is_noninteractive(station)?
+            || station_name.len() == 7
+                && station_name
+                    .iter()
+                    .zip("WinSta0".encode_utf16())
+                    .all(|(actual, expected)| {
+                        u8::try_from(*actual)
+                            .is_ok_and(|actual| actual.eq_ignore_ascii_case(&(expected as u8)))
+                    })
+        {
+            return Err(invalid("私有桌面拒绝交互窗口站"));
+        }
+        let original_desktop = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+            .map_err(|error| api_error("original_desktop", error))?;
+        let desktop_name = wide(format!("InfiniShell.Probe.{suffix}").as_ref())?;
+        let mut startup_name = station_name.clone();
+        startup_name.push(b'\\' as u16);
+        startup_name.extend_from_slice(&desktop_name);
+        let owner = current_user_sid()?;
+        let container = sid_text(sid)?;
+        if owner == container {
+            return Err(invalid("私有桌面用户与容器 SID 相同"));
+        }
+        let descriptor = Descriptor::new(
+            &owner,
+            &container,
+            DESKTOP_OWNER_ACCESS,
+            DESKTOP_CONTAINER_ACCESS,
+        )?;
+        let mut result = Self {
+            station,
+            station_name,
+            original_desktop,
+            desktop: None,
+            desktop_name,
+            startup_name,
+            descriptor,
+            restored: false,
+        };
+        let created = (|| -> io::Result<()> {
+            let attributes = result.descriptor.attributes();
+            result.desktop = Some(
+                unsafe {
+                    CreateDesktopW(
+                        PCWSTR(result.desktop_name.as_ptr()),
+                        None,
+                        None,
+                        DESKTOP_CONTROL_FLAGS(0),
+                        DESKTOP_OWNER_ACCESS,
+                        Some(&attributes),
+                    )
+                }
+                .map_err(|error| api_error("create_existing_station_desktop", error))?,
+            );
+            result.verify()?;
+            result.restore()
+        })();
+        if let Err(error) = created {
+            let cleanup = result.close();
+            eprintln!(
+                "atomic_windows_existing_station_private_object_cleanup={{\"confirmed\":{}}}",
+                cleanup.is_ok()
+            );
+            return Err(match cleanup {
+                Ok(()) => error,
+                Err(cleanup) => io::Error::other(format!("{error}；私有对象清理失败：{cleanup}")),
+            });
+        }
+        Ok(result)
+    }
+
+    fn restore(&mut self) -> io::Result<()> {
+        if !self.restored {
+            let current = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+                .map_err(|error| api_error("read_current_desktop", error))?;
+            if current != self.original_desktop {
+                unsafe { SetThreadDesktop(self.original_desktop) }
+                    .map_err(|error| api_error("restore_desktop", error))?;
+            }
+            let restored = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+                .map_err(|error| api_error("verify_restored_desktop", error))?;
+            if restored != self.original_desktop {
+                return Err(invalid("私有桌面原始桌面恢复未确认"));
+            }
+            self.restored = true;
+        }
+        Ok(())
+    }
+
+    pub(super) fn verify(&self) -> io::Result<()> {
+        let current = unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("verify_existing_station", error))?;
+        if current != self.station
+            || object_name(HANDLE(current.0), "read_existing_station_name")? != self.station_name
+            || !station_is_noninteractive(current)?
+        {
+            return Err(invalid("私有桌面现有窗口站身份不匹配"));
+        }
+        let desktop = self.desktop.ok_or_else(|| invalid("私有桌面已关闭"))?;
+        if object_name(HANDLE(desktop.0), "read_existing_desktop_name")?.as_slice()
+            != &self.desktop_name[..self.desktop_name.len() - 1]
+        {
+            return Err(invalid("私有桌面对象名称不匹配"));
+        }
+        verify_object(HANDLE(desktop.0), &self.descriptor, false)
+    }
+
+    pub(super) fn configure_startup(&mut self, startup: &mut STARTUPINFOW) -> io::Result<()> {
+        if !self.restored {
+            return Err(invalid("私有桌面原始桌面尚未恢复"));
+        }
+        self.verify()?;
+        startup.lpDesktop = PWSTR(self.startup_name.as_mut_ptr());
+        Ok(())
+    }
+
+    pub(super) fn close(&mut self) -> io::Result<()> {
+        self.restore()?;
+        if let Some(desktop) = self.desktop {
+            unsafe { CloseDesktop(desktop) }.map_err(|error| api_error("close_desktop", error))?;
+            self.desktop = None;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(any(test, feature = "test-util"))]
+impl Drop for ExistingStationDesktop {
+    fn drop(&mut self) {
+        // 仅关闭本轮创建的桌面；现有窗口站与原桌面句柄均由系统持有。
+        let _ = self.close();
+    }
+}
+
+#[cfg(any(test, feature = "test-util"))]
 struct OriginalObjects {
     station: HWINSTA,
     desktop: HDESK,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 pub(super) struct PrivateDesktop {
     station: Option<HWINSTA>,
     desktop: Option<HDESK>,
@@ -319,6 +775,7 @@ pub(super) struct PrivateDesktop {
     desktop_sd: Descriptor,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl PrivateDesktop {
     pub(super) fn create(profile_name: &str, sid: PSID) -> io::Result<Self> {
         let suffix = profile_name
@@ -469,6 +926,7 @@ impl PrivateDesktop {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl Drop for PrivateDesktop {
     fn drop(&mut self) {
         // 显式清理失败已向调用方返回；析构只尽力释放自己创建的对象，不关闭借用句柄。

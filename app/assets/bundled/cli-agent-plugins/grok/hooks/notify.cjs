@@ -5,7 +5,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { TextDecoder } = require("node:util");
 
-const PLUGIN_VERSION = "0.1.5";
+const PLUGIN_VERSION = "0.1.6";
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_FRAME_BYTES = 4096;
 const TOTAL_TIMEOUT_MS = 4000;
@@ -174,24 +174,18 @@ function sendNotification(notification, environment, deadline = Date.now() + TOT
   const fitted = fitNotification(notification);
   if (!fitted) return false;
   try {
-    let remaining = deadline - now();
+    const remaining = deadline - now();
     if (remaining <= 0) return false;
-    const capabilities = execute(executable, ["cli-agent-notify", "--protocol-version"], {
-      encoding: "utf8", timeout: Math.min(500, remaining), maxBuffer: 256, killSignal: "SIGKILL",
-      stdio: ["ignore", "pipe", "ignore"], windowsHide: true, env: environment,
-    });
-    const parsed = JSON.parse(capabilities);
-    if (!parsed || Array.isArray(parsed) || parsed.protocol !== 1 || parsed.maxFrameBytes !== MAX_FRAME_BYTES
-        || Object.keys(parsed).sort().join(",") !== "maxFrameBytes,protocol") return false;
-    remaining = deadline - now();
-    if (remaining <= 0) return false;
-    const result = execute(executable, ["cli-agent-notify"], {
+    // worker 在读取输入或写终端之前验证协议，避免额外的短期限冷启动探测。
+    const result = execute(executable, ["cli-agent-notify", "--require-protocol", "1"], {
       input: JSON.stringify(fitted), encoding: "utf8", timeout: Math.min(2600, remaining),
       maxBuffer: 256, killSignal: "SIGKILL", stdio: ["pipe", "pipe", "ignore"],
       windowsHide: true, env: environment,
     });
-    // exit 0 加空 stdout 仅确认 worker 写完，不能冒充应用接收确认。
-    return result === "";
+    const parsed = JSON.parse(result);
+    // exit 0 加精确协议收据仅确认 worker 写完，不能冒充应用接收确认。
+    return !!parsed && !Array.isArray(parsed) && parsed.protocol === 1 && parsed.maxFrameBytes === MAX_FRAME_BYTES
+      && Object.keys(parsed).sort().join(",") === "maxFrameBytes,protocol";
   } catch (_) {
     // 缺失、忙碌、超时或版本不兼容都不回退旧 TTY 写法，也不自动重投。
     return false;

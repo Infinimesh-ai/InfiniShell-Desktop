@@ -15,9 +15,13 @@ use tempfile::{NamedTempFile, TempDir};
 use uuid::Uuid;
 use warp_core::{HostId, SessionId};
 
+use super::cli_image_claude_queue::{
+    ClaudeImageAttempt, ClaudePendingImageAttempt, ClaudeTranscriptBinding,
+};
+
 #[path = "cli_image_staging_recovery.rs"]
 mod recovery;
-pub(super) use recovery::{QueueClaim, QueueResult};
+pub(super) use recovery::{PreflightRejection, QueueClaim, QueueResult, TmuxImageRecovery};
 
 const MAX_CHUNK_BYTES: usize = 4 * 1024 * 1024;
 const MAX_SCOPE_TRANSFERS: usize = 32;
@@ -69,12 +73,71 @@ pub(crate) struct RemoteImageStaging {
 }
 
 impl RemoteImageStaging {
+    pub(super) fn queue_recovery_claim(
+        &self,
+        scope: &RemoteImageScope,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        self.references
+            .queue_recovery_claim(&scope.cli_session_id, submission, key)
+    }
+
+    pub(super) fn reference_recovery_claim(
+        &self,
+        scope: &RemoteImageScope,
+        transfer: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        self.references.reference_recovery_claim(
+            &scope.cli_session_id,
+            scope.submission_id,
+            transfer,
+            key,
+        )
+    }
+
     pub(super) fn queue_status(&self, scope: &RemoteImageScope, submission: Uuid, key: Uuid) -> io::Result<Option<QueueResult>> {
         self.references.queue_status(scope.host_id.as_str(), &scope.cli_session_id, submission, key)
     }
 
+    pub(super) fn preflight_rejection(
+        &self,
+        scope: &RemoteImageScope,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<PreflightRejection>> {
+        self.references.preflight_rejection(
+            scope.host_id.as_str(),
+            &scope.cli_session_id,
+            submission,
+            key,
+        )
+    }
+
+    pub(super) fn reject_preflight(
+        &mut self,
+        scope: &RemoteImageScope,
+        rejection: &PreflightRejection,
+    ) -> io::Result<()> {
+        self.references.reject_preflight(rejection)?;
+        // 先持久拒绝再回收，响应丢失或中途断连也能仅凭原身份继续清理。
+        for (id, key) in &rejection.references {
+            self.release_recovered(scope, *id, *key)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn claim_queue(&self, claim: &QueueClaim) -> io::Result<()> {
         self.references.claim_queue(claim)
+    }
+
+    pub(super) fn bind_claude_transcript(
+        &self,
+        claim: &QueueClaim,
+        pending: &ClaudePendingImageAttempt,
+    ) -> io::Result<(fs::File, ClaudeImageAttempt, ClaudeTranscriptBinding)> {
+        self.references.bind_claude_transcript(claim, pending)
     }
 
     pub(super) fn finish_queue(&mut self, scope: &RemoteImageScope, result: &QueueResult) -> io::Result<()> {
@@ -112,7 +175,7 @@ impl RemoteImageStaging {
             return Err(rejected("staging directory is not private"));
         }
         let references = recovery::ReferenceStore::new(parent)?;
-        let reserved_bytes = references.retained_bytes(host_id.as_str())?;
+        let reserved_bytes = references.retained_bytes()?;
         Ok(Self {
             host_id,
             root,

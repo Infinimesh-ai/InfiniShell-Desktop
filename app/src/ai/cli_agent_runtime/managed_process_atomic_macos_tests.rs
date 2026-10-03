@@ -449,3 +449,189 @@ fn make_tree_removable(path: &Path) {
         let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
     }
 }
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+fn homebrew_fixture() -> (Fixture, Manifest) {
+    let mut fixture = Fixture::new();
+    let prefix = fixture.root.join("brew");
+    create_private_directory(&prefix);
+    let caskroom = prefix.join("Caskroom");
+    create_private_directory(&caskroom);
+    fs::set_permissions(&caskroom, fs::Permissions::from_mode(0o775)).unwrap();
+    let source = caskroom.join("codex/0.160.0/bin/codex");
+    fs::create_dir_all(source.parent().unwrap()).unwrap();
+    fs::rename(&fixture.source, &source).unwrap();
+    fixture.source = source.clone();
+    fixture.expected = ExpectedFileIdentity::capture(&source).unwrap();
+    let generation = Uuid::new_v4();
+    let cwd = version_probe::prepare_directory(&fixture.state, generation).unwrap();
+    let manifest = Manifest {
+        version: 1,
+        launch_allowed: true,
+        generation,
+        token: Uuid::new_v4(),
+        parent_control: "127.0.0.1:1234".parse().unwrap(),
+        executable: source,
+        arguments: vec!["--version".into()],
+        atomic_cwd: Some(super::super::AtomicDirectoryIdentity::capture(&cwd).unwrap()),
+        cwd,
+        expected_files: vec![fixture.expected.clone()],
+        grok_stdio_eof: None,
+        isolated_home: None,
+        isolated_state_dir: None,
+        environment: None,
+        atomic_launch_kind: Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1),
+    };
+    (fixture, manifest)
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn private_homebrew_caskroom_allows_only_the_bound_probe_snapshot() {
+    let (fixture, manifest) = homebrew_fixture();
+    let strict = prepare_native_executable(
+        &fixture.state,
+        manifest.generation,
+        BINDING_DIGEST,
+        &fixture.expected,
+    );
+    assert_eq!(
+        strict.unwrap_err().to_string(),
+        "managed_process.atomic_macos_ancestor_unsafe"
+    );
+    let published =
+        prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest).unwrap();
+    published.verify_for_execution().unwrap();
+    assert_eq!(
+        published.summary().source_file_id,
+        PersistentFileId::from(fixture.expected.file_id.unwrap())
+    );
+    assert_eq!(published.summary().sha256, fixture.expected.sha256);
+    assert_eq!(
+        published.summary().signature_requirement,
+        CODESIGN_REQUIREMENT
+    );
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn homebrew_ancestor_exception_rejects_generic_native_authority() {
+    let (fixture, mut manifest) = homebrew_fixture();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::NativeFile);
+    let result = prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest);
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "managed_process.atomic_macos_homebrew_probe_kind_invalid"
+    );
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn group_writable_caskroom_under_public_prefix_is_rejected() {
+    let (fixture, manifest) = homebrew_fixture();
+    fs::set_permissions(fixture.root.join("brew"), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest).is_err());
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn homebrew_exception_does_not_accept_another_writable_ancestor() {
+    let (fixture, manifest) = homebrew_fixture();
+    fs::set_permissions(
+        fixture.root.join("brew/Caskroom/codex"),
+        fs::Permissions::from_mode(0o775),
+    )
+    .unwrap();
+    let result = prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest);
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "managed_process.atomic_macos_ancestor_unsafe"
+    );
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn homebrew_exception_does_not_relax_snapshot_state_permissions() {
+    let (fixture, manifest) = homebrew_fixture();
+    fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o775)).unwrap();
+    let result = prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest);
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "managed_process.atomic_macos_ancestor_unsafe"
+    );
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn caskroom_permission_change_after_source_verification_is_rejected() {
+    let (fixture, manifest) = homebrew_fixture();
+    let caskroom = PrivateHomebrewCaskroom::capture(&fixture.source).unwrap();
+    let result = prepare_executable_inner(
+        &fixture.state,
+        manifest.generation,
+        BINDING_DIGEST,
+        &fixture.expected,
+        Some(&caskroom),
+        || fs::set_permissions(&caskroom.caskroom_path, fs::Permissions::from_mode(0o777)),
+        || Ok(()),
+    );
+    assert!(result.is_err());
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn caskroom_replacement_after_source_verification_is_rejected() {
+    let (fixture, manifest) = homebrew_fixture();
+    let caskroom = PrivateHomebrewCaskroom::capture(&fixture.source).unwrap();
+    let result = prepare_executable_inner(
+        &fixture.state,
+        manifest.generation,
+        BINDING_DIGEST,
+        &fixture.expected,
+        Some(&caskroom),
+        || {
+            fs::rename(
+                &caskroom.caskroom_path,
+                fixture.root.join("retained-caskroom"),
+            )?;
+            fs::create_dir(&caskroom.caskroom_path)?;
+            fs::set_permissions(&caskroom.caskroom_path, fs::Permissions::from_mode(0o775))
+        },
+        || Ok(()),
+    );
+    assert!(result.is_err());
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn caskroom_symlink_cannot_substitute_for_the_original_directory() {
+    let (fixture, manifest) = homebrew_fixture();
+    let caskroom = fixture.root.join("brew/Caskroom");
+    let outside = fixture.root.join("outside-caskroom");
+    fs::rename(&caskroom, &outside).unwrap();
+    symlink(&outside, &caskroom).unwrap();
+    assert!(prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest).is_err());
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}
+
+#[cfg(all(feature = "local_fs", target_arch = "aarch64"))]
+#[test]
+fn caskroom_acl_added_after_capture_is_rejected() {
+    let (fixture, manifest) = homebrew_fixture();
+    let caskroom = PrivateHomebrewCaskroom::capture(&fixture.source).unwrap();
+    let status = command::blocking::Command::new("/bin/chmod")
+        .args(["+a", "everyone allow read"])
+        .arg(&caskroom.caskroom_path)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert!(caskroom.verify().is_err());
+    assert!(prepare_homebrew_probe_executable(&fixture.state, BINDING_DIGEST, &manifest).is_err());
+    assert!(!fixture.generation_path(manifest.generation).exists());
+}

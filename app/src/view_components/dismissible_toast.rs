@@ -514,7 +514,8 @@ impl<A: Action + Clone> DismissibleToast<A> {
             })
             .build()
             .finish();
-        let message_element = if message_expanded {
+        // 没有展开入口的消息必须按自然高度显示，避免高度截断后无法查看完整内容。
+        let message_element = if message_expanded || !toast_message_is_truncated(&self.main_text) {
             message_element
         } else {
             ConstrainedBox::new(message_element)

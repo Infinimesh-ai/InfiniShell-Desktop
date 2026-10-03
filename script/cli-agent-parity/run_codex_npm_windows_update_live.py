@@ -23,20 +23,53 @@ DEPENDENCY = "node_modules/@openai/codex-win32-x64/"
 CASES = ("updated", "old_moved", "published_receipt_missing", "external_change_preserved", "candidate_changed_preserved")
 COLD_CASES = CASES[1:4]
 TEST = "terminal::cli_agent_updates::sources::npm_windows::live_tests::real_codex_windows_npm_update_without_model"
-SOURCE_FILES = (
+# 监督程序必须嵌入生产源码；构建配置、测试与运行器只属于验收来源。
+# 两类都由 libtest 的编译字节绑定，并在运行前后逐文件核验，不能靠后缀猜测角色。
+SUPERVISOR_SOURCE_FILES = (
     "app/src/terminal/cli_agent_updates.rs",
     *["app/src/terminal/cli_agent_updates/" + name for name in (
         "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_codex_windows.rs",
-        "sources_npm_codex_windows_tree.rs", "sources_npm_codex_windows_contract.rs",
-        "sources_codex_npm_windows_live_tests.rs")],
+        "sources_npm_codex_windows_tree.rs", "sources_npm_codex_windows_contract.rs")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
-        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
-        "managed_process_npm_probe_windows.rs")],
+        "managed_process.rs", "managed_process_probe_control.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
+        "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_snapshot.rs",
+        "managed_process_atomic_windows_snapshot_temp.rs",
+        "managed_process_atomic_windows_witness.rs", "managed_process_npm_probe_windows.rs")],
+    "crates/command/src/windows.rs",
+    "crates/command/src/managed.rs",
     "crates/command/src/windows_appcontainer.rs",
+    "crates/command/src/windows_appcontainer_witness.rs",
+    "crates/command/src/windows_appcontainer_desktop.rs",
+    "crates/command/src/windows_station_bootstrap.rs",
+    "crates/command/src/windows_station_device_map.rs",
+    "crates/command/src/windows_station_debugger.rs",
+    "crates/command/src/windows_station_debug_event.rs",
+    "crates/command/src/bin/infinishell-station-bootstrap.rs",
     "script/cli-agent-parity/codex_0156_package_manifest.json",
+)
+ACCEPTANCE_SOURCE_FILES = (
+    ".github/workflows/cross-platform-preflight.yml",
+    "app/Cargo.toml",
+    "crates/command/Cargo.toml",
+    "app/src/terminal/cli_agent_updates/sources_codex_npm_windows_live_tests.rs",
+    *["app/src/ai/cli_agent_runtime/" + name for name in (
+        "managed_process_atomic_windows_creation_witness_tests.rs",
+        "managed_process_atomic_windows_snapshot_tests.rs",
+        "managed_process_atomic_windows_snapshot_temp_tests.rs",
+        "managed_process_atomic_windows_witness_tests.rs",
+        "managed_process_probe_control_tests.rs",
+        "managed_process_npm_probe_windows_tests.rs")],
+    "crates/command/src/managed_tests.rs",
+    "crates/command/src/windows_station_bootstrap_tests.rs",
+    "crates/command/src/windows_station_device_map_tests.rs",
+    "crates/command/src/windows_station_debugger_tests.rs",
+    "crates/command/src/windows_station_debug_event_tests.rs",
+    "crates/command/src/windows_appcontainer_tests.rs",
+    "crates/command/src/windows_appcontainer_console_tests.rs",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
 )
+SOURCE_FILES = SUPERVISOR_SOURCE_FILES + ACCEPTANCE_SOURCE_FILES
 # 完整官方 registry 固定版本 SRI；平台包仍注册为 @openai/codex 的 npm alias。
 INTEGRITIES = {
     OLD: "sha512-02fAAGyBtlA1zPjEo3kTj/bOSYbPz5DvjLwRZJdV7weFFEDzNFOMjQGmZ/+5CuirYV0hE+AZTrnjzwXYU4AdAQ==",
@@ -261,7 +294,7 @@ def fixture(args, case, binaries, sources, old, manager_tree, system_root):
 
 
 def verify_embedded(supervisor, repo):
-    names = [name for name in SOURCE_FILES if not name.endswith(("_live_tests.rs", ".py"))]
+    names = SUPERVISOR_SOURCE_FILES
     needles = [(repo / name).read_bytes() for name in names]
     found, maximum = [False] * len(needles), max(map(len, needles))
     with Path(supervisor).open("rb") as stream:
@@ -271,7 +304,8 @@ def verify_embedded(supervisor, repo):
             for index,needle in enumerate(needles):
                 found[index] |= needle in data
             tail = data[-maximum:]
-    require(all(found), "supervisor_source_binding")
+    missing = [name for name, present in zip(names, found) if not present]
+    require(not missing, "supervisor_source_binding: missing=" + ", ".join(missing))
 
 
 def verify_product(root, case, old, target):
@@ -302,15 +336,18 @@ def parser():
     result.add_argument("--repo", type=Path, required=True)
     result.add_argument("--output", type=Path, required=True)
     result.add_argument("--official-inputs", type=Path)
-    for role in ("test-binary", "supervisor", "node", "npm-cli"):
+    for role in ("test-binary", "supervisor", "station-bootstrap", "node", "npm-cli"):
         result.add_argument("--" + role, type=Path, required=True)
         result.add_argument("--" + role + "-sha256", required=True)
     result.add_argument("--case", choices=CASES, action="append")
+    result.add_argument("--native-witness", action="store_true",
+                        help="仅首个 updated CMD 候选的一次原生因果取证；不视为完整验收")
     return result
 
 
 def main():
     args = parser().parse_args()
+    require(not args.native_witness or args.case == ["updated"], "witness_requires_one_updated_case")
     require(platform.system() == "Windows" and platform.machine().lower() in ("amd64", "x86_64"), "windows_x64_only")
     args.repo = canonical(args.repo)
     args.official_inputs = canonical(args.official_inputs) if args.official_inputs else None
@@ -320,11 +357,15 @@ def main():
     require(not any(char in str(args.output) for char in '\n\r\x00%&|<>"'), "fixture_path_metacharacters")
     require(shutil.disk_usage(args.output).free > 4 * 1024**3, "fixture_space_insufficient")
     binaries = {}
-    for key,role in (("worker","test_binary"),("supervisor","supervisor"),("node","node"),("npm_cli","npm_cli")):
+    for key,role in (("worker","test_binary"),("supervisor","supervisor"),
+                     ("station_bootstrap","station_bootstrap"),("node","node"),("npm_cli","npm_cli")):
         path = canonical(getattr(args, role))
         expected = getattr(args, role + "_sha256").lower()
         require(re.fullmatch(r"[0-9a-f]{64}", expected) and sha(path) == expected, "binary_binding")
         binaries[key] = {"path":str(path),"sha256":expected}
+    require(Path(binaries["station_bootstrap"]["path"])
+            == Path(binaries["supervisor"]["path"]).parent / "infinishell-station-bootstrap.exe",
+            "station_bootstrap_not_packaged_sibling")
     node, npm_cli = Path(binaries["node"]["path"]), Path(binaries["npm_cli"]["path"])
     require(node.name.lower() == "node.exe" and npm_cli == node.parent / "node_modules/npm/bin/npm-cli.js", "same_node_npm_installation")
     manager_root = npm_cli.parent.parent
@@ -346,7 +387,10 @@ def main():
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=args.repo, text=True, encoding="utf-8")
     write(args.output / "source.safe.json", {"commit":revision,"source_sha256":sources,"binaries":binaries,
         "working_tree_dirty":bool(status.strip()),"npm_version":manager_manifest.get("version"),"cmd_shim_registrations":shim_sources,
-        "platform":"windows-x64","consumer_channel_discovery_covered":False})
+        "source_roles":{"supervisor_embedded":SUPERVISOR_SOURCE_FILES,"acceptance_only":ACCEPTANCE_SOURCE_FILES},
+        "platform":"windows-x64","consumer_channel_discovery_covered":False,
+        "native_witness_requested":args.native_witness,
+        "native_witness_scope":"first_codex_cmd_generation" if args.native_witness else None})
     cache = args.output / "official-inputs"
     cache.mkdir()
     packages = {version:official_package(version, cache, args.official_inputs) for version in INTEGRITIES}
@@ -356,7 +400,10 @@ def main():
     for case in args.case or CASES:
         require(shutil.disk_usage(args.output).free > 4 * 1024**3, "fixture_space_insufficient")
         root, manifest = fixture(args, case, binaries, sources, old, manager_tree, system_root)
-        run_test(binaries["worker"]["path"], TEST, root / "project", environment(root, binaries, system_root, "execute"), root / "execute", True)
+        execute_environment = environment(root, binaries, system_root, "execute")
+        if args.native_witness:
+            execute_environment["INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"] = "codex-npm-first-cmd-v1"
+        run_test(binaries["worker"]["path"], TEST, root / "project", execute_environment, root / "execute", True)
         result = json.loads((root / "result-execute.safe.json").read_bytes())
         if case in COLD_CASES:
             require(result.get("needs_cold_recovery") is True and result.get("accepted") is False, "checkpoint_not_observed")
@@ -371,6 +418,7 @@ def main():
                 and inventory(manager_root) == manager_tree, "source_or_manager_changed_during_run")
         cases.append({"case":case,"root":str(root),"result":result})
     write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"cases":cases,"model_inputs_sent":0,
+        "native_witness_requested":args.native_witness,"full_case_matrix_covered":not args.native_witness and not args.case,
         "fixed_release_test_hook_used":True,"consumer_channel_discovery_covered":False,"gui_covered":False,
         "busy_or_plugin_recheck_covered":False,"private_npm_registration_executed":True,
         "npm_lifecycle_executed":False,"npm_installer_tree_cleanup_covered":False,

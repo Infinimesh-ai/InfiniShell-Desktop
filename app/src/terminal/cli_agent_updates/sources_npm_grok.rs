@@ -252,6 +252,7 @@ pub(super) async fn execute(
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
     supports(plan.agent, &plan.target_version)?;
+    contract::supports_transition(&plan.installed_version, &plan.target_version)?;
     let path = path(root);
     if path.try_exists().map_err(|_| Error::RecoveryRequired)? {
         return Err(Error::RecoveryRequired);
@@ -266,8 +267,13 @@ pub(super) async fn execute(
         return Err(Error::UnsupportedSource);
     }
     let id = Uuid::new_v4();
-    let mirror = Mirror::capture(&owner.home, &plan.installed_version, id)?;
-    let mut packages = contract::download_release(root).await?;
+    let mirror = Mirror::capture(
+        &owner.home,
+        &plan.installed_version,
+        &plan.target_version,
+        id,
+    )?;
+    let mut packages = contract::download_version_release(root, &plan.target_version).await?;
     let mut journal = Journal {
         schema: 1,
         id,
@@ -314,7 +320,11 @@ pub(super) async fn execute(
                     package.archive.as_file_mut(),
                     |path, _, bytes| {
                         if path == contract::compressed_entry() {
-                            contract::decompress(bytes, native.as_file_mut())
+                            contract::decompress_version(
+                                bytes,
+                                native.as_file_mut(),
+                                &journal.target_version,
+                            )
                         } else {
                             std::io::copy(bytes, &mut std::io::sink())
                                 .map(|_| ())
@@ -324,7 +334,7 @@ pub(super) async fn execute(
                 )?;
             }
         }
-        let expected = contract::native(contract::VERSION)?;
+        let expected = contract::native(journal.target_version.as_str())?;
         native
             .as_file_mut()
             .seek(SeekFrom::Start(0))
@@ -336,19 +346,21 @@ pub(super) async fn execute(
             expected.digest()?,
         )?;
         stage.create_grok_link()?;
-        let executables = contract::installed_files(contract::VERSION)?
+        let executables = contract::installed_files(journal.target_version.as_str())?
             .into_iter()
             .map(|(path, file)| (path, file.executable))
             .collect();
         stage.apply_grok_permissions(&journal.original.tree, &executables)?;
         let prepared = stage.grok_snapshot()?;
-        verify_release(&prepared, contract::VERSION)?;
+        verify_release(&prepared, journal.target_version.as_str())?;
         journal.prepared = Some(prepared);
         native
             .as_file_mut()
             .seek(SeekFrom::Start(0))
             .map_err(|_| Error::PersistenceFailed)?;
-        journal.mirror.prepare(native.as_file_mut())?;
+        journal
+            .mirror
+            .prepare(native.as_file_mut(), &journal.target_version)?;
         save(&path, &journal)?;
         #[cfg(test)]
         live_tests::checkpoint(live_tests::Point::Prepared).await;
@@ -407,7 +419,7 @@ async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Er
         .join(&journal.stage)
         .join("bin/grok-native");
     let identity = stamp(&program)?;
-    let expected = contract::native(contract::VERSION)?;
+    let expected = contract::native(journal.target_version.as_str())?;
     if identity.canonical != program || identity.digest != expected.digest()? {
         return Err(Error::SourceChanged);
     }
@@ -470,7 +482,7 @@ async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Er
         std::str::from_utf8(&bytes).map_err(|_| Error::ProbeFailed)?,
     )
     .ok_or(Error::ProbeFailed)?;
-    if actual != contract::VERSION {
+    if actual != journal.target_version.as_str() {
         return Err(Error::VersionMismatch);
     }
     journal
@@ -499,7 +511,7 @@ fn confirmed(root: &Path, journal: &Journal) -> Result<(), Error> {
 }
 
 fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
-    contract::supports(&journal.target_version)?;
+    contract::supports_transition(&journal.old_version, &journal.target_version)?;
     if journal.schema != 1
         || journal.id.is_nil()
         || journal.stage != OsString::from(format!(".infinishell-grok-npm-{}", journal.id))
@@ -510,9 +522,12 @@ fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
         return Err(Error::RecoveryRequired);
     }
     journal.owner.validate(entry)?;
-    journal
-        .mirror
-        .validate(&journal.owner.home, &journal.old_version, journal.id)?;
+    journal.mirror.validate(
+        &journal.owner.home,
+        &journal.old_version,
+        &journal.target_version,
+        journal.id,
+    )?;
     verify_release(&journal.original, &journal.old_version)?;
     if let Some(prepared) = &journal.prepared {
         verify_release(prepared, &journal.target_version)?;
@@ -535,12 +550,13 @@ fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
         if probe.generation.is_nil()
             || probe.program != program
             || probe.identity.canonical != program
-            || probe.identity.digest != contract::native(contract::VERSION)?.digest()?
+            || probe.identity.digest
+                != contract::native(journal.target_version.as_str())?.digest()?
             || probe.binding != digest
             || probe
                 .version
                 .as_ref()
-                .is_some_and(|version| version != contract::VERSION)
+                .is_some_and(|version| version != journal.target_version.as_str())
         {
             return Err(Error::RecoveryRequired);
         }
@@ -569,7 +585,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
                 .probe
                 .as_ref()
                 .and_then(|probe| probe.version.as_deref())
-                != Some(contract::VERSION)
+                != Some(journal.target_version.as_str())
         {
             return Err(Error::RecoveryRequired);
         }
@@ -625,7 +641,7 @@ fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
         .probe
         .as_ref()
         .and_then(|probe| probe.version.as_deref())
-        != Some(contract::VERSION)
+        != Some(journal.target_version.as_str())
     {
         return Err(Error::RecoveryRequired);
     }

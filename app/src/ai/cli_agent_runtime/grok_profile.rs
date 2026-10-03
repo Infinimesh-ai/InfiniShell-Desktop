@@ -840,7 +840,7 @@ impl GrokCreationPolicyV1 {
                 | GrokToolSet::Skills
                 | GrokToolSet::Commands
                 | GrokToolSet::CommandsSkills
-        ) && matches!(input["variant"].as_str(), Some("GrepSearch" | "ListDir"))
+        ) && matches!(input["variant"].as_str(), Some("Grep" | "ListDir"))
         {
             return self.validate().is_ok()
                 && search::approval_allowed(&self.canonical_working_directory, tool_call);
@@ -1111,6 +1111,17 @@ fn immutable_file(path: &Path, contents: &[u8]) -> Result<(), RuntimeError> {
     file.write_all(contents)?;
     file.sync_all()?;
     Ok(())
+}
+
+pub(super) fn fixed_stdio_executable_digest(digest: &str) -> bool {
+    VERIFIED_EXECUTABLES
+        .iter()
+        .any(|(os, arch, version, expected)| {
+            *os == std::env::consts::OS
+                && *arch == std::env::consts::ARCH
+                && *version == FIXED_SCOPE_VERSION
+                && *expected == digest
+        })
 }
 
 fn verified_executable_digest(path: &Path) -> Result<(&'static str, String), RuntimeError> {

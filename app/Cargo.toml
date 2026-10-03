@@ -178,6 +178,7 @@ serde_yaml.workspace = true
 settings.workspace = true
 settings_value = { workspace = true, features = ["derive"] }
 sha2.workspace = true
+blake3.workspace = true
 shellexpand.workspace = true
 shell-words = "1.1.0"
 socket2.workspace = true
@@ -411,6 +412,7 @@ windows = { workspace = true, features = [
     "Win32_System_Threading",
     "Win32_System_LibraryLoader",
     "Win32_System_WindowsProgramming",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
 windows-registry = { workspace = true }
@@ -470,6 +472,8 @@ embed-resource = "3.0"
 
 # Note that we support channel-specific enables for these features
 [features]
+# 仅隔离原生候选取证构建使用；默认构建不暂停线程或设置诊断断点。
+cli-agent-native-witness = ["command/native-probe-witness", "windows/Win32_System_Memory"]
 tui = ["warpui_core/tui"]
 ai_resume_button = []
 autoupdate = []

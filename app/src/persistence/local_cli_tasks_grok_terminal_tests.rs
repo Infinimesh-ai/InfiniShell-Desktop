@@ -96,6 +96,18 @@ fn response(delivery: &GrokTerminalDelivery, prompt_id: Uuid) -> Value {
         "_meta":{"sessionId":delivery.session_id,"promptId":prompt_id,"requestId":prompt_id,"modelId":"grok-4.7"}}})
 }
 
+fn verified(
+    delivery: &GrokTerminalDelivery,
+    prompt_id: Uuid,
+    output: &str,
+) -> GrokTerminalVerifiedResult {
+    GrokTerminalVerifiedResult {
+        native_prompt_id: prompt_id,
+        completion_watermark: format!("{}-3", delivery.session_id),
+        output: output.into(),
+    }
+}
+
 fn assert_queued(connection: &mut SqliteConnection, claim: &GrokTerminalInputClaim) {
     let (_, record) = read_record(
         connection,
@@ -567,4 +579,267 @@ fn old_generation_final_preserves_original_unknown_record() {
         .unwrap()
         .unwrap();
     assert_eq!(record.grok_terminal_delivery, Some(delivery));
+}
+
+#[test]
+fn same_generation_cold_recovery_cannot_disturb_a_new_turn() {
+    let (mut database, first_claim) = fixture();
+    let first_delivery = claimed(&mut database, &first_claim);
+    let first_prompt = Uuid::new_v4();
+    let first_delivery = acknowledge_exact(
+        &mut database,
+        first_delivery.clone(),
+        response(&first_delivery, first_prompt),
+    )
+    .unwrap()
+    .unwrap()
+    .grok_terminal_delivery
+    .unwrap();
+    assert_eq!(
+        missing_historical_exact(&mut database, first_claim.expected_task.clone()).unwrap(),
+        vec![first_delivery.clone()]
+    );
+
+    let mut second_claim = first_claim.clone();
+    second_claim.input_revision = Uuid::new_v4();
+    advance_config(&mut database, &mut second_claim.expected_task, |config| {
+        config["grok_terminal"]["input_revision"] = json!(second_claim.input_revision);
+    });
+    second_claim.message.message_id = Uuid::new_v4().to_string();
+    second_claim.message.body = "恢复期间新输入".into();
+    second_claim.body_sha256 = digest(&second_claim.message.body);
+    second_claim.rpc_id = Uuid::new_v4();
+    insert_message(&mut database, second_claim.message.clone()).unwrap();
+    let second_unknown = claimed(&mut database, &second_claim);
+    assert_eq!(
+        missing_historical_exact(&mut database, second_claim.expected_task.clone()).unwrap(),
+        vec![first_delivery.clone()]
+    );
+
+    let recovered = save_verified_exact(
+        &mut database,
+        first_delivery.clone(),
+        verified(&first_delivery, first_prompt, "冷恢复完整回答"),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(recovered.state, LocalCliTaskState::Running);
+    assert_eq!(recovered.result.as_deref(), Some("冷恢复完整回答"));
+    let second_prompt = Uuid::new_v4();
+    let second_finished = acknowledge_exact(
+        &mut database,
+        second_unknown.clone(),
+        response(&second_unknown, second_prompt),
+    )
+    .unwrap()
+    .unwrap()
+    .grok_terminal_delivery
+    .unwrap();
+    let latest = save_verified_exact(
+        &mut database,
+        second_finished.clone(),
+        verified(&second_finished, second_prompt, "新回合完整回答"),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(latest.result.as_deref(), Some("新回合完整回答"));
+    assert_eq!(latest.state, LocalCliTaskState::Running);
+    assert!(
+        missing_historical_exact(&mut database, latest)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn late_first_turn_cannot_replace_a_later_verified_result_in_the_same_generation() {
+    let (mut database, first_claim) = fixture();
+    let first_delivery = claimed(&mut database, &first_claim);
+    let first_prompt = Uuid::new_v4();
+    let first_delivery = acknowledge_exact(
+        &mut database,
+        first_delivery.clone(),
+        response(&first_delivery, first_prompt),
+    )
+    .unwrap()
+    .unwrap()
+    .grok_terminal_delivery
+    .unwrap();
+
+    let mut second_claim = first_claim.clone();
+    second_claim.input_revision = Uuid::new_v4();
+    advance_config(&mut database, &mut second_claim.expected_task, |config| {
+        config["grok_terminal"]["input_revision"] = json!(second_claim.input_revision);
+    });
+    second_claim.message.message_id = Uuid::new_v4().to_string();
+    second_claim.message.body = "第二轮输入".into();
+    second_claim.body_sha256 = digest(&second_claim.message.body);
+    second_claim.rpc_id = Uuid::new_v4();
+    insert_message(&mut database, second_claim.message.clone()).unwrap();
+    let second_delivery = claimed(&mut database, &second_claim);
+    let second_prompt = Uuid::new_v4();
+    let second_delivery = acknowledge_exact(
+        &mut database,
+        second_delivery.clone(),
+        response(&second_delivery, second_prompt),
+    )
+    .unwrap()
+    .unwrap()
+    .grok_terminal_delivery
+    .unwrap();
+
+    let latest = save_verified_exact(
+        &mut database,
+        second_delivery.clone(),
+        verified(&second_delivery, second_prompt, "第二轮完整回答"),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(latest.result.as_deref(), Some("第二轮完整回答"));
+    assert!(
+        save_verified_exact(
+            &mut database,
+            first_delivery.clone(),
+            verified(&first_delivery, first_prompt, "第一轮迟到回答"),
+        )
+        .unwrap()
+        .is_none()
+    );
+    let stored = read_task(&mut database, &latest.task_id).unwrap().unwrap();
+    assert_eq!(stored.result.as_deref(), Some("第二轮完整回答"));
+    assert_eq!(stored.state, LocalCliTaskState::Running);
+    assert!(
+        save_verified_exact(
+            &mut database,
+            second_delivery.clone(),
+            verified(&second_delivery, second_prompt, "冲突回答"),
+        )
+        .is_err()
+    );
+    assert_eq!(
+        read_task(&mut database, &latest.task_id).unwrap().unwrap(),
+        stored
+    );
+}
+
+#[test]
+fn old_generation_result_is_saved_only_to_its_history_after_continuation() {
+    let (mut database, claim) = fixture();
+    let delivery = claimed(&mut database, &claim);
+    let prompt = Uuid::new_v4();
+    let delivery = acknowledge_exact(&mut database, delivery.clone(), response(&delivery, prompt))
+        .unwrap()
+        .unwrap()
+        .grok_terminal_delivery
+        .unwrap();
+    let mut old = claim.expected_task;
+    old.state = LocalCliTaskState::Disconnected;
+    old.revision += 1;
+    checkpoint(&mut database, old.clone(), Some(1)).unwrap();
+    let mut continued = old.clone();
+    continued.generation = 2;
+    continued.revision = 0;
+    continued.state = LocalCliTaskState::Queued;
+    continued.result = None;
+    let mut config: Value = serde_json::from_str(&continued.config_json).unwrap();
+    config["grok_terminal"]["launch_id"] = json!(Uuid::new_v4());
+    config["grok_terminal"]["binding_id"] = json!(Uuid::new_v4());
+    continued.config_json = config.to_string();
+    checkpoint(&mut database, continued.clone(), Some(1)).unwrap();
+    assert_eq!(
+        missing_historical_exact(&mut database, continued.clone()).unwrap(),
+        vec![delivery.clone()]
+    );
+    let mut wrong_binding = continued.clone();
+    let mut wrong_config: Value = serde_json::from_str(&wrong_binding.config_json).unwrap();
+    wrong_config["grok_terminal"]["binding_id"] = json!(Uuid::new_v4());
+    wrong_binding.config_json = wrong_config.to_string();
+    assert!(missing_historical_exact(&mut database, wrong_binding).is_err());
+
+    let restored = save_verified_exact(
+        &mut database,
+        delivery.clone(),
+        verified(&delivery, prompt, "旧代完整回答"),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(restored.generation, 1);
+    assert_eq!(restored.state, LocalCliTaskState::Disconnected);
+    assert_eq!(restored.result.as_deref(), Some("旧代完整回答"));
+    assert_eq!(
+        read_task(&mut database, &continued.task_id)
+            .unwrap()
+            .unwrap(),
+        continued
+    );
+    assert_eq!(
+        read_task_generation(&mut database, &continued.task_id, 1)
+            .unwrap()
+            .unwrap()
+            .result
+            .as_deref(),
+        Some("旧代完整回答")
+    );
+    assert!(
+        missing_historical_exact(&mut database, continued)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn cancelled_or_unverified_native_history_cannot_create_a_task_result() {
+    let (mut database, claim) = fixture();
+    let delivery = claimed(&mut database, &claim);
+    let prompt = Uuid::new_v4();
+    let delivery = acknowledge_exact(&mut database, delivery.clone(), response(&delivery, prompt))
+        .unwrap()
+        .unwrap()
+        .grok_terminal_delivery
+        .unwrap();
+    assert!(
+        save_verified_exact(
+            &mut database,
+            delivery.clone(),
+            verified(&delivery, prompt, "  "),
+        )
+        .is_err()
+    );
+    let mut bad_watermark = verified(&delivery, prompt, "正文");
+    bad_watermark.completion_watermark = "another-session-3".into();
+    assert!(save_verified_exact(&mut database, delivery.clone(), bad_watermark).is_err());
+
+    let mut cancelled = claim.expected_task;
+    cancelled.state = LocalCliTaskState::Cancelled;
+    cancelled.revision += 1;
+    checkpoint(&mut database, cancelled.clone(), Some(1)).unwrap();
+    assert!(
+        save_verified_exact(
+            &mut database,
+            delivery.clone(),
+            verified(&delivery, prompt, "完成前被取消的回合"),
+        )
+        .unwrap()
+        .is_none()
+    );
+    let (_, record) = read_record(&mut database, delivery.message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        record
+            .grok_terminal_result
+            .as_ref()
+            .map(|result| result.output.as_str()),
+        Some("完成前被取消的回合")
+    );
+    let stored = read_task(&mut database, &cancelled.task_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.state, LocalCliTaskState::Cancelled);
+    assert_eq!(stored.result, None);
+    assert!(
+        missing_historical_exact(&mut database, stored)
+            .unwrap()
+            .is_empty()
+    );
 }
