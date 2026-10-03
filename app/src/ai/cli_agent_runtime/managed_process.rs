@@ -7,6 +7,8 @@ use std::io::{self, Read as _, Seek as _, Write as _};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
+#[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
+use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 use std::thread;
@@ -1741,6 +1743,26 @@ async fn spawn_configured_inner(
     }
     let manifest_path = directory.join("manifest.json");
     let mut command = Command::new(worker);
+    #[cfg(all(windows, feature = "cli-agent-native-witness"))]
+    command.env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION");
+    #[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
+    {
+        // 仅显式原生测试驱动的首个固定 Codex CMD 候选取证；后续代次不继承授权。
+        static CLAIMED: AtomicBool = AtomicBool::new(false);
+        if manifest.atomic_launch_kind == Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1)
+            && manifest.arguments.first().and_then(|value| value.to_str()) == Some("cmd")
+            && std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW").as_deref()
+                == Ok("codex-npm-first-cmd-v1")
+            && CLAIMED
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+        {
+            command.env(
+                "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",
+                generation.to_string(),
+            );
+        }
+    }
     command
         .arg(WORKER_COMMAND)
         .arg(&manifest_path)

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -64,15 +65,28 @@ class RunnerTests(unittest.TestCase):
 
     def test_environment_discards_auth_and_user_npm_settings(self):
         with patch.dict(os.environ,{"OPENAI_API_KEY":"must-not-propagate","NODE_OPTIONS":"--require injected.js",
-                                    "NPM_CONFIG_PREFIX":"user-prefix","PSExecutionPolicyPreference":"Bypass"}):
+                                    "NPM_CONFIG_PREFIX":"user-prefix","PSExecutionPolicyPreference":"Bypass",
+                                    "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW":"codex-npm-first-cmd-v1",
+                                    "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION":"stale"}):
             result = runner.environment(self.root,self.binaries,self.root / "Windows","execute")
         self.assertNotIn("OPENAI_API_KEY",result)
         self.assertNotIn("NODE_OPTIONS",result)
         self.assertNotIn("NPM_CONFIG_PREFIX",result)
         self.assertNotIn("PSExecutionPolicyPreference",result)
+        self.assertNotIn("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW",result)
+        self.assertNotIn("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",result)
         self.assertEqual(Path(result["NPM_CONFIG_USERCONFIG"]),self.root / "npm/user.npmrc")
         self.assertEqual(Path(result["CODEX_HOME"]),self.root / "home/.codex")
         self.assertEqual(result["INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW"],runner.SCOPE)
+
+    def test_witness_rejects_repeated_or_full_matrix_before_native_setup(self):
+        for cases in (None, ["old_moved"], ["updated", "updated"], ["updated", "old_moved"]):
+            with self.subTest(cases=cases), patch.object(runner, "parser") as parser:
+                parser.return_value.parse_args.return_value = SimpleNamespace(native_witness=True, case=cases)
+                with patch.object(runner.platform, "system") as platform_read:
+                    with self.assertRaisesRegex(ValueError, "witness_requires_one_updated_case"):
+                        runner.main()
+                    platform_read.assert_not_called()
 
     def test_actual_npm_cli_arguments_only_target_private_prefix(self):
         archive = self.root / "official-inputs/fixed.tgz"

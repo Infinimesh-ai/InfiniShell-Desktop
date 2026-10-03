@@ -68,6 +68,39 @@ use windows::core::{BOOL, HRESULT, PCWSTR, PWSTR};
 
 use super::appcontainer::desktop::NewLogonDesktop;
 
+#[cfg(feature = "native-probe-witness")]
+use windows::Win32::Foundation::DUPLICATE_SAME_ACCESS;
+#[cfg(feature = "native-probe-witness")]
+use windows::Win32::System::StationsAndDesktops::{CloseDesktop, HDESK};
+#[cfg(feature = "native-probe-witness")]
+use windows::Win32::System::Threading::PROCESS_DUP_HANDLE;
+
+#[cfg(feature = "native-probe-witness")]
+struct WitnessDesktop(Option<usize>);
+
+#[cfg(feature = "native-probe-witness")]
+impl WitnessDesktop {
+    fn close(&mut self) -> io::Result<()> {
+        if let Some(value) = self.0 {
+            unsafe { CloseDesktop(HDESK(value as *mut c_void)) }.map_err(io::Error::other)?;
+            self.0 = None;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "native-probe-witness")]
+impl Drop for WitnessDesktop {
+    fn drop(&mut self) {
+        let _ = self.close();
+    }
+}
+
+#[cfg(feature = "native-probe-witness")]
+fn witness_disabled(value: &bool) -> bool {
+    !value
+}
+
 const MODE: &str = "--infinishell-station-bootstrap";
 const START_TIMEOUT: Duration = Duration::from_secs(15);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -377,6 +410,9 @@ struct Request {
     image: PathBuf,
     image_size: u64,
     image_sha256: String,
+    #[cfg(feature = "native-probe-witness")]
+    #[serde(default, skip_serializing_if = "witness_disabled")]
+    witness_desktop: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -412,6 +448,9 @@ struct Ready {
     process: Snapshot,
     station: String,
     desktop: String,
+    #[cfg(feature = "native-probe-witness")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    witness_desktop_handle: Option<u64>,
 }
 
 fn save<T: Serialize>(root: &Path, name: &str, value: &T) -> io::Result<()> {
@@ -838,6 +877,10 @@ pub(super) struct PrivateStation {
     closed: bool,
     reaped: bool,
     close_attempted: bool,
+    #[cfg(feature = "native-probe-witness")]
+    witness_desktop: Option<WitnessDesktop>,
+    #[cfg(feature = "native-probe-witness")]
+    witness_desktop_error: Option<i32>,
 }
 impl PrivateStation {
     pub(super) fn create(
@@ -865,6 +908,10 @@ impl PrivateStation {
             image: image.lease.path().to_owned(),
             image_size: image.size,
             image_sha256: image.sha256.clone(),
+            #[cfg(feature = "native-probe-witness")]
+            witness_desktop: std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION")
+                .ok()
+                .is_some_and(|generation| profile == format!("InfiniShell.Version.{generation}")),
         };
         let job = owned(unsafe { CreateJobObjectW(None, None) }.map_err(io::Error::other)?);
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
@@ -894,6 +941,10 @@ impl PrivateStation {
             closed: false,
             reaped: false,
             close_attempted: false,
+            #[cfg(feature = "native-probe-witness")]
+            witness_desktop: None,
+            #[cfg(feature = "native-probe-witness")]
+            witness_desktop_error: None,
         };
         let started = result.start(&request);
         diagnostic(
@@ -1005,13 +1056,20 @@ impl PrivateStation {
         )?;
         // 报文只给首段地址空间中的源值；仅内核 DuplicateHandle 新生成的本地句柄可接管。
         let mut duplicated = HANDLE::default();
+        let access = PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE;
+        #[cfg(feature = "native-probe-witness")]
+        let access = if request.witness_desktop {
+            access | PROCESS_DUP_HANDLE
+        } else {
+            access
+        };
         unsafe {
             DuplicateHandle(
                 first,
                 HANDLE(second.source_handle as usize as *mut c_void),
                 GetCurrentProcess(),
                 &mut duplicated,
-                (PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE).0,
+                access.0,
                 false,
                 DUPLICATE_HANDLE_OPTIONS(0),
             )
@@ -1048,6 +1106,31 @@ impl PrivateStation {
             Snapshot::capture(process)? == second.process && alive(process)?,
             "窗口站授权持有者已退出",
         )?;
+        #[cfg(feature = "native-probe-witness")]
+        if request.witness_desktop {
+            // 只有原 helper 报出的实际持有对象参与比较，不按桌面名称重新打开。
+            if let Some(source) = ready
+                .witness_desktop_handle
+                .filter(|value| *value > 0 && *value < isize::MAX as u64)
+            {
+                let mut desktop = HANDLE::default();
+                let result = unsafe {
+                    DuplicateHandle(
+                        process,
+                        HANDLE(source as usize as *mut c_void),
+                        GetCurrentProcess(),
+                        &mut desktop,
+                        0,
+                        false,
+                        DUPLICATE_SAME_ACCESS,
+                    )
+                };
+                match result {
+                    Ok(()) => self.witness_desktop = Some(WitnessDesktop(Some(desktop.0 as usize))),
+                    Err(error) => self.witness_desktop_error = Some(error.code().0),
+                }
+            }
+        }
         save(self.root.path(), "ready.json", &ready)?;
         self.startup = wide(format!("{}\\{}", ready.station, ready.desktop).as_ref())?;
         self.phase = "ready";
@@ -1058,6 +1141,36 @@ impl PrivateStation {
         unsafe { IsProcessInJob(process, Some(raw(&self.job)), &mut contained) }
             .map_err(io::Error::other)?;
         require(contained.as_bool(), "窗口站引导进程不在本次严格 Job")
+    }
+    #[cfg(feature = "native-probe-witness")]
+    pub(super) fn native_witness_desktop(&self) -> io::Result<HDESK> {
+        require(!self.closed && !self.reaped, "取证桌面所有者已清理")?;
+        let process = self
+            .second
+            .as_ref()
+            .ok_or_else(|| invalid("取证桌面原所有者缺失"))?;
+        let expected = self
+            .second_identity
+            .as_ref()
+            .ok_or_else(|| invalid("取证桌面原身份缺失"))?;
+        self.verify_member(raw(process))?;
+        require(
+            Snapshot::capture(raw(process))? == *expected && alive(raw(process))?,
+            "取证桌面原所有者身份变化",
+        )?;
+        self.root.verify()?;
+        self.image.lease.verify()?;
+        if let Some(code) = self.witness_desktop_error {
+            return Err(io::Error::other(windows::core::Error::from_hresult(
+                HRESULT(code),
+            )));
+        }
+        let handle = self
+            .witness_desktop
+            .as_ref()
+            .and_then(|desktop| desktop.0)
+            .ok_or_else(|| invalid("取证桌面对象未取得"))?;
+        Ok(HDESK(handle as *mut c_void))
     }
     pub(super) fn configure_startup(&mut self, startup: &mut STARTUPINFOW) -> io::Result<()> {
         require(
@@ -1120,6 +1233,10 @@ impl PrivateStation {
         Ok(())
     }
     fn release_and_verify(&mut self, deadline: Instant) -> io::Result<()> {
+        #[cfg(feature = "native-probe-witness")]
+        if let Some(desktop) = &mut self.witness_desktop {
+            desktop.close()?;
+        }
         // 进程对象本身可保留主 token；原句柄确认退出后先释放，再核 LSA 会话消失。
         self.first.take();
         self.second.take();
@@ -1161,6 +1278,10 @@ impl PrivateStation {
     }
     fn close_inner(&mut self) -> io::Result<()> {
         require(!self.startup.is_empty(), "窗口站尚未授权完成")?;
+        #[cfg(feature = "native-probe-witness")]
+        if let Some(desktop) = &mut self.witness_desktop {
+            desktop.close()?;
+        }
         self.phase = "request_desktop_close";
         let deadline = Instant::now() + CLEANUP_TIMEOUT;
         let pipe = self
@@ -1402,6 +1523,15 @@ fn helper_second(
         process: identity.clone(),
         station: binding.first.station_name(),
         desktop: request.profile.clone(),
+        #[cfg(feature = "native-probe-witness")]
+        witness_desktop_handle: request
+            .witness_desktop
+            .then(|| {
+                desktop
+                    .witness_handle()
+                    .map(|handle| handle.0 as usize as u64)
+            })
+            .transpose()?,
     })?;
     *phase = "desktop_lifetime";
     let deadline = Instant::now() + LIFETIME;

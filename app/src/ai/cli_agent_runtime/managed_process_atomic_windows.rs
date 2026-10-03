@@ -56,6 +56,16 @@ use super::{
     AtomicDirectoryIdentity, ExpectedFileId, ExpectedFileIdentity, WindowsChildImage, sha256_file,
 };
 
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_creation_witness.rs"]
+mod creation_witness;
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_snapshot.rs"]
+mod native_snapshot;
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_witness.rs"]
+mod native_witness;
+
 const MAX_NATIVE_EXECUTABLE_BYTES: u64 = 1024 * 1024 * 1024;
 const DOS_HEADER_PE_OFFSET: u64 = 0x3c;
 const MAX_PE_HEADER_OFFSET: u64 = 16 * 1024 * 1024;
@@ -181,6 +191,8 @@ pub(super) struct WindowsImageDebugSession {
     root_exit_observed: bool,
     cancellation: Option<Arc<AtomicBool>>,
     npm_diagnostics: Option<NpmProcessDiagnostics>,
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    native_witness: Option<native_witness::NativeWitness>,
     #[cfg(test)]
     loader_trace: Option<loader_tests::LoaderTrace>,
 }
@@ -647,6 +659,8 @@ impl WindowsReplacementLease {
                 .npm_console_host
                 .is_some()
                 .then(NpmProcessDiagnostics::new),
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            native_witness: None,
             #[cfg(test)]
             loader_trace: None,
         })
@@ -817,24 +831,51 @@ impl WindowsImageDebugSession {
         &mut self,
         deadline: Instant,
         timeout_message: &'static str,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))] container: Option<
+            &AppContainerProbe,
+        >,
     ) -> io::Result<DEBUG_EVENT> {
         if self.pending_event.is_some() {
             return Err(error(
                 "managed_process.atomic_windows_debug_event_still_pending",
             ));
         }
-        let diagnostics = self
-            .npm_diagnostics
-            .as_mut()
-            .and_then(|value| value.trace.as_mut());
-        let event = match self.cancellation.as_deref() {
-            Some(cancellation) => wait_for_cancellable_debug_event(
-                deadline,
-                timeout_message,
-                cancellation,
-                diagnostics,
-            )?,
-            None => wait_for_debug_event_until(deadline, timeout_message, diagnostics)?,
+        let event = {
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            let observed = if self.native_witness.is_some()
+                && container.is_some()
+                && self
+                    .npm_diagnostics
+                    .as_ref()
+                    .is_some_and(|value| !value.cleanup)
+            {
+                Some(self.wait_for_native_witness_event(
+                    deadline,
+                    timeout_message,
+                    container.unwrap(),
+                )?)
+            } else {
+                None
+            };
+            #[cfg(not(all(feature = "cli-agent-native-witness", target_arch = "x86_64")))]
+            let observed: Option<DEBUG_EVENT> = None;
+            if let Some(event) = observed {
+                event
+            } else {
+                let diagnostics = self
+                    .npm_diagnostics
+                    .as_mut()
+                    .and_then(|value| value.trace.as_mut());
+                match self.cancellation.as_deref() {
+                    Some(cancellation) => wait_for_cancellable_debug_event(
+                        deadline,
+                        timeout_message,
+                        cancellation,
+                        diagnostics,
+                    )?,
+                    None => wait_for_debug_event_until(deadline, timeout_message, diagnostics)?,
+                }
+            }
         };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
         if let Some(diagnostics) = &mut self.npm_diagnostics {
@@ -889,6 +930,8 @@ impl WindowsImageDebugSession {
             self.initial_breakpoints.remove(&process_id);
             self.child_images.remove(&process_id);
             self.component_images.remove(&process_id);
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            self.native_witness_process_exit(process_id);
             if process_id == self.root_process_id {
                 self.root_exit_observed = true;
             }
@@ -949,6 +992,8 @@ impl WindowsImageDebugSession {
         let event = self.next_event(
             Instant::now() + DEBUG_INITIAL_TIMEOUT,
             "managed_process.atomic_windows_initial_debug_event_timed_out",
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            container,
         )?;
         if event.dwDebugEventCode != CREATE_PROCESS_DEBUG_EVENT
             || event.dwProcessId != root_process_id
@@ -1045,6 +1090,8 @@ impl WindowsImageDebugSession {
             let event = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_session_timed_out",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                container,
             )?;
             let continue_status = match self.validate_event_in_container(&event, container) {
                 Ok(status) => status,
@@ -1085,6 +1132,10 @@ impl WindowsImageDebugSession {
             // 原始线程句柄由 ContinueDebugEvent 在 EXIT_* 时关闭，不能提前释放。
             CREATE_THREAD_DEBUG_EVENT => Ok(DBG_CONTINUE),
             EXCEPTION_DEBUG_EVENT => {
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                if let Some(status) = self.native_witness_exception(event)? {
+                    return Ok(status);
+                }
                 let information = unsafe { event.u.Exception };
                 if information.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT
                     && self.initial_breakpoints.insert(event.dwProcessId)
@@ -1094,7 +1145,10 @@ impl WindowsImageDebugSession {
                     Ok(DBG_EXCEPTION_NOT_HANDLED)
                 }
             }
-            EXIT_THREAD_DEBUG_EVENT | OUTPUT_DEBUG_STRING_EVENT | UNLOAD_DLL_DEBUG_EVENT => {
+            EXIT_THREAD_DEBUG_EVENT | OUTPUT_DEBUG_STRING_EVENT => Ok(DBG_CONTINUE),
+            UNLOAD_DLL_DEBUG_EVENT => {
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                self.native_witness_unload(event)?;
                 Ok(DBG_CONTINUE)
             }
             EXIT_PROCESS_DEBUG_EVENT => Ok(DBG_CONTINUE),
@@ -1133,6 +1187,13 @@ impl WindowsImageDebugSession {
                         dependencies.push(lease);
                     }
                 }
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                self.native_witness_module(
+                    event.dwProcessId,
+                    &file,
+                    information.lpBaseOfDll as u64,
+                    true,
+                )?;
                 Ok(DBG_CONTINUE)
             }
             RIP_EVENT => Err(error("managed_process.atomic_windows_loader_rip_event")),
@@ -1237,6 +1298,8 @@ impl WindowsImageDebugSession {
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             diagnostics.roles.insert(event.dwProcessId, role);
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_create(event, &file, role)?;
         #[cfg(test)]
         if self.loader_trace.is_some() && self.npm_console_host.is_some() && container.is_some() {
             // 仅固定对照在映像、精确 Job 和令牌核验后只读观察；失败不影响事件继续。
@@ -1317,6 +1380,8 @@ impl WindowsImageDebugSession {
             let Ok(next) = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_drain_timed_out",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                None,
             ) else {
                 break;
             };
@@ -1400,6 +1465,8 @@ impl WindowsImageDebugSession {
             let event = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_drain_timed_out",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                container,
             )?;
             match event.dwDebugEventCode {
                 CREATE_PROCESS_DEBUG_EVENT => {
@@ -1441,6 +1508,8 @@ impl WindowsImageDebugSession {
         // 等待失败时保留所有真实句柄；后续 abort 不能用已移除的 EXIT 记录生成空集合成功。
         wait_for_debugged_processes_exit(&self.held_package_processes, deadline)?;
         self.held_package_processes.clear();
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_confirm_exit()?;
         Ok(())
     }
 

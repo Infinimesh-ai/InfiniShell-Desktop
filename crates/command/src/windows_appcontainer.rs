@@ -258,6 +258,12 @@ impl Drop for Attributes {
 #[path = "windows_appcontainer_desktop.rs"]
 pub(super) mod desktop;
 
+#[cfg(feature = "native-probe-witness")]
+#[path = "windows_appcontainer_witness.rs"]
+mod witness;
+#[cfg(feature = "native-probe-witness")]
+pub use witness::NativeWitnessProcess;
+
 /// 除固定 --version 外不接受其他参数；进程在 token 与严格 Job 核对前始终挂起。
 pub struct AppContainerProbe {
     profile_name: Vec<u16>,

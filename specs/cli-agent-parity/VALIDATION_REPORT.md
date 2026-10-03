@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Windows 原生停滞取证接入，原源码门禁终审
+
+新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。原fcd的[37074002886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37074002886)已自然结束为failure；两份官方ZIP大小、摘要和CRC均核验。Windows全日志5041次普通PASS、预期28项逐名PASS，i18n22次执行／11唯一；唯一失败仍为步骤44旧平台拒绝断言，三次尝试共两次自动重试，无LEAK/FLAKY/TIMEOUT。完整Windows日志SHA `54e6ba6524c53b110882c90e6ccc45168da62435986eb19ee5a0e968447248e0`，终审索引 `129e2d87ce557eaf5d49e56d5c671a8538741ac496697c8197a00060efe66a2c`；Linux旧编译失败保留，873修复复验通过。ce6的Windows断言修正仍待目标复验。
+
+基于ce6接入默认关闭的原生取证功能，仅专用测试显式选择的首个固定Codex npm CMD generation可启用。使用原Job内身份复核后的进程、线程、已验证映像句柄及原helper持有的实际桌面；原调试线程一次采集取消前上下文和有界栈，核验实际CMD创建入口／返回并恢复调试寄存器，映像卸载先撤销断点。只输出结构化身份、映像摘要／偏移及数值错误，不输出原始栈、路径、环境或参数；未知身份和恢复失败仍走原严格清理。不修改子进程权限、令牌、产品超时或通过条件。此为根因取证接入，尚非原生修复或G09关闭；20文件冻结索引 `05074a741d6e2e8b5b285ae32870c6488905372acd9abae8cc6a58d6c320318a`。
+
+冻结后本机check `r-3ys3j6i0`通过，定向377普通PASS、i18n11项、Python16项及workflow作用域检查通过；command的Windows目标交叉check通过。应用完整Windows交叉check在aws-lc构建因本机缺windows.h/SDK失败，尚未检查应用代码，不重复该环境。22项Windows纯测试仅通过元数据编译，25项实际执行及应用接线编译仍待runner。各本机短根均已核验清理；本地门禁索引 `728251fe1f54eb6e3200e87474964b2d21340f2b42797f8995ac51bff8bf2f21`，仓外 `g09-native-witness-integration-v1`。无需本地化变更：内部诊断、编译开关与专用验收入口不改变英中界面、错误语义或布局。
+
+下一轮只选择同一首CMD候选，先执行25项原生纯测试及ce6降级断言，再获取创建返回、线程和桌面对象证据，不重复全矩阵。G09另一固定Codex hooks失败经CPython3.13.15与固定Codex源码核查，确认关闭错误被吞、关闭与等待计时混合；但刷新异常仍关闭底层，不能据此断言stdin写端泄漏，仍缺服务端收到EOF后的阶段证据。G03真实Finder拖放仍待完成；当前两项原生失败不能归结为设备缺失。
+
 ## 2026-10-03：Linux 修复复验通过，Windows 平台拒绝断言修正
 
 新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。精确 `873a7eb44ce754d2efd36ed859f1e970769e3d62` 的 [37076566107](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37076566107) Linux源码门禁成功：5427普通PASS，新增/增强17项逐名通过，另rust-genai 81项通过；无FAIL/LEAK/RETRY/FLAKY/TIMEOUT。updates275，i18n22次执行／11唯一；步骤范围与770一致。两个官方ZIP的API大小、SHA及CRC全部核验，最终索引 `228a6a620d06bffd284f56616d3e2f08cf45817544fbf210ae605513e248e583`，完整日志 `7b0e0e84c6a802afdd361f2c48ec9bb1b88b0505fe63d66a1372a003c8fc2acb`。Windows/macOS未选择；远端辅助临时根因ValueError仍retained、cleanup_ready=false，不称清理完成。此轮只证明源码门禁，不覆盖原生专项失败。

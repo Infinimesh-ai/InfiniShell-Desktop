@@ -480,6 +480,8 @@ pub(super) fn execute(
     let mut debugger = executable.prepare_image_debug_session()?;
     debugger.bind_cancellation(cancellation);
     debugger.bind_package_diagnostics(manifest.generation);
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    debugger.bind_native_witness(manifest.generation, input.mode());
     let spawn_started = Instant::now();
     let spawned = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
         executable.execution_path(),
@@ -505,6 +507,10 @@ pub(super) fn execute(
     }
     record_phase("cleanup_before", started, None);
     // 派生后任何失败都保留原事件状态；先请求终止精确 Job，才允许继续未验证事件。
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    if result.is_err() {
+        debugger.note_native_witness_cancel();
+    }
     let termination = match &result {
         Ok(_) => Ok(()),
         Err(_) => terminate_package_probe(&process, &mut debugger),
@@ -517,6 +523,8 @@ pub(super) fn execute(
         Ok(()) => record_phase("cleanup_complete", started, None),
         Err(failure) => record_phase("cleanup_failed", started, Some(failure)),
     }
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    debugger.record_native_witness_result();
     drop(handles);
     drop(bootstrap);
     drop(bootstrap_handle);

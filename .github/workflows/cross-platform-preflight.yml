@@ -104,6 +104,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_windows_npm_native_witness:
+        description: 仅固定 Codex npm 首 CMD 候选的取消前原生因果取证；不计完整验收
+        required: true
+        default: false
+        type: boolean
       run_grok_npm_updates:
         description: Linux 私有 npm 安装的 Grok 1.0.41 后端更新事务及中断恢复
         required: true
@@ -175,6 +180,12 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("run_windows_npm_native_witness", False):
+              required = {"run_windows", "windows_grok_installer_only", "run_windows_codex_npm_updates", "run_windows_npm_native_witness"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "all", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name, False) for name in required):
+                  sys.exit("原生因果取证只允许单独 Windows 首 CMD 范围：" + ", ".join(sorted(conflicts)))
           if not inputs.get("source_gate_only", False):
               sys.exit(0)
           allowed = {"source_gate_only", "run_linux", "run_windows"}
@@ -1221,7 +1232,7 @@ jobs:
 
       # 安装器补验跳过无关 CLI 的离线合集，仅保留固定 Grok 获取前置。
       - name: Test fixed Grok preparation for installer-only verification
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
+        if: ${{ !inputs.run_windows_npm_native_witness && github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -1347,7 +1358,7 @@ jobs:
 
       - name: Prepare fixed native Grok without credentials
         id: fixed_grok
-        if: ${{ !inputs.source_gate_only && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.run_windows_npm_native_witness && !inputs.source_gate_only && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1592,7 +1603,10 @@ jobs:
         id: check_app
         if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
-        run: cargo check -p warp --lib
+        run: |
+          $arguments = @('check', '-p', 'warp', '--lib')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'cli-agent-native-witness') }
+          cargo @arguments
 
       - name: Build fixed Grok terminal bridge from public source on Windows
         id: grok_native_bridge_source
@@ -1766,7 +1780,10 @@ jobs:
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
-        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::station_bootstrap::tests::)'
+        run: |
+          $arguments = @('nextest', 'run', '--no-fail-fast', '-p', 'command', '--lib', '-E', 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::station_bootstrap::tests::)')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'native-probe-witness') }
+          cargo @arguments
 
       - name: Diagnose unnamed Windows station without changing the production probe
         if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
@@ -1892,7 +1909,10 @@ jobs:
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
-        run: cargo build -p warp_tui --bin infinishell-tui -p command --bin infinishell-station-bootstrap
+        run: |
+          $arguments = @('build', '-p', 'warp_tui', '--bin', 'infinishell-tui', '-p', 'command', '--bin', 'infinishell-station-bootstrap')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'warp/cli-agent-native-witness,command/native-probe-witness') }
+          cargo @arguments
 
       # 真实 npm 生成私有安装登记和入口；不改写用户前缀、凭据或执行策略。
       - name: Verify fixed Windows Codex npm update transactions without credentials
@@ -1904,10 +1924,22 @@ jobs:
           PYTHONUTF8: "1"
         run: |
           $ErrorActionPreference = 'Stop'
-          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          $arguments = @('test', '-p', 'warp', '--lib', '--no-run', '--message-format=json')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'cli-agent-native-witness') }
+          $buildMessages = cargo @arguments
           if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
           $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
           if ($executables.Count -ne 1) { throw 'Expected exactly one same-commit warp libtest executable' }
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') {
+            $unitBinary = $executables[0]
+            $listedTests = @(& $unitBinary --list)
+            if ($LASTEXITCODE -ne 0) { throw 'Witness unit test discovery failed' }
+            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'sources::claude_downgrade::tests::')) {
+              if (@($listedTests | Where-Object { $_.Contains($filter) -and $_.EndsWith(': test') }).Count -eq 0) { throw "Missing witness unit group: $filter" }
+              & $unitBinary $filter --test-threads=1
+              if ($LASTEXITCODE -ne 0) { throw "Witness unit group failed: $filter" }
+            }
+          }
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'Same-commit supervisor lookup failed' }
           $parityFixture = Join-Path $env:RUNNER_TEMP ('infinishell-codex-npm-' + [guid]::NewGuid().ToString())
@@ -1932,7 +1964,9 @@ jobs:
           $nodePath = (Get-Command node.exe -CommandType Application).Source
           $npmPath = Join-Path (Split-Path -Parent $nodePath) 'node_modules/npm/bin/npm-cli.js'
           if (-not (Test-Path -LiteralPath $npmPath -PathType Leaf)) { throw 'Fixed Node npm entry is missing' }
-          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --station-bootstrap $stationBootstrap --station-bootstrap-sha256 (Get-ParityDigest $stationBootstrap) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath)
+          $witnessArguments = @()
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $witnessArguments = @('--native-witness', '--case', 'updated') }
+          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --station-bootstrap $stationBootstrap --station-bootstrap-sha256 (Get-ParityDigest $stationBootstrap) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath) @witnessArguments
           if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm transaction failed; original receipts are preserved' }
 
       - name: Preserve Windows Codex npm update receipts

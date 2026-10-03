@@ -29,13 +29,36 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
         image: PathBuf::from(r"C:\bootstrap.exe"),
         image_size: 5,
         image_sha256: "b".repeat(64),
+        #[cfg(feature = "native-probe-witness")]
+        witness_desktop: false,
     };
     let ready = Ready {
         nonce: request.nonce.clone(),
         process: second.clone(),
         station: first.station_name(),
         desktop: request.profile.clone(),
+        #[cfg(feature = "native-probe-witness")]
+        witness_desktop_handle: None,
     };
+    #[cfg(feature = "native-probe-witness")]
+    {
+        // 取证构建未显式启用时，正常引导报文仍与旧版本逐字段兼容。
+        let request_wire = serde_json::to_value(&request).unwrap();
+        let ready_wire = serde_json::to_value(&ready).unwrap();
+        assert!(request_wire.get("witness_desktop").is_none());
+        assert!(ready_wire.get("witness_desktop_handle").is_none());
+        assert!(
+            !serde_json::from_value::<Request>(request_wire)
+                .unwrap()
+                .witness_desktop
+        );
+        assert!(
+            serde_json::from_value::<Ready>(ready_wire)
+                .unwrap()
+                .witness_desktop_handle
+                .is_none()
+        );
+    }
     validate_ready(&request, &first, &second, &ready).unwrap();
     for changed in [
         Ready {

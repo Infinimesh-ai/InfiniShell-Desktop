@@ -10,6 +10,8 @@ use warp_errors::report_error;
 #[path = "windows_appcontainer.rs"]
 mod appcontainer;
 pub use appcontainer::AppContainerProbe;
+#[cfg(feature = "native-probe-witness")]
+pub use appcontainer::NativeWitnessProcess;
 
 #[path = "windows_station_bootstrap.rs"]
 mod station_bootstrap;

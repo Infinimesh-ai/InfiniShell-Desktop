@@ -353,6 +353,12 @@ impl NewLogonDesktop {
         verify_object(HANDLE(desktop.0), &self.desktop_sd, false)
     }
 
+    #[cfg(feature = "native-probe-witness")]
+    pub(in crate::windows) fn witness_handle(&self) -> io::Result<HDESK> {
+        self.verify()?;
+        self.desktop.ok_or_else(|| invalid("取证桌面已关闭"))
+    }
+
     pub(in crate::windows) fn close(&mut self) -> io::Result<()> {
         // 只恢复同一新站的初始桌面；不切换窗口站，也不关闭借用的初始句柄。
         self.restore()?;

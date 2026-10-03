@@ -24,6 +24,9 @@ CASES = ("updated", "old_moved", "published_receipt_missing", "external_change_p
 COLD_CASES = CASES[1:4]
 TEST = "terminal::cli_agent_updates::sources::npm_windows::live_tests::real_codex_windows_npm_update_without_model"
 SOURCE_FILES = (
+    ".github/workflows/cross-platform-preflight.yml",
+    "app/Cargo.toml",
+    "crates/command/Cargo.toml",
     "app/src/terminal/cli_agent_updates.rs",
     *["app/src/terminal/cli_agent_updates/" + name for name in (
         "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_codex_windows.rs",
@@ -31,10 +34,16 @@ SOURCE_FILES = (
         "sources_codex_npm_windows_live_tests.rs")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
         "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
+        "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_creation_witness_tests.rs",
+        "managed_process_atomic_windows_snapshot.rs", "managed_process_atomic_windows_snapshot_tests.rs",
+        "managed_process_atomic_windows_witness.rs", "managed_process_atomic_windows_witness_tests.rs",
         "managed_process_npm_probe_windows.rs")],
+    "crates/command/src/windows.rs",
     "crates/command/src/windows_appcontainer.rs",
+    "crates/command/src/windows_appcontainer_witness.rs",
     "crates/command/src/windows_appcontainer_desktop.rs",
     "crates/command/src/windows_station_bootstrap.rs",
+    "crates/command/src/windows_station_bootstrap_tests.rs",
     "crates/command/src/bin/infinishell-station-bootstrap.rs",
     "script/cli-agent-parity/codex_0156_package_manifest.json",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
@@ -309,11 +318,14 @@ def parser():
         result.add_argument("--" + role, type=Path, required=True)
         result.add_argument("--" + role + "-sha256", required=True)
     result.add_argument("--case", choices=CASES, action="append")
+    result.add_argument("--native-witness", action="store_true",
+                        help="仅首个 updated CMD 候选的一次原生因果取证；不视为完整验收")
     return result
 
 
 def main():
     args = parser().parse_args()
+    require(not args.native_witness or args.case == ["updated"], "witness_requires_one_updated_case")
     require(platform.system() == "Windows" and platform.machine().lower() in ("amd64", "x86_64"), "windows_x64_only")
     args.repo = canonical(args.repo)
     args.official_inputs = canonical(args.official_inputs) if args.official_inputs else None
@@ -353,7 +365,9 @@ def main():
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=args.repo, text=True, encoding="utf-8")
     write(args.output / "source.safe.json", {"commit":revision,"source_sha256":sources,"binaries":binaries,
         "working_tree_dirty":bool(status.strip()),"npm_version":manager_manifest.get("version"),"cmd_shim_registrations":shim_sources,
-        "platform":"windows-x64","consumer_channel_discovery_covered":False})
+        "platform":"windows-x64","consumer_channel_discovery_covered":False,
+        "native_witness_requested":args.native_witness,
+        "native_witness_scope":"first_codex_cmd_generation" if args.native_witness else None})
     cache = args.output / "official-inputs"
     cache.mkdir()
     packages = {version:official_package(version, cache, args.official_inputs) for version in INTEGRITIES}
@@ -363,7 +377,10 @@ def main():
     for case in args.case or CASES:
         require(shutil.disk_usage(args.output).free > 4 * 1024**3, "fixture_space_insufficient")
         root, manifest = fixture(args, case, binaries, sources, old, manager_tree, system_root)
-        run_test(binaries["worker"]["path"], TEST, root / "project", environment(root, binaries, system_root, "execute"), root / "execute", True)
+        execute_environment = environment(root, binaries, system_root, "execute")
+        if args.native_witness:
+            execute_environment["INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"] = "codex-npm-first-cmd-v1"
+        run_test(binaries["worker"]["path"], TEST, root / "project", execute_environment, root / "execute", True)
         result = json.loads((root / "result-execute.safe.json").read_bytes())
         if case in COLD_CASES:
             require(result.get("needs_cold_recovery") is True and result.get("accepted") is False, "checkpoint_not_observed")
@@ -378,6 +395,7 @@ def main():
                 and inventory(manager_root) == manager_tree, "source_or_manager_changed_during_run")
         cases.append({"case":case,"root":str(root),"result":result})
     write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"cases":cases,"model_inputs_sent":0,
+        "native_witness_requested":args.native_witness,"full_case_matrix_covered":not args.native_witness and not args.case,
         "fixed_release_test_hook_used":True,"consumer_channel_discovery_covered":False,"gui_covered":False,
         "busy_or_plugin_recheck_covered":False,"private_npm_registration_executed":True,
         "npm_lifecycle_executed":False,"npm_installer_tree_cleanup_covered":False,

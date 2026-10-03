@@ -10,6 +10,7 @@ name = "infinishell-station-bootstrap"
 path = "src/bin/infinishell-station-bootstrap.rs"
 
 [features]
+native-probe-witness = []
 test-util = ["windows/Win32_System_StationsAndDesktops", "windows/Win32_Graphics_Gdi"]
 
 [dependencies]
