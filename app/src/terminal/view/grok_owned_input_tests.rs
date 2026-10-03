@@ -588,15 +588,20 @@ fn owned_grok_open_composer_routes_image_drops_without_pty_write() {
 
 #[test]
 fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
-    grok_file_drop_event_reaches_batch_guard_before_editor(false);
+    grok_file_drop_event_reaches_batch_guard_before_editor(false, false);
 }
 
 #[test]
 fn native_bridge_grok_file_drop_event_reaches_batch_guard_before_editor() {
-    grok_file_drop_event_reaches_batch_guard_before_editor(true);
+    grok_file_drop_event_reaches_batch_guard_before_editor(true, false);
 }
 
-fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool) {
+#[test]
+fn native_bridge_grok_first_file_drop_opens_composer_and_attaches_image() {
+    grok_file_drop_event_reaches_batch_guard_before_editor(true, true);
+}
+
+fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool, start_closed: bool) {
     App::test((), move |mut app| async move {
         let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
         let _images = FeatureFlag::ImageAsContext.override_enabled(true);
@@ -621,6 +626,17 @@ fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool) {
         std::fs::write(&other, b"not an image").unwrap();
 
         let editor_position_id = terminal.update(&mut app, |view, ctx| {
+            if start_closed {
+                // 首次开框前仍有启动命令，不能用空白编辑器掩盖图片选项尚未同步。
+                view.model.lock().enter_alt_screen(true);
+                view.input.update(ctx, |input, ctx| {
+                    input.set_input_mode_terminal(false, ctx);
+                    input.replace_buffer_content("grok", ctx);
+                });
+                view.redetermine_terminal_focus(ctx);
+                assert!(!view.is_cli_agent_rich_input_open(ctx));
+                return view.content_element_position_id.clone();
+            }
             view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
             let editor = view.input.as_ref(ctx).editor().clone();
             ctx.focus(&editor);
@@ -628,7 +644,20 @@ fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool) {
             view.input.as_ref(ctx).editor_save_position_id()
         });
         terminal.read(&app, |view, ctx| {
-            assert!(view.input.as_ref(ctx).editor().is_focused(ctx));
+            if start_closed {
+                assert!(!view.is_cli_agent_rich_input_open(ctx));
+                assert!(
+                    !view
+                        .input
+                        .as_ref(ctx)
+                        .editor()
+                        .as_ref(ctx)
+                        .image_context_options
+                        .is_enabled()
+                );
+            } else {
+                assert!(view.input.as_ref(ctx).editor().is_focused(ctx));
+            }
         });
 
         let (mixed_reported, mixed_notification) = oneshot::channel();
@@ -724,12 +753,66 @@ fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool) {
         });
         drop_files(&mut app, vec![first.to_string_lossy().into_owned()]);
         received_event_at(received, "窗口拖放：有效首图入卡").await;
+        let mut expected_draft = if start_closed { "" } else { &original_draft };
+        let mut expected_images = 1;
         terminal.read(&app, |view, ctx| {
+            assert!(view.is_cli_agent_rich_input_open(ctx));
             let images = view.ai_context_model.as_ref(ctx).pending_images();
             assert_eq!(images.len(), 1);
             assert_eq!(images[0].file_name, "first.png");
-            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), original_draft);
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), expected_draft);
         });
+
+        if start_closed {
+            terminal.update(&mut app, |view, ctx| {
+                view.input.update(ctx, |input, ctx| {
+                    input.replace_buffer_content("隐藏后保留图片草稿", ctx);
+                });
+                view.close_cli_agent_rich_input_and_disable_auto_toggle(ctx);
+            });
+            terminal.read(&app, |view, ctx| {
+                assert!(!view.is_cli_agent_rich_input_open(ctx));
+                assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 1);
+            });
+            let (attached, received) = oneshot::channel();
+            let mut attached = Some(attached);
+            app.update(|ctx| {
+                ctx.subscribe_to_model(&context, move |model, event, ctx| {
+                    if matches!(event, BlocklistAIContextEvent::UpdatedPendingContext { .. })
+                        && model.as_ref(ctx).pending_images().len() == 2
+                        && let Some(attached) = attached.take()
+                    {
+                        attached.send(()).unwrap();
+                    }
+                });
+                let mut updated = EntityIdSet::default();
+                for view_id in ctx.view_ids_for_window(window_id) {
+                    updated.insert(view_id);
+                }
+                presenter.borrow_mut().invalidate(
+                    WindowInvalidation {
+                        updated,
+                        ..Default::default()
+                    },
+                    ctx,
+                );
+                presenter
+                    .borrow_mut()
+                    .build_scene(vec2f(1024., 768.), 1., None, ctx);
+            });
+            drop_files(&mut app, vec![second.to_string_lossy().into_owned()]);
+            received_event_at(received, "窗口拖放：隐藏后保留首图并追加第二图").await;
+            expected_draft = "隐藏后保留图片草稿";
+            expected_images = 2;
+            terminal.read(&app, |view, ctx| {
+                assert!(view.is_cli_agent_rich_input_open(ctx));
+                let images = view.ai_context_model.as_ref(ctx).pending_images();
+                assert_eq!(images.len(), 2);
+                assert_eq!(images[0].file_name, "first.png");
+                assert_eq!(images[1].file_name, "second.png");
+                assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), expected_draft);
+            });
+        }
 
         terminal.update(&mut app, |view, _| {
             if native_bridge {
@@ -741,8 +824,11 @@ fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool) {
         drop_files(&mut app, vec![second.to_string_lossy().into_owned()]);
         received_event_at(unavailable_notification, "窗口拖放：失效目标拒绝通知").await;
         terminal.read(&app, |view, ctx| {
-            assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 1);
-            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), original_draft);
+            assert_eq!(
+                view.ai_context_model.as_ref(ctx).pending_images().len(),
+                expected_images
+            );
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), expected_draft);
         });
         assert_eq!(writes.load(Ordering::SeqCst), 0);
     });

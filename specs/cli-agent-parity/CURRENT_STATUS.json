@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03授权CGEvent跨应用仍未交付。Mac消费者和英中功能链已齐。精确50c64e9e3的Windows首CMD仍ProbeFailed（0通过/1失败，366.85秒），PowerShell未到达。原生TMP/TEMP实际283 UTF16单元、偏离构造208；早期GetTempPathW不足重试status=0xc0000023，Length=MaximumLength=566字节，六项代码/IAT均匹配。微软确认AppContainer会重定向临时目录，实际路径字符串及具体改写调用点未采；已实现原生profile路径绑定、提交前Mac门禁通过，仍待Windows真实成功及最终源码门禁，G09不关闭。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03人工拖放已确认富框展开时正常，但新会话第一次拖图仅展开富框而丢失附件，首拖初始化已修复并通过本机回归，待新构建实窗和最终源码门禁，未关闭。精确d5ec5dbc9的Windows原生profile修复已越过旧CMD停滞：Node实际进入模块加载，随后lstat卷根C:\\返回EPERM，约2.5秒退出1；真实更新仍0通过/1失败，PowerShell未到达。零能力AppContainer所需受限路径元数据能力及最终源码门禁待完成，未再次运行相近候选。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -9042,5 +9042,68 @@
     "localization": "无需本地化变更：内部原生路径错误仍经原ProbeFailed英中映射；无用户文案或布局变化，i18n11项通过。",
     "remaining": "Windows编译、新回归、KnownFolder token权限/路径映射和真实CMD及PowerShell更新尚待同提交运行；Mac检查不代替Windows执行。G03跨应用拖放独立开放，最终两平台源码门禁未完成。",
     "independent_source_review_sha256": "1e32229409362fe6dc025ce9fd23c0d264721240a7c793445a2adf1ef34c76ee"
+  },
+  "g03_manual_first_drop_20261004": {
+    "status": "open",
+    "host_source_commit": "69c17fce39bf5ae849e33b1a20d839f97efd38ce",
+    "run_id": "r-zvc31qhz",
+    "native_version": "1.0.41+infinishell.session-notifications.5",
+    "evidence_sha256": "faf8751e3e68ec41dcbdbe9119e78639135886d45d559ba2d40248a86c5df517",
+    "user_screenshot_sha256": "f9da8e77200e53af1da591108059c78c6a7bd21b6bb1c4425249d1c1cba06f89",
+    "accepted_boundary": "用户确认直接富框拖放，以及富框已展开时的上方终端区域拖放均出现图片卡；1.0.46另列观察，不充作固定工件证据。",
+    "new_defect": "新会话尚未打开Rich Input时，第一次拖图仅展开富框没有图片卡；第二次及初始化后隐藏再拖正常。",
+    "native_input_submitted_by_agent": false,
+    "native_ack_count": 0,
+    "remaining": "修复首次自动开框的附件初始化顺序，新会话真实复验、正确会话和图片字节、英中审计及最终源码门禁。",
+    "gap_closed": false
+  },
+  "g09_native_profile_runtime_20261004": {
+    "status": "open",
+    "source_commit": "d5ec5dbc961efe1e7725673d9c2ddadf304e3555",
+    "run_id": 37132673681,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37132673681",
+    "conclusion": "failure",
+    "ordinary_pass": 1153,
+    "feature_tests_ok": 68,
+    "actual_update": {
+      "passed": 0,
+      "failed": 1,
+      "duration_seconds": 85.85,
+      "generation": "0034a6b6-1bc3-4a14-bba5-6953f80c24b2",
+      "node_create_ms": 2049,
+      "node_exit_ms": 2489,
+      "cmd_exit_ms": 2497,
+      "native_exit_code": 1,
+      "cancel_observed": false,
+      "error": "EPERM",
+      "errno": -4048,
+      "syscall": "lstat",
+      "object": "C:\\",
+      "powershell_reached": false
+    },
+    "boundary": "Node实际进入CJS模块加载；本轮未停至旧300秒期限，未采新TMP/TEMP值或长度，不沿用旧283单元。CP936拒绝访问首行仍未独立归属具体调用。",
+    "source_files_verified": 35,
+    "debug_events_received_validated_continued": 113,
+    "root_review_sha256": "02620a0911358784504c014155f521d657591939630136f6269167ec6b6e7b64",
+    "independent_review_sha256": "a7758755bcf90e462ba0cd73a16d202ff62eb98e826c4673c87e442c739fa47a",
+    "full_log_sha256": "c36dad299d7b0a6ce9ee6c4d95cbc54812698f46e7f736580cda8cd079d1408c",
+    "cleanup": "同代Job空、AppContainer删除、私有站及LSA消失和helper退出获证；整个远端夹具根删除未证。",
+    "remaining": "保持固定Node/shim、零capability和共享ACL不变，补必要路径规范化能力，证明CMD/PowerShell真实更新及最终源码门禁。",
+    "same_candidate_retried": false,
+    "gap_closed": false
+  },
+  "g03_first_drop_fix_20261004": {
+    "status": "implemented_pending_real_gui_and_source_gates",
+    "source_files_sha256": {
+      "app/src/terminal/input.rs": "b450ad04ec032748a768fbe5a74786a485c893f247abbe76d58bf631428dfc68",
+      "app/src/terminal/view/grok_owned_input_tests.rs": "426d17d3b933f79050aba9d2c453342f4b112847498220f3e7f3916a0deaadf0"
+    },
+    "local_gate_receipt_sha256": "1df6ca6d131d6341fd3265608661c07270e1cf7f07769942bbcf1289c64f1dc4",
+    "framework_regressions_passed": 121,
+    "i18n_tests_passed": 11,
+    "cargo_check": "passed",
+    "localization": "无需本地化变更：无新增文案/键/布局；英中既有图片、非图片和失效目标文案复核一致，i18n11项通过。",
+    "remaining": "精确新构建首次真实拖放及最终两平台源码门禁。",
+    "gap_closed": false
   }
 }

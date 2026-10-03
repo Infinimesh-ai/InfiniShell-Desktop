@@ -11482,6 +11482,12 @@ impl Input {
             return 0;
         }
 
+        // 首次拖放会先打开 CLI 富输入，但打开通知尚未刷新编辑器的图片选项。
+        // 运行中的启动命令仍占据缓冲，不能依赖下方空缓冲分支完成初始化。
+        if CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id) {
+            self.update_image_context_options(ctx);
+        }
+
         self.maybe_enter_agent_view_for_image_add(ctx);
 
         let num_images_to_attach = self.check_image_limits_for_paste(image_filepaths.len(), ctx);
