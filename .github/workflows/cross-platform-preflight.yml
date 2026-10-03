@@ -120,7 +120,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 原生调试范围；g09_tokens 验证 NUL/私有桌面，g09_netcredentials 验证两段窗口站，codex_hooks 仅复验固定 0.156.1 hooks
+        description: Windows 专项范围；g09_image_contract 只读固定系统映像，其他选项保留原生调试或 hooks 验证
         required: true
         default: all
         type: choice
@@ -131,6 +131,7 @@ on:
           - g09_tokens
           - g09_netcredentials
           - codex_hooks
+          - g09_image_contract
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -181,6 +182,12 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("windows_atomic_debug_scope") == "g09_image_contract":
+              required = {"run_windows"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or inputs.get("run_windows") is not True:
+                  sys.exit("固定系统映像静态取证只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
           if inputs.get("windows_atomic_debug_scope") == "codex_hooks":
               required = {"run_windows", "run_atomic_windows_debug"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -1092,6 +1099,34 @@ jobs:
           [[ "$version" == *"$EXPECTED_TAG"* ]]
           test -d resources
 
+  windows_g09_image_contract:
+    name: Windows fixed system image contract
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope == 'g09_image_contract' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 只保存与 b3 原代次摘要一致的四个固定候选，不执行映像或原生探针。
+      - name: Collect fixed Windows system images without executing them
+        shell: pwsh
+        timeout-minutes: 3
+        run: ./script/ci/collect_g09_windows_images.ps1
+
+      - name: Preserve fixed system image bytes and mismatch evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: g09-windows-image-contract-${{ github.sha }}
+          path: ${{ runner.temp }}/g09-image-contract-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
   windows_codex_hooks:
     name: Windows fixed Codex 0.156.1 hooks
     needs: validate_scope
@@ -1152,7 +1187,7 @@ jobs:
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks')
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract')
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:
