@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；234 Windows编译与普通回归已过，原生结果待取得；另修复退出获证后的取证句柄释放并过本机门禁，目标待验；首CMD停滞和Codex退出失败仍开放",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；234 Windows普通1138项通过，但取证feature测试编译失败，首CMD未执行；三处测试接线与诊断输出已修并过本机门禁，目标待验；原生停滞和Codex退出失败仍开放",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1556,6 +1556,28 @@
       "live_run_observed": "Windows编译、普通生命周期回归、command归属及CLI监督程序构建成功，进入限定npm原生步骤；libtest、25项取证及实际候选结果仍待取得",
       "target_recheck": "pending",
       "localization": "无需本地化变更：仅内部取证对象生命周期，不改变英中用户文案、错误语义或布局",
+      "gaps_closed": []
+    },
+    "g09_native_witness_test_wiring_fix_20261003": {
+      "base_commit": "ad20f3c015cbf18bfb4dfed8eb2d94adbfdf28c3",
+      "failed_run": 37086236420,
+      "failed_commit": "234dbf7776587bd32f302e5050aed61a9a889bd2",
+      "terminal_index_sha256": "5c0ad94045b480012d22ca013192f17e179a5393175ef577d7e1608ea2665607",
+      "ordinary_pass": 1138,
+      "ordinary_ce6_tests_pass": 11,
+      "ordinary_i18n_tests_pass": 11,
+      "witness_25_tests_executed": false,
+      "native_candidate_executed": false,
+      "hidden_ci_diagnostics_recovered": false,
+      "source_fix": "一个测试构造字段及两个条件参数按生产相同cfg补None；保留原断言和门禁；该构建诊断交Cargo直接渲染",
+      "source_index_sha256": "a5d2fabefc3a8954f99c728e5e39fd94935b9301779f85fe6b05b77f77b7ce49",
+      "local_gate_sha256": "f73990142a626c5c4819f3935d2595a33ae9128068049b7b3782c6716cdf6a8f",
+      "local_cargo_check": true,
+      "local_i18n_pass": 11,
+      "workflow_scope_cases": 6,
+      "short_roots_cleaned": true,
+      "windows_recheck": "pending",
+      "localization": "无需本地化变更：仅测试接线和CI诊断输出，无用户文案或布局变化",
       "gaps_closed": []
     }
   },

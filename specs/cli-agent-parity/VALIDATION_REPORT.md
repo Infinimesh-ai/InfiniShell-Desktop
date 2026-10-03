@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：修复取证 feature 的测试接线，保留编译诊断
+
+新增关闭0项。精确234dbf777的[37086236420](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37086236420)已结束为failure：普通warp 1095与command 43，共1138项PASS，含ce6降级11项及i18n 11项各一次，无测试FAIL/LEAK/RETRY/FLAKY；取证feature的libtest构建汇总3 errors，25项取证测试及首CMD原生均未启动。具体compiler-message被旧脚本截获而未输出，不能将源码推断当成已恢复的原始诊断。完整日志SHA `5e15771a70779684ddb01e72fd18b44e0e7c9b3ad0ff8db46827a1b78459200a`，唯一官方环境ZIP的API大小／SHA／CRC已核，终审索引 `5c0ad94045b480012d22ca013192f17e179a5393175ef577d7e1608ea2665607`；可见警告及未取得的编译警告明细边界保留。
+
+源码复核定位三处确定遗漏：测试session构造缺取证条件字段，两个next_event调用缺同条件的第三参。现仅按生产相同cfg补None，旧断言、ignore、权限及超时不变；该构建改用Cargo的json-render-diagnostics，产物继续JSON、编译诊断直接渲染，失败仍停止。两文件源码索引 `a5d2fabefc3a8954f99c728e5e39fd94935b9301779f85fe6b05b77f77b7ce49`，本机check、i18n 11项、actionlint与6个作用域条件均通过，三个短根已清理；门禁索引 `f73990142a626c5c4819f3935d2595a33ae9128068049b7b3782c6716cdf6a8f`，仓外 `g09-native-witness-test-wiring-fix-v1`。无需本地化变更：仅测试接线和CI诊断输出，无用户文案或布局变化。修复及ad20句柄释放均待下一精确Windows复验，原生停滞与Codex退出失败未解决；仍9关闭／G03、G09开放／3移交，PR草稿。
+
 ## 2026-10-03：退出获证后释放原生取证句柄
 
 新增关闭0项，仍9关闭／G03、G09开放／3移交，PR草稿。精确234dbf777的[37086236420](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37086236420)已通过Windows编译、普通生命周期回归、command归属及CLI监督程序构建，进入限定npm原生步骤；该步先构建libtest并执行25项取证纯测试及ce6降级组，步骤启动不代表首CMD已执行。整轮及原生结果尚未取得，不提前计通过。

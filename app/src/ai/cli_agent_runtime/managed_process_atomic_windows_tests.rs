@@ -1377,6 +1377,8 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         root_exit_observed: false,
         cancellation: None,
         npm_diagnostics: None,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        native_witness: None,
         loader_trace: None,
     };
     assert!(session.verify_root_image(&file).is_ok());
@@ -1585,7 +1587,12 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
     let (failure, rejected_identity) = loop {
         let event = fixture
             .debugger
-            .next_event(deadline, "测试未收到子映像事件")
+            .next_event(
+                deadline,
+                "测试未收到子映像事件",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                None,
+            )
             .unwrap();
         let image = (event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT).then(|| {
             // 复制 hFile，仅供断言；实际事件所有权仍由 validate_event 接管。
@@ -1647,6 +1654,8 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
         .next_event(
             Instant::now() + DEBUG_DRIVER_TIMEOUT,
             "测试未收到 loader 事件",
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            None,
         )
         .unwrap();
     fixture

@@ -1924,7 +1924,7 @@ jobs:
           PYTHONUTF8: "1"
         run: |
           $ErrorActionPreference = 'Stop'
-          $arguments = @('test', '-p', 'warp', '--lib', '--no-run', '--message-format=json')
+          $arguments = @('test', '-p', 'warp', '--lib', '--no-run', '--message-format=json-render-diagnostics')
           if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'cli-agent-native-witness') }
           $buildMessages = cargo @arguments
           if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
