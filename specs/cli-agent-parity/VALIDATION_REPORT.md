@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：标准堆修复后的真实更新仍失败
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确`a53b3c49eca3afa4fa972984ec090badbc7c48e6`的[37118252587](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37118252587)已终态失败。源码检查、warp普通配置1102项及带native-probe-witness的command43项共1145 nextest通过，无FAIL／LEAK／RETRY／FLAKY／TIMEOUT；feature libtest仍为12＋14＋6＋11＋5共48项通过。新增CMD/PowerShell环境两项在实际Windows各普通PASS，32项取证仅feature执行，环境5项双配置通过；这些结果不代替原生更新。真实用例0通过／1失败，372.38秒、exit101、ProbeFailed，仍停于首CMD代次`514763af-d55f-49fa-97e6-dde2310dea45`，PowerShell未到达。
+
+原主线程PID9856/TID19308的两种创建身份在15.109／240.071秒样本一致，224.962秒墙钟内增加224.25秒用户CPU及0.46875秒内核CPU。早期23帧由普通RtlFreeHeap+279经GetTempPathW+546、应用兼容检查至CreateProcessW/CMD；旧调试堆帧不再出现在这次早期样本中，但不据此声称观测全部堆标志。晚期仅1帧，指令不在已验证模块范围，必须保持未知，不能沿旧轮符号或调用链外推。五快照共33帧，31帧与原SHA映像、微软PDB及`.pdata`绑定，2帧未知；暂停恢复均平衡。配对审计`80bca86a403ab883f20a3239c7cc9dd2ba08405bc482c692d4adb8814dfa49fc`，根审`db1c5263080caa5b8283f588ab42e38e60bb16148bb2cc30a275ba1fb7f96ebf`，独审`1d6c246f7c610981c6ef916fd48a7c85ee8a643c05e2099c2cfee5fd31200576`。
+
+31源与started、冻结提交一致，manifest／launch／spawn／exit／receipt摘要闭合。49事件全验全Continue、owner31432、pending为空；Node早期已生但主线程原暂停1，本次观察仅1→2→1恢复，CREATE仍只在取消清理出现，不能证明Node已执行。原exit1、Job清空、AppContainer/profile删除、helper双exit0、窗口站及登录会话消失均有原件；整个远端失败夹具删除未证。两官方ZIP API大小、SHA及全部CRC通过；主ZIP`348e956fe45bb24933413ab56eacd56c959146e48ee999c2aa5beb2e04fffab5`，日志独审`82280a68ee08ead6e3b030f14d4e1289f69f5d81ca3d40c20dcae790ca624ffe`，仓外`a53b3c49e-ci`。
+
+固定磁盘映像的613字节GetTempPathW与ntdll查询分支已只读复核：早期返回PC `0xef802` 对应容量不足后的释放/回跳，普通清理返回PC是 `0xef827`。静态分支要求STATUS_BUFFER_TOO_SMALL及长路径分支；下层所需NUL空间与重试按Length分配存在条件性不增长关系。源码TMP/TEMP/TMPDIR为208个UTF-16单元，初始内部容量261，首次不足尚无法解释；运行中实际环境、UNICODE_STRING、IAT和函数字节未采，不能归因AppContainer重写、扩展路径或确定Windows缺陷。未运行新探针或改产品。静态收据`7d82e6f121d2751b0f53fa40395fb1719b1b9a9ad8a6b6315d9208543da9f48d`，根代理核17件唯一引用文件并复读完整函数。
+
+此次实测否定“仅选择标准堆即可解决首CMD阻塞”。私有环境从构造到CreateProcessW的静态传递完整，与[LLDB同类实现](https://lldb.llvm.org/cpp_reference/PlatformWindows_8cpp_source.html#l00622)一致，仍不能冒称生产修复成功。停止重复同一候选，继续只读核查已获GetTempPathW调用点及环境参数；不改权限、超时或关闭条件。本轮仅证据与审计更新，无需本地化变更。提交前cargo check `r-qmszwg7s`通过，log SHA `992a9327d058c393b193aa1873f2d5519487f7d937418f20a07399868becf63e`，短TMPDIR已核验退出并清理；产品源码未再变，复用a53已验回归及i18n。
+
 ## 2026-10-03：2e9 原主线程配对结果与修复依据
 
 新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确`2e9f8d60f365e786fe0e9e05ea5c7dee3928d0bf`的[37112613018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37112613018)源码检查及两组nextest通过：warp未加witness feature的1100项，加native-probe-witness的command43项；不能把全部1143项描述成默认feature。witness配置libtest为12＋14＋6＋11＋5共48项通过，32项取证测试逐名通过，环境5项在两配置各通过一次。真实用例0通过／1失败，耗时368.63秒、exit101、ProbeFailed；上述单元结果不覆盖它。
