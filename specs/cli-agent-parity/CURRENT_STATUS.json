@@ -1506,6 +1506,22 @@
       "hooks_eof_boundary": "CPython关闭会继续下层关闭；当前证据不足以归因写端泄漏，服务端EOF阶段未证",
       "localization": "无需本地化变更：内部诊断结构、编译开关与专用验收入口，不改变用户界面、错误文案或布局。",
       "gaps_closed": []
+    },
+    "g09_hooks_close_receipt_20261003": {
+      "base_commit": "ae97906986c9cc48e6e63be9f1f52f28808b9a32",
+      "source_index_sha256": "fdcbff3b9e939aae2f312ac98ef87e3611a3407438a1241d3427dc541e05211a",
+      "local_gate_sha256": "a61a41747824c0f17433384fa23e8f4ece1ab5fd4e604830a8b714debe86a997",
+      "python_pass": 49,
+      "python_platform_skipped": 2,
+      "cargo_check": true,
+      "short_roots_cleaned": true,
+      "native_execution": false,
+      "eof_failure_solved": false,
+      "active_first_cmd_run": 37084517646,
+      "active_run_source_commit": "ae97906986c9cc48e6e63be9f1f52f28808b9a32",
+      "active_run_contains_this_increment": false,
+      "localization": "无需本地化变更：内部验证收据，无用户文案或布局变化",
+      "gaps_closed": []
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -1708,7 +1724,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
   "documentation_updated_at": "2026-10-03",
-  "documentation_source_commit": "ce6c047c03d6ffb90da17d7e98116cd1824e7aab",
+  "documentation_source_commit": "ae97906986c9cc48e6e63be9f1f52f28808b9a32",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {

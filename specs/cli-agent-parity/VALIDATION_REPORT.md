@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：保留 Codex 关闭错误及独立计时
+
+新增关闭0项。固定Codex hooks驱动现在记录stdin关闭前后状态、正常返回或异常类型与errno/winerror，并分离关闭与实际等待耗时；不记录错误正文，不将closed=true当作服务端EOF，不改5秒自然退出、后续监督清理或通过条件。两文件冻结 `fdcbff3b9e939aae2f312ac98ef87e3611a3407438a1241d3427dc541e05211a`；本机Python49通过／2平台跳过，check通过，两短根已核验清理，门禁索引 `a61a41747824c0f17433384fa23e8f4ece1ab5fd4e604830a8b714debe86a997`，仓外 `g09-hooks-close-receipt-v1`。无需本地化变更：内部验收收据，无用户文案或布局变化。
+
+此修复仅保留原来丢失的诊断，不解决6726的原生退出失败。精确ae9790698的[37084517646](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37084517646)仍独立执行限定首CMD取证，不包含本增量；未扩运行范围或重复全矩阵。当前仍9关闭、G03/G09开放、3移交，PR草稿。
+
 ## 2026-10-03：Windows 原生停滞取证接入，原源码门禁终审
 
 新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。原fcd的[37074002886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37074002886)已自然结束为failure；两份官方ZIP大小、摘要和CRC均核验。Windows全日志5041次普通PASS、预期28项逐名PASS，i18n22次执行／11唯一；唯一失败仍为步骤44旧平台拒绝断言，三次尝试共两次自动重试，无LEAK/FLAKY/TIMEOUT。完整Windows日志SHA `54e6ba6524c53b110882c90e6ccc45168da62435986eb19ee5a0e968447248e0`，终审索引 `129e2d87ce557eaf5d49e56d5c671a8538741ac496697c8197a00060efe66a2c`；Linux旧编译失败保留，873修复复验通过。ce6的Windows断言修正仍待目标复验。

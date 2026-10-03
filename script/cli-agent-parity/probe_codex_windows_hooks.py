@@ -273,10 +273,20 @@ class NativeRecorder:
 
     def _close_root_and_outputs(self):
         started = time.monotonic()
+        self.close_receipt.update(stdin_closed_before=self.process.stdin.closed,
+            stdin_close_returned=False, stdin_close_error_type=None,
+            stdin_close_errno=None, stdin_close_winerror=None)
         try:
             self.process.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass
+            self.close_receipt['stdin_close_returned'] = True
+        except (BrokenPipeError, OSError) as error:
+            # 只保留错误类别与数值码；关闭异常和对象 closed 状态均不能证明子进程已收到 EOF。
+            self.close_receipt.update(stdin_close_error_type=type(error).__name__,
+                stdin_close_errno=error.errno, stdin_close_winerror=getattr(error, 'winerror', None))
+        finally:
+            self.close_receipt.update(stdin_closed_after=self.process.stdin.closed,
+                stdin_close_elapsed_ms=round((time.monotonic() - started) * 1000))
+        wait_started = time.monotonic()
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -290,7 +300,7 @@ class NativeRecorder:
                 self.process.wait(timeout=3)
         self.close_receipt.update(root_exit_code=self.process.returncode,
             root_exited_naturally=not self.close_receipt['termination_requested'],
-            root_wait_elapsed_ms=round((time.monotonic() - started) * 1000))
+            root_wait_elapsed_ms=round((time.monotonic() - wait_started) * 1000))
         if self.probe_job is not None:
             require(self.close_receipt['job_assigned_before_resume'], '原生进程没有在运行前归属私有 Job')
             active = self.probe_job.wait_empty(5)
