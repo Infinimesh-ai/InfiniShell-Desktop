@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：固定系统映像及微软符号缩小旧栈范围
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确9773abe49的[37109159914](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37109159914)只运行范围校验和固定映像收集，其余任务跳过，没有Cargo或原生候选执行。四份cmd/ntdll/kernel32/kernelbase的读取前后身份及SHA一致，并与b3原快照匹配；官方ZIP大小、SHA、全CRC通过，ZIP SHA `84bd74f5c8ab368959d19b80289eaac0a6c15bde52fa5b944a0629d329791219`，仓外`9773abe49-image-ci`。
+
+从微软官方符号服务器取得对应PDB，四份GUID匹配PE RSDS、Info age不小于映像age、DBI age与映像age均为1，符合[微软OpenValidate4源码合同](https://github.com/microsoft/microsoft-pdb/blob/master/PDB/dbi/pdb.cpp#L745-L821)；不误称Info age也都是1。PDB section表逐字节匹配PE，无OMAP。只读公共符号和同SHA PE的`.pdata`交叉核对，约15秒CMD原主线程的CreateProcessW→BasepQueryAppCompat→CompatCachepLookupExeProcessImpl→AslPathIsTemporaryDirectory→GetTempPathW→堆分配链获证，顶帧位于RtlpAllocateHeap对应范围；另两个CMD线程采样在worker等待。最近公共符号不自动等于函数范围，Node无已核模块的帧仍未知。该单次采样不证明约286秒时仍在同处，不证明死锁、debug heap或TEMP/ACL根因。
+
+CMD普通IAT有CreateProcessW/CreateProcessAsUserW；5个延迟描述符的18项中，17项具名、1项为未识别的Wldp ordinal 2，未建立完整延迟导入语义。没有放宽现有拒绝或把普通导入子集冒称完整创建观察。公共符号收据SHA `587171d4910faf7f168f386817aef03fa6ea7b911e87f8b0317abf57ae828b30`，仓外`g09-fixed-image-contract-v1`；根代理独立复核PE/PDB分析和映像共20件大小/SHA，收据SHA `421a5faa99a25d69fb0838b9fef7ef9ae47e31b4040469676eb5ddf2978d4ff8`。初始解析器过严age假设及报告遍历失败原件保留，修正后纯解析通过并清理短根；未执行系统映像。现有单独普通IAT观察或追加晚期采样尚不足以指向生产修复，暂不运行相近候选，不改权限、环境或超时。G09原生失败及最终源码门禁继续开放。
+
+收集入口提交前actionlint、7组范围校验、5项PowerShell文件合同及cargo check通过，短根均已清理；Mac合同测试不冒称Windows API运行，实际Windows收集另按上述CI计证。本次审计提交前cargo check `r-c279tw0a`通过，日志SHA `cace9cfac1dd44b97c06721ea3d7a4f64d5611cd53cf8c58188f6da165444f5e`，短根已清理。仅内部取证入口与审计，无需本地化变更。
+
 ## 2026-10-03：首 CMD 已进入，创建观察受延迟导入限制
 
 新增关闭0项。精确b3c8cc839的[37103876288](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37103876288)已失败：普通warp1100＋command43共1143 PASS，无普通FAIL/LEAK/RETRY/FLAKY；feature取证25＋ce6 11＋环境5共41 ok，五个新环境合同按关/开两配置逐名通过。真实ignored入口1 FAIL，execute返回ProbeFailed，已进入首CMD代次e7c9aa44-b1f2-46b3-81a6-519abca693fa。31来源、started及manifest/exit/launch摘要链与冻结提交一致。终审索引 `afb174088621343e4c3d8e0a99d1cff1440fb445a27b93b7d181e7ad884c1335`，完整日志SHA `c47122f5704466443a57a41c83b4566f249f724299ceb2388ee64bce150234a9`，仓外`b3c8cc839-ci`；两官方ZIP API大小、SHA及全CRC通过，根代理独立核验索引22件大小/摘要。

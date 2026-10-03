@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。授权CGEvent的Finder内部校准成功，普通Grok与独立TextEdit跨应用均未交付图片，不能据此归因产品路由。b3 Windows普通1143项与feature41项通过，首CMD真实启动后ProbeFailed；创建观察因delay-import覆盖限制未启用，Node暂停根因仍未知，本代原生清理有证。不重复相近手势/探针，保留原关闭条件。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。授权CGEvent的Finder内部校准成功，普通Grok与独立TextEdit跨应用均未交付图片，不能据此归因产品路由。b3首CMD真实启动后ProbeFailed；9773只读收集与微软PDB把15秒旧栈定位到创建进程的应用兼容检查及堆分配，但不能解释最终停滞，Node暂停根因仍未知。不重复相近手势/探针，保留原关闭条件。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -8721,6 +8721,27 @@
     "windows_log_sha256": "c47122f5704466443a57a41c83b4566f249f724299ceb2388ee64bce150234a9",
     "originals": "两官方ZIP大小/SHA/全CRC核验；根代理独立复核终审索引22件大小/摘要。",
     "boundary": "不得将snapshot.complete=true写作完整创建/桌面取证成功；未解决Node暂停根因，不以测试或清理通过关闭G09。",
+    "gap_closed": false
+  },
+  "g09_fixed_images_symbols_20261003": {
+    "source_commit": "9773abe497085f6d73db1387f4004132b83dd365",
+    "run_id": 37109159914,
+    "conclusion": "success",
+    "scope": "四份固定系统映像只读收集；其他CI任务跳过，没有新候选或Rust门禁执行。",
+    "matched_b3_images": 4,
+    "artifact_zip_sha256": "84bd74f5c8ab368959d19b80289eaac0a6c15bde52fa5b944a0629d329791219",
+    "pdb_identity": "四份GUID匹配PE RSDS、Info age >=映像age、DBI age=映像age=1；section表与PE逐字节相等，无OMAP。",
+    "stack_result": "约15秒CMD主线程在CreateProcessW的应用兼容检查/GetTempPathW/堆分配链，顶帧对应RtlpAllocateHeap；仅按公共符号与同SHA PE.pdata共同确定范围，不以最近符号代替归属。",
+    "unproven": "约286秒最终停滞原因、Node未归属模块的帧及线程桌面；不推断debug heap、TEMP或ACL故障。",
+    "imports": "普通IAT有两个具名创建入口；延迟18项中Wldp ordinal 2未识别，不能声称完整创建覆盖。",
+    "pdb_delivery_sha256": "587171d4910faf7f168f386817aef03fa6ea7b911e87f8b0317abf57ae828b30",
+    "root_verified_files": 20,
+    "root_review_sha256": "421a5faa99a25d69fb0838b9fef7ef9ae47e31b4040469676eb5ddf2978d4ff8",
+    "archive": "resume-20261001/g08-build-preparation/9773abe49-image-ci；g09-fixed-image-contract-v1",
+    "local_gate": "收集入口的actionlint、7组范围校验、5项PowerShell文件合同及cargo check通过；Mac合同不代替Windows API，实际收集另由CI证明。",
+    "audit_commit_check": "r-c279tw0a cargo check通过，日志SHA cace9cfac1dd44b97c06721ea3d7a4f64d5611cd53cf8c58188f6da165444f5e；短根cleaned/cleanup_ready=true。",
+    "next_probe_decision": "单独普通IAT或追加晚期采样尚不足以指向生产修复，暂不运行相近候选；不改权限、环境或超时。",
+    "localization": "仅内部取证及审计，无需本地化变更。",
     "gap_closed": false
   }
 }
