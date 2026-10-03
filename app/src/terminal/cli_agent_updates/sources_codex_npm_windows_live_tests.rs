@@ -220,7 +220,61 @@ struct Manifest {
     source_sha256: BTreeMap<String, String>,
 }
 
+// 与运行器的完整来源集合一致；验收文件无需嵌入生产监督程序。
 const SOURCES: &[(&str, &[u8])] = &[
+    (
+        ".github/workflows/cross-platform-preflight.yml",
+        include_bytes!("../../../../.github/workflows/cross-platform-preflight.yml"),
+    ),
+    ("app/Cargo.toml", include_bytes!("../../../Cargo.toml")),
+    (
+        "crates/command/Cargo.toml",
+        include_bytes!("../../../../crates/command/Cargo.toml"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness_tests.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_witness.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_witness.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_witness_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_witness_tests.rs"
+        ),
+    ),
+    (
+        "crates/command/src/windows.rs",
+        include_bytes!("../../../../crates/command/src/windows.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_witness.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_witness.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_bootstrap_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_bootstrap_tests.rs"),
+    ),
     (
         "app/src/terminal/cli_agent_updates.rs",
         include_bytes!("../cli_agent_updates.rs"),

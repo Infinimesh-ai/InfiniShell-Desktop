@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：来源绑定前置修复与固定 Codex hooks 实测结果
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确363b17a77的[37094078558](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37094078558)Windows check、监督程序和feature libtest构建通过，普通1138项、snapshot8＋creation14＋glue3共25项及feature ce6 11项均通过；随后Python verify_embedded报 `supervisor_source_binding`，首CMD、原生事务与其因果取证尚未启动。原错误不含缺失文件名，不能称已逐项扫描失败二进制；终审索引 `205b5f267425d47b1e8e343138a9f3939ace02912cd230ca39bff1ad27aa7d00`，仓外 `363b17a77-ci`。原822夹具失败和更早原生停滞均保留。
+
+当前四文件修复保留完整31来源，显式区分21份生产源码与10份验收来源，监督嵌入表81→86补齐5份生产源码，worker编译字节绑定19→31；失败列出全部缺失固定相对名，不靠后缀删检查。本机Python首轮20通过/1个静态表正则遗漏&失败保留，修正后21通过；check及实际Mac监督程序构建通过。真实二进制扫描确认21份生产源码全部嵌入，原31文件集合保留、扫描前后SHA不变，收据 `edeeafb1fa6649e6e10c40b02d34d06848fd6601ddadfcf0dfbb657041eda521`，仓外 `g09-supervisor-source-binding-fix-v1`。四文件源码索引 `22823692340c0ec2a09ecee9b3963a55a7c267bdf1b576e0526f06ee9cb5a011`，独审 `2e86654185606530d4fdf1d312b30a28afaf79f4a2e9e37e5328c0dc070a368e`；i18n11项通过，七个短根全部清理。首轮监督构建包选择错误退出101的原记录保留；最终门禁索引 `3e3284e388c53fff5fca6ddfb671f8cd35586ab4166803a5d3151c6f8113648f`。Windows运行及最新精确源码门禁待完成；Mac扫描不代记Windows执行。无需本地化变更：仅来源校验及内部诊断，无用户文案、权限、超时或退出行为变化。
+
+独立34e0f2f51的[37095262392](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37095262392)正式hooks复验为success：51合同测试通过，8个真实app-server均自然退出0，实际等待41–523ms，原5s/3s时限不变。关闭收据、stdio_connection_closed、输出EOF、完整Job及配置/私有目录回滚清理相互印证；未进入强制等待分支。原生JSON SHA `be137bd24bc9e0c86c2f97c6eb5f97471bae83daf0071574ca25396c7dcf4f63`，终审索引 `bdec8d0e6b3e3d27725ca1b8fc63c0f350cfe5cc741dab30ead68b9ad46f2940`，仓外 `34e0f2f51-hooks-ci`。该正例不证明日志变化解决了6726旧失败根因，不覆盖ConPTY、npm更新或G09整体；原失败原件保持。
+
 ## 2026-10-03：单独复验固定 Codex hooks 的最小工作流范围
 
 新增关闭0项。现有原生补验会连带运行旧版hooks、两版ConPTY及其他CLI和Rust门禁，首CMD专项又不包含hooks。现仅在既有Windows调试choice增加codex_hooks，保持25个input；前置校验要求仅Windows和该专项启用，独立job沿用固定Python准备、既有合同测试、同字节0.156.1探针命令及JSON归档。5s/3s退出判定、20分钟探针步骤上限和全部原验收条件保持；不把新增复验范围当成功或关闭。

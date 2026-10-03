@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PureWindowsPath
 import tempfile
 from types import SimpleNamespace
@@ -23,6 +24,82 @@ class RunnerTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def source_fixture(self):
+        repo = self.root / "repo"
+        payloads = {}
+        for name in runner.SOURCE_FILES:
+            # 每份源码用独特小字节串，避免一个成员被另一成员的内容意外覆盖。
+            payloads[name] = b"source-binding<" + hashlib.sha256(name.encode()).hexdigest().encode() + b">"
+            path = repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payloads[name])
+        return repo, payloads
+
+    def test_source_roles_match_real_compiled_tables_and_paths(self):
+        repo = Path(__file__).resolve().parents[2]
+        source = repo / "app/src/terminal/cli_agent_updates/sources.rs"
+        text = source.read_text(encoding="utf-8")
+        table = re.search(r"static SUPERVISOR_UPDATER_SOURCE_BINDING: \[&\[u8\]; (\d+)\] = \[(.*?)\n\];", text, re.S)
+        self.assertIsNotNone(table)
+        embedded = re.findall(r'include_bytes!\(\s*"([^"]+)"\s*\)', table.group(2))
+        self.assertEqual(len(embedded), int(table.group(1)))
+        embedded_paths = [(source.parent / name).resolve() for name in embedded]
+        self.assertTrue(all(path.is_file() for path in embedded_paths))
+        embedded_names = {path.relative_to(repo).as_posix() for path in embedded_paths}
+        self.assertEqual(len(embedded_names), len(embedded))
+
+        worker = source.with_name("sources_codex_npm_windows_live_tests.rs")
+        table = re.search(r"const SOURCES:.*?= &\[(.*?)\n\];", worker.read_text(encoding="utf-8"), re.S)
+        self.assertIsNotNone(table)
+        pairs = re.findall(r'\(\s*"([^"]+)",\s*include_bytes!\(\s*"([^"]+)"\s*\)', table.group(1))
+        self.assertEqual(len(pairs), len({name for name, relative in pairs}))
+        for name, relative in pairs:
+            with self.subTest(name=name):
+                path = (worker.parent / relative).resolve()
+                self.assertTrue(path.is_file())
+                self.assertEqual(path, repo / name)
+
+        self.assertEqual({name for name, relative in pairs}, set(runner.SOURCE_FILES))
+        self.assertEqual(len(runner.SOURCE_FILES), len(set(runner.SOURCE_FILES)))
+        self.assertFalse(set(runner.SUPERVISOR_SOURCE_FILES) & set(runner.ACCEPTANCE_SOURCE_FILES))
+        self.assertLessEqual(set(runner.SUPERVISOR_SOURCE_FILES), embedded_names)
+        self.assertFalse(set(runner.ACCEPTANCE_SOURCE_FILES) & embedded_names)
+
+    def test_supervisor_requires_production_bytes_without_acceptance_files(self):
+        repo, payloads = self.source_fixture()
+        binary = Path(self.binaries["supervisor"]["path"])
+        data = b"".join(payloads[name] for name in runner.SUPERVISOR_SOURCE_FILES)
+        binary.write_bytes(data)
+        self.assertTrue(all(payloads[name] not in data for name in runner.ACCEPTANCE_SOURCE_FILES))
+        runner.verify_embedded(binary, repo)
+
+    def test_every_missing_production_source_is_rejected_and_named(self):
+        repo, payloads = self.source_fixture()
+        binary = Path(self.binaries["supervisor"]["path"])
+        for missing in runner.SUPERVISOR_SOURCE_FILES:
+            with self.subTest(missing=missing):
+                binary.write_bytes(b"".join(payloads[name] for name in runner.SUPERVISOR_SOURCE_FILES if name != missing))
+                with self.assertRaises(ValueError) as caught:
+                    runner.verify_embedded(binary, repo)
+                self.assertEqual(str(caught.exception), "supervisor_source_binding: missing=" + missing)
+
+    def test_binding_reports_all_missing_production_sources(self):
+        repo, payloads = self.source_fixture()
+        binary = Path(self.binaries["supervisor"]["path"])
+        missing = runner.SUPERVISOR_SOURCE_FILES[::2]
+        binary.write_bytes(b"".join(payloads[name] for name in runner.SUPERVISOR_SOURCE_FILES if name not in missing))
+        with self.assertRaises(ValueError) as caught:
+            runner.verify_embedded(binary, repo)
+        self.assertEqual(str(caught.exception), "supervisor_source_binding: missing=" + ", ".join(missing))
+
+    def test_embedded_source_spanning_read_blocks_is_preserved(self):
+        repo, payloads = self.source_fixture()
+        binary = Path(self.binaries["supervisor"]["path"])
+        first = payloads[runner.SUPERVISOR_SOURCE_FILES[0]]
+        binary.write_bytes(b"\0" * (1024 * 1024 - len(first) // 2)
+                           + b"".join(payloads[name] for name in runner.SUPERVISOR_SOURCE_FILES))
+        runner.verify_embedded(binary, repo)
 
     def package(self, version):
         metadata = {"name":runner.PACKAGE,"version":version,"scripts":None,"dependencies":None}

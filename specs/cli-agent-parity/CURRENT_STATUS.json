@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；822 Windows普通1138项及取证feature编译通过，但snapshot首组4通过/4共享冲突失败，首CMD未执行；四处测试夹具已修并过本机门禁，目标待验；原生停滞和Codex退出失败仍开放",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；363 Windows普通1138项、25取证回归及feature ce6 11项通过，但来源绑定前置失败，首CMD与原生事务未启动。34 hooks复验8个app-server自然退出0，旧6726失败及根因未知保留。来源绑定已修并通过本机check、21项Python回归、i18n11项及实际Mac监督嵌入扫描；最新Windows验证与最终源码门禁待完成。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1077,10 +1077,10 @@
     "g09_progress": {
       "status": "open",
       "audit_ref": "g09_scope_audit_20261002",
-      "mac_consumer_and_homebrew_acceptance_complete": false,
+      "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "Claude真实npm和Homebrew合法降级、忙碌、应用冷回滚/重试已验；Codex真实Homebrew及npm消费者链、Grok真实npm更新/镜像已验。Grok Homebrew多入口恢复、Windows原生npm与最终源码门禁仍欠；不只差其他平台设备。"
+      "boundary": "Mac消费者、真实Homebrew多入口回滚/重试和英中功能链已齐备。363的首CMD与原生事务未启动，Windows既有npm停滞仍待真实因果证据；34固定Codex hooks复验通过，但不外推旧6726失败根因。当前来源绑定修复的目标平台验证与最终源码门禁仍欠，不关闭G09。"
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -1623,7 +1623,7 @@
       "windows_test_metadata_count": 22,
       "metadata_is_execution": false,
       "short_roots_cleaned": true,
-      "windows_recheck": "pending",
+      "windows_recheck": "363b17a77 / 37094078558：snapshot8、creation14、glue3均通过；之后来源绑定前置失败，首CMD未执行。",
       "original_native_failures_solved": false,
       "localization": "无需本地化变更：仅测试夹具，无用户文案、行为或布局变化",
       "gaps_closed": []
@@ -1640,9 +1640,78 @@
       "scope_cases": 28,
       "cargo_check": "passed",
       "short_roots": "cleaned",
-      "native_result": "待单独复验；当前363首CMD运行不含hooks",
+      "native_result": "34e0f2f51 / 37095262392 success：51合同测试与8个app-server自然退出0，时限不变；独立终审见g09_source_binding_and_hooks_results_20261003，旧6726根因不外推。",
       "localization": "无需本地化变更；仅CI范围，无用户功能、文案或布局变化",
       "newly_closed": []
+    },
+    "g09_source_binding_and_hooks_results_20261003": {
+      "gaps_closed": [],
+      "windows_npm_run": {
+        "run_id": 37094078558,
+        "commit": "363b17a77960708cbb2e2052f90f3cf87db475fc",
+        "conclusion": "failure",
+        "final_index": "g08-build-preparation/363b17a77-ci/final-audit-index.safe.json",
+        "final_index_sha256": "205b5f267425d47b1e8e343138a9f3939ace02912cd230ca39bff1ad27aa7d00",
+        "boundary_audit_sha256": "4988e7c226cc88d44bc0c651450ba4184ee8e9ce7d66f1f8f9344d3ada86720c",
+        "production_check_and_feature_builds": "passed",
+        "ordinary_pass": 1138,
+        "witness_tests_pass": 25,
+        "feature_ce6_pass": 11,
+        "failure": "Python verify_embedded抛supervisor_source_binding；原错误没有缺失文件名，不能冒称逐项扫描过Windows监督二进制。",
+        "first_cmd_executed": false,
+        "native_transaction_executed": false
+      },
+      "fixed_hooks_run": {
+        "run_id": 37095262392,
+        "commit": "34e0f2f510f142b58415cb4cb4ed3dccaff41c64",
+        "conclusion": "success",
+        "final_index": "g08-build-preparation/34e0f2f51-hooks-ci/final-index.safe.json",
+        "final_index_sha256": "bdec8d0e6b3e3d27725ca1b8fc63c0f350cfe5cc741dab30ead68b9ad46f2940",
+        "audit_sha256": "1fe4e096add74fdca0e85156cbb42b176df63febb26e27f557775a6e3f740cc9",
+        "raw_receipt_sha256": "be137bd24bc9e0c86c2f97c6eb5f97471bae83daf0071574ca25396c7dcf4f63",
+        "contract_tests_pass": 51,
+        "app_servers_natural_exit_zero": 8,
+        "wait_timeouts_seconds": [
+          5,
+          3,
+          3
+        ],
+        "job_eof_and_rollback_cleanup_verified": true,
+        "historical_6726_failure_preserved": true,
+        "historical_root_cause_proven": false,
+        "boundary": "本次正式hooks正例；不覆盖ConPTY、npm事务或G09整体，不把关停日志变化归因为旧失败修复。"
+      },
+      "source_binding_fix": {
+        "base_commit": "34e0f2f510f142b58415cb4cb4ed3dccaff41c64",
+        "complete_sources_preserved": 31,
+        "supervisor_production_sources": 21,
+        "acceptance_sources": 10,
+        "supervisor_embedded_table_before_after": [
+          81,
+          86
+        ],
+        "worker_bound_sources_before_after": [
+          19,
+          31
+        ],
+        "change": "显式来源角色取代后缀推断；补齐5份生产源码，全部31份由worker编译字节绑定，缺失诊断列固定相对名。",
+        "python_tests_pass": 21,
+        "python_initial_failure": "首轮20通过/1个静态表正则遗漏&失败；修正后21通过，原记录保留。",
+        "cargo_check": "passed",
+        "mac_supervisor_build": "passed",
+        "mac_actual_embedded_scan": "passed",
+        "actual_scan_sha256": "edeeafb1fa6649e6e10c40b02d34d06848fd6601ddadfcf0dfbb657041eda521",
+        "i18n": "passed_11",
+        "windows_execution": false,
+        "boundary": "实际Mac监督二进制内21份源码均检出，完整31文件集合保留且扫描前后SHA不变；不代表Windows运行。",
+        "source_index_sha256": "22823692340c0ec2a09ecee9b3963a55a7c267bdf1b576e0526f06ee9cb5a011",
+        "independent_review_sha256": "2e86654185606530d4fdf1d312b30a28afaf79f4a2e9e37e5328c0dc070a368e",
+        "local_gate_sha256": "3e3284e388c53fff5fca6ddfb671f8cd35586ab4166803a5d3151c6f8113648f",
+        "local_short_roots_cleaned": 7,
+        "initial_build_failure_preserved": "首轮监督构建遗漏warp包选择而退出101；修正命令后实际构建通过，原记录保留。"
+      },
+      "localization": "无需本地化变更：仅来源绑定及验收诊断，无用户文案、权限、超时或退出语义变化。",
+      "remaining": "G03 Finder真实拖放；G09既有Windows npm停滞、来源修复的Windows执行及最终精确源码门禁。PR保持草稿，V01/V02/V05仍移交。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

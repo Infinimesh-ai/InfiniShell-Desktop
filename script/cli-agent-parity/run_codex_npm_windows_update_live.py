@@ -23,32 +23,39 @@ DEPENDENCY = "node_modules/@openai/codex-win32-x64/"
 CASES = ("updated", "old_moved", "published_receipt_missing", "external_change_preserved", "candidate_changed_preserved")
 COLD_CASES = CASES[1:4]
 TEST = "terminal::cli_agent_updates::sources::npm_windows::live_tests::real_codex_windows_npm_update_without_model"
-SOURCE_FILES = (
-    ".github/workflows/cross-platform-preflight.yml",
-    "app/Cargo.toml",
-    "crates/command/Cargo.toml",
+# 监督程序必须嵌入生产源码；构建配置、测试与运行器只属于验收来源。
+# 两类都由 libtest 的编译字节绑定，并在运行前后逐文件核验，不能靠后缀猜测角色。
+SUPERVISOR_SOURCE_FILES = (
     "app/src/terminal/cli_agent_updates.rs",
     *["app/src/terminal/cli_agent_updates/" + name for name in (
         "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_codex_windows.rs",
-        "sources_npm_codex_windows_tree.rs", "sources_npm_codex_windows_contract.rs",
-        "sources_codex_npm_windows_live_tests.rs")],
+        "sources_npm_codex_windows_tree.rs", "sources_npm_codex_windows_contract.rs")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
         "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
-        "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_creation_witness_tests.rs",
-        "managed_process_atomic_windows_snapshot.rs", "managed_process_atomic_windows_snapshot_tests.rs",
-        "managed_process_atomic_windows_witness.rs", "managed_process_atomic_windows_witness_tests.rs",
-        "managed_process_npm_probe_windows.rs")],
+        "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_snapshot.rs",
+        "managed_process_atomic_windows_witness.rs", "managed_process_npm_probe_windows.rs")],
     "crates/command/src/windows.rs",
     "crates/command/src/windows_appcontainer.rs",
     "crates/command/src/windows_appcontainer_witness.rs",
     "crates/command/src/windows_appcontainer_desktop.rs",
     "crates/command/src/windows_station_bootstrap.rs",
-    "crates/command/src/windows_station_bootstrap_tests.rs",
     "crates/command/src/bin/infinishell-station-bootstrap.rs",
     "script/cli-agent-parity/codex_0156_package_manifest.json",
+)
+ACCEPTANCE_SOURCE_FILES = (
+    ".github/workflows/cross-platform-preflight.yml",
+    "app/Cargo.toml",
+    "crates/command/Cargo.toml",
+    "app/src/terminal/cli_agent_updates/sources_codex_npm_windows_live_tests.rs",
+    *["app/src/ai/cli_agent_runtime/" + name for name in (
+        "managed_process_atomic_windows_creation_witness_tests.rs",
+        "managed_process_atomic_windows_snapshot_tests.rs",
+        "managed_process_atomic_windows_witness_tests.rs")],
+    "crates/command/src/windows_station_bootstrap_tests.rs",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
 )
+SOURCE_FILES = SUPERVISOR_SOURCE_FILES + ACCEPTANCE_SOURCE_FILES
 # 完整官方 registry 固定版本 SRI；平台包仍注册为 @openai/codex 的 npm alias。
 INTEGRITIES = {
     OLD: "sha512-02fAAGyBtlA1zPjEo3kTj/bOSYbPz5DvjLwRZJdV7weFFEDzNFOMjQGmZ/+5CuirYV0hE+AZTrnjzwXYU4AdAQ==",
@@ -273,7 +280,7 @@ def fixture(args, case, binaries, sources, old, manager_tree, system_root):
 
 
 def verify_embedded(supervisor, repo):
-    names = [name for name in SOURCE_FILES if not name.endswith(("_live_tests.rs", ".py"))]
+    names = SUPERVISOR_SOURCE_FILES
     needles = [(repo / name).read_bytes() for name in names]
     found, maximum = [False] * len(needles), max(map(len, needles))
     with Path(supervisor).open("rb") as stream:
@@ -283,7 +290,8 @@ def verify_embedded(supervisor, repo):
             for index,needle in enumerate(needles):
                 found[index] |= needle in data
             tail = data[-maximum:]
-    require(all(found), "supervisor_source_binding")
+    missing = [name for name, present in zip(names, found) if not present]
+    require(not missing, "supervisor_source_binding: missing=" + ", ".join(missing))
 
 
 def verify_product(root, case, old, target):
@@ -365,6 +373,7 @@ def main():
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=args.repo, text=True, encoding="utf-8")
     write(args.output / "source.safe.json", {"commit":revision,"source_sha256":sources,"binaries":binaries,
         "working_tree_dirty":bool(status.strip()),"npm_version":manager_manifest.get("version"),"cmd_shim_registrations":shim_sources,
+        "source_roles":{"supervisor_embedded":SUPERVISOR_SOURCE_FILES,"acceptance_only":ACCEPTANCE_SOURCE_FILES},
         "platform":"windows-x64","consumer_channel_discovery_covered":False,
         "native_witness_requested":args.native_witness,
         "native_witness_scope":"first_codex_cmd_generation" if args.native_witness else None})

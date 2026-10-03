@@ -23,7 +23,7 @@
 | G08 | Mac 范围关闭 | 三 CLI 真实 SSH／tmux 图片、原消费者断连恢复、重复与旧回调保稿、权限拒绝及引用清理齐备；b47 两平台最终源码门禁通过 |
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
-| G03、G09 | 开放，共 2 项 | G03 缺 Finder 真实拖放；G09 的 Mac 功能链已齐，873 Linux源码门禁通过；822 Windows普通1138项及取证feature编译通过，但snapshot首组4通过/4共享冲突失败、首CMD未运行；四处测试夹具已修并过本机门禁，目标待验；原生停滞与Codex退出失败仍开放 |
+| G03、G09 | 开放，共 2 项 | G03 缺 Finder 真实拖放；G09 Mac功能链已齐，363 Windows普通1138项、25取证回归及feature ce6 11项通过，但来源绑定前置失败、首CMD未启动；34 hooks复验8个app-server自然退出0，旧6726根因未知保留。来源绑定已修，本机21项Python/check/i18n11项/实际Mac嵌入扫描通过；Windows实际执行与最终源码门禁待完成 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -256,6 +256,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-03 来源绑定前置修复与 hooks 实测结果，仍开放**：精确363的[37094078558](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37094078558)编译、普通1138项、取证25项和feature ce6 11项通过，随后Python `supervisor_source_binding` 失败，首CMD与原生事务均未启动；终审索引 `205b5f267425d47b1e8e343138a9f3939ace02912cd230ca39bff1ad27aa7d00`。当前保留全部31来源，明确21生产/10验收，监督嵌入表81→86、worker绑定19→31，并列出具体缺失项；本机21项Python、check、i18n11项和Mac监督程序实际嵌入扫描通过，扫描收据 `edeeafb1fa6649e6e10c40b02d34d06848fd6601ddadfcf0dfbb657041eda521`；七个短根已清理，两次准备/测试失败保留，门禁索引 `3e3284e388c53fff5fca6ddfb671f8cd35586ab4166803a5d3151c6f8113648f`。Windows执行及最终源码门禁待验。独立34的[37095262392](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37095262392)为success：51合同测试、8个app-server自然退出0，5s/3s时限不变，Job/EOF/回滚清理获证；终审索引 `bdec8d0e6b3e3d27725ca1b8fc63c0f350cfe5cc741dab30ead68b9ad46f2940`。不据此解释或覆盖6726旧失败根因，不外推npm或ConPTY。**新增关闭0项**；G03/G09开放、PR草稿，无需本地化变更。
 
 - **2026-10-03 固定 Codex hooks 缩小复验范围，仍开放**：既有工作流新增独占codex_hooks choice，复用同一0.156.1探针、退出时限和证据合同，不重复其他原生矩阵。actionlint、28范围组合、旧结构/原命令等价与check通过，短根清理；门禁索引 `11c0552ca3e21fc9547d6ccd5888c4db8f65acead4e330f1b08a45dd62e09931`。原生结果仍待独立复验；不影响当前363首CMD运行。无需本地化变更，**新增关闭0项**。
 
