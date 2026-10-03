@@ -99,7 +99,7 @@ fn mapped_image_size(file: &File) -> io::Result<u32> {
 }
 
 impl WindowsImageDebugSession {
-    pub(super) fn bind_native_witness(&mut self, generation: Uuid, mode: &str) {
+    pub(in super::super) fn bind_native_witness(&mut self, generation: Uuid, mode: &str) {
         let value = std::env::var(GENERATION_ENV).ok();
         if enabled(generation, mode, value.as_deref())
             && self.package_images.is_some()
@@ -566,7 +566,7 @@ impl WindowsImageDebugSession {
         }
     }
 
-    pub(super) fn note_native_witness_cancel(&mut self) {
+    pub(in super::super) fn note_native_witness_cancel(&mut self) {
         let at_ms = self
             .npm_diagnostics
             .as_ref()
@@ -606,7 +606,7 @@ impl WindowsImageDebugSession {
         Ok(())
     }
 
-    pub(super) fn record_native_witness_result(&self) {
+    pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
             let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
             // 仅地址、摘要、对象身份和固定错误类别；不含内存字节、路径、命令行或环境。

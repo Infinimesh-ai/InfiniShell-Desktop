@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；873 Linux源码门禁通过，fcd终审唯一Windows旧断言失败已修正、待目标复验；首CMD原生取证已接入，Windows执行及两项原生失败修复仍待完成",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；Windows取证编译发现3个方法可见性错误，已最小修正并过本机check，待目标复验；原生首CMD停滞和Codex退出失败仍开放",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1522,6 +1522,21 @@
       "active_run_contains_this_increment": false,
       "localization": "无需本地化变更：内部验证收据，无用户文案或布局变化",
       "gaps_closed": []
+    },
+    "g09_native_witness_visibility_fix_20261003": {
+      "base_commit": "949a1a679891236aa5d03e82b99bece81490b708",
+      "failed_run": 37084517646,
+      "failed_commit": "ae97906986c9cc48e6e63be9f1f52f28808b9a32",
+      "failure": "3个E0624，仅内部方法可见范围不够",
+      "native_and_25_pure_tests_executed": false,
+      "terminal_index_sha256": "39e0082e1a4ea7dcce0c7a37d8154e056590f0b9f0bf515da0ce215a5ecaf50b",
+      "source_index_sha256": "4a3544816577f2c08dc8a304b3898b63ed99321a21d6f93247250ff38b82c00f",
+      "local_gate_sha256": "b89b6cb2c918d35f5695b88e963cd73d79c96d1a74463d1016f2e4ce56619c3a",
+      "local_check": true,
+      "local_short_root_cleaned": true,
+      "windows_recheck": "pending",
+      "localization": "无需本地化变更：仅内部方法可见范围修正，不变更运行逻辑、用户文案或布局",
+      "gaps_closed": []
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -1724,7 +1739,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
   "documentation_updated_at": "2026-10-03",
-  "documentation_source_commit": "ae97906986c9cc48e6e63be9f1f52f28808b9a32",
+  "documentation_source_commit": "949a1a679891236aa5d03e82b99bece81490b708",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {

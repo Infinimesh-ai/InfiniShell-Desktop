@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：修复 Windows 取证模块可见性
+
+新增关闭0项，仍9关闭／G03、G09开放／3移交，PR草稿。精确ae9790698的[37084517646](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37084517646)已结束为failure：Windows步骤35出现3个E0624，兄弟npm_windows_probe调用的绑定、取消与结果方法仍仅对atomic_windows可见。25项Rust纯测试、ce6断言及首CMD原生均未开始，辅助脚本通过不代替这些验收。完整日志SHA `d666c46c8a2fa7bafb1c6941d18f89c3036828d00a48fadabe6f4b0d64d6a3fc`，官方唯一环境ZIP大小／SHA／CRC核验，终审索引 `39e0082e1a4ea7dcce0c7a37d8154e056590f0b9f0bf515da0ce215a5ecaf50b`。
+
+仅将3个方法改为 `pub(in super::super)`，限定到共同managed_process祖先；独审确认无运行逻辑、平台或feature门禁变化。本机check `r-7v93d7_z`通过并清理短根，源码索引 `4a3544816577f2c08dc8a304b3898b63ed99321a21d6f93247250ff38b82c00f`、门禁索引 `b89b6cb2c918d35f5695b88e963cd73d79c96d1a74463d1016f2e4ce56619c3a`，仓外 `g09-native-witness-visibility-fix-v1`。无需本地化变更：仅内部方法可见范围，无用户文案或布局变化。原Windows编译失败保留；修复后同范围目标复验及原生取证仍待执行，G09原生失败不变。
+
 ## 2026-10-03：保留 Codex 关闭错误及独立计时
 
 新增关闭0项。固定Codex hooks驱动现在记录stdin关闭前后状态、正常返回或异常类型与errno/winerror，并分离关闭与实际等待耗时；不记录错误正文，不将closed=true当作服务端EOF，不改5秒自然退出、后续监督清理或通过条件。两文件冻结 `fdcbff3b9e939aae2f312ac98ef87e3611a3407438a1241d3427dc541e05211a`；本机Python49通过／2平台跳过，check通过，两短根已核验清理，门禁索引 `a61a41747824c0f17433384fa23e8f4ece1ab5fd4e604830a8b714debe86a997`，仓外 `g09-hooks-close-receipt-v1`。无需本地化变更：内部验收收据，无用户文案或布局变化。
