@@ -54,6 +54,8 @@ ACCEPTANCE_SOURCE_FILES = (
         "managed_process_atomic_windows_snapshot_temp_tests.rs",
         "managed_process_atomic_windows_witness_tests.rs")],
     "crates/command/src/windows_station_bootstrap_tests.rs",
+    "crates/command/src/windows_appcontainer_tests.rs",
+    "crates/command/src/windows_appcontainer_console_tests.rs",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
 )

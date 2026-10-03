@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03授权CGEvent跨应用仍未交付。Mac消费者和英中功能链已齐。精确a53标准堆候选的Windows首CMD仍ProbeFailed；同原主线程224.962秒间累计224.71875秒CPU，早期为普通RtlFreeHeap→GetTempPathW/AppCompat创建链，晚期指令不在已验证模块内。限定堆配置未解决阻塞，PowerShell未到达；真实成功及最终源码门禁仍欠，G09不关闭。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03授权CGEvent跨应用仍未交付。Mac消费者和英中功能链已齐。精确50c64e9e3的Windows首CMD仍ProbeFailed（0通过/1失败，366.85秒），PowerShell未到达。原生TMP/TEMP实际283 UTF16单元、偏离构造208；早期GetTempPathW不足重试status=0xc0000023，Length=MaximumLength=566字节，六项代码/IAT均匹配。微软确认AppContainer会重定向临时目录，实际路径字符串及具体改写调用点未采；已实现原生profile路径绑定、提交前Mac门禁通过，仍待Windows真实成功及最终源码门禁，G09不关闭。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1080,7 +1080,7 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "Mac消费者和英中功能链已齐。精确a53标准堆候选的Windows首CMD仍ProbeFailed；同原主线程224.962秒间累计224.71875秒CPU，早期为普通RtlFreeHeap→GetTempPathW/AppCompat创建链，晚期指令不在已验证模块内。限定堆配置未解决阻塞，PowerShell未到达；真实成功及最终源码门禁仍欠，G09不关闭。"
+      "boundary": "Mac消费者和英中功能链已齐。精确50c64e9e3的Windows首CMD仍ProbeFailed（0通过/1失败，366.85秒），PowerShell未到达。原生TMP/TEMP实际283 UTF16单元、偏离构造208；早期GetTempPathW不足重试status=0xc0000023，Length=MaximumLength=566字节，六项代码/IAT均匹配。微软确认AppContainer会重定向临时目录，实际路径字符串及具体改写调用点未采；已实现原生profile路径绑定、提交前Mac门禁通过，仍待Windows真实成功及最终源码门禁，G09不关闭。"
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -1951,7 +1951,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
   "documentation_updated_at": "2026-10-03",
-  "documentation_source_commit": "949a1a679891236aa5d03e82b99bece81490b708",
+  "documentation_source_commit": "50c64e9e31f2ee014da10cc944534ebca727f75f",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -8946,5 +8946,101 @@
         "log_sha256": "992a9327d058c393b193aa1873f2d5519487f7d937418f20a07399868becf63e"
       }
     }
+  },
+  "g09_temp_path_runtime_20261003": {
+    "source_commit": "50c64e9e31f2ee014da10cc944534ebca727f75f",
+    "run_id": 37125688198,
+    "conclusion": "failure",
+    "gap_closed": false,
+    "local_gates": {
+      "check": "passed",
+      "i18n_pass": 11,
+      "python_contract_pass": 21,
+      "receipt_sha256": "d010ea3a2d1daec8f7378ff4c4208d3b5bedb02d923eede89489d9b85df08b60"
+    },
+    "windows_tests": {
+      "nextest_pass": 1145,
+      "warp_pass": 1102,
+      "command_pass": 43,
+      "feature_libtest_pass": 68,
+      "feature_expected_names_each_once": true,
+      "actual_update_pass": 0,
+      "actual_update_fail": 1,
+      "actual_update_seconds": 366.85,
+      "no_nextest_fail_leak_retry_flaky_timeout": true,
+      "rust_warning_diagnostic_markers": 90,
+      "compiler_warning_summaries": 5,
+      "actions_node20_warning": 1,
+      "sccache_stop_connection_refused_preserved": true
+    },
+    "native": {
+      "generation": "5475a58e-d4cc-4fa5-845f-5ae5653b57aa",
+      "first_cmd_result": "ProbeFailed",
+      "powershell_reached": false,
+      "source_bindings_matching": 33,
+      "early_ms": 15065,
+      "late_ms": 240111,
+      "same_original_birth_identity": true,
+      "wall_seconds": 225.046,
+      "cpu_user_seconds": 224.859375,
+      "cpu_kernel_seconds": 0,
+      "six_code_iat_checks_each_sample_match": true,
+      "nt_query_status": 0,
+      "tmp_temp_expected_utf16_units": 208,
+      "tmp_temp_observed_utf16_units": 283,
+      "userprofile_observed_expected_units": 209,
+      "environment_two_reads_stable": true,
+      "process_environment_atomicity_proven": false,
+      "early_retry_status": "0xc0000023",
+      "early_length_bytes": 566,
+      "early_maximum_length_bytes": 566,
+      "late_retry_frame": "skipped_trusted_retry_frame_unavailable",
+      "received_validated_continued": 51,
+      "pending_event": null
+    },
+    "cleanup": {
+      "job_profile_station_helpers_confirmed": true,
+      "entire_remote_fixture_deletion_proven": false
+    },
+    "evidence": {
+      "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/50c64e9e3-ci",
+      "run_sha256": "076ec7bb04d3f1a243ef2fd0aa1a0774441e6337836b21f44b205a2f1b3ec29b",
+      "windows_log_sha256": "3b938bb1019cb079918911b362c80f2cef200c5a411f7b0b5da81cd5d232d03b",
+      "log_audit_sha256": "3804f89263f739b20f367af9e9624ec2e0177a4dfd375ae7c640d6b46ccfeb79",
+      "independent_log_audit_sha256": "2fd07195c0fb5a6b8958546470a06452da6917d4e8b3a7d350536da15ad19fec",
+      "root_native_audit_sha256": "b51cde2422a4e0c4d87cb2096365ee55cd271fc6fd64b0140f984c50cdae1796",
+      "independent_native_audit_sha256": "21699a9deff7563f99b8d3c0e6e117a87d2f3298f9fa78ad3a44476e39536824",
+      "artifact_zip_sha256": "51a95443c5504861834394880f96bd94dce42815f9132c994f173816f6d01fca",
+      "all_artifact_api_size_digest_crc_verified": true,
+      "small_extraction_sha256": "8575625b9dad57239402998dec1efac63efbb86d755d6145724dc18cf7e77799",
+      "final_delivery_index_sha256": "55eb4ad5f866d6dc5b51ceb1e58e7a130e1daa394cd392a1332e533879417bbf",
+      "final_delivery_index_files": 68
+    },
+    "interpretation": "观测确认运行TEMP/TMP超出初始容量及当前不足重试数值闭合；官方确认AppContainer重定向。未采环境原值，不把源码拼接长度推导称为实际字符串或具体改写调用点证明；不沿早期栈回填晚期缺失帧。",
+    "official_reference": "https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer",
+    "localization": "无需本地化变更：默认关闭的内部观察与审计，没有用户文案或布局变化。",
+    "remaining": "修复本轮fresh profile原生路径绑定，真实CMD/PowerShell updated及最终源码门禁；G03真实跨应用拖放仍独立开放。"
+  },
+  "g09_native_profile_path_fix_20261003": {
+    "status": "implemented_local_gates_passed_windows_pending",
+    "source_base": "50c64e9e31f2ee014da10cc944534ebca727f75f",
+    "gap_closed": false,
+    "implementation": "显式原进程TOKEN_QUERY|TOKEN_IMPERSONATE查询原生LocalAppData，fresh SID路径由GetAppContainerFolderPath取得；无线程模拟，拒绝远程/reparse并按只读句柄FileID核验严格祖先身份，启动前重验。只改候选唯一LOCALAPPDATA值，不改其余配置、capability、Job、句柄继承或时限。profile目录句柄在原进程/Job/站/ACL清理后、DeleteProfile前释放。",
+    "new_pure_windows_tests": 8,
+    "existing_native_cleanup_test_enhanced": true,
+    "acceptance_source_bindings": 35,
+    "local_gates": {
+      "check_run": "r-l8jpa2nz",
+      "i18n_run": "r-86uezubi",
+      "i18n_pass": 11,
+      "python_run": "r-1ecxfzln",
+      "python_contract_pass": 21,
+      "all_short_roots_cleaned": true,
+      "receipt_sha256": "96473f38bcf62c06de8b71e7b78130abfbb0c27a8f47202b56839478a26e409a"
+    },
+    "root_source_review_sha256": "64cc807ace4bb2c928cb99a8e7a23b7020c70faa8ece9440dbac2ad0b50c866d",
+    "localization": "无需本地化变更：内部原生路径错误仍经原ProbeFailed英中映射；无用户文案或布局变化，i18n11项通过。",
+    "remaining": "Windows编译、新回归、KnownFolder token权限/路径映射和真实CMD及PowerShell更新尚待同提交运行；Mac检查不代替Windows执行。G03跨应用拖放独立开放，最终两平台源码门禁未完成。",
+    "independent_source_review_sha256": "1e32229409362fe6dc025ce9fd23c0d264721240a7c793445a2adf1ef34c76ee"
   }
 }

@@ -289,6 +289,14 @@ const SOURCES: &[(&str, &[u8])] = &[
         include_bytes!("../../../../crates/command/src/windows_station_bootstrap_tests.rs"),
     ),
     (
+        "crates/command/src/windows_appcontainer_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_console_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_console_tests.rs"),
+    ),
+    (
         "app/src/terminal/cli_agent_updates.rs",
         include_bytes!("../cli_agent_updates.rs"),
     ),

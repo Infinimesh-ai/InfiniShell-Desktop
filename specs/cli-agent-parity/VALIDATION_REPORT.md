@@ -1,5 +1,27 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：原生 profile 路径修复及提交前门禁
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。针对下述50c真实TMP/TEMP扩长证据，候选LOCALAPPDATA改用原进程token查询的原生基址；仅申请TOKEN_QUERY|TOKEN_IMPERSONATE，无线程模拟或环境回退。fresh SID路径由GetAppContainerFolderPath取得，原路径从卷根逐级以只读、不共享DELETE句柄锁住，拒绝reparse并比较严格FileID祖先链，启动前重查映射及身份；不猜测固定AC父级。API分配路径和SID文本按各自合同释放。
+
+只替换候选环境唯一既有LOCALAPPDATA值，大小写重复或缺键明确拒绝；HOME、USERPROFILE、APPDATA及CLI配置等其余原字节不变。零capability、Job、继承句柄、取消及产品时限未改。原进程/Job/站/ACL全部清理后，先释放profile目录句柄，再调用DeleteAppContainerProfile。新增8项纯回归及原真实空Job/ACL失败清理测试的持有/释放断言，Windows尚未执行。验收源码表33→35，补齐两份受影响的command测试文件，生产嵌入表不删减。
+
+本机cargo check `r-l8jpa2nz`通过，日志SHA `8e0a3c1accd156296242a12e2050e532b728ca1d35bf0b7b1e9af94fb697255c`；i18n11项 `r-86uezubi`通过，日志SHA `cb8d450a83e347d1c7f229748afb3d0289540b00e3fd0404ab9b69137d2efbaf`；Python来源合同21项 `r-1ecxfzln`通过。三个短TMPDIR均核实进程/launchd/打开文件释放并清理，门禁收据`96473f38bcf62c06de8b71e7b78130abfbb0c27a8f47202b56839478a26e409a`，根源码审查`64cc807ace4bb2c928cb99a8e7a23b7020c70faa8ece9440dbac2ad0b50c866d`、独审`1e32229409362fe6dc025ce9fd23c0d264721240a7c793445a2adf1ef34c76ee`，仓外`g09-native-profile-path-fix-v1`。已有编译警告保留。无需本地化变更：原生内部错误沿原ProbeFailed英中用户映射，不新增用户文案或布局。
+
+以上不证明Windows API权限、原生profile映射或真实更新成功；需精确提交的Windows编译/回归及CMD、PowerShell更新通过，再做最终源码门禁。G03跨应用真实拖放独立开放，旧50c和a53失败证据不改写。
+
+## 2026-10-03：原生临时路径实际改写与 GetTempPathW 不足重试
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确`50c64e9e31f2ee014da10cc944534ebca727f75f`的[37125688198](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37125688198)为failure。Windows check通过，普通nextest为warp1102＋command43共1145个唯一PASS；feature libtest的68个预期全名各一次ok，六组14/16/14/8/11/5，不用汇总数量替代逐名核验。实际ignored更新0通过／1失败，366.85秒，首CMD代次`5475a58e-d4cc-4fa5-845f-5ae5653b57aa`返回ProbeFailed，PowerShell未到达。原日志保留90条Rust诊断、5条编译警告汇总、1条Actions Node20警告，以及sccache停止时10061连接拒绝；没有nextest FAIL/LEAK/RETRY/FLAKY/TIMEOUT，不将前置非致命异常改写为无警告。
+
+新观察使用原来同进程/线程句柄、暂停计数、取消和256KiB共享读取预算，没有增加暂停次数或产品权限。15.065秒与240.111秒的样本均核三段函数代码SHA和三项IAT目标与固定映像一致，PBI原始NTSTATUS为0；运行TMP/TEMP各唯一、283个UTF16单元，均不匹配构造的208，USERPROFILE唯一209且匹配。两遍读取及指针一致只记observed_stable，process_atomicity_proven明确false。早期可信GetTempPathW重试释放返回帧的保存状态为`0xc0000023`，Length与MaximumLength均566字节：当前283单元的值超过初始261容量，重试容量等于值长而没有NUL余量，与固定代码不足重试机制闭合。此帧不是第一次查询现场；晚期无可信重试帧，明确skipped，不沿用早期栈。原身份绑定的225.046秒间用户CPU增加224.859375秒、内核增量0。
+
+微软[AppContainer合同](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)明确TMP/TEMP会重定向到独立profile。源码将LOCALAPPDATA指向私有cwd/data；结合profile与AC/Temp后缀的长度推导与283吻合，但观察故意没有采集环境原值，不能把这一推导写成实际路径字符串或具体改写调用点已证。下一步按本轮fresh SID绑定原生profile目录，保留配置隔离、零capability、严格Job及现有清理；修复效果尚未验证，不缩短某条CI目录或延长超时充当完成。
+
+33项来源与冻结提交/启动记录匹配，51调试事件全部验证并Continue、pending为空；原暂停均0→1→0。creation仍为delay_import_coverage_unsupported，未安装创建断点。GetThreadDesktop失败保留未知，未外推Node已执行JS。原manifest/exit/绑定、Job和AppContainer profile清理、双helper退出及站/登录会话消失证据齐全；远端整夹具删除未证。两份官方ZIP的API大小、SHA及全CRC已核，53份小文件安全提取，3份大TGZ留在完整ZIP中。主ZIP SHA `51a95443c5504861834394880f96bd94dce42815f9132c994f173816f6d01fca`；完整日志SHA `3b938bb1019cb079918911b362c80f2cef200c5a411f7b0b5da81cd5d232d03b`，日志独审`2fd07195c0fb5a6b8958546470a06452da6917d4e8b3a7d350536da15ad19fec`；根原生审计`b51cde2422a4e0c4d87cb2096365ee55cd271fc6fd64b0140f984c50cdae1796`，独审`21699a9deff7563f99b8d3c0e6e117a87d2f3298f9fa78ad3a44476e39536824`。原件在仓外`g08-build-preparation/50c64e9e3-ci`。
+
+50c提交前本机含取证feature的cargo check、i18n 11项及Python合同21项通过，短根均已核验退出并清理；收据`d010ea3a2d1daec8f7378ff4c4208d3b5bedb02d923eede89489d9b85df08b60`。本观察及审计无需本地化变更，没有用户文案或布局变化。真实更新失败不改记成功，G03拖放仍独立待验，最终源码门禁尚未运行。
+
 ## 2026-10-03：标准堆修复后的真实更新仍失败
 
 新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确`a53b3c49eca3afa4fa972984ec090badbc7c48e6`的[37118252587](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37118252587)已终态失败。源码检查、warp普通配置1102项及带native-probe-witness的command43项共1145 nextest通过，无FAIL／LEAK／RETRY／FLAKY／TIMEOUT；feature libtest仍为12＋14＋6＋11＋5共48项通过。新增CMD/PowerShell环境两项在实际Windows各普通PASS，32项取证仅feature执行，环境5项双配置通过；这些结果不代替原生更新。真实用例0通过／1失败，372.38秒、exit101、ProbeFailed，仍停于首CMD代次`514763af-d55f-49fa-97e6-dde2310dea45`，PowerShell未到达。

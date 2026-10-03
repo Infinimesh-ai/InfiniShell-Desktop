@@ -23,7 +23,7 @@
 | G08 | Mac 范围关闭 | 三 CLI 真实 SSH／tmux 图片、原消费者断连恢复、重复与旧回调保稿、权限拒绝及引用清理齐备；b47 两平台最终源码门禁通过 |
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
-| G03、G09 | 开放，共 2 项 | G03的Finder内部校准成功，普通Grok与TextEdit跨应用均未交付，需可交付手势或人工实测；G09 Mac功能链已齐，a53标准堆修复后首CMD仍ProbeFailed；同主线程224.962秒间累计224.71875秒CPU，早期普通堆仍在GetTempPathW/AppCompat创建链，晚期地址未知；PowerShell未到达，最终源码门禁待完成 |
+| G03、G09 | 开放，共 2 项 | G03普通Grok与TextEdit跨应用拖放均未交付，需可交付手势或人工实测；G09首CMD仍ProbeFailed，已证TMP/TEMP被重定向后283单元触发GetTempPathW不足重试，原生profile路径绑定已实现且Mac门禁通过；Windows真实更新及最终源码门禁待完成 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -258,6 +258,10 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-03 原生 profile 路径修复，目标平台待验**：使用显式原进程 token 查询原生 LocalAppData，并按 fresh SID 查询 profile；逐级拒绝重解析目录，以只读且不共享删除的句柄绑定祖先身份，启动前重验。仅替换候选环境唯一 LOCALAPPDATA，其余私有配置及零 capability、严格 Job、时限不变；清理顺序在删除 profile 前释放存储句柄。新增8项纯回归并增强原空Job/ACL清理测试，尚未在Windows执行。Mac含取证feature的cargo check、i18n11项、Python合同21项通过，三个短根已清理；门禁收据`96473f38bcf62c06de8b71e7b78130abfbb0c27a8f47202b56839478a26e409a`，完整来源绑定扩至35项。无需本地化变更：内部路径错误沿原英中错误映射，无布局变化。真实CMD/PowerShell成功及最终源码门禁仍待完成，**新增关闭0项**。
+
+- **2026-10-03 原生临时路径观察定位不足重试，仍开放**：精确`50c64e9e3`的[37125688198](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37125688198)前置nextest1145项及feature libtest68个预期全名各一次通过；真实首CMD仍ProbeFailed，0通过／1失败、366.85秒，PowerShell未到达。早晚三段代码及三项IAT全部匹配固定原件；运行TMP/TEMP各283个UTF16单元且偏离构造208，USERPROFILE209一致，两次读取稳定但不证明全进程原子性。早期可信重试帧status `0xc0000023`、Length=MaximumLength=566字节，与不足重试遗漏结束符容量数值闭合；晚期缺可信帧，不回填早期栈。微软[原生合同](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)明确AppContainer重定向TMP/TEMP；实际字符串及具体改写调用点未采。33源绑定、同原出生身份、51事件全部Continue及Job/profile/站/helper清理获证，远端整根删除未证。根审`b51cde2422a4e0c4d87cb2096365ee55cd271fc6fd64b0140f984c50cdae1796`，独审`21699a9deff7563f99b8d3c0e6e117a87d2f3298f9fa78ad3a44476e39536824`，仓外`50c64e9e3-ci`。下一步修复fresh profile原生路径绑定；观察及安全清理不计完成，**新增关闭0项**。
 
 - **2026-10-03 标准堆修复实测仍失败**：精确`a53b3c49e`的[37118252587](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37118252587)前置nextest1145项（warp1102、带native-probe-witness的command43）及feature libtest48项通过，新增两项环境测试实际Windows通过。真实首CMD仍ProbeFailed，0通过／1失败、372.38秒；PowerShell未到达。15.109至240.071秒同原主线程消耗224.25秒用户及0.46875秒内核CPU；早期为普通RtlFreeHeap→GetTempPathW/AppCompat创建链，晚期仅一个未知地址，不沿旧轮套符号或调试堆结论。49事件全Continue、31源及启动/退出绑定一致；本代Job、AppContainer、helper、窗口站和登录会话清理获证，整个远端夹具删除未证。根审`db1c5263080caa5b8283f588ab42e38e60bb16148bb2cc30a275ba1fb7f96ebf`，仓外`a53b3c49e-ci`。限定堆配置未解决阻塞，不再重复同一候选；先核查已获GetTempPathW调用点。**新增关闭0项**。
 - **2026-10-03 同原主线程配对实测，仍开放**：精确`2e9f8d60f`的[37112613018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37112613018)普通nextest1143项（warp1100、带native-probe-witness的command43）与feature libtest48项通过；真实用例1项失败，首CMD仍ProbeFailed。同PID/TID及两种创建时间绑定的15.118／240.046秒样本，用户CPU增加224.703125秒、墙钟224.928秒；早期调试分配、晚期调试释放/尾部校验均位于同CreateProcessW→AppCompat→GetTempPathW链，原暂停均0→1→0，失败字段均空。此证据支持限定CMD私有标准堆修复候选，但不证明修复成功。31源及启动/退出绑定一致，本代Job/AppContainer/私有站清理通过，整个远端夹具删除未证；根审`b99873d2467ad91b3e7cc6ca6a2b2cd024b6160f02dc3f201d2e9b8f3d7055c1`。**新增关闭0项**。
