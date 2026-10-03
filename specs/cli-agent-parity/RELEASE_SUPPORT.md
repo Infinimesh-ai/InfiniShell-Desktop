@@ -70,9 +70,9 @@ CLI 升级后若版本或能力没有验证，应保留普通终端入口和本�
 | --- | --- | --- |
 | Codex | `codex-warp 0.4.0` 与随附持久来源、固定通知修补 | 安装与原生 hooks 信任分别检查；在 Codex 内使用 `/hooks` 审核并决定信任当前定义。应用不代写信任摘要 |
 | Claude | `warp 2.2.0` 与固定通知修补 | `2.1.0` 仅是已审计的升级来源；禁用状态和无关用户设置应保留 |
-| Grok | 随附 `infinishell-grok 0.1.5` 与原生通知桥接 | 需要 Node.js 18 或更高版本；桥接补齐 `1.0.41` 初始 hook 加载，按事件去重，无需手动 reload；原生 `plugin update` 成功不证明实际文件已更新，应用另核对安装缓存完整性 |
+| Grok | 随附 `infinishell-grok 0.1.6` 与原生通知桥接 | 需要 Node.js 18 或更高版本；桥接补齐 `1.0.41` 初始 hook 加载，按事件去重，无需手动 reload；原生 `plugin update` 成功不证明实际文件已更新，应用另核对安装缓存完整性 |
 
-Grok 安装状态与启用状态分开。已禁用的插件不会因修复而自动重新启用。受控旧版 `0.1.0`–`0.1.4` 可迁移到 `0.1.5`；同版本受控文件损坏可以由用户触发修复，未知来源或并发编辑不能被直接覆盖。升级失败时仅回退属于此次操作的文件和配置，无法确认所有权时保留恢复资料并报告失败。详细操作与各阶段证据见 [通知兼容说明](PLUGIN_COMPATIBILITY.md)、[Codex 持久来源](CODEX_PLUGIN_CACHE_REFRESH.md)、[Claude 升级事务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md) 和 [Grok 完整性](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/GROK_PLUGIN_INTEGRITY_VERIFICATION.md)。
+Grok 安装状态与启用状态分开。已禁用的插件不会因修复而自动重新启用。受控旧版 `0.1.0`–`0.1.5` 可迁移到 `0.1.6`；同版本受控文件损坏可以由用户触发修复，未知来源或并发编辑不能被直接覆盖。升级失败时仅回退属于此次操作的文件和配置，无法确认所有权时保留恢复资料并报告失败。详细操作与各阶段证据见 [通知兼容说明](PLUGIN_COMPATIBILITY.md)、[Codex 持久来源](CODEX_PLUGIN_CACHE_REFRESH.md)、[Claude 升级事务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md) 和 [Grok 完整性](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/GROK_PLUGIN_INTEGRITY_VERIFICATION.md)。
 
 Grok 原生审批通知有时只有会话标识、没有回合标识。应用仅在可信的当前会话上显示“需要操作”提醒，不据此宣称当前回合阻塞或成功；工具完成或后续输入会清除提醒。插件通知不授予工具权限。
 

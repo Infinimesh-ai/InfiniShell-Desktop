@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03首拖初始化已修，新Mac窗口待真实单次拖放确认；6296源码门禁已终审为整轮failure，Linux SSH通知失败、Windows成功但菜单用例1条LEAK保留。新f576 Linux编译和生命周期通过，通知步骤37再次失败，具体诊断待官方完整日志，不假定同因。G09私有盘根、候选父进程/标准流绑定和原监督Job双阶段接管已提交，完整Windows原生更新恢复正在验收，尚无通过结论。本轮新增关闭0项。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。用户已确认6296新Mac窗口真实首拖符合预期，G03仅待最终源码门禁。f576 Linux通知失败已定位独立500ms协议查询超时，尚未发送；已将协议核验与发送合并为一次进程并升级插件0.1.6，本机编译/定向/实际已就绪worker及英中门禁通过，最终两平台源码门禁待验，原发送期限/帧预算和旧版合同保留。G09私有盘根的完整Windows原生更新恢复仍在验收。本轮新增关闭0项。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -9093,7 +9093,7 @@
     "gap_closed": false
   },
   "g03_first_drop_fix_20261004": {
-    "status": "implemented_pending_real_gui_and_source_gates",
+    "status": "real_gui_accepted_final_source_gates_pending",
     "source_files_sha256": {
       "app/src/terminal/input.rs": "b450ad04ec032748a768fbe5a74786a485c893f247abbe76d58bf631428dfc68",
       "app/src/terminal/view/grok_owned_input_tests.rs": "426d17d3b933f79050aba9d2c453342f4b112847498220f3e7f3916a0deaadf0"
@@ -9103,7 +9103,7 @@
     "i18n_tests_passed": 11,
     "cargo_check": "passed",
     "localization": "无需本地化变更：无新增文案/键/布局；英中既有图片、非图片和失效目标文案复核一致，i18n11项通过。",
-    "remaining": "精确新构建首次真实拖放及最终两平台源码门禁。",
+    "remaining": "最终两平台源码门禁；真实首拖已获用户确认。",
     "gap_closed": false
   },
   "g09_private_device_map_20261004": {
@@ -9176,7 +9176,7 @@
       "first_drop": "not_compiled_unix_cfg",
       "full_log_sha256": "0775121a2096c86b7b1133cad86af7272bbf7605eb269914b750ccc80b49958d"
     },
-    "mac_first_drop_real_gui": "pending_user",
+    "mac_first_drop_real_gui": "user_confirmed_pass_on_6296_build",
     "newly_closed": [],
     "documentation_gate": {
       "cargo_check": "passed",
@@ -9189,12 +9189,58 @@
   "f576_source_and_native_runs_20261004": {
     "commit": "f5763d34e6ed8a1fddb5c4c23ae9fe7c7d1f8449",
     "linux_run": 37145283547,
-    "linux_status": "in_progress_with_step_37_failure",
+    "linux_status": "completed_failure",
     "linux_check_and_lifecycle": "passed",
-    "linux_failure_details": "pending_official_complete_log; do not assume same cause as6296",
+    "linux_failure_details": {
+      "test": "DetachedGrokHookTests.test_ssh_terminal_without_bootstrap_still_uses_real_pty",
+      "stage": "protocol",
+      "elapsed_ms": 508.508874,
+      "error_code": "ETIMEDOUT",
+      "signal": "SIGKILL",
+      "exit_code": null,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "send_invoked": false,
+      "cause_of_slow_start": "unknown",
+      "not_attributed_to_6296": true,
+      "review_sha256": "d13a4285d59dcffbf16a732f80b84706bcb8e4a621f9ef68d3947c3e1400c3e6"
+    },
     "windows_run": 37145335699,
     "windows_status": "in_progress",
     "windows_native_acceptance": "not_yet_proven",
     "newly_closed": []
+  },
+  "g03_first_drop_user_acceptance_20261004": {
+    "status": "accepted_final_source_gates_pending",
+    "user_text": "真实首拖已经确认，已经满足预期了",
+    "host_commit": "6296fb36a2adee2c9b670f68050f7929a014efab",
+    "native_version": "1.0.41+infinishell.session-notifications.5",
+    "run_id": "r-r6gr9mus",
+    "evidence": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g03-preparation/first-drop-user-confirmation-6296-v1.safe.json",
+    "evidence_sha256": "07afe5f25c1f5b1f182a9dce0827444d0b33471eaee089f44838b641224b096f",
+    "new_screenshot_or_model_ack_claimed": false,
+    "gap_closed": false
+  },
+  "grok_guarded_notification_20261004": {
+    "status": "local_gates_passed_final_source_gates_pending",
+    "base_commit": "7ebc649484f818e1b9c70b32ab5a98e670c57249",
+    "plugin_version": "0.1.6",
+    "implementation": "单次cli-agent-notify --require-protocol 1在读取输入/打开终端前守卫协议，完整写入后精确回复协议JSON。取消独立500ms查询；保留原2600ms发送上限、总期限、帧预算、锁及终端绑定，不自动重投。旧query和空stdout发送合同保留；0.1.5四文件原字节冻结用于受控升级和备份。",
+    "localization": "无需本地化变更：内部隐藏参数和传输修复；英中既有插件失败/恢复/兼容提示语义一致，无文案键或布局变化。bundled README同步中英文合同说明。",
+    "newly_closed": [],
+    "local_gate_receipt_sha256": "828ec7a8fe1057352f245cd8a61d6fa788c8156f954a5ab2b9fbec4e2114fc70",
+    "local_gates": {
+      "focused_nextest_pass": 97,
+      "i18n_pass": 11,
+      "node_contract_pass": 19,
+      "python_diagnostic_pass": 14,
+      "python_installer_pass": 15,
+      "real_worker_pass": 24,
+      "real_worker_skip": 1
+    },
+    "real_worker_boundary": "25项中24通过、fish缺失1跳过；新复制worker冷启动协议预检7.558秒，后续验已就绪路径，不称冷hook启动通过。",
+    "all_completed_short_roots_cleaned": true,
+    "source_freeze_sha256": "b2a74844f9ca048c7c8f28b81b84ba9832aec26f669bb8dee7fd4b8d271e9031",
+    "g09_source_impact_sha256": "ac3013de82eccbbd662cd24ce525891719e1d3f973ee172e532f6abaa8a4033f"
   }
 }

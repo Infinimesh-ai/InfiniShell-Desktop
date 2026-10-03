@@ -14,7 +14,7 @@ import time
 
 DIAGNOSTIC_LIMIT = 4096
 NATIVE_ERRORS = (
-    "invalid_payload", "frame_too_large", "input_unavailable", "input_timeout",
+    "protocol_mismatch", "invalid_payload", "frame_too_large", "input_unavailable", "input_timeout",
     "terminal_unavailable", "tmux_unavailable", "lock_unavailable", "lock_timeout",
     "write_failed", "write_timeout",
     "send_timeout_prepare", "send_timeout_terminal", "send_timeout_cache",
@@ -47,7 +47,8 @@ emit({stage: "preload", elapsed_ms: 0, exit_code: null, signal: null,
   stdout_bytes: 0, stderr_bytes: 0, error_code: null});
 child.execFileSync = function(file, args, options) {
   const stage = file === expected && Array.isArray(args) && args[0] === "cli-agent-notify"
-    ? args.length === 1 ? "send"
+    ? args.length === 1
+      || args.length === 3 && args[1] === "--require-protocol" && args[2] === "1" ? "send"
       : args.length === 2 && args[1] === "--protocol-version" ? "protocol" : null : null;
   if (!stage) return execute.apply(this, arguments);
   const started = process.hrtime.bigint();
@@ -92,9 +93,9 @@ def worker_diagnostics(raw):
         if not 1 <= len(rows) <= 3 or not raw.endswith(b"\n"):
             raise ValueError
         fields = {"stage", "elapsed_ms", "exit_code", "signal", "stdout_bytes", "stderr_bytes", "error_code"}
-        for index, row in enumerate(rows):
+        for row in rows:
             if (not isinstance(row, dict) or set(row) != fields
-                    or row["stage"] != ("preload", "protocol", "send")[index]
+                    or row["stage"] not in ("preload", "protocol", "send")
                     or type(row["elapsed_ms"]) not in (int, float)
                     or not math.isfinite(row["elapsed_ms"]) or not 0 <= row["elapsed_ms"] <= 60000
                     or row["signal"] not in DIAGNOSTIC_SIGNALS | {None}
@@ -106,6 +107,12 @@ def worker_diagnostics(raw):
                     raise ValueError
             if row["exit_code"] == 0 and (row["signal"] is not None or row["error_code"] is not None):
                 raise ValueError
+        # 新发送在同一进程内守卫协议；不能补造一次未发生的独立查询。
+        # 保留旧 hook 的分阶段诊断，但仍拒绝重试、乱序和混合序列。
+        if tuple(row["stage"] for row in rows) not in (
+                ("preload",), ("preload", "send"), ("preload", "protocol"),
+                ("preload", "protocol", "send")):
+            raise ValueError
         if len(rows) == 3 and (rows[1]["exit_code"] != 0 or rows[1]["error_code"] is not None):
             raise ValueError
         return {"status": "captured", "events": rows}

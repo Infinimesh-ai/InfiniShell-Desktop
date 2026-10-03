@@ -26,6 +26,19 @@ def encode(*rows):
 
 
 class WorkerDiagnosticTests(unittest.TestCase):
+    def test_guarded_send_has_no_synthetic_protocol_stage(self):
+        rows = [row("preload"), row("send", exit_code=0, elapsed_ms=2.5,
+                                   stdout_bytes=len(b'{"protocol":1,"maxFrameBytes":4096}\n'),
+                                   stderr_bytes=None)]
+        self.assertEqual(worker_diagnostics(encode(*rows)), {"status": "captured", "events": rows})
+
+    def test_guarded_send_protocol_mismatch_and_timeout_keep_the_send_stage(self):
+        for values in ({"exit_code": 1, "error_code": "cli_agent_notify_protocol_mismatch"},
+                       {"signal": "SIGKILL", "error_code": "ETIMEDOUT", "elapsed_ms": 2600}):
+            with self.subTest(values=values):
+                rows = [row("preload"), row("send", **values)]
+                self.assertEqual(worker_diagnostics(encode(*rows)), {"status": "captured", "events": rows})
+
     def test_native_terminal_error_is_preserved_without_stderr_text(self):
         rows = [row("preload"), row("protocol", exit_code=0, elapsed_ms=0.5, stdout_bytes=41,
                                    stderr_bytes=None),
@@ -75,7 +88,9 @@ class WorkerDiagnosticTests(unittest.TestCase):
                                  {"status": "invalid"})
 
     def test_stage_order_duplicates_and_send_after_failed_protocol_are_rejected(self):
-        cases = [[row("send")], [row("preload"), row("send")],
+        cases = [[row("send")], [row("protocol"), row("send")],
+                 [row("preload"), row("send"), row("send")],
+                 [row("preload"), row("send"), row("protocol")],
                  [row("preload"), row("protocol"), row("protocol")],
                  [row("preload"), row("protocol", exit_code=1, error_code="unknown"), row("send")],
                  [row("preload")] * 4]
@@ -128,7 +143,7 @@ class WorkerDiagnosticTests(unittest.TestCase):
 
             with patch("run_installed_grok_hook.subprocess.Popen", side_effect=fail_spawn):
                 with self.assertRaisesRegex(RuntimeError, "synthetic-spawn-failure"):
-                    verify_installed_hook(*files[0], *files[1], *files[2], root, "0.1.5", environment)
+                    verify_installed_hook(*files[0], *files[1], *files[2], root, "0.1.6", environment)
             self.assertEqual(environment, before_environment)
             self.assertEqual(set(root.iterdir()), before_files)
             for descriptor in observed.values():

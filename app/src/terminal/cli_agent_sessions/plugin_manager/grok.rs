@@ -26,7 +26,7 @@ use super::{
 use crate::util::path::resolve_executable_in_path;
 
 const PLUGIN_NAME: &str = "infinishell-grok";
-const PLUGIN_VERSION: &str = "0.1.5";
+const PLUGIN_VERSION: &str = "0.1.6";
 const TESTED_GROK_VERSION: &str = "1.0.30";
 const STARTUP_BRIDGE_NAME: &str = "infinishell-1.0.41";
 // 仅认可已发布 Mac 补桥的完整原字节，并要求原生 JSON 同时匹配本次安装。
@@ -102,6 +102,25 @@ const LEGACY_014_SHA256: &[(&str, &str)] = &[
     (
         "README.md",
         "50308b3c9a7822afd1f6985ec049ffabdf62b5d0f027d924e6b22f046d84f534",
+    ),
+];
+// 0.1.5 的四文件原字节来自已发布提交；原子通知升级必须保留旧来源和恢复副本。
+const LEGACY_015_SHA256: &[(&str, &str)] = &[
+    (
+        ".grok-plugin/plugin.json",
+        "5c4b3c4a4c46f141d99e5ac7542cb1c9772ee8aa68075aa53c6445acc0b21e9a",
+    ),
+    (
+        "hooks/hooks.json",
+        "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe",
+    ),
+    (
+        "hooks/notify.cjs",
+        "f6c0ee3e79a38de6412fffd2c7cf4bcd7f7abc7c43230a2dd19f96bb31a2ad36",
+    ),
+    (
+        "README.md",
+        "66fd9cf96faba1d3495c30c5751cec42386a14729a9426ece6c3068c453f6999",
     ),
 ];
 const BUNDLED_FILES: &[(&str, &str)] = &[
@@ -731,7 +750,7 @@ fn notification_integrity(root: &Path) -> PluginComponentIntegrity {
     }
     if !matches!(
         plugin.version.as_str(),
-        "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4"
+        "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4" | "0.1.5"
     ) && plugin.version != PLUGIN_VERSION
     {
         return PluginComponentIntegrity::Unverified;
@@ -1321,8 +1340,10 @@ fn plugin_tree(root: &Path, allow_missing: bool) -> io::Result<PluginTree> {
 
 fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> {
     let tree = plugin_tree(root, false)?;
-    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4")
-        && version != PLUGIN_VERSION
+    if !matches!(
+        version,
+        "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4" | "0.1.5"
+    ) && version != PLUGIN_VERSION
     {
         return Err(invalid_tree());
     }
@@ -1361,6 +1382,11 @@ fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> 
                     name == *expected_name && digest == *expected_digest
                 }),
             ("0.1.4", name) => LEGACY_014_SHA256
+                .iter()
+                .any(|(expected_name, expected_digest)| {
+                    name == *expected_name && digest == *expected_digest
+                }),
+            ("0.1.5", name) => LEGACY_015_SHA256
                 .iter()
                 .any(|(expected_name, expected_digest)| {
                     name == *expected_name && digest == *expected_digest

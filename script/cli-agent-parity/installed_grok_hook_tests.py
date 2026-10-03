@@ -68,7 +68,7 @@ def collect_terminal_output(descriptor, *, expect_notification):
 def setUpModule():
     if os.name != "posix":
         return
-    # 复制后的 macOS 可执行文件首次启动可明显慢于 hook 的 500 ms 协议探测预算。
+    # 复制后的 macOS 可执行文件首次启动可能受文件属性处理影响。
     # 单独核对冷启动文件属性和协议，再验收已就绪 worker 的真实终端路径；不把预热算作 hook 投递。
     worker = os.environ.get("INFINISHELL_TEST_NOTIFY_WORKER")
     if not worker:
@@ -118,7 +118,7 @@ class InstalledGrokHookTests(unittest.TestCase):
         result = self.verify()
         self.assertTrue(result["main_entry_verified"])
         self.assertEqual(result["notification_channel"], "native_worker_to_unix_controlling_tty")
-        self.assertEqual(result["plugin_version"], "0.1.5")
+        self.assertEqual(result["plugin_version"], "0.1.6")
         self.assertEqual(result["worker_sha256"], self.worker_sha)
         self.assertEqual(result["stdout_bytes"], 0)
         self.assertEqual(result["stderr_bytes"], 0)
@@ -201,11 +201,11 @@ class DetachedGrokHookTests(unittest.TestCase):
     def diagnostic_summary(self):
         return "worker_diagnostics=" + json.dumps(self.hook_diagnostics, ensure_ascii=True, separators=(",", ":"))
 
-    def run_hook(self, extra, hook=None):
+    def run_hook(self, extra, hook=None, *, invocation="require(process.argv[1]).main();"):
         # 和 Grok 的 hook 一样真正 setsid 且三条标准流都是管道；先证明 /dev/tty 报 ENXIO。
         check = ("const fs=require('node:fs');try {const fd=fs.openSync('/dev/tty','w');"
                  "fs.closeSync(fd);process.exit(90)} catch(e) {if(e.code!=='ENXIO')process.exit(91)};"
-                 "require(process.argv[1]).main();")
+                 + invocation)
         # 匿名诊断文件只传给原 Node；不传入 PTY，不改变 setsid、环境或原调用次数。
         with tempfile.TemporaryFile(mode="w+b", dir=self.root) as diagnostic_file, \
                 tempfile.NamedTemporaryFile(mode="w", prefix="hook-diagnostic-", suffix=".cjs",
@@ -250,7 +250,7 @@ class DetachedGrokHookTests(unittest.TestCase):
             raise AssertionError(f"terminal_notification_json_invalid: {summary}") from None
         self.assertTrue(isinstance(event, dict), summary)
         for field, expected in (("event", "session_start"), ("session_id", "detached-terminal-test"),
-                                ("plugin_version", "0.1.5"), ("agent", "grok")):
+                                ("plugin_version", "0.1.6"), ("agent", "grok")):
             self.assertTrue(event.get(field) == expected, f"terminal_notification_{field}_invalid: {summary}")
 
     def check_bootstrap_refresh(self, shell, filename, marker, tail):
@@ -294,6 +294,16 @@ class DetachedGrokHookTests(unittest.TestCase):
 
     def test_ssh_terminal_without_bootstrap_still_uses_real_pty(self):
         self.run_hook({"SSH_TTY": self.terminals[0][2]})
+        self.assert_notification(self.output(0, expect_notification=True))
+        self.assertEqual(self.output(1), b"")
+
+    def test_guarded_send_requires_real_worker_success_receipt_and_target_pty_frame(self):
+        # main 安静降级；另以同一真实发送的返回值核对成功收据，不替代既有 main 用例。
+        self.run_hook({"SSH_TTY": self.terminals[0][2]}, invocation=(
+            "const hook=require(process.argv[1]);"
+            "const notification=hook.makeNotification(hook.normalize("
+            "JSON.parse(fs.readFileSync(0,'utf8')),process.env));"
+            "if(!notification||hook.sendNotification(notification,process.env)!==true)process.exit(92);"))
         self.assert_notification(self.output(0, expect_notification=True))
         self.assertEqual(self.output(1), b"")
 

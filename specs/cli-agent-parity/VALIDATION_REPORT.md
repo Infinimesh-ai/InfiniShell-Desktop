@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：真实首拖确认与通知协议启动修复
+
+用户确认修复后真实首拖已满足预期：`6296fb36a` 的私有 Mac 窗口 `r-r6gr9mus`、固定 Grok `1.0.41+infinishell.session-notifications.5`，未先打开富输入，一次拖入上方终端即可展开并出现图片卡。人工收据 SHA `07afe5f25c1f5b1f182a9dce0827444d0b33471eaee089f44838b641224b096f`；未据此声称新截图、模型 ACK 或新的隐藏重拖操作。G03 的真实首拖阻塞解除，仅待最终源码门禁。
+
+`f5763d34e` 的 [Linux 门禁 37145283547](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145283547) 终态失败。官方完整日志确认 SSH 用例在独立协议查询启动 508.508874ms 后 ETIMEDOUT/SIGKILL，stdout/stderr 均零字节，发送未调用；慢启动原因未知，不回填 6296 的旧故障根因。终审 SHA `d13a4285d59dcffbf16a732f80b84706bcb8e4a621f9ef68d3947c3e1400c3e6`。本次将协议核验合入一次发送，完整写入后才返回精确协议收据；原期限、帧预算、锁和终端绑定不变、不重投。插件升为0.1.6，0.1.5原配方及备份保护保留。当前最终两平台源码门禁待完成；G09的Windows完整原生更新验收仍运行。无需本地化变更，既有英中失败/恢复提示语义一致，README同步中英文合同说明。
+
+本机冻结源码门禁通过：cargo check/build、97项定向nextest、i18n11项、Node19项、Python诊断14项及安装器合同15项；真实worker 25项中24通过、fish缺失1跳过，包含严格成功收据和目标PTY原帧。新复制worker冷启动协议预检7.558秒，后续仅验已就绪路径，不称冷hook启动或应用接收确认。首轮安装器版本负例过时导致3处断言失败，修正旧/未来版本集合后通过，原失败保留。门禁收据SHA `828ec7a8fe1057352f245cd8a61d6fa788c8156f954a5ab2b9fbec4e2114fc70`，仓外 `notify-guarded-send-v1/local-gates-final.safe.json`；完成短根均清理。G09冻结42项来源逐字节未变，不把f576原生结果冒充新整二进制重跑。最终两平台源码门禁仍待验。
+
+本轮新增关闭0项；9关闭／G03、G09开放／V01、V02、V05移交，PR保持草稿。
+
 ## 2026-10-04：6296 首拖源码门禁终审及 f576 待验边界
 
 **2026-10-04 首拖源码门禁终审，仍开放**：`6296fb36a` 的[37140741806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37140741806)已结束，Windows success、Linux failure，整轮 failure。Linux 普通 nextest 5428 项通过，新首拖用例逐名普通PASS；原生通知 Python 24项为21通过／1失败／2跳过，SSH无bootstrap用例PTY零字节超时。Windows 普通 nextest 5056项通过，另1条 `terminal::input::tests::test_ai_context_menu_preserves_lock_state` LEAK单列保留；首拖夹具受Unix cfg限制，不能计Windows执行。两边check及各11项i18n通过，另各81项rust-genai通过；无nextest FAIL／RETRY／FLAKY不代表整轮成功。完整终审SHA `e7718d52358061a948207c871dba9253d554c2ef7bede47e0e7c708534b3a3f4`，仓外 `6296fb36a-ci/final-review.safe.json`。新 `f5763d34e` 的[Linux37145283547](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145283547)已通过编译／生命周期组，但通知步骤37再次失败；具体用例及新诊断待官方完整日志，不假定同因。其[Windows37145335699](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145335699)完整原生更新验收已开始，尚无结果。Mac修复窗口及未操作的首拖现场保留待用户确认。**本轮新增关闭0项，9关闭／G03、G09开放／V01、V02、V05移交，PR保持草稿。**

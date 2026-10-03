@@ -23,6 +23,8 @@ const PROTOCOL_REPLY: &[u8] = b"{\"protocol\":1,\"maxFrameBytes\":4096}\n";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum HookWriteError {
+    #[error("cli_agent_notify_protocol_mismatch")]
+    ProtocolMismatch,
     #[error("cli_agent_notify_invalid_payload")]
     InvalidPayload,
     #[error("cli_agent_notify_frame_too_large")]
@@ -184,7 +186,11 @@ fn read_input(mut input: impl io::Read) -> Result<Vec<u8>> {
 
 /// 只能从一次性 worker 入口调用：超时后入口退出，内核关闭所有句柄并释放锁。
 /// 成功仅说明终端写入完成，不能视为应用已接受通知或允许重投。
-pub(crate) fn run_worker(protocol_version: bool) -> Result<()> {
+pub(crate) fn run_worker(protocol_version: bool, require_protocol: Option<u32>) -> Result<()> {
+    // 在读取输入或打开终端前核对协议，避免查询与发送之间再派生一个 worker。
+    if require_protocol.is_some_and(|version| version != 1 || protocol_version) {
+        return Err(HookWriteError::ProtocolMismatch);
+    }
     if protocol_version {
         return io::stdout()
             .write_all(PROTOCOL_REPLY)
@@ -221,7 +227,13 @@ pub(crate) fn run_worker(protocol_version: bool) -> Result<()> {
                     _ => "unknown",
                 })
             }
-        })?
+        })??;
+    if require_protocol.is_some() {
+        io::stdout()
+            .write_all(PROTOCOL_REPLY)
+            .map_err(|_| HookWriteError::WriteFailed)?;
+    }
+    Ok(())
 }
 
 fn send_notification(notification: Notification, progress: &AtomicU8) -> Result<()> {

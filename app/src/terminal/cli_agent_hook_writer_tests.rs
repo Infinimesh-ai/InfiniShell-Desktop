@@ -20,6 +20,114 @@ fn parsed(value: &Value) -> Notification {
 }
 
 #[test]
+fn worker_rejects_unknown_protocol_and_conflicting_modes_before_input() {
+    // 直接调用也必须先拒绝；不能依赖 CLI 解析拦截后才避免读取测试进程的 stdin。
+    for (query, protocol) in [
+        (false, 0),
+        (false, 2),
+        (false, u32::MAX),
+        (true, 1),
+        (true, 2),
+    ] {
+        assert_eq!(
+            run_worker(query, Some(protocol)),
+            Err(HookWriteError::ProtocolMismatch)
+        );
+    }
+}
+
+const PROTOCOL_WORKER_ENV: &str = "INFINISHELL_TEST_NOTIFY_PROTOCOL_WORKER";
+const PROTOCOL_WORKER_FILTER: &str =
+    "terminal::cli_agent_hook_writer::tests::protocol_worker_subprocess";
+const PROTOCOL_WORKER_START: &str = "NOTIFY_PROTOCOL_WORKER_START\n";
+const PROTOCOL_WORKER_END: &str = "NOTIFY_PROTOCOL_WORKER_END\n";
+
+#[test]
+#[ignore = "只供协议 stdout 合同通过精确过滤器调用"]
+fn protocol_worker_subprocess() {
+    let Ok(mode) = std::env::var(PROTOCOL_WORKER_ENV) else {
+        return;
+    };
+    let (query, required, expected) = match mode.as_str() {
+        "query" => (true, None, Ok(())),
+        "legacy-invalid" => (false, None, Err(HookWriteError::InvalidPayload)),
+        "required-invalid" => (false, Some(1), Err(HookWriteError::InvalidPayload)),
+        "unsupported" => (false, Some(2), Err(HookWriteError::ProtocolMismatch)),
+        value => panic!("未知协议子测试模式：{value}"),
+    };
+    io::stdout()
+        .write_all(PROTOCOL_WORKER_START.as_bytes())
+        .unwrap();
+    io::stdout().flush().unwrap();
+    assert_eq!(run_worker(query, required), expected);
+    io::stdout()
+        .write_all(PROTOCOL_WORKER_END.as_bytes())
+        .unwrap();
+    io::stdout().flush().unwrap();
+}
+
+fn protocol_worker_stdout(mode: &str, input: Option<&[u8]>) -> String {
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args([
+            "--ignored",
+            "--exact",
+            PROTOCOL_WORKER_FILTER,
+            "--nocapture",
+        ])
+        .env(PROTOCOL_WORKER_ENV, mode)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    command.creation_flags(0);
+    let mut child = ChildGuard(command.spawn().unwrap());
+    if let Some(input) = input {
+        child.0.stdin.take().unwrap().write_all(input).unwrap();
+    }
+    // 查询及未知协议故意保留 stdin 写端，不能依靠 EOF 才完成协议分支。
+    let stdout = child.0.stdout.take().unwrap();
+    let output = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.take(65536).read_to_end(&mut bytes).unwrap();
+        String::from_utf8(bytes).unwrap()
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            break status;
+        }
+        assert!(Instant::now() < deadline, "协议子测试未按期退出");
+        thread::sleep(Duration::from_millis(10));
+    };
+    let output = output.join().unwrap();
+    assert!(status.success(), "协议子测试失败：{output}");
+    output
+        .split_once(PROTOCOL_WORKER_START)
+        .unwrap()
+        .1
+        .split_once(PROTOCOL_WORKER_END)
+        .unwrap()
+        .0
+        .to_owned()
+}
+
+#[test]
+fn legacy_query_keeps_exact_reply_without_reading_stdin() {
+    assert_eq!(
+        protocol_worker_stdout("query", None),
+        "{\"protocol\":1,\"maxFrameBytes\":4096}\n"
+    );
+}
+
+#[test]
+fn rejected_sends_do_not_emit_a_successful_protocol_reply() {
+    assert!(protocol_worker_stdout("legacy-invalid", Some(b"invalid-json")).is_empty());
+    assert!(protocol_worker_stdout("required-invalid", Some(b"invalid-json")).is_empty());
+    assert!(protocol_worker_stdout("unsupported", None).is_empty());
+}
+
+#[test]
 fn accepts_only_the_declared_grok_events_and_identity() {
     for event in [
         "session_start",
