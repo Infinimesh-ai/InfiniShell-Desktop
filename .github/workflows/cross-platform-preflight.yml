@@ -120,7 +120,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 原生调试范围；g09_tokens 验证 NUL/私有桌面，g09_netcredentials 仅验证两段窗口站候选
+        description: Windows 原生调试范围；g09_tokens 验证 NUL/私有桌面，g09_netcredentials 验证两段窗口站，codex_hooks 仅复验固定 0.156.1 hooks
         required: true
         default: all
         type: choice
@@ -130,6 +130,7 @@ on:
           - nul_token
           - g09_tokens
           - g09_netcredentials
+          - codex_hooks
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -180,6 +181,12 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("windows_atomic_debug_scope") == "codex_hooks":
+              required = {"run_windows", "run_atomic_windows_debug"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name, False) for name in required):
+                  sys.exit("固定 Codex hooks 复验只允许单独 Windows 范围：" + ", ".join(sorted(conflicts)))
           if inputs.get("run_windows_npm_native_witness", False):
               required = {"run_windows", "windows_grok_installer_only", "run_windows_codex_npm_updates", "run_windows_npm_native_witness"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "all", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -1085,12 +1092,67 @@ jobs:
           [[ "$version" == *"$EXPECTED_TAG"* ]]
           test -d resources
 
+  windows_codex_hooks:
+    name: Windows fixed Codex 0.156.1 hooks
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'codex_hooks' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Prepare job-local Python for fixed Codex hook verification
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
+
+      - name: Test fixed Codex Windows hook contracts
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/codex_windows_hook_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Codex Windows hook contract tests failed' }
+
+      # 复用正式入口和退出判定；本范围不执行旧版、ConPTY、更新事务或 Cargo。
+      - name: Verify fixed Codex 0.156.1 Windows native hooks without model requests
+        shell: pwsh
+        timeout-minutes: 20
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash with msys-2.0.dll is required for Codex hooks' }
+          $env:INFINISHELL_GIT_BASH_EXE = (Resolve-Path $gitBash).Path
+          $env:INFINISHELL_JQ_EXE = (Get-Command jq.exe -ErrorAction Stop).Source
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_hooks.py" --codex-version 0.156.1 --repo "$env:GITHUB_WORKSPACE" --architecture x86_64 --download-dir "$env:RUNNER_TEMP\codex-01561-hook-inputs" --bash-executable "$env:INFINISHELL_GIT_BASH_EXE" --jq-executable "$env:INFINISHELL_JQ_EXE" --output "$env:RUNNER_TEMP\codex-01561-windows-native-hooks.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
+
+      - name: Preserve fixed Codex 0.156.1 Windows native hook evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-01561-windows-native-hooks-${{ github.sha }}
+          path: ${{ runner.temp }}/codex-01561-windows-native-hooks.json
+          if-no-files-found: error
+          retention-days: 14
+
   windows:
     name: Windows x64
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows)
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks')
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:

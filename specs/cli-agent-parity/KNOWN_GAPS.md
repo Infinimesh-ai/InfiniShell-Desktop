@@ -257,6 +257,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-03 固定 Codex hooks 缩小复验范围，仍开放**：既有工作流新增独占codex_hooks choice，复用同一0.156.1探针、退出时限和证据合同，不重复其他原生矩阵。actionlint、28范围组合、旧结构/原命令等价与check通过，短根清理；门禁索引 `11c0552ca3e21fc9547d6ccd5888c4db8f65acead4e330f1b08a45dd62e09931`。原生结果仍待独立复验；不影响当前363首CMD运行。无需本地化变更，**新增关闭0项**。
+
 - **2026-10-03 取证夹具共享冲突修复，仍开放**：精确822的[37089624639](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37089624639)普通1138项通过、ce6和i18n各11项，取证feature已编译；snapshot首组8项中4通过/4失败，原件为ReOpenFile Win32 32，其余17项取证、feature ce6再验与首CMD未执行。完整日志及唯一官方环境ZIP已核验，终审索引 `a8b15e6dd5bb424fea6017f418634d52e698ccb3e03f449ffc8995a6a36ae01b`。锁定tempfile在Windows以share_mode(0)打开匿名文件，现仅四处测试夹具改为生产等价只读租约，保留原解析/游标/边界断言并核拒写/改名；生产共享和权限不变。源码索引 `173fb523057b9cbbed6edb9d1667d9b1e06d8b12b654a8d64e00ab84583dd738`，本机check、i18n11项与Windows22项元数据类型检查通过，三个短根清理，门禁索引 `a4847fd637c2f208979acd299fd9d163b888ff732ca2437dd82118f36b28469f`；元数据不等于测试执行，目标复验待完成。无需本地化变更；原生更新停滞及Codex关停失败未解决，**新增关闭0项**，PR草稿。
 
 - **2026-10-03 Linux 修复复验通过，Windows 旧平台断言待复验**：873门禁37076566107的Linux5427普通PASS、17新增/增强逐名PASS，另rust-genai81通过，i18n11唯一，无FAIL/LEAK/RETRY/FLAKY/TIMEOUT；两个官方ZIP核验，终审索引 `228a6a620d06bffd284f56616d3e2f08cf45817544fbf210ae605513e248e583`。远端辅助临时根仍retained，Windows未选择。原fcd门禁Windows步骤44为3358通过/1失败，旧断言误将现已支持限定降级的Windows当作不支持主机；按生产拒绝语义单列InvalidRelease/RecoveryRequired，未扩大允许集。独审、本机check、聚焦14项和i18n11项通过，短根全清，门禁索引 `e89f6959238c94b7ca77fa923cb80bbc77d0dde235f995f58c565fa43b4ccda3`；原run完整终审与修正的Windows复验待齐。既有原生CMD/Node停滞及Codex hooks失败保留，现有runner可补取因果证据，归档取证代码未执行。**新增关闭0项**；无需本地化变更，PR草稿。

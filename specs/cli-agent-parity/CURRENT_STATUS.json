@@ -1627,6 +1627,22 @@
       "original_native_failures_solved": false,
       "localization": "无需本地化变更：仅测试夹具，无用户文案、行为或布局变化",
       "gaps_closed": []
+    },
+    "g09_hooks_only_workflow_20261003": {
+      "base_commit": "363b17a77960708cbb2e2052f90f3cf87db475fc",
+      "scope": "run_windows=true、run_atomic_windows_debug=true、windows_atomic_debug_scope=codex_hooks，其余 false/default",
+      "purpose": "单独执行已提交的固定 Codex 0.156.1 hooks 关闭收据及关停日志，不重跑其他原生矩阵或 Cargo",
+      "same_probe_and_timeouts": true,
+      "existing_workflow_behavior_preserved": true,
+      "source_index_sha256": "c8e489a1c209defc79200b4857f9be9c046f35084be1169952bc8beeb7570f53",
+      "local_gate_sha256": "11c0552ca3e21fc9547d6ccd5888c4db8f65acead4e330f1b08a45dd62e09931",
+      "actionlint": "passed",
+      "scope_cases": 28,
+      "cargo_check": "passed",
+      "short_roots": "cleaned",
+      "native_result": "待单独复验；当前363首CMD运行不含hooks",
+      "localization": "无需本地化变更；仅CI范围，无用户功能、文案或布局变化",
+      "newly_closed": []
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

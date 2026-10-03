@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：单独复验固定 Codex hooks 的最小工作流范围
+
+新增关闭0项。现有原生补验会连带运行旧版hooks、两版ConPTY及其他CLI和Rust门禁，首CMD专项又不包含hooks。现仅在既有Windows调试choice增加codex_hooks，保持25个input；前置校验要求仅Windows和该专项启用，独立job沿用固定Python准备、既有合同测试、同字节0.156.1探针命令及JSON归档。5s/3s退出判定、20分钟探针步骤上限和全部原验收条件保持；不把新增复验范围当成功或关闭。
+
+源码索引 `c8e489a1c209defc79200b4857f9be9c046f35084be1169952bc8beeb7570f53`，actionlint、28项范围组合、旧工作流结构等价及原命令同字节检查通过；cargo check通过，两个短根已核验清理，门禁索引 `11c0552ca3e21fc9547d6ccd5888c4db8f65acead4e330f1b08a45dd62e09931`。仓外 `g09-hooks-only-workflow-v1`。无需本地化变更：仅CI选择范围，无用户功能、文案或布局变化。当前363首CMD运行继续，不重复或取消；hooks另以精确辅助ref排队复验，原退出失败仍开放。G03/G09保持开放，PR草稿。
+
 ## 2026-10-03：修复 Windows 取证测试的排他文件夹具
 
 新增关闭0项。精确82204ea4f的[37089624639](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37089624639)已结束为failure：普通warp1095与command43共1138项PASS，ce6与i18n各11唯一项；取证feature的libtest已成功编译，snapshot首组8项实际4PASS/4FAIL。三项原始错误为ReOpenFile Win32 32/HRESULT -2147024864，截断用例也提前得到api_failed而非预期解析错误；后续creation14、glue3、feature ce6再验及首CMD均未执行。完整日志SHA `48316691936faaf3fb31c8f21d9ca4928433b4a0f98c83ff86804cafd9347f4c`，唯一官方环境ZIP的API大小、SHA与CRC核验，终审索引 `a8b15e6dd5bb424fea6017f418634d52e698ccb3e03f449ffc8995a6a36ae01b`；96条可见warning保留，普通组无LEAK/RETRY/FLAKY。
