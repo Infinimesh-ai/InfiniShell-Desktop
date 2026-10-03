@@ -329,20 +329,30 @@ fn emit_result_ready(app: &mut App, child: &LocalCliTask, message: &LocalCliMess
     });
 }
 
-async fn wait_for_result_bridge(app: &App, message_id: &str) -> Option<String> {
-    for _ in 0..250 {
-        Timer::after(Duration::from_millis(10)).await;
-        let (pending, error) = LocalCLIConversationBridge::handle(app).read(app, |bridge, _| {
-            (
-                bridge.pending_results.contains_key(message_id),
-                bridge.delivery_error(message_id).map(str::to_owned),
-            )
+async fn wait_for_result_bridge(app: &mut App, message_id: &str) -> Option<String> {
+    let bridge = LocalCLIConversationBridge::handle(app);
+    if !bridge.read(app, |bridge, _| {
+        bridge.pending_results.contains_key(message_id)
+    }) {
+        return bridge.read(app, |bridge, _| {
+            bridge.delivery_error(message_id).map(str::to_owned)
         });
-        if !pending {
-            return error;
-        }
     }
-    panic!("父结果桥未在期限内完成：{message_id}");
+    let message_id = message_id.to_owned();
+    let (completion, completed) = oneshot::channel();
+    let mut completion = Some(completion);
+    app.update(|ctx| {
+        ctx.observe_model(&bridge, move |bridge, ctx| {
+            let bridge = bridge.as_ref(ctx);
+            if !bridge.pending_results.contains_key(&message_id)
+                && let Some(completion) = completion.take()
+            {
+                let _ = completion.send(Ok(bridge.delivery_error(&message_id).map(str::to_owned)));
+            }
+        });
+    });
+    // 等待生产桥的提交完成通知，沿用私有 SQLite 回执期限，不用固定轮询次数推断完成。
+    committed(completed).await
 }
 
 fn saved_root_messages(database: &Path, conversation_id: AIConversationId) -> Vec<api::Message> {
@@ -369,7 +379,7 @@ fn oz_result_ready_commits_history_once_and_records_application_receipt() {
         emit_result_ready(&mut app, &child, &message);
         emit_result_ready(&mut app, &child, &message);
         assert_eq!(
-            wait_for_result_bridge(&app, &message.message_id).await,
+            wait_for_result_bridge(&mut app, &message.message_id).await,
             None
         );
         let stored = committed(
@@ -393,7 +403,7 @@ fn oz_result_ready_commits_history_once_and_records_application_receipt() {
         emit_result_ready(&mut app, &child, &message);
         emit_result_ready(&mut app, &child, &message);
         assert_eq!(
-            wait_for_result_bridge(&app, &message.message_id).await,
+            wait_for_result_bridge(&mut app, &message.message_id).await,
             None
         );
         assert_eq!(saved_root_messages(&database, conversation_id), [expected]);
@@ -452,7 +462,7 @@ fn oz_result_ready_rejects_previous_parent_generation_or_user_exchange() {
             assert_eq!(before[0].receipt_kind, None);
             emit_result_ready(&mut app, &child, &message);
             assert!(
-                wait_for_result_bridge(&app, &message.message_id)
+                wait_for_result_bridge(&mut app, &message.message_id)
                     .await
                     .is_some()
             );
@@ -488,7 +498,7 @@ fn oz_result_ready_without_history_persistence_keeps_claim_unconfirmed() {
         });
         emit_result_ready(&mut app, &child, &message);
         assert!(
-            wait_for_result_bridge(&app, &message.message_id)
+            wait_for_result_bridge(&mut app, &message.message_id)
                 .await
                 .is_some()
         );
@@ -512,7 +522,7 @@ fn oz_result_ready_without_history_persistence_keeps_claim_unconfirmed() {
         // 再次收到事件也不能把没有入历史的已领取结果自动重投或伪造确认。
         emit_result_ready(&mut app, &child, &stored[0]);
         emit_result_ready(&mut app, &child, &message);
-        wait_for_result_bridge(&app, &message.message_id).await;
+        wait_for_result_bridge(&mut app, &message.message_id).await;
         assert!(saved_root_messages(&database, conversation_id).is_empty());
         assert_eq!(
             committed(load_messages(&writer.sender, parent.task_id, parent.generation).unwrap())
