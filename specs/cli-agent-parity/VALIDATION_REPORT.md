@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：固定 CMD 调用点与原主线程配对观察
+
+新增关闭0项。对同SHA CMD的独立静态复核确认：旧返回帧`0x24a6c`对应`0x24a65`经IAT `0x3af10`的CreateProcessW调用，前置块第六参数为`0x80000`，没有CREATE_SUSPENDED；IAT `0x3af00`的GetStartupInfoW输出lpDesktop被复制到新STARTUPINFOEX。根代理逐字节核验13处指令，收据SHA `fc3030bc9884b8b7e2fed9ae78cab8a8b6cdbb6ddfd59b68a9409c08cbe243c9`，仓外`g09-fixed-image-contract-v1`。这削弱“CMD显式暂停或丢弃桌面”的解释，但没有读取动态参数、IAT或桌面字符串，不能证明实际桌面或最终停滞原因。
+
+据此不实施普通IAT子集观察；仅在现有精确generation、默认关闭的取证功能中补15秒/240秒原主线程配对。两次使用原CREATE事件复制的同一process/thread句柄，早期优先采根主线程并从既有枚举去重，计入原16线程额度；晚期不枚举其他线程。CPU保留GetThreadTimes累计user/kernel的100ns单位，仅在PID/TID及两种创建时间相同、采样时间递增、累计值单调时给出差分。准备后和暂停前均复查取消/截止，原EXIT Continue后释放诊断句柄；清理路径不会进入晚期观察。
+
+同步修正触及的identity：微软[GetThreadTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadtimes)和[GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes)均未定义存活对象的exitTime，删除据此判活的两处比较，输出明确不从timing推断活体。旧枚举句柄未申请SYNCHRONIZE，不为诊断新增等待权限；原Suspend/GetContext失败及EXIT/Job清理保留。CPU有效也不代表栈或活体检查通过，所有未知和失败单列。
+
+四文件已独审并冻结；Mac原字节纯逻辑7项通过，完整snapshot的12项Windows测试仅元数据编译通过，不代记执行；完整Windows应用glue及真实候选待唯一限定CI。本机含取证feature的`cargo check -p warp`与`i18n::tests`11项通过，短根`r-suzrsvnh`、`r-n7t6bl_c`均已核验退出并清理；根代理另核19件交付文件大小/SHA，收据`12c8e74e27a19e4728ac2ed23f42296cecace5138d5f8dcf43f1ef9037840742`。无需本地化变更：仅内部取证，无英中用户文案、产品权限、超时或验收条件变化。G03真实拖放、G09原生停滞及最终源码门禁仍开放，PR草稿。
+
 ## 2026-10-03：固定系统映像及微软符号缩小旧栈范围
 
 新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确9773abe49的[37109159914](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37109159914)只运行范围校验和固定映像收集，其余任务跳过，没有Cargo或原生候选执行。四份cmd/ntdll/kernel32/kernelbase的读取前后身份及SHA一致，并与b3原快照匹配；官方ZIP大小、SHA、全CRC通过，ZIP SHA `84bd74f5c8ab368959d19b80289eaac0a6c15bde52fa5b944a0629d329791219`，仓外`9773abe49-image-ci`。

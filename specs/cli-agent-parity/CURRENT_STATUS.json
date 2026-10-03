@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。授权CGEvent的Finder内部校准成功，普通Grok与独立TextEdit跨应用均未交付图片，不能据此归因产品路由。b3首CMD真实启动后ProbeFailed；9773只读收集与微软PDB把15秒旧栈定位到创建进程的应用兼容检查及堆分配，但不能解释最终停滞，Node暂停根因仍未知。不重复相近手势/探针，保留原关闭条件。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03授权CGEvent在普通Grok与TextEdit跨应用均未交付，需人工实测。G09固定CMD创建调用未显式请求暂停且复制桌面字段；b3单次15秒栈仍不能解释最终停滞。现补默认关闭的15/240秒原主线程配对观察，目标Windows复验待完成；未改权限、超时或关闭条件，不计缺口完成。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -8743,5 +8743,35 @@
     "next_probe_decision": "单独普通IAT或追加晚期采样尚不足以指向生产修复，暂不运行相近候选；不改权限、环境或超时。",
     "localization": "仅内部取证及审计，无需本地化变更。",
     "gap_closed": false
+  },
+  "g09_root_paired_snapshot_20261003": {
+    "base_commit": "aa60298242a6198ced81c352194d5066b92e19e7",
+    "static_callsite_receipt_sha256": "fc3030bc9884b8b7e2fed9ae78cab8a8b6cdbb6ddfd59b68a9409c08cbe243c9",
+    "static_finding": "旧CMD返回帧对应CreateProcessW普通IAT调用，flags恒0x80000、不含CREATE_SUSPENDED，复制GetStartupInfoW的lpDesktop；13处指令字节独审，不代替动态内存/桌面证明。",
+    "decision_sha256": "a16ea58f139db419d0ad891a824bf30c93c5331e062ad3b6482e66b3c2a52c43",
+    "change": "原CREATE复制同一process/thread句柄及创建四元组；15秒优先根主线程、原枚举去重并计入16上限；240秒仅同一根主线程。CPU按严格身份与单调累计值求差，取消/截止优先，原EXIT Continue后释放。",
+    "timing_contract_fix": "不再用存活对象未定义的exitTime判活；liveness=not_inferred_from_timing。未增加SYNCHRONIZE或其他权限，原Suspend/GetContext和EXIT/Job边界保持。",
+    "local_pure_tests_pass": 7,
+    "windows_snapshot_tests_metadata_only": 12,
+    "windows_execution": "待精确提交限定CI；没有将元数据或纯逻辑通过当原生成功。",
+    "source_binding": "四文件仍由既有31来源清单及生产嵌入绑定覆盖；仅Windows/x86_64/默认关闭feature，原清理不进入取证。",
+    "localization": "无需本地化变更：仅内部取证，不改变用户文案、产品权限、超时或验收条件。",
+    "gap_closed": false,
+    "local_gates": {
+      "cargo_check": {
+        "run_id": "r-suzrsvnh",
+        "passed": true,
+        "log_sha256": "f22749a59bd733a6d478380834cefa8e938f793d54fce4cb6190822b2e56a3a1"
+      },
+      "i18n": {
+        "run_id": "r-n7t6bl_c",
+        "passed": 11,
+        "failed": 0,
+        "log_sha256": "fb70d9e0fcdb2e20ada293de66159d11e807221fd467705e510d54ba2dd8ce20"
+      },
+      "both_cleaned": true,
+      "independently_verified_files": 19,
+      "receipt_sha256": "12c8e74e27a19e4728ac2ed23f42296cecace5138d5f8dcf43f1ef9037840742"
+    }
   }
 }

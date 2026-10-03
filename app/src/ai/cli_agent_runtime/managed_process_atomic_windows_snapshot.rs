@@ -1,4 +1,4 @@
-//! 私有 npm 调试 worker 的一次性、取消前 x64 用户态快照。
+//! 私有 npm 调试 worker 的有界、取消前 x64 用户态快照。
 //!
 //! 调用方必须已用原 Job、进程创建身份、token 和映像租约核验所有输入，并在调用期间
 //! 持有它们；本模块不按 PID 获取权限，也不改变任何授权。所有结果仅供诊断。
@@ -157,12 +157,52 @@ pub(super) struct PreparedModules {
     modules: Vec<Module>,
 }
 
-#[derive(Debug, Serialize)]
-struct Identity {
-    process_id: u32,
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub(super) struct Identity {
+    pub(super) process_id: u32,
     process_created: u64,
-    thread_id: u32,
+    pub(super) thread_id: u32,
     thread_created: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub(super) struct CpuTimes {
+    // GetThreadTimes 的线程累计 CPU 时间，单位为 100ns；不是进程总量或墙钟时间。
+    kernel_100ns: u64,
+    user_100ns: u64,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+pub(super) struct CpuSample {
+    identity: Identity,
+    sampled_at_ms: u128,
+    cumulative: CpuTimes,
+}
+
+impl CpuSample {
+    pub(super) fn difference_from(&self, earlier: &Self) -> Result<CpuTimes, Failure> {
+        if self.identity != earlier.identity {
+            return Err(Failure::rejected("cpu_identity_changed"));
+        }
+        if self.sampled_at_ms <= earlier.sampled_at_ms {
+            return Err(Failure::rejected("cpu_sample_time_not_increasing"));
+        }
+        let kernel_100ns = self
+            .cumulative
+            .kernel_100ns
+            .checked_sub(earlier.cumulative.kernel_100ns);
+        let user_100ns = self
+            .cumulative
+            .user_100ns
+            .checked_sub(earlier.cumulative.user_100ns);
+        match (kernel_100ns, user_100ns) {
+            (Some(kernel_100ns), Some(user_100ns)) => Ok(CpuTimes {
+                kernel_100ns,
+                user_100ns,
+            }),
+            (None, _) | (_, None) => Err(Failure::rejected("cpu_cumulative_time_decreased")),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -197,6 +237,8 @@ struct Suspension {
 #[derive(Debug, Serialize)]
 pub(super) struct Snapshot {
     identity: Option<Identity>,
+    cpu_times: Option<CpuTimes>,
+    liveness: &'static str,
     modules: Vec<ModuleIdentity>,
     context: Option<ContextAddresses>,
     frames: Vec<Frame>,
@@ -207,6 +249,14 @@ pub(super) struct Snapshot {
 }
 
 impl Snapshot {
+    pub(super) fn cpu_sample(&self, sampled_at_ms: u128) -> Option<CpuSample> {
+        Some(CpuSample {
+            identity: self.identity?,
+            sampled_at_ms,
+            cumulative: self.cpu_times?,
+        })
+    }
+
     /// 只报告本次增加的暂停计数是否已平衡；不代表其他诊断字段成功。
     pub(super) fn suspension_balanced(&self) -> bool {
         self.suspension
@@ -477,7 +527,11 @@ fn desktop(thread_id: u32, expected: Option<HDESK>) -> DesktopComparison {
     }
 }
 
-fn identity(process: HANDLE, thread: HANDLE, expected_creation: u64) -> Result<Identity, Failure> {
+pub(super) fn identity(
+    process: HANDLE,
+    thread: HANDLE,
+    expected_creation: u64,
+) -> Result<(Identity, CpuTimes), Failure> {
     unsafe { SetLastError(WIN32_ERROR(0)) };
     let process_id = unsafe { GetProcessId(process) };
     if process_id == 0 {
@@ -506,14 +560,13 @@ fn identity(process: HANDLE, thread: HANDLE, expected_creation: u64) -> Result<I
     unsafe { GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user) }
         .map_err(|error| Failure::windows("GetProcessTimes", error))?;
     let process_created = ticks(created);
-    if process_created != expected_creation || ticks(exited) != 0 {
-        return Err(Failure::rejected("process_creation_or_liveness_mismatch"));
+    if process_created != expected_creation {
+        return Err(Failure::rejected("process_creation_mismatch"));
     }
     unsafe { GetThreadTimes(thread, &mut created, &mut exited, &mut kernel, &mut user) }
         .map_err(|error| Failure::windows("GetThreadTimes", error))?;
-    if ticks(exited) != 0 {
-        return Err(Failure::rejected("thread_exited"));
-    }
+    // 未退出时 lpExitTime 未定义；这里只绑定身份/累计 CPU，不把它当作活体判据。
+    // 原枚举句柄未申请 SYNCHRONIZE，不能为诊断新增等待权限或按 TID 重开。
     let mut machine = IMAGE_FILE_MACHINE_UNKNOWN;
     let mut native = IMAGE_FILE_MACHINE_UNKNOWN;
     unsafe { IsWow64Process2(process, &mut machine, Some(&mut native)) }
@@ -521,12 +574,18 @@ fn identity(process: HANDLE, thread: HANDLE, expected_creation: u64) -> Result<I
     if machine != IMAGE_FILE_MACHINE_UNKNOWN || native != IMAGE_FILE_MACHINE_AMD64 {
         return Err(Failure::rejected("not_native_amd64"));
     }
-    Ok(Identity {
-        process_id,
-        process_created,
-        thread_id,
-        thread_created: ticks(created),
-    })
+    Ok((
+        Identity {
+            process_id,
+            process_created,
+            thread_id,
+            thread_created: ticks(created),
+        },
+        CpuTimes {
+            kernel_100ns: ticks(kernel),
+            user_100ns: ticks(user),
+        },
+    ))
 }
 
 struct WalkState<'a> {
@@ -766,9 +825,13 @@ pub(super) fn capture(
     thread: BorrowedHandle<'_>,
     expected_desktop: Option<HDESK>,
     modules: &PreparedModules,
+    expected_identity: Option<&Identity>,
+    stopped: impl Fn() -> bool,
 ) -> Snapshot {
     let mut snapshot = Snapshot {
         identity: None,
+        cpu_times: None,
+        liveness: "not_inferred_from_timing",
         modules: modules
             .modules
             .iter()
@@ -783,21 +846,30 @@ pub(super) fn capture(
     };
     let process = HANDLE(process.as_raw_handle());
     let thread = HANDLE(thread.as_raw_handle());
-    let identity = match identity(process, thread, process_creation_filetime) {
-        Ok(identity) => identity,
+    let (identity, cpu_times) = match identity(process, thread, process_creation_filetime) {
+        Ok(observation) => observation,
         Err(failure) => {
             snapshot.failure = Some(failure);
             return snapshot;
         }
     };
+    if expected_identity.is_some_and(|expected| *expected != identity) {
+        snapshot.failure = Some(Failure::rejected("bound_thread_identity_changed"));
+        return snapshot;
+    }
     let thread_id = identity.thread_id;
     snapshot.identity = Some(identity);
+    snapshot.cpu_times = Some(cpu_times);
     let Ok(_walk_lock) = STACK_WALK_LOCK.try_lock() else {
         snapshot.failure = Some(Failure::rejected("stack_walker_busy"));
         return snapshot;
     };
     if ACTIVE_WALK.with(|active| !active.get().is_null()) {
         snapshot.failure = Some(Failure::rejected("nested_stack_walk"));
+        return snapshot;
+    }
+    if stopped() {
+        snapshot.failure = Some(Failure::rejected("cancelled_or_expired_before_suspend"));
         return snapshot;
     }
     let suspended = match SuspendedThread::acquire(thread) {

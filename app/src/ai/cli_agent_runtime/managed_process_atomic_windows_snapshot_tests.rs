@@ -6,6 +6,148 @@ use windows::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
 
 use super::*;
 
+fn cpu_sample() -> CpuSample {
+    CpuSample {
+        identity: Identity {
+            process_id: 10,
+            process_created: 20,
+            thread_id: 30,
+            thread_created: 40,
+        },
+        sampled_at_ms: 15_000,
+        cumulative: CpuTimes {
+            kernel_100ns: 100,
+            user_100ns: 200,
+        },
+    }
+}
+
+#[test]
+fn cpu_difference_uses_exact_identity_and_cumulative_100ns_units() {
+    let earlier = cpu_sample();
+    let later = CpuSample {
+        sampled_at_ms: 240_000,
+        cumulative: CpuTimes {
+            kernel_100ns: 150,
+            user_100ns: 500,
+        },
+        ..earlier
+    };
+    assert_eq!(
+        later.difference_from(&earlier).unwrap(),
+        CpuTimes {
+            kernel_100ns: 50,
+            user_100ns: 300
+        }
+    );
+}
+
+#[test]
+fn cpu_difference_rejects_reused_process_or_thread_identity() {
+    let earlier = cpu_sample();
+    let later = CpuSample {
+        sampled_at_ms: 240_000,
+        ..earlier
+    };
+    assert_eq!(
+        CpuSample {
+            identity: Identity {
+                process_created: 21,
+                ..later.identity
+            },
+            ..later
+        }
+        .difference_from(&earlier)
+        .unwrap_err()
+        .reason,
+        "cpu_identity_changed"
+    );
+    assert_eq!(
+        CpuSample {
+            identity: Identity {
+                thread_created: 41,
+                ..later.identity
+            },
+            ..later
+        }
+        .difference_from(&earlier)
+        .unwrap_err()
+        .reason,
+        "cpu_identity_changed"
+    );
+    assert_eq!(
+        CpuSample {
+            identity: Identity {
+                process_id: 11,
+                ..later.identity
+            },
+            ..later
+        }
+        .difference_from(&earlier)
+        .unwrap_err()
+        .reason,
+        "cpu_identity_changed"
+    );
+    assert_eq!(
+        CpuSample {
+            identity: Identity {
+                thread_id: 31,
+                ..later.identity
+            },
+            ..later
+        }
+        .difference_from(&earlier)
+        .unwrap_err()
+        .reason,
+        "cpu_identity_changed"
+    );
+}
+
+#[test]
+fn cpu_difference_rejects_equal_or_reversed_sample_time() {
+    let earlier = cpu_sample();
+    assert_eq!(
+        earlier.difference_from(&earlier).unwrap_err().reason,
+        "cpu_sample_time_not_increasing"
+    );
+    let reversed = CpuSample {
+        sampled_at_ms: 14_999,
+        ..earlier
+    };
+    assert_eq!(
+        reversed.difference_from(&earlier).unwrap_err().reason,
+        "cpu_sample_time_not_increasing"
+    );
+}
+
+#[test]
+fn cpu_difference_rejects_decreased_cumulative_time() {
+    let earlier = cpu_sample();
+    let later = CpuSample {
+        sampled_at_ms: 240_000,
+        cumulative: CpuTimes {
+            kernel_100ns: 99,
+            user_100ns: 300,
+        },
+        ..earlier
+    };
+    assert_eq!(
+        later.difference_from(&earlier).unwrap_err().reason,
+        "cpu_cumulative_time_decreased"
+    );
+    let later = CpuSample {
+        cumulative: CpuTimes {
+            kernel_100ns: 200,
+            user_100ns: 199,
+        },
+        ..later
+    };
+    assert_eq!(
+        later.difference_from(&earlier).unwrap_err().reason,
+        "cpu_cumulative_time_decreased"
+    );
+}
+
 #[test]
 fn address_reads_reject_cross_boundary_zero_and_overflow() {
     assert!(contained(0x1000, 0x100, 0x10f8, 8));

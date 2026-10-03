@@ -259,6 +259,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-03 排除固定 CMD 的显式暂停分支，补齐原主线程配对观察**：同SHA映像中，b3返回帧`0x24a6c`对应普通IAT的CreateProcessW调用；前置直线块的flags为`0x80000`，不含CREATE_SUSPENDED，并复制GetStartupInfoW的lpDesktop字段。根代理独立核13处指令字节，收据 `fc3030bc9884b8b7e2fed9ae78cab8a8b6cdbb6ddfd59b68a9409c08cbe243c9`；不据此推定动态内存或实际桌面。现仅默认关闭的取证功能优先用原CREATE句柄做15秒主线程基线，240秒再采同一对象，CPU按完整创建身份和单调累计值求差；取消/截止优先，原16线程上限及严格清理保持。修正取证误用未定义exitTime判断活体的问题，不加句柄权限。该增量仍非停滞修复，目标Windows复验及最终源码门禁待完成，**新增关闭0项**。
+
 - **2026-10-03 固定映像与符号复核，仍开放**：精确9773abe49的[37109159914](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37109159914)仅只读收集四份固定系统映像，全部SHA与b3原快照一致；没有再次运行候选。匹配微软PDB并以同映像`.pdata`交叉核对后，约15秒的CMD主线程位于CreateProcessW→应用兼容检查→GetTempPathW→堆分配，顶帧对应RtlpAllocateHeap；单次采样不能解释约286秒后的最终停滞。普通导入有两个具名创建入口，但延迟导入含未识别的Wldp ordinal 2，不能宣称完整创建覆盖。独审20件大小/SHA通过，收据 `421a5faa99a25d69fb0838b9fef7ef9ae47e31b4040469676eb5ddf2978d4ff8`；详见最新验证结论。未改生产权限、环境或超时，不重复相近探针，**新增关闭0项**。
 
 - **2026-10-03 首 CMD 真实取证结果，仍开放**：精确b3的[37103876288](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37103876288)普通1143项与feature41项通过，新增环境五项双配置逐名通过。首CMD已实际启动但ProbeFailed；创建观察因delay-import覆盖限制未启用，15秒快照中Node主线程原暂停计数1且取证Suspend/Resume平衡，桌面与根因仍未知。47个调试事件均继续，Node CREATE只在取消后到达，不能误作取消后才创建。本代Job/AppContainer/私有站清理通过，整个远端根删除未证；两官方ZIP核验，终审索引 `afb174088621343e4c3d8e0a99d1cff1440fb445a27b93b7d181e7ad884c1335`。仍需解决原生失败及最终源码门禁，**新增关闭0项**；无需本地化变更，PR草稿。

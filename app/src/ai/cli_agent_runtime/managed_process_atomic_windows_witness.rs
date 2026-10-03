@@ -6,10 +6,13 @@ use windows::Win32::System::Threading::{PROCESS_NAME_WIN32, QueryFullProcessImag
 use windows::core::PWSTR;
 
 use super::creation_witness::{CreationWitness, Disposition, Summary, VerifiedImage};
-use super::native_snapshot::{VerifiedModule, capture, prepare_modules};
+use super::native_snapshot::{
+    CpuSample, Identity, VerifiedModule, capture, identity, prepare_modules,
+};
 use super::*;
 
 const SNAPSHOT_AFTER: Duration = Duration::from_secs(15);
+const LATE_SNAPSHOT_AFTER: Duration = Duration::from_secs(240);
 const MAX_WITNESS_MODULES: usize = 64;
 const MAX_WITNESS_THREADS: usize = 16;
 const GENERATION_ENV: &str = "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION";
@@ -20,6 +23,44 @@ struct BoundModule {
     base: u64,
     size: u32,
     dll: bool,
+}
+
+#[derive(Debug)]
+struct RootThread {
+    process: OwnedHandle,
+    thread: OwnedHandle,
+    identity: Identity,
+    process_created: u64,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum SnapshotAction {
+    Cancelled,
+    Expired,
+    Early,
+    Late,
+    Wait,
+}
+
+fn snapshot_action(
+    cancelled: bool,
+    expired: bool,
+    elapsed: Duration,
+    early_taken: bool,
+    late_taken: bool,
+    root_ready: bool,
+) -> SnapshotAction {
+    if cancelled {
+        SnapshotAction::Cancelled
+    } else if expired {
+        SnapshotAction::Expired
+    } else if root_ready && !early_taken && elapsed >= SNAPSHOT_AFTER {
+        SnapshotAction::Early
+    } else if root_ready && early_taken && !late_taken && elapsed >= LATE_SNAPSHOT_AFTER {
+        SnapshotAction::Late
+    } else {
+        SnapshotAction::Wait
+    }
 }
 
 impl BoundModule {
@@ -50,6 +91,9 @@ pub(super) struct NativeWitness {
     completed_creation: Option<Summary>,
     creation_unavailable: Option<serde_json::Value>,
     snapshot: Option<serde_json::Value>,
+    root_thread: Option<RootThread>,
+    early_root_cpu: Option<CpuSample>,
+    late_snapshot: Option<serde_json::Value>,
     failures: Vec<serde_json::Value>,
     cancelled: bool,
     exit_confirmed: bool,
@@ -114,6 +158,9 @@ impl WindowsImageDebugSession {
                 completed_creation: None,
                 creation_unavailable: None,
                 snapshot: None,
+                root_thread: None,
+                early_root_cpu: None,
+                late_snapshot: None,
                 failures: Vec::new(),
                 cancelled: false,
                 exit_confirmed: false,
@@ -206,9 +253,29 @@ impl WindowsImageDebugSession {
         let witness = self.native_witness.as_mut().unwrap();
         witness.births.insert(event.dwProcessId, birth);
         if role == NpmProcessRole::Root {
-            if witness.creation.is_some() {
+            if witness.creation.is_some() || witness.root_thread.is_some() {
                 return Err(error("native_witness.duplicate_root"));
             }
+            // 只从已验证的原 CREATE 事件复制；后续不能以 PID/TID 重开替代。
+            let process = duplicate_process_handle(info.hProcess)?;
+            let thread = duplicate_process_handle(info.hThread)?;
+            let (bound, _) = match identity(
+                HANDLE(process.as_raw_handle()),
+                HANDLE(thread.as_raw_handle()),
+                birth,
+            ) {
+                Ok(identity) => identity,
+                Err(failure) => return Err(self.native_failure("root_identity", failure)),
+            };
+            if bound.process_id != event.dwProcessId || bound.thread_id != event.dwThreadId {
+                return Err(error("native_witness.root_event_identity_changed"));
+            }
+            witness.root_thread = Some(RootThread {
+                process,
+                thread,
+                identity: bound,
+                process_created: birth,
+            });
             let root = witness.modules[&event.dwProcessId][0].creation_image();
             match CreationWitness::new(event, root, birth, at_ms) {
                 Ok(creation) => witness.creation = Some(creation),
@@ -252,6 +319,14 @@ impl WindowsImageDebugSession {
         if let Some(witness) = &mut self.native_witness {
             witness.modules.remove(&pid);
             witness.births.remove(&pid);
+            if witness
+                .root_thread
+                .as_ref()
+                .is_some_and(|root| root.identity.process_id == pid)
+            {
+                // 仅在原 EXIT 已 Continue 后释放，不让诊断复制句柄跨过 Job 清理。
+                witness.root_thread.take();
+            }
         }
     }
 
@@ -366,7 +441,18 @@ impl WindowsImageDebugSession {
         Ok(NpmProcessRole::Node)
     }
 
-    fn capture_native_witness(&mut self, container: &AppContainerProbe) -> io::Result<()> {
+    fn snapshot_stopped(&self, deadline: Instant) -> bool {
+        self.cancellation
+            .as_ref()
+            .is_some_and(|value| value.load(Ordering::Acquire))
+            || Instant::now() >= deadline
+    }
+
+    fn capture_native_witness(
+        &mut self,
+        container: &AppContainerProbe,
+        deadline: Instant,
+    ) -> io::Result<()> {
         if self.pending_event.is_some() {
             return Err(error("native_witness.pending_debug_event"));
         }
@@ -374,19 +460,44 @@ impl WindowsImageDebugSession {
         // 先占用唯一采样机会；失败也不能重采并替换原因。
         self.native_witness.as_mut().unwrap().snapshot =
             Some(serde_json::json!({"started_ms":started_ms,"complete":false}));
-        let desktop = container.native_witness_desktop();
-        let desktop_failure = desktop
+        // 根主线程优先使用原 CREATE 句柄，不依赖枚举、重开成功或其他线程占满额度。
+        let (root_main_thread, early_root_cpu, mut balanced) =
+            self.capture_root_snapshot(container, deadline);
+        let root_identity = self
+            .native_witness
             .as_ref()
-            .err()
-            .map(|failure| safe_failure("expected_desktop", failure));
-        let expected_desktop = desktop.ok().flatten();
+            .unwrap()
+            .root_thread
+            .as_ref()
+            .map(|root| root.identity);
+        let (expected_desktop, desktop_failure) = if balanced && !self.snapshot_stopped(deadline) {
+            match container.native_witness_desktop() {
+                Ok(desktop) => (desktop, None),
+                Err(failure) => (None, Some(safe_failure("expected_desktop", &failure))),
+            }
+        } else {
+            (
+                None,
+                Some(serde_json::json!({"skipped":"root_unbalanced_or_cancelled_or_expired"})),
+            )
+        };
         let mut observations = Vec::new();
-        let mut balanced = true;
-        let mut thread_count = 0;
-        match container.native_witness_processes() {
+        let mut thread_count = 1;
+        let processes = if balanced && !self.snapshot_stopped(deadline) {
+            container.native_witness_processes()
+        } else {
+            Ok(Vec::new())
+        };
+        match processes {
             Err(failure) => observations.push(safe_failure("job_members", &failure)),
             Ok(processes) => {
                 for (pid, process) in processes {
+                    if self.snapshot_stopped(deadline) {
+                        observations.push(
+                            serde_json::json!({"skipped":"cancelled_or_expired_before_capture"}),
+                        );
+                        break;
+                    }
                     let process = match process {
                         Ok(process) => process,
                         Err(failure) => {
@@ -443,6 +554,11 @@ impl WindowsImageDebugSession {
                         Err(failure) => threads.push(safe_failure("thread_discovery", &failure)),
                         Ok(members) => {
                             for (tid, thread) in members {
+                                if root_identity.is_some_and(|root| {
+                                    root.process_id == pid && root.thread_id == tid
+                                }) {
+                                    continue;
+                                }
                                 if thread_count == MAX_WITNESS_THREADS {
                                     threads.push(serde_json::json!({"tid":tid,"reason":"snapshot_thread_limit"}));
                                     break;
@@ -461,12 +577,18 @@ impl WindowsImageDebugSession {
                                     threads.push(serde_json::json!({"tid":tid,"failure":safe_failure("process_revalidate",&failure)}));
                                     break;
                                 }
+                                if self.snapshot_stopped(deadline) {
+                                    threads.push(serde_json::json!({"tid":tid,"skipped":"cancelled_or_expired_before_capture"}));
+                                    break;
+                                }
                                 let snapshot = capture(
                                     process.process(),
                                     process.created_filetime(),
                                     thread.as_handle(),
                                     expected_desktop,
                                     &prepared,
+                                    None,
+                                    || self.snapshot_stopped(deadline),
                                 );
                                 thread_count += 1;
                                 balanced &= snapshot.suspension_balanced();
@@ -486,8 +608,9 @@ impl WindowsImageDebugSession {
         }
         let finished_ms = self.native_at_ms();
         let witness = self.native_witness.as_mut().unwrap();
+        witness.early_root_cpu = early_root_cpu;
         witness.snapshot = Some(
-            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
+            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"root_main_thread":root_main_thread,"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
         );
         if let Some(creation) = &mut witness.creation
             && let Err(failure) =
@@ -501,6 +624,127 @@ impl WindowsImageDebugSession {
         Ok(())
     }
 
+    fn capture_root_snapshot(
+        &self,
+        container: &AppContainerProbe,
+        deadline: Instant,
+    ) -> (serde_json::Value, Option<CpuSample>, bool) {
+        let observation = (|| {
+            if self.snapshot_stopped(deadline) {
+                return Ok((
+                    serde_json::json!({"skipped":"cancelled_or_expired_before_capture"}),
+                    None,
+                    true,
+                ));
+            }
+            let witness = self.native_witness.as_ref().unwrap();
+            let root = witness
+                .root_thread
+                .as_ref()
+                .ok_or_else(|| serde_json::json!({"unknown":"original_root_missing"}))?;
+            self.native_process_role(
+                root.process.as_handle(),
+                root.identity.process_id,
+                root.process_created,
+                container,
+            )
+            .map_err(|failure| safe_failure("root_authority", &failure))?;
+            let modules = witness
+                .modules
+                .get(&root.identity.process_id)
+                .ok_or_else(|| serde_json::json!({"unknown":"root_modules_missing"}))?;
+            let bindings = modules
+                .iter()
+                .map(|module| {
+                    module.lease.verify_image(&module.lease.program)?;
+                    Ok(module.snapshot_image())
+                })
+                .collect::<io::Result<Vec<_>>>()
+                .map_err(|failure| safe_failure("root_module_lease", &failure))?;
+            let prepared = prepare_modules(&bindings).map_err(
+                |failure| serde_json::json!({"stage":"root_prepare_modules","failure":failure}),
+            )?;
+            let desktop = container.native_witness_desktop();
+            let desktop_failure = desktop
+                .as_ref()
+                .err()
+                .map(|failure| safe_failure("expected_desktop", failure));
+            container
+                .verify_package_process(root.process.as_handle())
+                .map_err(|failure| safe_failure("root_revalidate", &failure))?;
+            // 租约/模块准备后再次处理取消与截止，不能为了采样拖延原终止。
+            if self.snapshot_stopped(deadline) {
+                return Ok((
+                    serde_json::json!({"skipped":"cancelled_or_expired_before_capture"}),
+                    None,
+                    true,
+                ));
+            }
+            let sampled_at_ms = self.native_at_ms();
+            let snapshot = capture(
+                root.process.as_handle(),
+                root.process_created,
+                root.thread.as_handle(),
+                desktop.ok().flatten(),
+                &prepared,
+                Some(&root.identity),
+                || self.snapshot_stopped(deadline),
+            );
+            let balanced = snapshot.suspension_balanced();
+            let cpu = snapshot.cpu_sample(sampled_at_ms);
+            Ok::<_, serde_json::Value>((
+                serde_json::json!({"sampled_at_ms":sampled_at_ms,"snapshot":snapshot,"desktop_failure":desktop_failure}),
+                cpu,
+                balanced,
+            ))
+        })();
+        match observation {
+            Ok(observation) => observation,
+            Err(failure) => (serde_json::json!({"failure":failure}), None, true),
+        }
+    }
+
+    fn capture_late_native_witness(
+        &mut self,
+        container: &AppContainerProbe,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        if self.pending_event.is_some() {
+            return Err(error("native_witness.pending_debug_event"));
+        }
+        let started_ms = self.native_at_ms();
+        self.native_witness.as_mut().unwrap().late_snapshot =
+            Some(serde_json::json!({"started_ms":started_ms,"complete":false}));
+        let (observation, cpu, balanced) = self.capture_root_snapshot(container, deadline);
+        let cpu_difference = match (
+            self.native_witness
+                .as_ref()
+                .unwrap()
+                .early_root_cpu
+                .as_ref(),
+            cpu,
+        ) {
+            (Some(early), Some(late)) => match late.difference_from(early) {
+                Ok(difference) => {
+                    serde_json::json!({"difference":difference,"earlier":early,"later":late})
+                }
+                Err(failure) => {
+                    serde_json::json!({"failure":failure,"earlier":early,"later":late})
+                }
+            },
+            (None, _) => serde_json::json!({"unknown":"early_root_cpu_unavailable"}),
+            (Some(_), None) => serde_json::json!({"unknown":"late_root_cpu_unavailable"}),
+        };
+        let finished_ms = self.native_at_ms();
+        self.native_witness.as_mut().unwrap().late_snapshot = Some(
+            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"observation":observation,"cpu_difference":cpu_difference}),
+        );
+        if !balanced {
+            return Err(error("managed_process.native_witness_suspend_unbalanced"));
+        }
+        Ok(())
+    }
+
     pub(super) fn wait_for_native_witness_event(
         &mut self,
         deadline: Instant,
@@ -508,42 +752,48 @@ impl WindowsImageDebugSession {
         container: &AppContainerProbe,
     ) -> io::Result<DEBUG_EVENT> {
         loop {
+            let witness = self.native_witness.as_ref().unwrap();
+            let action = snapshot_action(
+                self.cancellation
+                    .as_ref()
+                    .is_some_and(|value| value.load(Ordering::Acquire)),
+                Instant::now() >= deadline,
+                self.npm_diagnostics.as_ref().unwrap().started.elapsed(),
+                witness.snapshot.is_some(),
+                witness.late_snapshot.is_some(),
+                witness.root_thread.is_some()
+                    && witness.births.contains_key(&self.root_process_id)
+                    && witness.modules.contains_key(&self.root_process_id),
+            );
+            match action {
+                SnapshotAction::Cancelled => {
+                    if let Some(trace) = self
+                        .npm_diagnostics
+                        .as_mut()
+                        .and_then(|value| value.trace.as_mut())
+                    {
+                        trace.last_boundary = "wait_cancelled";
+                    }
+                    return Err(io::Error::new(
+                        io::ErrorKind::Interrupted,
+                        "managed_process.atomic_windows_probe_cancelled",
+                    ));
+                }
+                SnapshotAction::Expired => {
+                    return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
+                }
+                SnapshotAction::Early => {
+                    self.capture_native_witness(container, deadline)?;
+                }
+                SnapshotAction::Late => self.capture_late_native_witness(container, deadline)?,
+                SnapshotAction::Wait => {}
+            }
             if self
                 .cancellation
                 .as_ref()
                 .is_some_and(|value| value.load(Ordering::Acquire))
             {
-                if let Some(trace) = self
-                    .npm_diagnostics
-                    .as_mut()
-                    .and_then(|value| value.trace.as_mut())
-                {
-                    trace.last_boundary = "wait_cancelled";
-                }
-                return Err(io::Error::new(
-                    io::ErrorKind::Interrupted,
-                    "managed_process.atomic_windows_probe_cancelled",
-                ));
-            }
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
-            }
-            if self
-                .native_witness
-                .as_ref()
-                .is_some_and(|value| value.snapshot.is_none())
-                && self
-                    .npm_diagnostics
-                    .as_ref()
-                    .is_some_and(|value| value.started.elapsed() >= SNAPSHOT_AFTER)
-                && self.root_process_id != 0
-                && self.native_witness.as_ref().is_some_and(|value| {
-                    value.births.contains_key(&self.root_process_id)
-                        && value.modules.contains_key(&self.root_process_id)
-                })
-            {
-                self.capture_native_witness(container)?;
+                continue;
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
@@ -615,7 +865,7 @@ impl WindowsImageDebugSession {
 
     pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
-            let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
+            let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
             // 仅地址、摘要、对象身份和固定错误类别；不含内存字节、路径、命令行或环境。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }
