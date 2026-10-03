@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03授权CGEvent在普通Grok与TextEdit跨应用均未交付，需人工实测。G09固定CMD创建调用未显式请求暂停且复制桌面字段；b3单次15秒栈仍不能解释最终停滞。现补默认关闭的15/240秒原主线程配对观察，目标Windows复验待完成；未改权限、超时或关闭条件，不计缺口完成。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03授权CGEvent在普通Grok与TextEdit跨应用均未交付，需可交付手势或人工实测。精确2e9的Windows首CMD仍ProbeFailed；同原主线程15/240秒间用户CPU224.703125秒，两栈同属创建期间调试堆路径，支持限定CMD标准堆修复候选，尚未证明修复成功。未改权限、超时或关闭条件，不计缺口完成。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1080,7 +1080,7 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "Mac消费者、真实Homebrew多入口回滚/重试和英中功能链已齐备。363的首CMD与原生事务未启动，Windows既有npm停滞仍待真实因果证据；34固定Codex hooks复验通过，但不外推旧6726失败根因。当前来源绑定修复的目标平台验证与最终源码门禁仍欠，不关闭G09。"
+      "boundary": "Mac消费者、真实Homebrew多入口回滚/重试和英中功能链已齐备。精确2e9的Windows首CMD仍ProbeFailed；同原主线程在224.928秒间消耗224.703125秒用户CPU，早晚均处于CreateProcessW应用兼容检查中的调试堆路径，原暂停计数平衡。现据此推进限定CMD标准堆修复；真实成功及最终源码门禁仍欠，G09不关闭。"
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -8753,7 +8753,7 @@
     "timing_contract_fix": "不再用存活对象未定义的exitTime判活；liveness=not_inferred_from_timing。未增加SYNCHRONIZE或其他权限，原Suspend/GetContext和EXIT/Job边界保持。",
     "local_pure_tests_pass": 7,
     "windows_snapshot_tests_metadata_only": 12,
-    "windows_execution": "待精确提交限定CI；没有将元数据或纯逻辑通过当原生成功。",
+    "windows_execution": "精确2e9的37112613018已执行：snapshot12/creation14/witness6逐名通过，真实首CMD仍ProbeFailed；完整结果见windows_validation。原metadata-only字段保留此前本机范围，不覆盖实测。",
     "source_binding": "四文件仍由既有31来源清单及生产嵌入绑定覆盖；仅Windows/x86_64/默认关闭feature，原清理不进入取证。",
     "localization": "无需本地化变更：仅内部取证，不改变用户文案、产品权限、超时或验收条件。",
     "gap_closed": false,
@@ -8772,6 +8772,99 @@
       "both_cleaned": true,
       "independently_verified_files": 19,
       "receipt_sha256": "12c8e74e27a19e4728ac2ed23f42296cecace5138d5f8dcf43f1ef9037840742"
+    },
+    "windows_validation": {
+      "run_id": 37112613018,
+      "head": "2e9f8d60f365e786fe0e9e05ea5c7dee3928d0bf",
+      "conclusion": "failure",
+      "nextest_pass": 1143,
+      "warp_default_feature_nextest_pass": 1100,
+      "command_native_probe_witness_nextest_pass": 43,
+      "feature_libtest_ok": 48,
+      "native_witness_expected_and_passed": 32,
+      "environment_five_each_configuration_passed": true,
+      "native_test_failed": 1,
+      "native_test_seconds": 368.63,
+      "native_error": "ProbeFailed",
+      "generation": "f6d08827-7a5c-413c-b6be-d00106eee943",
+      "paired_cpu_user_seconds": 224.703125,
+      "paired_wall_seconds": 224.928,
+      "root_native_review_sha256": "b99873d2467ad91b3e7cc6ca6a2b2cd024b6160f02dc3f201d2e9b8f3d7055c1",
+      "paired_symbols_sha256": "6a2e117ce5fb87d6a87cc85fad354fd7b135c40b5fd2d793289893b1b639fe82",
+      "manifest_launch_exit_bindings_match": true,
+      "source_files_match": 31,
+      "cleanup": "本代Job/AppContainer/profile/私有站与helpers已核；整个远端夹具删除未证",
+      "gap_closed": false,
+      "independent_reviews_sha256": {
+        "independent-log-review.safe.json": "9bb3c2f8ed5ace40213931de7f0f0378b22b4a816bd460f41671ac26d780dfe0",
+        "independent-native-review.safe.json": "cdf9c35f09d24b05b40079e89433bc25ffb82cb4c4612558bd2f593b4e815bc8"
+      }
     }
+  },
+  "g09_cmd_standard_heap_20261003": {
+    "source_base": "2e9f8d60f365e786fe0e9e05ea5c7dee3928d0bf",
+    "status": "implemented_pending_real_windows_validation",
+    "evidence": "g09_root_paired_snapshot_20261003.windows_validation",
+    "change": "仅Codex Windows npm已验证cmd候选的私有环境增加唯一_NO_DEBUG_HEAP=1；从共享resolved_environment构造，不接受调用方覆盖。PowerShell及共享环境保持原映射。",
+    "unchanged": [
+      "DEBUG_PROCESS及原事件验证",
+      "Job/令牌/桌面/权限",
+      "取消/超时/恢复/严格清理",
+      "manifest及继承环境白名单"
+    ],
+    "tests": [
+      "cmd_candidate_uses_standard_heap_without_changing_shared_environment",
+      "powershell_candidate_preserves_shared_environment_without_heap_override"
+    ],
+    "localization": "无需本地化变更：内部受管候选堆配置，无用户文案、权限提示或布局变化。",
+    "local_gates": {
+      "cargo_check": {
+        "run_id": "r-1gahsk3b",
+        "command": [
+          "cargo",
+          "check",
+          "--locked",
+          "-p",
+          "warp",
+          "--features",
+          "cli-agent-native-witness,warpui/test-util,rust-embed/debug-embed"
+        ],
+        "exit_code": 0,
+        "status": "cleaned",
+        "cleanup_ready": true,
+        "log_sha256": "bc36d339b652fd012c4cd339b7e610c187e48b3fd38facf7ab58b5ce54109903"
+      },
+      "i18n": {
+        "run_id": "r-z5p5ubo2",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "warp",
+          "--lib",
+          "i18n::tests",
+          "--features",
+          "cli-agent-native-witness,warpui/test-util,rust-embed/debug-embed"
+        ],
+        "exit_code": 0,
+        "status": "cleaned",
+        "cleanup_ready": true,
+        "log_sha256": "a2c8e0d983011ac6b84f4b74fff98a8dbd7a66ca2769b715773ec66db6aa4db1"
+      },
+      "i18n_count": 11,
+      "pure_mapping_tests": {
+        "unique": 2,
+        "runs": 4,
+        "source_bytes_extracted": true,
+        "real_macos_cfg": true,
+        "windows_branch_executed": false,
+        "run_id": "r-o0b9hglz"
+      },
+      "root_receipt_sha256": "013bd25d7042b91c4a7693cd89939b89a616aaf7c26f2063caea171f52efe8a7",
+      "agent_delivery_sha256": "47bbf42f53620e2f3e2222aa2a51fd2c4c02048d479801ae520a29e7ab0d8fc8"
+    },
+    "windows_real_candidate": "pending",
+    "gap_closed": false
   }
 }

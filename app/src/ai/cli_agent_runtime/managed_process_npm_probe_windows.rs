@@ -111,6 +111,15 @@ fn system_program(mode: &str) -> io::Result<PathBuf> {
         .canonicalize()
 }
 
+fn candidate_environment(mode: &str, root: &Path) -> io::Result<Vec<(OsString, OsString)>> {
+    let mut environment = super::version_probe::resolved_environment(root)?;
+    if mode == "cmd" {
+        // 仅本次受管 CMD 候选使用标准堆，调试事件与隔离约束保持原样。
+        environment.push(("_NO_DEBUG_HEAP".into(), "1".into()));
+    }
+    Ok(environment)
+}
+
 fn safe_path(path: &Path) -> bool {
     path.is_absolute()
         && !path
@@ -451,7 +460,7 @@ pub(super) fn execute(
         "powershell" => format!("-NoLogo -NoProfile -NonInteractive -File \"{entry}\" --version"),
         _ => return Err(invalid()),
     };
-    let mut environment = super::version_probe::resolved_environment(&manifest.cwd)?;
+    let mut environment = candidate_environment(input.mode(), &manifest.cwd)?;
     if node_directory != install {
         let system_path = environment
             .iter_mut()

@@ -4,6 +4,44 @@ use super::super::AtomicDirectoryIdentity;
 use super::*;
 
 #[test]
+fn cmd_candidate_uses_standard_heap_without_changing_shared_environment() {
+    let root = Path::new("private-candidate");
+    let baseline = super::super::version_probe::resolved_environment(root).unwrap();
+    let candidate = candidate_environment("cmd", root).unwrap();
+    let settings = candidate
+        .iter()
+        .filter(|(name, _)| {
+            name.to_string_lossy()
+                .eq_ignore_ascii_case("_NO_DEBUG_HEAP")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(settings.len(), 1);
+    assert_eq!(settings[0].1, "1");
+    assert_eq!(
+        candidate
+            .into_iter()
+            .filter(|(name, _)| !name
+                .to_string_lossy()
+                .eq_ignore_ascii_case("_NO_DEBUG_HEAP"))
+            .collect::<Vec<_>>(),
+        baseline
+    );
+}
+
+#[test]
+fn powershell_candidate_preserves_shared_environment_without_heap_override() {
+    let root = Path::new("private-candidate");
+    let baseline = super::super::version_probe::resolved_environment(root).unwrap();
+    let candidate = candidate_environment("powershell", root).unwrap();
+    assert_eq!(candidate, baseline);
+    assert!(candidate.iter().all(|(name, _)| {
+        !name
+            .to_string_lossy()
+            .eq_ignore_ascii_case("_NO_DEBUG_HEAP")
+    }));
+}
+
+#[test]
 fn dos_directory_path_keeps_long_unicode_cwd_bound() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary

@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：2e9 原主线程配对结果与修复依据
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确`2e9f8d60f365e786fe0e9e05ea5c7dee3928d0bf`的[37112613018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37112613018)源码检查及两组nextest通过：warp未加witness feature的1100项，加native-probe-witness的command43项；不能把全部1143项描述成默认feature。witness配置libtest为12＋14＋6＋11＋5共48项通过，32项取证测试逐名通过，环境5项在两配置各通过一次。真实用例0通过／1失败，耗时368.63秒、exit101、ProbeFailed；上述单元结果不覆盖它。
+
+首CMD原主线程PID7940/TID5888的完整创建身份在两次样本一致。15.118秒至240.046秒的墙钟间隔224.928秒，用户CPU从133281250增至2380312500个100ns单位，差224.703125秒，约99.90%单核，内核CPU均0。早期栈为RtlCompareMemoryUlong/调试分配，晚期为RtlpCheckBusyBlockTail/RtlpValidateHeapEntry/RtlDebugFreeHeap；两者均处于CreateProcessW应用兼容检查的GetTempPathW链。实际模块SHA、微软PDB及对应`.pdata`范围已绑定；两次failure=null，暂停均0→1→0。配对审计`6a2e117ce5fb87d6a87cc85fad354fd7b135c40b5fd2d793289893b1b639fe82`；它证明两次状态和区间CPU消耗，不独自证明完整根因。微软说明调试进程可显式[选择标准堆](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/debugging-a-user-mode-process-using-windbg)，据此推进仅CMD私有候选环境的修复，效果仍待真实更新验收。
+
+原49个调试事件均验证并继续、pending为空；Node CREATE仍仅在清理时到达，不能据此说取消后才创建。延迟导入覆盖拒绝保留且未安装创建断点，CP936拒绝访问未归因API。31份源码与started记录符合冻结提交，原manifest、launch、spawn、exit及receipt摘要互相匹配。本代Job、AppContainer/profile、私有站、两个helper退出和对象释放均有原件；整个远端夹具删除未证。根审`b99873d2467ad91b3e7cc6ca6a2b2cd024b6160f02dc3f201d2e9b8f3d7055c1`；完整日志审计`f0baa7644fdd4b239454095e2fcea17ade58a780b33e8d00547b154f390560ca`。两官方ZIP大小、SHA、CRC已核，主ZIP`c5e56c7e77041dba34bc19919d5a179433a451bb69fea10bea6890854b4be3b6`，仓外`2e9f8d60f-ci`。没有改记历史失败或扩大关闭条件。
+
+代码修正仅在已经验证的`mode==cmd`候选中从原私有环境增加唯一`_NO_DEBUG_HEAP=1`，不接受调用方环境覆盖；PowerShell及共享构造保持原映射，DEBUG_PROCESS、Job、令牌、桌面、取消、超时及清理均不变。两项回归核CMD唯一值1及其余映射、PowerShell完全相等。无需本地化变更：内部堆配置没有用户文案、提示或布局变化。新修复的真实Windows效果与最终源码门禁仍待验。 本机含取证feature的cargo check及i18n 11项通过；两项原字节映射测试在父环境缺失/值0两配置共4次通过，只执行Mac非Windows分支。三个短根均已核验退出并清理，根门禁收据`013bd25d7042b91c4a7693cd89939b89a616aaf7c26f2063caea171f52efe8a7`。
+
 ## 2026-10-03：固定 CMD 调用点与原主线程配对观察
 
 新增关闭0项。对同SHA CMD的独立静态复核确认：旧返回帧`0x24a6c`对应`0x24a65`经IAT `0x3af10`的CreateProcessW调用，前置块第六参数为`0x80000`，没有CREATE_SUSPENDED；IAT `0x3af00`的GetStartupInfoW输出lpDesktop被复制到新STARTUPINFOEX。根代理逐字节核验13处指令，收据SHA `fc3030bc9884b8b7e2fed9ae78cab8a8b6cdbb6ddfd59b68a9409c08cbe243c9`，仓外`g09-fixed-image-contract-v1`。这削弱“CMD显式暂停或丢弃桌面”的解释，但没有读取动态参数、IAT或桌面字符串，不能证明实际桌面或最终停滞原因。
