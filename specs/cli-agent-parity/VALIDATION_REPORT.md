@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：修复首 CMD 取证入口的环境合同
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确33f8d91cc的[37098941047](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37098941047)普通1138项、feature取证25项及ce6 11项通过；runner的21份生产源码嵌入检查通过，完整31摘要匹配冻结提交。真实ignored入口随后在validate返回 `inherited_environment`：runner显式传入的固定ALLOW开关不在验收允许列表。没有started、supervisor或原生代次收据，调用顺序证明首CMD和exercise未执行；worker后续绑定与执行后复核未到达。两份官方ZIP的API大小、SHA和全CRC已核，终审索引 `28233569189db2e4802b83842419ac9d95fa01f93fd088f4d602db0085219552`，仓外 `33f8d91cc-ci`。私有npm登记是夹具准备，不是产品候选成功；远端现场保留，未证完整根目录及外部npm后代清理。
+
+现仅验收入口在专用feature、updated、execute与固定ALLOW值同时成立时接纳该键；GENERATION、未知键、错误值、其他case/recover仍拒绝。五项回归直接调用实际validator，普通Windows筛选与feature步骤均接入；生产权限、超时及CLI环境白名单未改。独审核实31来源、17路径及三份实际npm shim模板一致，未发现第二个确定前置合同错误；未执行的动态身份与manager树仍待真实运行。源码索引 `c566e3146b843d96ff9eeb70c4a26ee2347a388ac6f8d56c60b7fb1275b97559`。本机check、i18n11、Python21与actionlint通过；隔离原字节合同在Mac四项回归按feature关/开各通过一次，Windows五项仅双配置元数据检查，不能算Windows运行。六个短根已清理，首轮提取器自检失败保留；门禁索引 `07a0c5158a1b71bdf40f8abdf00d6f6040ea4e47c92c54be3d9ebf3f0e6bb22c`，仓外 `g09-witness-environment-fix-v1`。无需本地化变更。Windows精确修复复验及最终源码门禁待完成，旧原生停滞仍开放。
+
 ## 2026-10-03：来源绑定前置修复与固定 Codex hooks 实测结果
 
 新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确363b17a77的[37094078558](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37094078558)Windows check、监督程序和feature libtest构建通过，普通1138项、snapshot8＋creation14＋glue3共25项及feature ce6 11项均通过；随后Python verify_embedded报 `supervisor_source_binding`，首CMD、原生事务与其因果取证尚未启动。原错误不含缺失文件名，不能称已逐项扫描失败二进制；终审索引 `205b5f267425d47b1e8e343138a9f3939ace02912cd230ca39bff1ad27aa7d00`，仓外 `363b17a77-ci`。原822夹具失败和更早原生停滞均保留。

@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{Read as _, Write as _};
+use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -421,6 +422,46 @@ fn verify_shims(manifest: &Manifest) -> Result<(), String> {
     }
     Ok(())
 }
+// 仅验收入口接纳精确的首 CMD 取证开关；代次仍只能由生产父进程注入。
+fn validate_inherited_environment(
+    case: &str,
+    step: &str,
+    variables: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Result<(), String> {
+    let allowed = env_paths()
+        .into_iter()
+        .map(|(name, _)| name)
+        .chain([
+            "SYSTEMROOT",
+            "WINDIR",
+            "COMSPEC",
+            "PATH",
+            "PATHEXT",
+            "LANG",
+            "LC_ALL",
+            "DISABLE_AUTOUPDATER",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW",
+            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_MANIFEST",
+            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_STEP",
+            "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE",
+        ])
+        .collect::<std::collections::BTreeSet<_>>();
+    for (name, value) in variables {
+        let name = name.to_string_lossy().to_ascii_uppercase();
+        let permitted = if name == "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW" {
+            cfg!(feature = "cli-agent-native-witness")
+                && case == "updated"
+                && step == "execute"
+                && value.to_str() == Some("codex-npm-first-cmd-v1")
+        } else {
+            allowed.contains(name.as_str())
+        };
+        check(permitted, "inherited_environment")?;
+    }
+    Ok(())
+}
+
 fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
     let root = &manifest.root;
     check(
@@ -460,31 +501,7 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
             "private_environment_path",
         )?;
     }
-    let allowed = env_paths()
-        .into_iter()
-        .map(|(name, _)| name)
-        .chain([
-            "SYSTEMROOT",
-            "WINDIR",
-            "COMSPEC",
-            "PATH",
-            "PATHEXT",
-            "LANG",
-            "LC_ALL",
-            "DISABLE_AUTOUPDATER",
-            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
-            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW",
-            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_MANIFEST",
-            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_STEP",
-            "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE",
-        ])
-        .collect::<std::collections::BTreeSet<_>>();
-    for (name, _) in std::env::vars_os() {
-        check(
-            allowed.contains(name.to_string_lossy().to_ascii_uppercase().as_str()),
-            "inherited_environment",
-        )?;
-    }
+    validate_inherited_environment(&manifest.case, &step(), std::env::vars_os())?;
     check(
         std::env::var("INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW").as_deref() == Ok(SCOPE)
             && std::env::current_dir()
@@ -898,4 +915,131 @@ async fn real_codex_windows_npm_update_without_model() {
         result.is_ok(),
         "Windows npm 产品验收失败，原始现场保留：{result:?}"
     );
+}
+
+#[test]
+fn windows_npm_witness_environment_preserves_standard_environment() {
+    for case in [
+        "updated",
+        "old_moved",
+        "published_receipt_missing",
+        "external_change_preserved",
+        "candidate_changed_preserved",
+    ] {
+        for step in ["execute", "recover"] {
+            let variables = env_paths()
+                .into_iter()
+                .map(|(name, relative)| (OsString::from(name), OsString::from(relative)))
+                .chain([
+                    (OsString::from("Path"), OsString::from("private fixture")),
+                    (OsString::from("SystemRoot"), OsString::from("Windows")),
+                ]);
+            assert_eq!(
+                validate_inherited_environment(case, step, variables),
+                Ok(())
+            );
+        }
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_requires_compiled_feature() {
+    for name in [
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW",
+        "infinishell_windows_native_witness_allow",
+        "InfiniShell_Windows_Native_Witness_Allow",
+    ] {
+        let result = validate_inherited_environment(
+            "updated",
+            "execute",
+            [(
+                OsString::from(name),
+                OsString::from("codex-npm-first-cmd-v1"),
+            )],
+        );
+        if cfg!(feature = "cli-agent-native-witness") {
+            assert_eq!(result, Ok(()));
+        } else {
+            assert_eq!(result, Err("inherited_environment".to_string()));
+        }
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_rejects_wrong_values() {
+    for value in [
+        "",
+        "1",
+        "codex-npm-first-cmd-v2",
+        "CODEX-NPM-FIRST-CMD-V1",
+        "codex-npm-first-cmd-v1 ",
+        "codex-npm-first-cmd-v1\0extra",
+    ] {
+        let result = validate_inherited_environment(
+            "updated",
+            "execute",
+            [(
+                OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                OsString::from(value),
+            )],
+        );
+        assert_eq!(result, Err("inherited_environment".to_string()));
+    }
+    let result = validate_inherited_environment(
+        "updated",
+        "execute",
+        [(
+            OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+            OsString::from_wide(&[0xd800]),
+        )],
+    );
+    assert_eq!(result, Err("inherited_environment".to_string()));
+}
+
+#[test]
+fn windows_npm_witness_environment_rejects_other_cases_and_steps() {
+    for (case, step) in [
+        ("old_moved", "execute"),
+        ("published_receipt_missing", "execute"),
+        ("external_change_preserved", "execute"),
+        ("candidate_changed_preserved", "execute"),
+        ("unknown", "execute"),
+        ("updated", "recover"),
+        ("updated", "install"),
+        ("updated", ""),
+    ] {
+        let result = validate_inherited_environment(
+            case,
+            step,
+            [(
+                OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                OsString::from("codex-npm-first-cmd-v1"),
+            )],
+        );
+        assert_eq!(result, Err("inherited_environment".to_string()));
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_rejects_generation_and_unknown_names() {
+    for name in [
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",
+        "infinishell_windows_native_witness_generation",
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW_EXTRA",
+        "OPENAI_API_KEY",
+    ] {
+        for include_allow in [false, true] {
+            let mut variables = vec![(OsString::from(name), OsString::from("fixture"))];
+            if include_allow {
+                variables.push((
+                    OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                    OsString::from("codex-npm-first-cmd-v1"),
+                ));
+            }
+            assert_eq!(
+                validate_inherited_environment("updated", "execute", variables),
+                Err("inherited_environment".to_string())
+            );
+        }
+    }
 }

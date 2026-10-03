@@ -1996,7 +1996,7 @@ jobs:
             $unitBinary = $executables[0]
             $listedTests = @(& $unitBinary --list)
             if ($LASTEXITCODE -ne 0) { throw 'Witness unit test discovery failed' }
-            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'sources::claude_downgrade::tests::')) {
+            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'sources::claude_downgrade::tests::', 'sources::npm_windows::live_tests::windows_npm_witness_environment_')) {
               if (@($listedTests | Where-Object { $_.Contains($filter) -and $_.EndsWith(': test') }).Count -eq 0) { throw "Missing witness unit group: $filter" }
               & $unitBinary $filter --test-threads=1
               if ($LASTEXITCODE -ne 0) { throw "Witness unit group failed: $filter" }

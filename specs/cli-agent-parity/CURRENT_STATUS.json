@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；363 Windows普通1138项、25取证回归及feature ce6 11项通过，但来源绑定前置失败，首CMD与原生事务未启动。34 hooks复验8个app-server自然退出0，旧6726失败及根因未知保留。来源绑定已修并通过本机check、21项Python回归、i18n11项及实际Mac监督嵌入扫描；最新Windows验证与最终源码门禁待完成。",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。33 Windows普通1138项及feature取证25项/ce6 11项通过，来源绑定前置已越过，但验收入口因漏接固定取证环境开关拒绝，首CMD未启动。现已精准修复验收合同并完成本机check、i18n、Python和原字节合同检查；Windows实际复验及最终源码门禁待完成，既有原生停滞未改记解决。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1712,6 +1712,43 @@
       },
       "localization": "无需本地化变更：仅来源绑定及验收诊断，无用户文案、权限、超时或退出语义变化。",
       "remaining": "G03 Finder真实拖放；G09既有Windows npm停滞、来源修复的Windows执行及最终精确源码门禁。PR保持草稿，V01/V02/V05仍移交。"
+    },
+    "g09_witness_environment_contract_fix_20261003": {
+      "base_commit": "33f8d91cc071014c35d3c68b6a6e3daa0be1bc5f",
+      "failed_run": 37098941047,
+      "failed_final_index_sha256": "28233569189db2e4802b83842419ac9d95fa01f93fd088f4d602db0085219552",
+      "ordinary_pass": 1138,
+      "feature_witness_pass": 25,
+      "feature_ce6_pass": 11,
+      "runner_source_binding_passed": true,
+      "worker_later_source_and_binary_recheck_reached": false,
+      "failure": "runner显式加入INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW，验收allowed列表漏接，validate以inherited_environment拒绝。",
+      "first_cmd_executed": false,
+      "source_sha256_all_31_match": true,
+      "fix": "仅验收合同在专用feature、updated、execute和精确固定值同时成立时接纳ALLOW；仍拒绝GENERATION、未知键、错误值及其他阶段。",
+      "new_windows_contract_tests": 5,
+      "feature_workflow_filter_wired": true,
+      "production_changed": false,
+      "source_index_sha256": "c566e3146b843d96ff9eeb70c4a26ee2347a388ac6f8d56c60b7fb1275b97559",
+      "review_sha256": "087d052bb9b98b09d2f9dfd7268c4cd06d1439606e744599b2ccb74d84700147",
+      "local_gate_sha256": "07a0c5158a1b71bdf40f8abdf00d6f6040ea4e47c92c54be3d9ebf3f0e6bb22c",
+      "cargo_check": "passed",
+      "i18n_pass": 11,
+      "python_pass": 21,
+      "actionlint": "passed",
+      "isolated_original_contract": {
+        "macos_unique_tests": 4,
+        "feature_configurations": 2,
+        "windows_metadata_only_unique_tests": 5,
+        "windows_executed": false,
+        "receipt_sha256": "945fe541a074d01e07a142700dc12b2e5a774fe0192f38ec36eb188b5a7075e2"
+      },
+      "local_short_roots_cleaned": 6,
+      "preparation_failure_preserved": "首轮隔离提取器自检在rustc前失败，修断言后通过；产品及测试源码未变。",
+      "remote_cleanup": "33失败私有现场保留；没有根目录或外部npm安装后代独立清理证明；产品AppContainer未启动，不计清理通过。",
+      "windows_recheck": "待精确修复提交复验；首CMD原生停滞和最终源码门禁仍开放。",
+      "localization": "无需本地化变更：仅验收合同和CI筛选，无用户文案、权限、超时、退出语义或布局变化。",
+      "gaps_closed": []
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
