@@ -1579,6 +1579,24 @@
       "windows_recheck": "pending",
       "localization": "无需本地化变更：仅测试接线和CI诊断输出，无用户文案或布局变化",
       "gaps_closed": []
+    },
+    "g09_hooks_shutdown_logging_20261003": {
+      "base_commit": "82204ea4f516ab728a84cfc1c6f42b9846717b24",
+      "source_index_sha256": "c932ae36a66386e9d55cb6f0d6ef24daf10121da37d63ce7f25450a3fdafe442",
+      "local_gate_sha256": "24938245002f43b2e9be3588614860927a58d6086e60789ca625e7a141953e73",
+      "scope": "复制私有app-server环境启用固定上游关停日志，含ConPTY复用case；调用方环境、Recorder、RPC、超时和自然退出条件不变",
+      "python_unique_pass": 66,
+      "python_platform_skipped": 2,
+      "cargo_check": true,
+      "i18n_pass": 11,
+      "short_roots_cleaned": true,
+      "logs_alone_prove_stdin_eof": false,
+      "native_execution": false,
+      "original_exit_failure_solved": false,
+      "active_first_cmd_run": 37089624639,
+      "active_run_contains_this_increment": false,
+      "localization": "无需本地化变更：内部验收日志，无用户文案、错误语义或布局变化",
+      "gaps_closed": []
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

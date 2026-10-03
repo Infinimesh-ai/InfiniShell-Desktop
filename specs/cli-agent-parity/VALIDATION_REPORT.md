@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：为原有 Codex 验收保留服务端关停阶段
+
+新增关闭0项。固定b412上游源码的stdio读取结束、processor退出和outbound退出日志写入stderr，但原验收默认日志级别未启用这些阶段。现仅复制start_codex的私有app-server环境，设置warn基础级别及两个已核模块的info/debug，采用JSON格式，由既有Recorder保存；ConPTY复用case也适用。调用方环境、原生RPC、超时、自然退出条件及清理均不变；读取错误和转发失败也可能到达“EOF”日志，不能以该文字独立证明真实EOF或成功退出。
+
+源码索引 `c932ae36a66386e9d55cb6f0d6ef24daf10121da37d63ce7f25450a3fdafe442`；既有hooks/ConPTY回归66通过、2平台跳过，check及i18n 11项通过，四个本机短根核验清理（单独hooks重跑不加算覆盖）。门禁索引 `24938245002f43b2e9be3588614860927a58d6086e60789ca625e7a141953e73`，仓外 `g09-hooks-shutdown-logging-v1`。无需本地化变更：内部验收日志，无用户文案、错误语义或布局变化。未执行新的Windows hooks验收，也未解决原退出失败；当前[37089624639](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37089624639)仍绑定822并限定首CMD，不含此增量、不扩范围。G03/G09继续开放，PR草稿。
+
 ## 2026-10-03：修复取证 feature 的测试接线，保留编译诊断
 
 新增关闭0项。精确234dbf777的[37086236420](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37086236420)已结束为failure：普通warp 1095与command 43，共1138项PASS，含ce6降级11项及i18n 11项各一次，无测试FAIL/LEAK/RETRY/FLAKY；取证feature的libtest构建汇总3 errors，25项取证测试及首CMD原生均未启动。具体compiler-message被旧脚本截获而未输出，不能将源码推断当成已恢复的原始诊断。完整日志SHA `5e15771a70779684ddb01e72fd18b44e0e7c9b3ad0ff8db46827a1b78459200a`，唯一官方环境ZIP的API大小／SHA／CRC已核，终审索引 `5c0ad94045b480012d22ca013192f17e179a5393175ef577d7e1608ea2665607`；可见警告及未取得的编译警告明细边界保留。

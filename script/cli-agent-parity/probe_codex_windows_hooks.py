@@ -338,8 +338,13 @@ class NativeRecorder:
 def start_codex(executable, env, directory, traces):
     events = []
     traces.append(events)
+    # 仅私有 app-server 启用关停日志；ConPTY 复用此入口，调用方环境保持原样。
+    # 原生“EOF”日志也可由读取或转发失败触发，不能单独作为输入 EOF 证明。
+    app_server_env = dict(env)
+    app_server_env.update(RUST_LOG='warn,codex_app_server=info,codex_app_server_transport::transport::stdio=debug',
+                          LOG_FORMAT='json')
     recorder = NativeRecorder([str(executable), 'app-server', '--stdio', '--disable', 'shell_snapshot'],
-                              env, directory, events, supervise_windows=True)
+                              app_server_env, directory, events, supervise_windows=True)
     try:
         recorder.rpc('initialize', {'clientInfo': {'name': 'windows_hook_verification', 'version': '0.1.0'},
                                     'capabilities': {'experimentalApi': True}}, 1)
