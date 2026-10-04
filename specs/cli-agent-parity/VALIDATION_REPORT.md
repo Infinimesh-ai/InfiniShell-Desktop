@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 Mac 与 Linux musl 平台绑定原矩阵通过独审
+
+`a5ecc6848bc66b9be11be8d6247bff764ef2f3be` 的 Mac `r-kgcnezst` 五场景最终全部接受：实际更新到280、交换收据缺失后独立进程冷恢复278、外部改动后独立冷恢复保留280、候选改动保留原278，以及 Latest 降级真实 `ChannelMismatch`／无计划。两次冷恢复前的执行阶段按合同标记 `accepted=false/needs_cold_recovery=true`，不能单独当作最终失败或跳过恢复。四代候选原生退出0、coalition资源销毁与退出绑定均已核验，18份验收源码绑定a5。独审 `g09-claude-npm-platform-macos-runs/r-kgcnezst/independent-success-partial-cleanup-review.safe.json` SHA `f22d22d83bc0ff82e73267b72948287c0e3981c70e8e5367a78e0447b1097280`。这是后端更新／恢复回归，不增加GUI或在线模型验收范围；忙碌模型测试单列，未发送模型输入。
+
+子命令成功后，通用wrapper删除0500私有快照目录发生PermissionError；原外层失败保留。剩余546个文件、736对象扩展属性与身份均在外置保全，再核原进程、四个launchd标签和打开文件释放，仅对四个精确快照目录补owner写位并清理原根。保全 SHA `36cff712a999fcb6fb054995a49b1e517ddc217c574a04a0e19030d0ec5e0e03`，清理 SHA `a4cc51f6df56d68d3ab3de63b52227bd9f3127fd5f39acb7cf26fd9605a3cb07`。两轮旧失败根也完成全字节／元数据保全和逐根清理，登记仍保留原exit1。成功轮监督程序从旧轮取得精确同字节签名归档，关联 SHA `ecdb2bf9c13e3f43e2f26091955570e4119d0b14ecacbf37b8348bd66fec2164`；并非恢复原inode。成功轮测试worker原签名字节未归档，仅来源／执行摘要留存，不用重建或重跑覆盖该边界。
+
+精确 `926af2b65` 的 [Linux源码门禁37204698590](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37204698590) 完整日志独审通过：5482次nextest PASS，新增12项Linux原生模块与18项npm回归逐名各一次PASS；i18n11项分别在普通及feature配置通过，FAIL／LEAK／RETRY／FLAKY／TIMEOUT均0。Rust诊断、工具和Node warning原样保留；hook为23 PASS／2 SKIP（缺fish、zsh）。独审 SHA `58d69973ca853470ce265f9b761392052f7b31bba9ba0f00170e1dae1b0d231e`；这不是原生事务或最终双平台门禁。
+
+同 `a5ecc6848` 的 [Linux musl原生事务37207590339](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37207590339) 已通过原件独审：25输入完全匹配，仅Linux实际执行；三个正式小工件已核API摘要、长度、全成员SHA与CRC，18份driver源码及五份fixture清单无失配。五场景全部接受、两次独立libtest冷恢复完成、四代原生退出0并确认清理；候选篡改场景在启动监督者前拒绝，不能计为运行并清理。普通2060项PASS，Linux12／npm18／i18n11各一次通过，FAIL／LEAK／RETRY／FLAKY／TIMEOUT均0。busy模型测试通过但保留15行EOF错误（API keys6、Grok tokens6、cloud sync tokens3，无凭据值）；Rust66项诊断／7条摘要、Node10、Git1及GitHub1条warning保留。完整日志 SHA `057f6709149535f577a4f37fce932409c5d28a0cefd17cecee12cbd01578df31`，独审 SHA `cf3e709bc96e391fa506f35bde1be4be4c03b00834069a93a8c8458863a037cd`，交付索引 SHA `e4704b7cf12402dd97f5a7805eff1414cca7c0e96d1ee1a64c7324d1d6989ad1`。归档有四代exit记录，没有原process manifest／launch／loader动态绑定全链；不外推GUI、285／287、合法降级或远端整个夹具目录已删除。
+
+Linux终态后已串行启动同提交 [Windows原五场景／三次独立冷恢复37209945616](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37209945616)，witness关闭；精确25输入、50源文件、66项普通必需回归及11项i18n已冻结。此时没有Windows功能结论。**新增关闭0项；累计10项本次Mac范围关闭，G09仍开放，V01／V02／V05移交不计通过。额外ACL／安全属性范围及最终同冻结源码双平台门禁未满足，PR保持草稿。** 本轮仅同步证据与支持边界，无需本地化变更。提交前 `cargo check --locked -p warp` 在短根 `r-r6x6ua7y` 通过并清理，日志 SHA `fd8aa134f6c451355864f3ffa215aa756f672ac5ab23d2ebcb5e56ff92a611ce`。
+
 ## 2026-10-04：G09 PowerShell 管道兼容候选与 Mac 降级断言修订
 
 Windows 受管版本入口改为通过官方 `codex.ps1 --version` 请求空输入和流式输出管道，保留显式原生退出码；初值1避免未取得退出码时沿用成功状态。盘根严格限于 D–Z，拼接路径固定，官方包／Node选路、环境、Job、AppContainer、映像授权、取消期限与完整清理标准均保持。静态独审 SHA `b046e46011afa93d08f678cfcdc8fe3a864bbc0f43d8a192cf31d0ea1d4f858b` 无阻断，但不证明禁止系统回退、旧零输出根因或真实修复；仍须原五场景／三次独立冷恢复，`witness=false`。

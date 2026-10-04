@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。musl实现已提交926，本机门禁通过，Linux源码run37204698590运行中，固定加载器存在但未验执行。Mac新平台绑定前3场景通过，第4负例已安全拒绝但验收器错误要求监督者目录，整轮失败且现场保留；修订后待重跑。Windows2d9首updated仍ProbeFailed：PS Node/Codex真实退出0但stdout空，后4场景/3冷恢复未执行；原因未证。ACL/安全属性范围待决，最终同源双平台门禁未完成。",
+  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a5ecc Mac与Linux musl各5场景/2独立冷恢复已通过独审；Mac历史失败均保全并完成本机收尾。Linux926源码5482 PASS，a5ecc普通2060 PASS。Windows同提交原5场景/3冷恢复37209945616运行中，旧PS零输出失败保留。ACL/安全属性范围待决，最终同源双平台门禁未完成。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -1113,15 +1113,15 @@
     },
     "g09_progress": {
       "status": "open",
-      "audit_ref": "g09_version_candidate_stdin_eof_result_20261004",
+      "audit_ref": "g09_mac_platform_binding_acceptance_20261004",
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。musl实现已提交926，Linux源码run37204698590运行中，固定加载器存在但未验执行。cf18 Mac新平台绑定前4场景通过，第5场景旧断言未同步Latest降级拒绝合同，整轮失败且现场保留；精确修订后待重跑。Windows2d9首updated仍ProbeFailed：PS Node/Codex真实退出0但stdout空；当前PS显式管道兼容候选尚未原生验证，后4场景/3冷恢复未完成。ACL/安全属性范围待决，最终同源双平台门禁未完成。",
-      "latest_result_ref": "g09_version_candidate_stdin_eof_result_20261004",
-      "latest_result_source_commit": "2d9b3d4f49c26e7464a5666c8c0db833d48c9bdf",
+      "boundary": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a5ecc Mac与Linux musl各5场景/2独立冷恢复通过独审，历史失败及清理错误保留，Mac原根已保全后清理。Linux926源码门禁5482 PASS。Windows同提交原矩阵37209945616已启动，尚无PS新管道功能结论。ACL/安全属性范围待决，最终同源双平台门禁未完成。",
+      "latest_result_ref": "g09_mac_platform_binding_acceptance_20261004",
+      "latest_result_source_commit": "a5ecc6848bc66b9be11be8d6247bff764ef2f3be",
       "latest_preparation_ref": "g09_powershell_pipeline_candidate_20261004",
-      "mac_platform_binding_regression_complete": false
+      "mac_platform_binding_regression_complete": true
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -10534,7 +10534,7 @@
   "g09_musl_linux_source_gate_20261004": {
     "source_commit": "926af2b658ee23c4f6ecf22f9d51a8bab2473074",
     "run": 37204698590,
-    "status": "in_progress",
+    "status": "passed_independently_audited",
     "scope": "Linux source_gate_only",
     "actual_loader_entry_present": true,
     "actual_loader_target_uid": 0,
@@ -10543,6 +10543,72 @@
     "landlock_abi": 1,
     "native_transactions_selected": false,
     "final_same_source_dual_platform_gate": false,
-    "native_workflow_scope_prepared": "claude_musl：仅Linux/native_acceptance_only/run_claude_npm_updates三true，其余默认；25输入保持，尚未派发。"
+    "native_workflow_scope_prepared": "claude_musl：仅Linux/native_acceptance_only/run_claude_npm_updates三true，其余默认；25输入保持。另见a5ecc正式运行37207590339，不回填为本源码门禁执行。",
+    "nextest_pass": 5482,
+    "new_required_tests_pass": 30,
+    "i18n_each_configuration_pass": 11,
+    "i18n_configurations": 2,
+    "non_pass_nextest_statuses": 0,
+    "warnings_retained": true,
+    "hooks": {"pass": 23, "skip": 2, "missing_shells": ["fish", "zsh"]},
+    "independent_review_sha256": "58d69973ca853470ce265f9b761392052f7b31bba9ba0f00170e1dae1b0d231e"
+  },
+  "g09_mac_platform_binding_acceptance_20261004": {
+    "source_commit": "a5ecc6848bc66b9be11be8d6247bff764ef2f3be",
+    "run_id": "r-kgcnezst",
+    "status": "backend_five_cases_two_cold_recoveries_accepted",
+    "cases_pass": 5,
+    "independent_cold_recoveries": 2,
+    "actual_downgrade_refusal": "ChannelMismatch",
+    "actual_downgrade_plan_absent": true,
+    "native_exit_zero_and_cleanup_confirmed_generations": 4,
+    "source_files_bound": 18,
+    "model_inputs": 0,
+    "independent_review_sha256": "f22d22d83bc0ff82e73267b72948287c0e3981c70e8e5367a78e0447b1097280",
+    "original_wrapper_cleanup_failure": "PermissionError on mode0500 private executable snapshot directories; preserved",
+    "remaining_preservation_sha256": "36cff712a999fcb6fb054995a49b1e517ddc217c574a04a0e19030d0ec5e0e03",
+    "followup_cleanup_sha256": "a4cc51f6df56d68d3ab3de63b52227bd9f3127fd5f39acb7cf26fd9605a3cb07",
+    "supervisor_same_signed_bytes_association_sha256": "ecdb2bf9c13e3f43e2f26091955570e4119d0b14ecacbf37b8348bd66fec2164",
+    "signed_worker_original_archived": false,
+    "signed_worker_boundary": "此前wrapper部分删除；仅来源及签名后执行摘要留存，不以重建冒充原件。",
+    "old_failed_roots_archived_and_cleaned": ["r-bn8_xz96", "r-75gduwee"],
+    "old_failure_exit_codes_preserved": true,
+    "boundary": "后端原矩阵，不外推GUI/模型/忙碌消费者或其他平台；无需本地化变更。",
+    "g09_closed": false
+  },
+  "g09_musl_native_a5ecc_20261004": {
+    "source_commit": "a5ecc6848bc66b9be11be8d6247bff764ef2f3be",
+    "run_id": 37207590339,
+    "workflow_conclusion": "success",
+    "independent_audit": "passed",
+    "independent_review_sha256": "cf3e709bc96e391fa506f35bde1be4be4c03b00834069a93a8c8458863a037cd",
+    "independent_delivery_sha256": "e4704b7cf12402dd97f5a7805eff1414cca7c0e96d1ee1a64c7324d1d6989ad1",
+    "cases_pass": 5,
+    "independent_cold_recoveries": 2,
+    "native_exit_zero_and_cleanup_confirmed_generations": 4,
+    "ordinary_pass": 2060,
+    "required_each_once": {"linux_native": 12, "npm": 18, "i18n": 11},
+    "busy_tests_pass_with_retained_eof_error_lines": 15,
+    "scope_exact_match": true,
+    "verified_official_artifacts": 3,
+    "source_binding_mismatches": [],
+    "linux_full_log_sha256": "057f6709149535f577a4f37fce932409c5d28a0cefd17cecee12cbd01578df31",
+    "boundary": "五场景/两冷恢复后端原件独审通过；原PID/loader动态绑定全链未归档，不外推GUI、285/287、合法降级、远端整个夹具删除或最终双平台源码门禁。",
+    "g09_closed": false
+  },
+  "g09_windows_pipeline_full_matrix_a5ecc_20261004": {
+    "source_commit": "a5ecc6848bc66b9be11be8d6247bff764ef2f3be",
+    "run_id": 37209945616,
+    "status": "in_progress",
+    "dispatch_input_count": 25,
+    "source_files": 50,
+    "required_ordinary_tests": 66,
+    "required_i18n_tests": 11,
+    "native_witness": false,
+    "required_cases": 5,
+    "required_independent_cold_recoveries": 3,
+    "observer_binding_sha256": "748e39a6b1ae287658badd120f1f1c3a93b47ffefb3d996d1f7fc22d67cd19a4",
+    "boundary": "Linux原生工作流终态后串行派发；旧PS零输出失败保留，新管道入口尚无原生功能结论。",
+    "g09_closed": false
   }
 }
