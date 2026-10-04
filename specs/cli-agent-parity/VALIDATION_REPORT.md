@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：Linux ACL 源码门禁通过相关回归，真实通知超时使整轮失败
+
+[37215103046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37215103046) 已结束，精确源码为 `b5d9d9fb689d470c40c2abb50bfc0c11bcb63767`，仅 Linux／source_gate_only。新增ACL18、树5、npm事务3、Grok回滚3和Brew绑定3共32项逐名各一次PASS，含Linux原生fd ACL往返；普通nextest共5514 PASS，i18n11项在两配置各一次PASS，无nextest FAIL／LEAK／RETRY／FLAKY／TIMEOUT。以上不包含后续Mac父gid修复，也不是最终双平台门禁。
+
+唯一失败是step37的 `test_refreshed_shell_terminal_beats_inherited_ssh_terminal`：真实hook共25项，22PASS／1FAIL／2SKIP（fish、zsh缺失）。原Node诊断为preload后send在2612.677138ms遭SIGKILL／ETIMEDOUT，stdout／stderr均0字节，目标PTY也为0字节；0.074秒协议预检属于另一个成功进程。尚无失败worker内部阶段证据，不能判定Fluent、冷启动或调度为根因。只读源码核对发现TUI在发送预算开始前加载本地化，但当前复制路径不满足managed versions布局，不会取得版本共享锁；这只能排除该锁等待，不能证明其他卡点。没有重跑、提高期限或跳过用例。
+
+完整日志1985437字节，SHA `ee2523027f4876c149738dac730291165f532e873fb87e86faff10304b1439e0`；独审 `g09-unix-acl-linux-source-b5d9d9fb6-ci/independent-review.safe.json` SHA `1dcc3ecf7e93a4d692b6962dff8bb0e8f4ee5ec67ef644297a5226ba50284688`。根任务另核9份原件摘要及22份b5 Git源码绑定；观察登记 `r-0z4w7_9d` 已退出并清理。**新增关闭0项；G09、Windows原失败、额外安全属性范围决定及最终同源门禁继续保留，PR为草稿。** 本轮仅更新验收结论，无需本地化变更。
+
 ## 2026-10-05：Mac 只读 ACL 真实升级与冷恢复通过独审
 
 `b5d9d9fb689d470c40c2abb50bfc0c11bcb63767` 的 `r-t3ha378w` 仅运行 `updated` 与 `swap_receipt_missing`：公开入口升级至2.1.280；交换收据缺失后由独立进程恢复2.1.278，恢复后完整快照与更新前逐字节相同。两场景的before／prepared／after均为15节点、11文件；原权限和非空只读ACL逐项保持，实际四份官方tgz的SRI及成员内容已独立重核。真实路径集合未增加，不将本轮计为新增路径继承验收。
@@ -8,7 +16,7 @@
 
 新增路径审查发现Mac子目录与包根gid不同的确定缺陷。先运行真实内核组继承基准的红测 `r-bh6r4shq`，新文件错误取得20而非父目录12，失败日志 SHA `15f9f1b3e4a0da02670fce6168c80b79b56d9be0d701997ca24c10fe56a02377` 已保留；现仅将Mac新节点组来源改为最终直接父目录，既有节点原gid及Linux历史包根组策略保持。修复后更新379/379（`r-hcnt3_8v`，日志SHA `0ca9e538df973d3d884da3c8c5d039f883ce4fe22cbb2c2b90d48471ada22a29`）、i18n11/11（`r-t50ilrd0`）及 `cargo check --locked -p warp`（`r-ubbxsw_k`）通过，短根均已清理。两文件独审SHA `5fcab89654b1393e4a5abf6e7b9d91325076aabb6da074b65a51a915dc7db2c1`，本轮门禁索引 `g09-mac-parent-gid-local-gates-v1.safe.json` SHA `a9cc25cc51cad662325d81e6078c0a5f7c0d75732f9c6cb599b5515307c84510`。不将前述b5真实事务重标为新源码重跑。
 
-Linux源码门禁 [37215103046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37215103046) 绑定b5，仅Linux／source_gate_only，25输入已核；尚无终态，不是最终双平台门禁。Windows `37209945616` 原完整矩阵失败仍保留，缺少PS启动Node时具体失败操作／错误码，或实际重定向与标准流对象事实；不凭CREATE顺序推定ShellExecute回退，不重复相近探针。额外安全属性范围仍待用户决定。英中安装来源、权限、变更和恢复提示已复核，无需本地化变更，无布局变化。**本轮新增关闭0项；10关闭／G09开放／V01、V02、V05移交，PR保持草稿。**
+Linux源码门禁 [37215103046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37215103046) 绑定b5，仅Linux／source_gate_only，25输入已核；本节记录时尚无终态，后续失败及逐名通过范围见上节，不是最终双平台门禁。Windows `37209945616` 原完整矩阵失败仍保留，缺少PS启动Node时具体失败操作／错误码，或实际重定向与标准流对象事实；不凭CREATE顺序推定ShellExecute回退，不重复相近探针。额外安全属性范围仍待用户决定。英中安装来源、权限、变更和恢复提示已复核，无需本地化变更，无布局变化。**本轮新增关闭0项；10关闭／G09开放／V01、V02、V05移交，PR保持草稿。**
 
 ## 2026-10-04：G09 Unix 只读 ACL 实现通过本机门禁，真实事务待验
 

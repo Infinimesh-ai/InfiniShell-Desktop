@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。b5d9只读ACL真实升级至280及一次独立冷恢复278已通过原件独审，非空ACL和完整快照保留，短根已清理；本轮不覆盖新增相对路径。Mac新增路径异gid父目录问题已修复，379更新回归通过，i18n11项和cargo check通过。Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，后4场景/3冷恢复未跑；特殊安全属性范围及最终同源双平台门禁未完成。",
+  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。b5d9只读ACL真实升级至280及一次独立冷恢复278已通过原件独审，非空ACL和完整快照保留，短根已清理；本轮不覆盖新增相对路径。Mac新增路径异gid父目录问题已修复，379更新回归、i18n11项和cargo check通过。b5 Linux新增32项通过，但真实通知1项发送超时，整轮失败。Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，后4场景/3冷恢复未跑；特殊安全属性范围及最终同源双平台门禁未完成。",
   "g09_mac_acl_acceptance_20261005": {
     "status": "two_cases_one_cold_recovery_accepted_g09_open",
     "source_commit": "b5d9d9fb689d470c40c2abb50bfc0c11bcb63767",
@@ -20,7 +20,12 @@
     "fix_review_sha256": "5fcab89654b1393e4a5abf6e7b9d91325076aabb6da074b65a51a915dc7db2c1",
     "linux_source_run": 37215103046,
     "linux_source_commit": "b5d9d9fb689d470c40c2abb50bfc0c11bcb63767",
-    "linux_source_status": "in_progress",
+    "linux_source_status": "failure",
+    "linux_source_result": "新增ACL/树/回滚32项各一次PASS；nextest共5514 PASS，i18n11项在两配置各一次PASS；真实hook为22PASS/1FAIL/2SKIP，唯一失败为刷新终端优先于SSH终端用例。",
+    "linux_source_audit_sha256": "1dcc3ecf7e93a4d692b6962dff8bb0e8f4ee5ec67ef644297a5226ba50284688",
+    "linux_source_final_index_sha256": "1c6500da8b0a51af62e7af2ab66b548f8f9904c374d6fe7d63481531bf771047",
+    "linux_source_log_sha256": "ee2523027f4876c149738dac730291165f532e873fb87e86faff10304b1439e0",
+    "linux_source_blocker": "send在2612.677138ms被SIGKILL/ETIMEDOUT终止，stdout/stderr及目标PTY均0B。未取得该失败worker的启动/发送阶段，不能归因为Fluent、调度或冷启动；需定位卡点后修复，未提高超时、重试或跳过失败用例。",
     "windows_blocker": "需要实际PS启动Node的失败操作/错误码，或实际UseShellExecute/重定向/标准流对象证据；现有事件和零输出不足以认定根因，不重复相近探针。",
     "scope_decision": "只读ACL之外的特殊权限/安全属性范围仍待用户决定，未获得豁免。",
     "localization": "已复核英中来源不支持、权限、安装变化及恢复提示；无需本地化变更，无布局变化。",
