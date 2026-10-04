@@ -140,6 +140,151 @@ fn executable_and_private_file_modes_survive_replacement() {
 }
 
 #[test]
+fn hardlink_added_after_stage_snapshot_is_rejected_before_permission_changes() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let old = directory(&root, "old", b"old");
+    fs::set_permissions(root.join("old/payload"), fs::Permissions::from_mode(0o500)).unwrap();
+    let old = old.snapshot().unwrap();
+    let stage = directory(&root, "stage", b"new");
+    let staged = stage.snapshot().unwrap();
+    let opened = stage.read_file(OsStr::new("payload")).unwrap();
+    fs::hard_link(root.join("stage/payload"), root.join("external-alias")).unwrap();
+    let before = acl::capture(&opened).unwrap();
+
+    assert!(
+        stage
+            .apply_snapshot_permissions(&old, &BTreeMap::new(), staged)
+            .is_err()
+    );
+
+    assert_eq!(acl::capture(&opened).unwrap(), before);
+    let external = File::open(root.join("external-alias")).unwrap();
+    assert_eq!(acl::capture(&external).unwrap(), before);
+    assert_eq!(fs::read(root.join("external-alias")).unwrap(), b"new");
+}
+
+fn set_readonly_acl(file: &File, inherit: bool) -> acl::Acl {
+    if !inherit {
+        file.set_permissions(fs::Permissions::from_mode(0o644))
+            .unwrap();
+    }
+    let desired = acl::readonly_test_acl(inherit);
+    let captured = acl::capture(file).unwrap();
+    acl::apply_to_new(file, &captured, &desired).unwrap();
+    desired
+}
+
+#[test]
+fn replacement_preserves_existing_acl_and_inherits_new_members_before_exchange() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let old = directory(&root, "package", b"old");
+    let inherited = set_readonly_acl(&old.file, true);
+    let existing = set_readonly_acl(&old.read_file(OsStr::new("payload")).unwrap(), false);
+    let original = old.snapshot().unwrap();
+    let new = directory(&root, "stage", b"new");
+    fs::create_dir(root.join("stage/new-directory")).unwrap();
+    fs::write(root.join("stage/new-directory/new-file"), b"new member").unwrap();
+
+    new.apply_permissions(&original, &BTreeMap::new()).unwrap();
+    let prepared = new.snapshot().unwrap();
+    assert_eq!(prepared.root.acl, inherited.clone().into_optional());
+    assert_eq!(
+        prepared.nodes[Path::new("payload")].identity.acl,
+        existing.into_optional()
+    );
+    let (directory_acl, _) = inherited.inherit(true, 0o755).unwrap();
+    let (file_acl, _) = directory_acl.inherit(false, 0o644).unwrap();
+    assert_eq!(
+        prepared.nodes[Path::new("new-directory")].identity.acl,
+        directory_acl.into_optional()
+    );
+    assert_eq!(
+        prepared.nodes[Path::new("new-directory/new-file")]
+            .identity
+            .acl,
+        file_acl.into_optional()
+    );
+    let restored: Snapshot =
+        serde_json::from_slice(&serde_json::to_vec(&prepared).unwrap()).unwrap();
+    let parent = Directory::open(&root).unwrap();
+    parent
+        .exchange(OsStr::new("package"), OsStr::new("stage"))
+        .unwrap();
+    assert_eq!(
+        parent
+            .child(OsStr::new("package"))
+            .unwrap()
+            .snapshot()
+            .unwrap(),
+        restored
+    );
+    parent
+        .remove_matching(OsStr::new("stage"), &original)
+        .unwrap();
+    assert_eq!(fs::read(root.join("package/payload")).unwrap(), b"new");
+    assert!(!root.join("stage").exists());
+}
+
+#[test]
+fn acl_change_after_snapshot_preserves_backup_for_recovery() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let old = directory(&root, "backup", b"preserved");
+    let snapshot = old.snapshot().unwrap();
+    let serialized = serde_json::to_vec(&snapshot).unwrap();
+    assert!(
+        !String::from_utf8(serialized.clone())
+            .unwrap()
+            .contains("\"acl\"")
+    );
+    let restored: Snapshot = serde_json::from_slice(&serialized).unwrap();
+    set_readonly_acl(&old.read_file(OsStr::new("payload")).unwrap(), false);
+
+    assert!(
+        Directory::open(&root)
+            .unwrap()
+            .remove_matching(OsStr::new("backup"), &restored)
+            .is_err()
+    );
+    assert_eq!(fs::read(root.join("backup/payload")).unwrap(), b"preserved");
+}
+
+#[test]
+fn removing_acl_from_saved_snapshot_does_not_authorize_cleanup() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let old = directory(&root, "backup", b"preserved");
+    set_readonly_acl(&old.read_file(OsStr::new("payload")).unwrap(), false);
+    let mut saved = serde_json::to_value(old.snapshot().unwrap()).unwrap();
+    saved["nodes"]["payload"]["identity"]
+        .as_object_mut()
+        .unwrap()
+        .remove("acl");
+    let restored: Snapshot = serde_json::from_value(saved).unwrap();
+
+    assert!(
+        Directory::open(&root)
+            .unwrap()
+            .remove_matching(OsStr::new("backup"), &restored)
+            .is_err()
+    );
+    assert_eq!(fs::read(root.join("backup/payload")).unwrap(), b"preserved");
+}
+
+#[test]
+fn permission_plan_never_rewrites_the_original_tree() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let old = directory(&root, "original", b"preserved");
+    let snapshot = old.snapshot().unwrap();
+
+    assert!(old.apply_permissions(&snapshot, &BTreeMap::new()).is_err());
+    assert_eq!(old.snapshot().unwrap(), snapshot);
+}
+
+#[test]
 fn changed_backup_is_retained_instead_of_deleted() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path().canonicalize().unwrap();
@@ -241,7 +386,7 @@ fn ancestor_symlink_is_rejected_before_writing() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn acl_is_rejected_instead_of_silently_losing_access_rules() {
+fn external_readonly_acl_is_recorded_without_changing_access_rules() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path().canonicalize().unwrap();
     let package = directory(&root, "package", b"original");
@@ -254,7 +399,8 @@ fn acl_is_rejected_instead_of_silently_losing_access_rules() {
         .status()
         .unwrap();
     assert!(status.success());
-    assert!(package.snapshot().is_err());
+    let snapshot = package.snapshot().unwrap();
+    assert!(snapshot.nodes[Path::new("payload")].identity.has_acl());
     assert_eq!(fs::read(root.join("package/payload")).unwrap(), b"original");
 }
 

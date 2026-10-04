@@ -105,6 +105,15 @@ struct Journal {
     platform_archive_sha256: [u8; 32],
 }
 
+impl Journal {
+    fn has_acl(&self) -> bool {
+        self.owner.prefix_identity.has_acl()
+            || self.owner.parent_identity.has_acl()
+            || self.original.has_acl()
+            || self.prepared.as_ref().is_some_and(Snapshot::has_acl)
+    }
+}
+
 pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
     supports_for_platform(agent, version, &target()?)
 }
@@ -363,11 +372,15 @@ fn journal_path(root: &Path, agent: CLIAgent) -> PathBuf {
 }
 
 fn save(path: &Path, journal: &Journal) -> Result<(), Error> {
+    let bytes = serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?;
+    if bytes.len() as u64 > 12 * MAX_CONFIG {
+        return Err(Error::PersistenceFailed);
+    }
     plain_ancestors(path)?;
     let parent = path.parent().ok_or(Error::PersistenceFailed)?;
     let mut temporary = NamedTempFile::new_in(parent).map_err(|_| Error::PersistenceFailed)?;
     temporary
-        .write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
+        .write_all(&bytes)
         .map_err(|_| Error::PersistenceFailed)?;
     temporary
         .as_file()
@@ -960,6 +973,36 @@ pub(super) async fn execute(
     result
 }
 
+fn probe_digest(
+    journal: &Journal,
+    program_stamp: &Stamp,
+    codex_closure: &Option<npm_codex::ProbeClosure>,
+) -> Result<String, Error> {
+    let bytes = if codex_closure.is_some() {
+        serde_json::to_vec(&(program_stamp, "--version", journal.id, codex_closure))
+    } else if let Some(platform) = &journal.claude_platform {
+        serde_json::to_vec(&(program_stamp, "--version", journal.id, platform))
+    } else {
+        // 无 ACL 的旧事务保持原摘要字节，不能改变已落盘原生收据的绑定。
+        serde_json::to_vec(&(program_stamp, "--version", journal.id))
+    }
+    .map_err(|_| Error::PersistenceFailed)?;
+    let original = format!("{:x}", Sha256::digest(bytes));
+    if !journal.has_acl() {
+        return Ok(original);
+    }
+    let bytes = serde_json::to_vec(&(
+        "unix-acl-v1",
+        original,
+        &journal.owner.prefix_identity,
+        &journal.owner.parent_identity,
+        &journal.original,
+        &journal.prepared,
+    ))
+    .map_err(|_| Error::PersistenceFailed)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 async fn probe_version(
     agent: CLIAgent,
     root: &Path,
@@ -997,16 +1040,7 @@ async fn probe_version(
     };
     let program = program.as_path();
     let program_stamp = stamp(program)?;
-    let digest_bytes = if codex_closure.is_some() {
-        serde_json::to_vec(&(&program_stamp, "--version", journal.id, &codex_closure))
-    } else if let Some(platform) = &journal.claude_platform {
-        serde_json::to_vec(&(&program_stamp, "--version", journal.id, platform))
-    } else {
-        // Claude 保留既有收据绑定格式，不能因扩展 Codex 入口改变旧事务合同。
-        serde_json::to_vec(&(&program_stamp, "--version", journal.id))
-    }
-    .map_err(|_| Error::PersistenceFailed)?;
-    let digest = format!("{:x}", Sha256::digest(digest_bytes));
+    let digest = probe_digest(journal, &program_stamp, &codex_closure)?;
     let binding = probe_binding(agent == CLIAgent::Codex, digest.clone())?;
     let generation = Uuid::new_v4();
     journal.probe = Some(Probe {
@@ -1212,34 +1246,22 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
                 .is_err()
                 || npm_codex::verify_probe_target(&journal.target_version, &stage, closure).is_err()
                 || probe.binding_digest
-                    != format!(
-                        "{:x}",
-                        Sha256::digest(
-                            serde_json::to_vec(&(
-                                &probe.program_stamp,
-                                "--version",
-                                journal.id,
-                                &probe.codex_closure
-                            ))
-                            .map_err(|_| Error::RecoveryRequired)?
-                        )
-                    )
+                    != probe_digest(journal, &probe.program_stamp, &probe.codex_closure)
+                        .map_err(|_| Error::RecoveryRequired)?
             {
                 return Err(Error::RecoveryRequired);
             }
         } else if probe.codex_closure.is_some()
             || probe.program != stage.join(&journal.owner.public_relative)
-            || journal.claude_platform.as_ref().is_some_and(|platform| {
-                !serde_json::to_vec(&(&probe.program_stamp, "--version", journal.id, platform))
-                    .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
-                    .is_ok_and(|digest| digest == probe.binding_digest)
-                    || journal.prepared.as_ref().is_none_or(|prepared| {
-                        prepared
-                            .file_manifest()
-                            .get(&journal.owner.public_relative)
-                            .is_none_or(|(_, digest)| *digest != probe.program_stamp.digest)
-                    })
-            })
+            || !probe_digest(journal, &probe.program_stamp, &None)
+                .is_ok_and(|digest| digest == probe.binding_digest)
+            || journal.claude_platform.is_some()
+                && journal.prepared.as_ref().is_none_or(|prepared| {
+                    prepared
+                        .file_manifest()
+                        .get(&journal.owner.public_relative)
+                        .is_none_or(|(_, digest)| *digest != probe.program_stamp.digest)
+                })
         {
             return Err(Error::RecoveryRequired);
         }

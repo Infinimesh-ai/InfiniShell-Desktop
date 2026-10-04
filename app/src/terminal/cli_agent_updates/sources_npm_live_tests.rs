@@ -167,6 +167,8 @@ struct Manifest {
     scope: String,
     case: String,
     claude_platform: String,
+    #[serde(default)]
+    acl_fixture: Option<AclFixture>,
     root: PathBuf,
     node: Binary,
     npm_cli: Binary,
@@ -174,6 +176,12 @@ struct Manifest {
     supervisor: Binary,
     old_public_sha256: String,
     source_sha256: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+enum AclFixture {
+    #[serde(rename = "readonly-inherited-v1")]
+    ReadonlyInheritedV1,
 }
 
 const SCOPE: &str = "claude_npm_transaction_no_model_v1";
@@ -202,6 +210,10 @@ const SOURCES: &[(&str, &[u8])] = &[
     (
         "app/src/terminal/cli_agent_updates/sources_npm_tree_unix.rs",
         include_bytes!("sources_npm_tree_unix.rs"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources_npm_acl_unix.rs",
+        include_bytes!("sources_npm_acl_unix.rs"),
     ),
     (
         "app/src/terminal/cli_agent_updates/sources_npm_live_tests.rs",
@@ -332,6 +344,11 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
         ]
         .contains(&manifest.case.as_str()),
         "case_unknown",
+    )?;
+    check(
+        manifest.acl_fixture.is_none()
+            || matches!(manifest.case.as_str(), "updated" | "swap_receipt_missing"),
+        "acl_fixture_case_unknown",
     )?;
     for (name, relative) in env_paths() {
         let expected = root.join(relative);
@@ -489,7 +506,7 @@ fn verify_preserved_permissions(
 ) -> Result<(), String> {
     let before = serde_json::to_value(before).map_err(|_| "permissions_before_shape")?;
     let after = serde_json::to_value(after).map_err(|_| "permissions_after_shape")?;
-    for field in ["uid", "gid", "mode"] {
+    for field in ["uid", "gid", "mode", "acl"] {
         check(
             before["root"][field] == after["root"][field],
             "root_permissions_changed",
@@ -500,7 +517,7 @@ fn verify_preserved_permissions(
         .ok_or("permissions_nodes_shape")?;
     for (path, node) in nodes {
         if let Some(actual) = after["nodes"].get(path) {
-            for field in ["uid", "gid", "mode"] {
+            for field in ["uid", "gid", "mode", "acl"] {
                 check(
                     node["identity"][field] == actual["identity"][field],
                     "member_permissions_changed",
@@ -513,7 +530,26 @@ fn verify_preserved_permissions(
 
 async fn exercise(manifest: &Manifest) -> Result<Value, String> {
     let root = &manifest.root;
+    if manifest.acl_fixture.is_some() {
+        // validate 已绑定新私有根、原入口及构建；只在首次 execute 设置 ACL。
+        check(
+            !root
+                .join("before-tree.safe.json")
+                .try_exists()
+                .map_err(|_| "fixture_evidence_read")?,
+            "acl_fixture_already_started",
+        )?;
+        tree::Directory::open(&package(root))
+            .and_then(|directory| {
+                directory.install_claude_readonly_acl_fixture(&manifest.claude_platform)
+            })
+            .map_err(mapped)?;
+    }
     let old = tree(root)?;
+    if manifest.acl_fixture.is_some() {
+        old.verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .map_err(mapped)?;
+    }
     save(&root.join("before-tree.safe.json"), &old)?;
     let link = super::entry_link(&entry(root)).map_err(mapped)?;
     let plan = prepare(manifest, "2.1.280").await?;
@@ -624,6 +660,23 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
     )?;
     let after = tree(root)?;
     verify_preserved_permissions(&old, &after)?;
+    if manifest.acl_fixture.is_some() {
+        after
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .map_err(mapped)?;
+        let prepared: super::Journal = serde_json::from_slice(
+            &fs::read(root.join("prepared-journal.safe.json"))
+                .map_err(|_| "acl_prepared_missing")?,
+        )
+        .map_err(|_| "acl_prepared_invalid")?;
+        check(prepared.original == old, "acl_original_changed")?;
+        prepared
+            .prepared
+            .as_ref()
+            .ok_or("acl_prepared_tree_missing")?
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .map_err(mapped)?;
+    }
     save(&root.join("after-tree.safe.json"), &after)?;
     let observed = sources::version(CLIAgent::Claude, &entry(root))
         .await
@@ -721,6 +774,19 @@ async fn cold_recover(manifest: &Manifest) -> Result<Value, String> {
             && saved.claude_platform.as_deref() == Some(manifest.claude_platform.as_str()),
         "cold_checkpoint_invalid",
     )?;
+    if manifest.acl_fixture.is_some() {
+        // 冷恢复不设置权限；核对首次进程保存的旧/候选 ACL，交给真实恢复逻辑处理。
+        before
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .map_err(mapped)?;
+        check(saved.original == before, "cold_acl_original_changed")?;
+        saved
+            .prepared
+            .as_ref()
+            .ok_or("cold_acl_prepared_missing")?
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .map_err(mapped)?;
+    }
     let journal_root = sources::journal_root().map_err(mapped)?;
     let result = inspect(manifest, "2.1.280").await;
     let version;
@@ -842,6 +908,12 @@ async fn real_claude_npm_update_without_model() {
         }
     };
     evidence["claude_platform"] = json!(manifest.claude_platform);
+    if let Some(fixture) = manifest.acl_fixture {
+        evidence["acl_fixture"] = json!(fixture);
+        evidence["acl_permissions_verified"] =
+            json!(result.as_ref().is_ok_and(|value| value["accepted"] == true));
+        evidence["acl_new_relative_paths_covered"] = json!(false);
+    }
     save(
         &manifest.root.join(format!("result-{}.safe.json", step())),
         &evidence,

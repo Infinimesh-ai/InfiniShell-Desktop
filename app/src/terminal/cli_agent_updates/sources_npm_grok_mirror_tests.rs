@@ -1,5 +1,54 @@
 use super::*;
 
+// 只构造真实发布布局；小文件不冒充固定发行映像，也不调用发行合同验证。
+pub(in super::super::super) fn published_fixture(
+    bin: &Path,
+    id: Uuid,
+    existing_new: bool,
+) -> Mirror {
+    use std::os::unix::fs::{PermissionsExt as _, symlink};
+
+    std::fs::create_dir_all(bin).unwrap();
+    for (name, bytes) in [("grok-1.0.40", b"old image"), ("grok-1.0.41", b"new image")] {
+        std::fs::write(bin.join(name), bytes).unwrap();
+        std::fs::set_permissions(bin.join(name), std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let directory = Directory::open(bin).unwrap();
+    let old_name = OsString::from("grok-1.0.40");
+    let new_name = OsString::from("grok-1.0.41");
+    let link_stage = OsString::from(format!(".infinishell-grok-npm-link-{id}"));
+    symlink(&old_name, bin.join("grok")).unwrap();
+    symlink(&new_name, bin.join(&link_stage)).unwrap();
+    let old_file = file_node(&directory, &old_name).unwrap();
+    let new_file = file_node(&directory, &new_name).unwrap();
+    let record = Mirror {
+        bin: bin.to_owned(),
+        directory: directory.identity().unwrap(),
+        old_name,
+        old_file,
+        new_name,
+        existing_new: existing_new.then(|| new_file.clone()),
+        file_stage: format!(".infinishell-grok-npm-image-{id}").into(),
+        old_link: link(&directory, OsStr::new("grok")).unwrap(),
+        new_file: Some(new_file),
+        new_link: Some(link(&directory, &link_stage).unwrap()),
+        link_stage,
+    };
+    directory
+        .exchange(OsStr::new("grok"), &record.link_stage)
+        .unwrap();
+    record
+}
+
+pub(in super::super::super) fn change_new_readonly_acl(record: &Mirror) {
+    let directory = Directory::open(&record.bin).unwrap();
+    let file = directory.read_file(&record.new_name).unwrap();
+    let before = acl::capture(&file).unwrap();
+    let desired = acl::readonly_file_test_acl(file.metadata().unwrap().mode() & 0o777).unwrap();
+    assert_ne!(before.acl, desired);
+    acl::apply_to_new(&file, &before, &desired).unwrap();
+}
+
 fn mirror(old: &str, target: &str, id: Uuid) -> Mirror {
     let image = contract::native(old).unwrap();
     let identity = Identity {
@@ -8,6 +57,7 @@ fn mirror(old: &str, target: &str, id: Uuid) -> Mirror {
         uid: 501,
         gid: 20,
         mode: u32::from(libc::S_IFREG) | 0o700,
+        acl: None,
     };
     Mirror {
         bin: PathBuf::from("/private/grok-home/bin"),

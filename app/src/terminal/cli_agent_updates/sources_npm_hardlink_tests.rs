@@ -45,7 +45,12 @@ fn unit_probe_receipts(fixture: &mut Fixture) {
         fs::set_permissions(cwd.join(name), fs::Permissions::from_mode(0o700)).unwrap();
     }
     let cwd_metadata = fs::metadata(&cwd).unwrap();
-    let digest = "1".repeat(64);
+    let program_stamp = stamp(&program).unwrap();
+    // 使用旧无平台字段账本的真实摘要，收据夹具不能跳过产品的原绑定核验。
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&(&program_stamp, "--version", journal.id)).unwrap())
+    );
     let manifest = serde_json::json!({
         "version":1,"generation":generation,"launch_allowed":true,
         "token":Uuid::new_v4(),"parent_control":"127.0.0.1:0",
@@ -99,7 +104,7 @@ fn unit_probe_receipts(fixture: &mut Fixture) {
     journal.probe = Some(Probe {
         generation,
         program: program.clone(),
-        program_stamp: stamp(&program).unwrap(),
+        program_stamp,
         binding_digest: digest,
         observed_version: Some(journal.target_version.clone()),
         codex_closure: None,

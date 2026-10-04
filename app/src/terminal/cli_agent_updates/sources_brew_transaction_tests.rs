@@ -2,6 +2,157 @@ use std::os::unix::fs::PermissionsExt as _;
 
 use super::*;
 
+fn acl_probe_fixture() -> Fixture {
+    let mut fixture = fixture();
+    let mut value = serde_json::to_value(&fixture.journal).unwrap();
+    value["original"]["root"]["acl"] = serde_json::json!({
+        "format": "MacV1", "extended": {"flags": 0, "entries": []}
+    });
+    value["prepared"]["root"]["acl"] = value["original"]["root"]["acl"].clone();
+    fixture.journal = serde_json::from_value(value).unwrap();
+    fixture
+}
+
+#[test]
+fn old_acl_probe_binding_does_not_change_when_prepared_tree_appears() {
+    let mut fixture = acl_probe_fixture();
+    let prepared = fixture.journal.prepared.take();
+    let program = fixture.journal.parent().join("codex/0.155.1/bin/codex");
+    let arguments = vec![OsString::from("--version")];
+    let original_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                fixture.journal.id,
+                &program,
+                <[u8; 32]>::from(Sha256::digest(b"old public binary")),
+                &arguments,
+            ))
+            .unwrap()
+        )
+    );
+    let (digest, acl_base_digest) =
+        acl_probe_digest(&fixture.journal, &program, original_digest).unwrap();
+    let probe = Probe {
+        generation: Uuid::new_v4(),
+        program,
+        digest,
+        acl_base_digest,
+        version: None,
+        arguments,
+        completed: false,
+        output_sha256: None,
+    };
+    assert_eq!(verify_probe_acl(&fixture.journal, &probe), Ok(()));
+    fixture.journal.prepared = prepared;
+    assert_eq!(verify_probe_acl(&fixture.journal, &probe), Ok(()));
+}
+
+#[test]
+fn acl_probe_recovery_rejects_stripped_base_digest_and_changed_candidate_acl() {
+    let mut fixture = acl_probe_fixture();
+    let program = fixture
+        .journal
+        .parent()
+        .join(fixture.journal.stage_name())
+        .join("0.156.1/bin/codex");
+    let arguments = vec![OsString::from("--version")];
+    let original_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                fixture.journal.id,
+                &program,
+                <[u8; 32]>::from(Sha256::digest(b"new public binary")),
+                &arguments,
+            ))
+            .unwrap()
+        )
+    );
+    let (digest, acl_base_digest) =
+        acl_probe_digest(&fixture.journal, &program, original_digest).unwrap();
+    fixture.journal.probe = Some(Probe {
+        generation: Uuid::new_v4(),
+        program,
+        digest,
+        acl_base_digest,
+        version: None,
+        arguments,
+        completed: false,
+        output_sha256: None,
+    });
+    let saved = serde_json::to_value(&fixture.journal).unwrap();
+    let loaded: Journal = serde_json::from_value(saved.clone()).unwrap();
+    assert_eq!(
+        verify_probe_acl(&loaded, loaded.probe.as_ref().unwrap()),
+        Ok(())
+    );
+
+    let mut stripped = saved.clone();
+    stripped["probe"]
+        .as_object_mut()
+        .unwrap()
+        .remove("acl_base_digest");
+    let stripped: Journal = serde_json::from_value(stripped).unwrap();
+    assert_eq!(
+        verify_probe_acl(&stripped, stripped.probe.as_ref().unwrap()),
+        Err(Error::RecoveryRequired)
+    );
+    let mut changed = saved;
+    changed["prepared"]["root"]["acl"]["extended"]["flags"] = 131072.into();
+    let changed: Journal = serde_json::from_value(changed).unwrap();
+    assert_eq!(
+        verify_probe_acl(&changed, changed.probe.as_ref().unwrap()),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[test]
+fn no_acl_probe_keeps_legacy_digest_and_rejects_an_unneeded_acl_field() {
+    let fixture = fixture();
+    let program = fixture.journal.parent().join("codex/0.155.1/bin/codex");
+    let arguments = vec![OsString::from("--version")];
+    let original_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                fixture.journal.id,
+                &program,
+                <[u8; 32]>::from(Sha256::digest(b"old public binary")),
+                &arguments,
+            ))
+            .unwrap()
+        )
+    );
+    let (digest, acl_base_digest) =
+        acl_probe_digest(&fixture.journal, &program, original_digest.clone()).unwrap();
+    assert_eq!(digest, original_digest);
+    assert_eq!(acl_base_digest, None);
+    let mut probe = Probe {
+        generation: Uuid::new_v4(),
+        program,
+        digest,
+        acl_base_digest,
+        version: None,
+        arguments,
+        completed: false,
+        output_sha256: None,
+    };
+    let bytes = serde_json::to_vec(&probe).unwrap();
+    assert!(
+        !String::from_utf8(bytes.clone())
+            .unwrap()
+            .contains("acl_base_digest")
+    );
+    let loaded: Probe = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(verify_probe_acl(&fixture.journal, &loaded), Ok(()));
+    probe.acl_base_digest = Some(original_digest);
+    assert_eq!(
+        verify_probe_acl(&fixture.journal, &probe),
+        Err(Error::RecoveryRequired)
+    );
+}
+
 struct Fixture {
     _temporary: tempfile::TempDir,
     parent: Directory,

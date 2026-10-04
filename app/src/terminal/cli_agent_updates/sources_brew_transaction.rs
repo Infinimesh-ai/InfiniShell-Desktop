@@ -85,6 +85,8 @@ struct Probe {
     generation: Uuid,
     program: PathBuf,
     digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    acl_base_digest: Option<String>,
     version: Option<String>,
     arguments: Vec<OsString>,
     completed: bool,
@@ -170,11 +172,15 @@ fn journal_path(root: &Path, agent: CLIAgent) -> PathBuf {
 }
 
 fn save(path: &Path, journal: &Journal) -> Result<(), Error> {
+    let bytes = serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?;
+    if bytes.len() as u64 > 12 * MAX_CONFIG {
+        return Err(Error::PersistenceFailed);
+    }
     super::plain_ancestors(path)?;
     let parent = path.parent().ok_or(Error::PersistenceFailed)?;
     let mut temporary = NamedTempFile::new_in(parent).map_err(|_| Error::PersistenceFailed)?;
     temporary
-        .write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
+        .write_all(&bytes)
         .map_err(|_| Error::PersistenceFailed)?;
     temporary
         .as_file()
@@ -645,6 +651,78 @@ pub(super) fn exchange_paths(left: &Path, right: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+fn acl_probe_digest(
+    journal: &Journal,
+    program: &Path,
+    original_digest: String,
+) -> Result<(String, Option<String>), Error> {
+    // 无 ACL 的旧账本沿用原摘要，不增加入口路径或候选形成阶段的约束。
+    if !journal.prefix_identity.has_acl()
+        && !journal.parent_identity.has_acl()
+        && !journal.bin_identity.has_acl()
+        && !journal.original.has_acl()
+        && !journal.prepared.as_ref().is_some_and(Snapshot::has_acl)
+    {
+        return Ok((original_digest, None));
+    }
+    // 旧入口在候选树形成之前已经执行；恢复时不能把后来的 prepared 绑定给旧代。
+    let snapshot = if program.starts_with(
+        journal
+            .parent()
+            .join(&journal.token)
+            .join(&journal.old_version),
+    ) {
+        &journal.original
+    } else if program.starts_with(journal.parent().join(journal.stage_name()))
+        || program.starts_with(
+            journal
+                .parent()
+                .join(&journal.token)
+                .join(&journal.target_version),
+        )
+    {
+        journal.prepared.as_ref().ok_or(Error::RecoveryRequired)?
+    } else {
+        return Err(Error::RecoveryRequired);
+    };
+    if !journal.prefix_identity.has_acl()
+        && !journal.parent_identity.has_acl()
+        && !journal.bin_identity.has_acl()
+        && !snapshot.has_acl()
+    {
+        return Ok((original_digest, None));
+    }
+    let bytes = serde_json::to_vec(&(
+        "unix-acl-v1",
+        &original_digest,
+        &journal.prefix_identity,
+        &journal.parent_identity,
+        &journal.bin_identity,
+        snapshot,
+    ))
+    .map_err(|_| Error::PersistenceFailed)?;
+    Ok((
+        format!("{:x}", Sha256::digest(bytes)),
+        Some(original_digest),
+    ))
+}
+
+fn verify_probe_acl(journal: &Journal, probe: &Probe) -> Result<(), Error> {
+    let (digest, original) = acl_probe_digest(
+        journal,
+        &probe.program,
+        probe
+            .acl_base_digest
+            .as_ref()
+            .unwrap_or(&probe.digest)
+            .clone(),
+    )?;
+    if digest != probe.digest || original != probe.acl_base_digest {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
 async fn probe(
     root: &Path,
     path: &Path,
@@ -669,12 +747,14 @@ async fn probe(
                 .map_err(|_| Error::PersistenceFailed)?
         )
     );
+    let (digest, acl_base_digest) = acl_probe_digest(journal, program, digest)?;
     let binding = probe_binding(agent, digest.clone())?;
     let generation = Uuid::new_v4();
     let probe = Probe {
         generation,
         program: program.to_owned(),
         digest,
+        acl_base_digest,
         version: None,
         arguments,
         completed: false,
@@ -783,6 +863,7 @@ fn probe_exited(root: &Path, journal: &Journal) -> Result<(), Error> {
         .chain(journal.extra_probes.iter())
         .chain(journal.entry_probes.iter())
     {
+        verify_probe_acl(journal, probe)?;
         let binding = probe_binding(journal.cli()?, probe.digest.clone())?;
         super::record_not_started_if_missing(
             root,

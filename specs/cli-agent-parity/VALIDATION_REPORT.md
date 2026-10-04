@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 Unix 只读 ACL 实现通过本机门禁，真实事务待验
+
+Windows a5 原生终审补充：三个正式ZIP均重核API摘要、长度和全部CRC；71份小原件257716字节已独审。首 `updated` 仍为 `ProbeFailed`：CMD退出0／18字节正确版本，PS根7836ms退出1，Codex在10732ms才创建，后续Codex／Node分别退出0；PS捕获stdout为0字节。202／415个事件均验证及Continue，pending为空，未观察控制取消；两代原生退出与Job、AppContainer、helper、desktop、DeviceMap、窗口站及LSA清理全部确认。后四场景／三冷恢复未执行。新空输入／流式输出参数由精确源码和实际启动代次绑定，未单列最终命令行、ExpectingInput或管道句柄，不能把语法意图当作同步捕获证明。与旧2d9相比，PS根由0变1而零输出及提前退出仍在；不由此推定ShellExecute分支、保留初始LASTEXITCODE或CLR异常根因。独审 SHA `f9ea149c550e3eeaa258bd6a7367ef0806e8ba3cf06c38470302b55f16fe27fc`，小原件索引 SHA `bca8978a66be934b840cd8bad7448f0ab0996a0fdaa6406f56a2f8be84a3c9c5`，均位于 `g09-ps-pipeline-full-matrix-a5ecc6848-ci`。
+
+本增量为自有包树保存Mac扩展ACL和Linux访问／默认ACL，原fd前后复核身份与权限，限制条数及账本预算；既有节点保留ACL，新节点按最终父权限继承，旧无ACL序列化与历史摘要保持兼容。Mac未知标志和写入allow、Linux非owner原始写位及未支持安全属性继续拒绝，不移除旧树权限来完成更新。Mac显式空ACL写入被APFS归一化为缺失时仍返回读回不符，不能计为精确复制成功；链接ACL仍未支持。
+
+首次378项前的ACL回归为369通过／5失败，修复旧测试摘要、旧拒绝所有ACL断言、Mac空ACL预期及链接打开标志后374项通过。独审又发现快照后增加树外硬链接会先执行chmod/chown；真实红测 `r-a6o6qn5v` 确认外部别名从0644变0500，日志 SHA `bd878a91ee75560b2aefb062b18eed7547c088278b5f75de3da3b40003a78286`。现已在权限修改前核单链接，保留后续复核。Grok恢复另在交换包树／公共链接前核已登记镜像及ACL，同时保持已部分清理现场的恢复能力。
+
+最终本机更新回归378/378（`r-6op9wcv_`，SHA `a5e6485844c3b68d5d626cc28926a683f0eacc902f5b62a3a7af415731d55c42`）、i18n11/11（`r-so83ujcn`，SHA `7869b388dd0e5ac2e80dab7e9bdfee9e60e22718a6e268f61f4be09fe9f6b663`）、Python driver22/22与 `cargo check --locked -p warp`（`r-j9t06rai`，SHA `7e1d5bcfb68f8fd3c54afc66c7527b0ae556102c881bbdbbb18b6fccecdf93bd`）通过。登记短根均已清理，原失败保留。21份变更源码与门禁索引 `g09-unix-acl-local-gates-v1.safe.json` SHA `be0bd7b83f5d3fdeb42c41bd3441836cf77fa0322c17a91fc8060b6c57368595`。英中不支持安装、安装变化、恢复提示语义保持准确，无需本地化变更，无布局变化。
+
+真实Claude ACL验收仅新增可选 `updated`／`swap_receipt_missing` 两场景及一次独立冷恢复，默认原五场景不变；此时尚未执行。恢复只核验首次保存ACL，不重新设置。实际固定包版本未必新增相对路径，不能用这两场景代替新路径继承的原生文件测试。Linux ACL原生执行、其他安全属性范围及最终同源双平台门禁仍待完成。
+
+同时，`a5ecc6848` 的 [Windows原矩阵37209945616](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37209945616) 已正式failure。完整官方日志独审为普通1233 PASS（warp1142／command91），66必需及i18n11各一次PASS；普通结果无FAIL／LEAK／RETRY／FLAKY／TIMEOUT。唯一失败为step60真实npm执行返回 `product_test_failed`；具体首场景与原生退出证据见本节首段，不由普通日志单独推断根因。90条Rust诊断、5条Rust摘要、1条GitHub工具warning和另6条Node弃用提示保留，不声称零警告。独审摘要 SHA `e8b0931f5154a14a05789a37329dad9be72dcaa9b3e08a7a5af155eb684842d3`。**本轮新增关闭0项；10关闭／G09开放／V01、V02、V05移交，PR保持草稿。**
+
 ## 2026-10-04：G09 Mac 与 Linux musl 平台绑定原矩阵通过独审
 
 `a5ecc6848bc66b9be11be8d6247bff764ef2f3be` 的 Mac `r-kgcnezst` 五场景最终全部接受：实际更新到280、交换收据缺失后独立进程冷恢复278、外部改动后独立冷恢复保留280、候选改动保留原278，以及 Latest 降级真实 `ChannelMismatch`／无计划。两次冷恢复前的执行阶段按合同标记 `accepted=false/needs_cold_recovery=true`，不能单独当作最终失败或跳过恢复。四代候选原生退出0、coalition资源销毁与退出绑定均已核验，18份验收源码绑定a5。独审 `g09-claude-npm-platform-macos-runs/r-kgcnezst/independent-success-partial-cleanup-review.safe.json` SHA `f22d22d83bc0ff82e73267b72948287c0e3981c70e8e5367a78e0447b1097280`。这是后端更新／恢复回归，不增加GUI或在线模型验收范围；忙碌模型测试单列，未发送模型输入。

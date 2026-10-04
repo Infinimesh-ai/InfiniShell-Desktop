@@ -205,11 +205,15 @@ fn path(root: &Path) -> PathBuf {
 }
 
 fn save(path: &Path, journal: &Journal) -> Result<(), Error> {
+    let bytes = serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?;
+    if bytes.len() as u64 > 12 * MAX_CONFIG {
+        return Err(Error::PersistenceFailed);
+    }
     plain_ancestors(path)?;
     let parent = path.parent().ok_or(Error::PersistenceFailed)?;
     let mut temporary = NamedTempFile::new_in(parent).map_err(|_| Error::PersistenceFailed)?;
     temporary
-        .write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
+        .write_all(&bytes)
         .map_err(|_| Error::PersistenceFailed)?;
     temporary
         .as_file()
@@ -410,6 +414,35 @@ fn binding(probe: &Probe) -> Result<managed_process::PreparedLaunchBinding, Erro
         .map_err(|_| Error::RecoveryRequired)
 }
 
+fn probe_digest(journal: &Journal, identity: &Stamp) -> Result<String, Error> {
+    let bytes = serde_json::to_vec(&(identity, "--version", journal.id))
+        .map_err(|_| Error::PersistenceFailed)?;
+    let original = format!("{:x}", Sha256::digest(bytes));
+    if !journal.owner.prefix_identity.has_acl()
+        && !journal.owner.parent_identity.has_acl()
+        && !journal.original.tree.has_acl()
+        && !journal
+            .prepared
+            .as_ref()
+            .is_some_and(|tree| tree.tree.has_acl())
+        && !journal.mirror.has_acl()
+    {
+        return Ok(original);
+    }
+    // 镜像与包树同时发布，原生候选收据必须绑定两侧已保存的权限身份。
+    let bytes = serde_json::to_vec(&(
+        "unix-acl-v1",
+        original,
+        &journal.owner.prefix_identity,
+        &journal.owner.parent_identity,
+        &journal.original,
+        &journal.prepared,
+        &journal.mirror,
+    ))
+    .map_err(|_| Error::PersistenceFailed)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Error> {
     let program = journal
         .owner
@@ -423,13 +456,7 @@ async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Er
     if identity.canonical != program || identity.digest != expected.digest()? {
         return Err(Error::SourceChanged);
     }
-    let digest = format!(
-        "{:x}",
-        Sha256::digest(
-            serde_json::to_vec(&(&identity, "--version", journal.id))
-                .map_err(|_| Error::PersistenceFailed)?
-        )
-    );
+    let digest = probe_digest(journal, &identity)?;
     let generation = Uuid::new_v4();
     journal.probe = Some(Probe {
         generation,
@@ -540,13 +567,7 @@ fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
             .ok_or(Error::RecoveryRequired)?
             .join(&journal.stage)
             .join("bin/grok-native");
-        let digest = format!(
-            "{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&(&probe.identity, "--version", journal.id))
-                    .map_err(|_| Error::RecoveryRequired)?
-            )
-        );
+        let digest = probe_digest(journal, &probe.identity).map_err(|_| Error::RecoveryRequired)?;
         if probe.generation.is_nil()
             || probe.program != program
             || probe.identity.canonical != program
@@ -600,16 +621,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         return Ok(Some(journal.target_version));
     }
     let parent = journal.owner.parent()?;
-    let current = parent.child(OsStr::new("grok"))?.grok_snapshot()?;
-    if current != journal.original {
-        if Some(&current) != journal.prepared.as_ref()
-            || parent.child(&journal.stage)?.grok_snapshot()? != journal.original
-        {
-            return Err(Error::RecoveryRequired);
-        }
-        parent.exchange(OsStr::new("grok"), &journal.stage)?;
-    }
-    journal.mirror.finish(false)?;
+    rollback_publication(&journal, &parent)?;
     config_unchanged(&journal, false)?;
     if let Some(prepared) = &journal.prepared {
         if parent.has_child(&journal.stage)? {
@@ -634,6 +646,36 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     fs::remove_file(&path).map_err(|_| Error::RecoveryRequired)?;
     super::sync_config_directory(root)?;
     Ok(None)
+}
+
+// 入口已核固定发行合同和退出收据；先整体核验包树与镜像，再执行回滚交换。
+fn rollback_publication(journal: &Journal, parent: &Directory) -> Result<(), Error> {
+    let current = parent.child(OsStr::new("grok"))?.grok_snapshot()?;
+    if current != journal.original {
+        if Some(&current) != journal.prepared.as_ref()
+            || parent.child(&journal.stage)?.grok_snapshot()? != journal.original
+        {
+            return Err(Error::RecoveryRequired);
+        }
+    } else if let Some(prepared) = &journal.prepared
+        && parent.has_child(&journal.stage)?
+    {
+        let staged = parent.child(&journal.stage)?.grok_snapshot()?;
+        staged.tree.verify_remaining(&prepared.tree)?;
+        if staged
+            .link
+            .as_ref()
+            .is_some_and(|link| Some(link) != prepared.link.as_ref())
+        {
+            return Err(Error::RecoveryRequired);
+        }
+    }
+    // 镜像可能在包交换后才被外部改动；任何回滚交换之前先核完整镜像布局。
+    journal.mirror.verify_rollback()?;
+    if current != journal.original {
+        parent.exchange(OsStr::new("grok"), &journal.stage)?;
+    }
+    journal.mirror.finish(false)
 }
 
 fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
@@ -668,3 +710,13 @@ fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
 #[cfg(test)]
 #[path = "sources_grok_npm_live_tests.rs"]
 pub(super) mod live_tests;
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+#[path = "sources_npm_grok_tests.rs"]
+mod tests;

@@ -2,6 +2,30 @@ use std::os::unix::fs::PermissionsExt as _;
 
 use super::*;
 
+#[test]
+fn legacy_acl_absent_migration_journal_keeps_schema_and_cold_rollback() {
+    let mut fixture = fixture();
+    let bytes = serde_json::to_vec(&fixture.journal).unwrap();
+    assert!(
+        !String::from_utf8(bytes.clone())
+            .unwrap()
+            .contains("\"acl\"")
+    );
+    let loaded: Migration = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(loaded.schema, 1);
+    assert_eq!(loaded.transaction.schema, 1);
+    assert_eq!(serde_json::to_vec(&loaded).unwrap(), bytes);
+    assert_eq!(save_and_recover(&mut fixture).unwrap(), None);
+    assert_eq!(
+        fs::read(&fixture.journal.transaction.entry).unwrap(),
+        b"old binary"
+    );
+    assert_eq!(
+        fs::read(&fixture.journal.config.path).unwrap(),
+        fixture.journal.config.before.unwrap()
+    );
+}
+
 struct Fixture {
     _temporary: tempfile::TempDir,
     root: PathBuf,

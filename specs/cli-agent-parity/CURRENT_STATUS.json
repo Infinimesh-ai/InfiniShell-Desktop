@@ -1,7 +1,34 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a5ecc Mac与Linux musl各5场景/2独立冷恢复已通过独审；Mac历史失败均保全并完成本机收尾。Linux926源码5482 PASS，a5ecc普通2060 PASS。Windows同提交原5场景/3冷恢复37209945616运行中，旧PS零输出失败保留。ACL/安全属性范围待决，最终同源双平台门禁未完成。",
+  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Unix只读ACL保存/继承/恢复保护已实现，本机378更新回归、i18n11、driver22及check通过，真实CLI ACL验收待执行。a5ecc Mac与Linux musl各5场景/2独立冷恢复已通过独审；Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，随后Node/Codex退出0，两代清理成功。后4场景/3冷恢复未运行；额外安全属性范围及最终同源双平台门禁未完成。",
+  "g09_windows_a5_final_review_20261004": {
+    "head": "a5ecc6848bc66b9be11be8d6247bff764ef2f3be",
+    "run": 37209945616,
+    "result": "failure",
+    "ordinary_tests": "1233 PASS，66必需与i18n11各一次PASS；普通结果无FAIL/LEAK/RETRY/FLAKY/TIMEOUT。",
+    "native": "首updated为ProbeFailed；CMD退出0/18B，PS根在Codex创建前退出1/0B，Node和Codex后续均退出0；202/415事件均验证并Continue，两代完整资源清理通过。",
+    "unexecuted": "后四场景及三次独立冷恢复。",
+    "boundary": "新管道以精确生产源码和实际代次绑定，不冒称记录最终lpCommandLine或内部句柄；尚不能确定PS提前退出与零输出根因。",
+    "native_audit_sha256": "f9ea149c550e3eeaa258bd6a7367ef0806e8ba3cf06c38470302b55f16fe27fc",
+    "small_originals_index_sha256": "bca8978a66be934b840cd8bad7448f0ab0996a0fdaa6406f56a2f8be84a3c9c5",
+    "log_audit_sha256": "e8b0931f5154a14a05789a37329dad9be72dcaa9b3e08a7a5af155eb684842d3",
+    "g09_closed": false
+  },
+  "g09_unix_acl_increment_20261004": {
+    "status": "implemented_local_gate_passed_native_acceptance_pending",
+    "source_base": "416118380",
+    "evidence_index": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-unix-acl-local-gates-v1.safe.json",
+    "evidence_index_sha256": "be0bd7b83f5d3fdeb42c41bd3441836cf77fa0322c17a91fc8060b6c57368595",
+    "implemented": "有界Mac/Linux只读ACL的fd捕获、原权限保留、新节点继承及摘要/恢复绑定；权限修改前拒绝新增硬链接，Grok回滚交换前核包树与镜像。",
+    "local_gate": "更新378/378，i18n11/11，driver22/22，cargo check --locked -p warp通过；登记短根均已清理。",
+    "failure_preserved": "硬链接新增后错误修改树外别名权限的红测r-a6o6qn5v保留；首次ACL回归369过/5失败及修复后374过按原日志保留。",
+    "real_acceptance": "可选两场景/一次独立冷恢复接线完成，尚未运行；不替代原五场景或新增相对路径继承验收。",
+    "remaining_boundaries": "Linux ACL原生执行、Mac真实CLI ACL事务、额外安全属性范围及最终双平台门禁仍待完成；Mac显式空ACL归一化与链接ACL未支持，不把拒绝计能力。",
+    "localization": "英中安装来源不支持、安装变化和恢复提示仍准确；无需本地化变更，无布局变化。",
+    "g09_closed": false,
+    "newly_closed_items": []
+  },
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {

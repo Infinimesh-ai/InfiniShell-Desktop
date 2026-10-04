@@ -2,6 +2,107 @@ use std::os::unix::fs::symlink;
 
 use super::*;
 
+#[test]
+fn legacy_acl_absent_probe_keeps_its_original_digest_after_journal_roundtrip() {
+    let fixture = fixture();
+    let program = fixture
+        .journal
+        .owner
+        .package_root
+        .parent()
+        .unwrap()
+        .join(&fixture.journal.stage_name)
+        .join("bin/claude.exe");
+    let identity = stamp(&program).unwrap();
+    // 保留改动前的真实 tuple，不能以新增摘要函数同时生成期望值。
+    let legacy = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&(&identity, "--version", fixture.journal.id)).unwrap())
+    );
+    let mut journal = fixture.journal;
+    journal.probe = Some(Probe {
+        generation: Uuid::new_v4(),
+        program,
+        program_stamp: identity,
+        binding_digest: legacy,
+        observed_version: None,
+        codex_closure: None,
+    });
+    let bytes = serde_json::to_vec(&journal).unwrap();
+    assert!(
+        !String::from_utf8(bytes.clone())
+            .unwrap()
+            .contains("\"acl\"")
+    );
+    let loaded: Journal = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(
+        validate(CLIAgent::Claude, &loaded.owner.entry, &loaded),
+        Ok(())
+    );
+}
+
+#[test]
+fn acl_probe_recovery_rejects_changed_or_stripped_saved_permissions() {
+    let fixture = fixture();
+    let program = fixture
+        .journal
+        .owner
+        .package_root
+        .parent()
+        .unwrap()
+        .join(&fixture.journal.stage_name)
+        .join("bin/claude.exe");
+    let identity = stamp(&program).unwrap();
+    let mut value = serde_json::to_value(&fixture.journal).unwrap();
+    // 只检验已保存权限与原生摘要的绑定；这不是原生 ACL 应用的通过证据。
+    value["original"]["root"]["acl"] = serde_json::json!({
+        "format": "MacV1", "extended": {"flags": 0, "entries": []}
+    });
+    let mut journal: Journal = serde_json::from_value(value).unwrap();
+    let digest = probe_digest(&journal, &identity, &None).unwrap();
+    journal.probe = Some(Probe {
+        generation: Uuid::new_v4(),
+        program,
+        program_stamp: identity,
+        binding_digest: digest,
+        observed_version: None,
+        codex_closure: None,
+    });
+    assert_eq!(
+        validate(CLIAgent::Claude, &journal.owner.entry, &journal),
+        Ok(())
+    );
+
+    let mut changed = serde_json::to_value(&journal).unwrap();
+    changed["original"]["root"]["acl"]["extended"]["flags"] = 131072.into();
+    let changed: Journal = serde_json::from_value(changed).unwrap();
+    assert_eq!(
+        validate(CLIAgent::Claude, &changed.owner.entry, &changed),
+        Err(Error::RecoveryRequired)
+    );
+    let mut stripped = serde_json::to_value(&journal).unwrap();
+    stripped["original"]["root"]
+        .as_object_mut()
+        .unwrap()
+        .remove("acl");
+    let stripped: Journal = serde_json::from_value(stripped).unwrap();
+    assert_eq!(
+        validate(CLIAgent::Claude, &stripped.owner.entry, &stripped),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[test]
+fn oversized_journal_never_replaces_the_existing_recovery_record() {
+    let mut fixture = fixture();
+    let path = journal_path(&fixture.root, CLIAgent::Claude);
+    save(&path, &fixture.journal).unwrap();
+    let original = fs::read(&path).unwrap();
+    fixture.journal.intent = "x".repeat(12 * MAX_CONFIG as usize);
+    assert_eq!(save(&path, &fixture.journal), Err(Error::PersistenceFailed));
+    assert_eq!(fs::read(&path).unwrap(), original);
+}
+
 struct Fixture {
     _temporary: tempfile::TempDir,
     root: PathBuf,

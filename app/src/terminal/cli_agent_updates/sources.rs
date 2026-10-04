@@ -150,7 +150,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 95] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 96] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
@@ -183,6 +183,7 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 95] = [
     include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe_macos.rs"),
     include_bytes!("sources_npm_transaction.rs"),
     include_bytes!("sources_npm_tree_unix.rs"),
+    include_bytes!("sources_npm_acl_unix.rs"),
     include_bytes!("sources_brew.rs"),
     include_bytes!("sources_brew_claude_linux.rs"),
     include_bytes!("sources_brew_claude_linux_probes.rs"),

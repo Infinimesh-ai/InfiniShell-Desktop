@@ -14,8 +14,8 @@ use super::super::{
     Channel, ClaudeUpdateScope, ConfigBackup, ConfigKind, Source, claude_downgrade,
 };
 use super::{
-    Journal, Link, Phase, Probe, bytes_file, download, exchange_links, journal_path, link,
-    lock_cask, probe_binding, probe_exited,
+    Journal, Link, Phase, Probe, acl_probe_digest, bytes_file, download, exchange_links,
+    journal_path, link, lock_cask, probe_binding, probe_exited, verify_probe_acl,
 };
 use futures::AsyncReadExt as _;
 use serde::{Deserialize, Serialize};
@@ -159,11 +159,15 @@ fn path(root: &Path) -> PathBuf {
 }
 
 fn save_migration(path: &Path, journal: &Migration) -> Result<(), Error> {
+    let bytes = serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?;
+    if bytes.len() as u64 > 12 * MAX_CONFIG {
+        return Err(Error::PersistenceFailed);
+    }
     sources::plain_ancestors(path)?;
     let parent = path.parent().ok_or(Error::PersistenceFailed)?;
     let mut temporary = NamedTempFile::new_in(parent).map_err(|_| Error::PersistenceFailed)?;
     temporary
-        .write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
+        .write_all(&bytes)
         .map_err(|_| Error::PersistenceFailed)?;
     temporary
         .as_file()
@@ -260,7 +264,9 @@ impl Migration {
             if probe.generation.is_nil()
                 || probe.program != self.candidate()
                 || probe.arguments != [OsString::from("--version")]
-                || probe.digest != probe_digest(tx.id, &probe.program, digest)?
+                || probe.acl_base_digest.as_ref().unwrap_or(&probe.digest)
+                    != &probe_digest(tx.id, &probe.program, digest)?
+                || verify_probe_acl(tx, probe).is_err()
                 || probe
                     .version
                     .as_deref()
@@ -625,11 +631,14 @@ async fn probe_candidate(
             .map_err(|_| Error::SourceChanged)?;
     let generation = Uuid::new_v4();
     let binding_digest = probe_digest(journal.transaction.id, &program, digest)?;
+    let (binding_digest, acl_base_digest) =
+        acl_probe_digest(&journal.transaction, &program, binding_digest)?;
     let binding = probe_binding(CLIAgent::Claude, binding_digest.clone())?;
     journal.transaction.probe = Some(Probe {
         generation,
         program: program.clone(),
         digest: binding_digest,
+        acl_base_digest,
         arguments: vec!["--version".into()],
         version: None,
         completed: false,

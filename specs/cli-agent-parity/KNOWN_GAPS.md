@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | a5ecc Mac与Linux musl各5场景／2冷恢复已通过独审；Linux源码门禁5482 PASS。Windows同提交原5场景／3冷恢复37209945616运行中；额外ACL／安全属性待决及最终同源双平台门禁保留 |
+| G09 | 开放 | Unix只读ACL实现及本机378回归通过，真实CLI ACL验收待执行；a5ecc Windows首updated仍失败，PS根先退出1／输出0B，后4场景／3冷恢复未跑。Mac与Linux musl原5场景／2冷恢复已通过；额外安全属性及最终同源双平台门禁保留 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -277,6 +277,10 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **Windows a5 原矩阵终审补充**：正式小原件确认首 `updated` 为 `ProbeFailed`，CMD退出0并输出18字节固定版本；PS根在Codex创建前退出1、捕获stdout0字节，随后Node/Codex均退出0。202／415调试事件均验证并继续，两代Job／AppContainer／helper／desktop／DeviceMap／窗口站／LSA清理成功；后四场景／三冷恢复未执行。原生独审 SHA `f9ea149c550e3eeaa258bd6a7367ef0806e8ba3cf06c38470302b55f16fe27fc`，71份小原件索引 SHA `bca8978a66be934b840cd8bad7448f0ab0996a0fdaa6406f56a2f8be84a3c9c5`。新管道尚未取得可验版本输出，内部句柄与首次创建错误未观测，不猜根因、不重复相近探针。
+
+- **2026-10-04 Unix 只读 ACL 实现与本机门禁通过，仍开放**：通过原fd捕获和复核有界Mac/Linux ACL，保留既有节点权限，新节点按最终父目录继承；摘要和恢复账本绑定ACL，旧无ACL格式保持兼容。修复快照后新增硬链接会先改树外别名权限的问题，以及Grok回滚先交换再发现镜像ACL变化的顺序问题。更新378项、i18n11项、driver22项与check通过；门禁索引 SHA `be0bd7b83f5d3fdeb42c41bd3441836cf77fa0322c17a91fc8060b6c57368595`。真实官方CLI的ACL更新／冷恢复尚未运行，额外安全属性、显式空ACL归一化及链接ACL不计支持。Windows [37209945616](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37209945616) 正式失败；普通1233 PASS、66必需与i18n11各一次通过；首updated失败的原生证据见上条终审补充，根因仍未确定。无需本地化变更；新增关闭0项，PR草稿。
 
 - **2026-10-04 Mac 与 Linux musl 平台绑定完整回归通过，仍开放**：`a5ecc6848` 的 Mac `r-kgcnezst` 五场景／两次独立冷恢复全部接受，实际 Latest 降级拒绝为 `ChannelMismatch` 且没有计划，四代原生退出0并确认资源清理；独审 SHA `f22d22d83bc0ff82e73267b72948287c0e3981c70e8e5367a78e0447b1097280`。初次本机目录清理失败保留，剩余内容／元数据已完整保全后清理；两轮旧失败也已保全并清理，不改写失败。成功轮监督程序已有同字节签名归档，测试worker仅来源和执行摘要仍在，未重建冒充原件。Linux源码 `926af2b65/run37204698590` 的5482次nextest及新增30项通过；同 `a5ecc6848` 的 [musl正式验收37207590339](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37207590339) 五场景／两冷恢复／四代退出0并清理通过独审，普通2060项及必需41项各一次通过。busy模型用例的15行EOF错误日志保留，不称日志无错误。Windows [原矩阵37209945616](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37209945616) 已启动、witness关闭，尚无功能结论。无需本地化变更；新增关闭0项，额外ACL／安全属性及最终同源门禁仍待完成。
 

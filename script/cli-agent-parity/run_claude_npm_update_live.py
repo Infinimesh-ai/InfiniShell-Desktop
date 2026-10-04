@@ -19,6 +19,8 @@ SCOPE = "claude_npm_transaction_no_model_v1"
 MARKER = b"InfiniShell private npm transaction fixture; no credentials\n"
 OLD, TARGET = "2.1.278", "2.1.280"
 CASES = ("updated", "swap_receipt_missing", "external_change_preserved", "candidate_changed_preserved", "unreviewed_downgrade_rejected")
+ACL_FIXTURE = "readonly-inherited-v1"
+ACL_CASES = ("updated", "swap_receipt_missing")
 TEST = "terminal::cli_agent_updates::sources::npm_transaction::live_tests::real_claude_npm_update_without_model"
 BUSY_TESTS = (
     "terminal::cli_agent_updates::tests::manual_update_still_obeys_busy_and_single_operation_guards",
@@ -27,7 +29,7 @@ BUSY_TESTS = (
 SOURCE_FILES = (
     "app/src/terminal/cli_agent_updates.rs",
     *["app/src/terminal/cli_agent_updates/" + name for name in (
-        "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_transaction.rs", "sources_npm_tree_unix.rs", "sources_npm_live_tests.rs",
+        "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_transaction.rs", "sources_npm_tree_unix.rs", "sources_npm_acl_unix.rs", "sources_npm_live_tests.rs",
         "sources_claude_downgrade.rs", "sources_claude_current_release.rs", "sources_claude_current_release.json", "sources_claude_musl_release.json")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
         "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_macos.rs", "managed_process_atomic_linux.rs", "managed_process_atomic_linux_glibc.rs", "managed_process_atomic_linux_musl.rs")],
@@ -207,6 +209,8 @@ def fixture(args, case, old, sources, binaries):
     os.symlink(binaries["npm_cli"]["path"], root / "tools/npm")
     manifest = dict(schema=2, scope=SCOPE, case=case, root=str(root), claude_platform=args.claude_platform,
         old_public_sha256=sha(package / "bin/claude.exe"), source_sha256=sources, **binaries)
+    if args.acl_fixture is not None:
+        manifest["acl_fixture"] = args.acl_fixture
     write(root / "manifest.private.json", manifest)
     return root, manifest
 
@@ -266,6 +270,14 @@ def verify_product_archives(root, case, old, target_platform):
         "published_members":len(actual),"target":TARGET,"old":OLD,"claude_platform":target_platform,"global_installation_changed":False})
 
 
+def selected_cases(cases, acl_fixture):
+    selected = cases or CASES
+    if acl_fixture is not None:
+        require(acl_fixture == ACL_FIXTURE, "acl_fixture_unknown")
+        require(tuple(selected) == ACL_CASES, "acl_requires_explicit_two_cases")
+    return selected
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, required=True)
@@ -275,7 +287,9 @@ def main():
         parser.add_argument("--" + role + "-sha256", required=True)
     parser.add_argument("--case", choices=CASES, action="append")
     parser.add_argument("--linux-libc", choices=("glibc", "musl"), default="glibc")
+    parser.add_argument("--acl-fixture", choices=(ACL_FIXTURE,))
     args = parser.parse_args()
+    cases = selected_cases(args.case, args.acl_fixture)
     args.claude_platform = selected_platform(args.linux_libc)
     args.repo = args.repo.resolve(strict=True)
     require(not args.output.exists(), "output_must_be_new")
@@ -307,7 +321,7 @@ def main():
     cache.mkdir(mode=0o700)
     old = prepare_old(cache, args.claude_platform)
     results = []
-    for case in args.case or CASES:
+    for case in cases:
         root, manifest = fixture(args, case, old, source, binaries)
         env = environment(root, manifest, "execute")
         if not results:
@@ -320,11 +334,17 @@ def main():
             run_test(binaries["worker"]["path"], TEST, root / "project", environment(root, manifest, "recover"), root / "recover", True)
             result = json.loads((root / "result-recover.safe.json").read_text())
         require(result.get("accepted") is True and result.get("claude_platform") == args.claude_platform, "case_not_accepted")
+        if args.acl_fixture is not None:
+            require(result.get("acl_fixture") == args.acl_fixture and result.get("acl_permissions_verified") is True,
+                    "acl_case_not_verified")
         verify_product_archives(root, case, old, args.claude_platform)
         results.append({"case":case,"root":str(root),"result":result})
-    write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"claude_platform":args.claude_platform,"cases":results,"model_inputs_sent":0,
+    summary = {"scope":SCOPE,"accepted":True,"claude_platform":args.claude_platform,"cases":results,"model_inputs_sent":0,
         "busy_scope":"existing product model state-machine tests only", "plugin_recheck_covered":False,
-        "g09_closed":False,"consumer_channels_unchanged":True})
+        "g09_closed":False,"consumer_channels_unchanged":True}
+    if args.acl_fixture is not None:
+        summary.update(acl_fixture=args.acl_fixture, acl_new_relative_paths_covered=False)
+    write(args.output / "summary.safe.json", summary)
 
 if __name__ == "__main__":
     main()
