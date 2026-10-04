@@ -1,7 +1,9 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# 每个固定病例的非零退出单独记录；后续病例仍各执行一次，不重试失败病例。
+$PSNativeCommandUseErrorActionPreference = $false
 
-# 只验证本轮新登录会话的两段路径；不执行旧 NUL、Node 或未命名窗口站对照。
+# 固定四例仅比较私有盘映射与已空 Job 生命周期；不执行 CLI、Node 或 AppContainer。
 if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP) -or
     [string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
     throw '缺少 GitHub runner 的证据目录环境'
@@ -74,24 +76,61 @@ try {
         executable_sha256 = $helperHash
         executable_bytes = (Get-Item -LiteralPath $helper).Length
         commit = $env:GITHUB_SHA
-        scope = '仅非管理员服务身份的新登录会话两段窗口站候选；不代表普通交互用户、AppContainer、Node 或 npm 通过'
+        scope = '仅新登录会话的 map × 已空 Job 四例对照；不代表普通交互用户、AppContainer、Node 或 npm 通过'
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceRoot 'build.safe.json') -Encoding utf8
 
     $env:INFINISHELL_WINDOWS_NETCREDENTIALS_HELPER = $helper
     $env:INFINISHELL_WINDOWS_NETCREDENTIALS_HELPER_SHA256 = $helperHash
-    $env:INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR = $evidenceRoot
-    $env:INFINISHELL_WINDOWS_NETCREDENTIALS_NONCE = $nonce
-    # 不重试；失败收据在测试有界清理后仍由下一步骤归档。
+    # 原基线保持无映射且查询前关 Job；其他三例每例新 nonce/目录，顺序各一次。
+    $cases = @(
+        @{ name = 'baseline'; map = $false; retain_empty_job = $false; test = 'netcredentials_two_stage_station_records_identity_and_cleanup' }
+        @{ name = 'device-map'; map = $true; retain_empty_job = $false; test = 'netcredentials_two_stage_private_device_map_records_identity_and_cleanup' }
+        @{ name = 'retained-empty-job'; map = $false; retain_empty_job = $true; test = 'netcredentials_two_stage_retained_empty_job_records_identity_and_cleanup' }
+        @{ name = 'device-map-retained-empty-job'; map = $true; retain_empty_job = $true; test = 'netcredentials_two_stage_private_device_map_retained_empty_job_records_identity_and_cleanup' }
+    )
+    $results = @()
+    $testExit = 0
     $stage = 'native_test'
-    cargo nextest run --no-fail-fast --retries 0 --success-output immediate -p command --lib --run-ignored only -E 'test(=windows::appcontainer::console_tests::netcredentials_two_stage_station_records_identity_and_cleanup)'
-    $testExit = $LASTEXITCODE
+    foreach ($case in $cases) {
+        $caseNonce = [guid]::NewGuid().ToString('N')
+        $caseRoot = Join-Path $evidenceRoot ($case.name + '-' + $caseNonce)
+        if (Test-Path -LiteralPath $caseRoot) { throw '病例目录已存在' }
+        New-Item -ItemType Directory -Path $caseRoot | Out-Null
+        $env:INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR = $caseRoot
+        $env:INFINISHELL_WINDOWS_NETCREDENTIALS_NONCE = $caseNonce
+        $filter = 'test(=windows::appcontainer::console_tests::' + $case.test + ')'
+        cargo nextest run --no-fail-fast --retries 0 --success-output immediate -p command --lib --run-ignored only -E $filter
+        $caseExit = $LASTEXITCODE
+        if ($caseExit -ne 0) { $testExit = 1 }
+        $results += @{
+            name = $case.name
+            nonce = $caseNonce
+            evidence_directory = $caseRoot
+            with_device_map = $case.map
+            retain_empty_job = $case.retain_empty_job
+            test = $case.test
+            exit_code = $caseExit
+        }
+        # 每例立即保存已有结果；后续病例不覆盖原例的失败或原三秒 LSA 判定。
+        @{
+            schema = 2
+            stage = $stage
+            status = 'in_progress'
+            cases = $results
+            g09_closed = $false
+            cleanup_ready = $false
+        } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidenceRoot 'workflow.safe.json') -Encoding utf8
+    }
     @{
-        schema = 1
+        schema = 2
         stage = $stage
         status = 'completed'
         test_exit_code = $testExit
+        cases = $results
+        g09_closed = $false
+        scope = '若通过，仅排除所测映射与空 Job 因素；不排除新 LUID AppContainer/console/debugger 组合'
         cleanup_ready = $false
-    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceRoot 'workflow.safe.json') -Encoding utf8
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidenceRoot 'workflow.safe.json') -Encoding utf8
     exit $testExit
 } catch {
     # 只保留阶段及数值错误，不序列化环境、账户或系统异常正文。

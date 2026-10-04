@@ -10,7 +10,25 @@ mod netcredentials;
 #[test]
 #[ignore = "仅在固定无网络 helper 的非管理员服务身份新登录会话候选验证中执行"]
 fn netcredentials_two_stage_station_records_identity_and_cleanup() {
-    netcredentials::run();
+    netcredentials::run(false, false);
+}
+
+#[test]
+#[ignore = "仅与原两段基线同轮执行一次私有盘映射对照，不代表 G09 通过"]
+fn netcredentials_two_stage_private_device_map_records_identity_and_cleanup() {
+    netcredentials::run(true, false);
+}
+
+#[test]
+#[ignore = "仅与原两段基线同轮执行一次保留已空 Job 对照，不代表 G09 通过"]
+fn netcredentials_two_stage_retained_empty_job_records_identity_and_cleanup() {
+    netcredentials::run(false, true);
+}
+
+#[test]
+#[ignore = "仅与原两段基线同轮执行一次私有盘映射加保留已空 Job 对照，不代表 G09 通过"]
+fn netcredentials_two_stage_private_device_map_retained_empty_job_records_identity_and_cleanup() {
+    netcredentials::run(true, true);
 }
 
 #[test]

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05按原关闭条件完成纯PNG、同轮图片加单技能、恢复/保稿和英中补验并独审，历史失败保留。G09的Windows窗口站或LSA登录会话回收仍待解决；原完整矩阵与最终同提交双平台源码门禁仍待完成。",
+  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05按原关闭条件完成纯PNG、同轮图片加单技能、恢复/保稿和英中补验并独审，历史失败保留。G09的Windows新LSA登录会话回收仍待解决；原完整矩阵与最终同提交双平台源码门禁仍待完成。4ff原矩阵已确认窗口站消失、LSA仍存在且查询无错误；未定位剩余token引用，原生修复尚未证明。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -9558,5 +9558,55 @@
     "newly_closed_items": [
       "G05"
     ]
+  },
+  "g09_lsa_release_failure_20261004": {
+    "source_commit": "4ff41b6146932dc89155f6a24c7a6e0e8e243ea9",
+    "run_id": 37163186787,
+    "run_conclusion": "failure",
+    "windows_job_id": 111320808485,
+    "failed_step": 60,
+    "final_index": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/4ff41b614-windows-ci/final-delivery-index.safe.json",
+      "sha256": "301a6428fc1941b6965e215850dc63597131b62f2449caaabe598a20dda464b7"
+    },
+    "native_review_sha256": "ce4d3f73d1d26e8491fc2580212b337167204f741a2d1e73c6659e447afa448b",
+    "ordinary_pass": 1193,
+    "required_named_tests_pass": 43,
+    "i18n_pass": 11,
+    "native_witness_enabled": false,
+    "first_cmd_native_exit_code": 0,
+    "candidate_stdout": "codex-cli 0.156.1",
+    "debug_events_received_validated_continued": 196,
+    "pending_event": null,
+    "release_state": {
+      "station_absent": true,
+      "logon_absent": false,
+      "station_query_error": null,
+      "logon_query_error": null
+    },
+    "both_release_receipts_sha256": "0b98c92df109ac1612c942c6cb077224d1695c1b73100aaa87eeecbed2dd6ae2",
+    "updated_outcome": "RecoveryRequired",
+    "powershell_executed": false,
+    "remaining_four_cases_executed": false,
+    "three_cold_resumes_executed": false,
+    "reference_holder_proven": false,
+    "read_only_source_review": "command/helper/debugger与app/授权普通持有者未找到确定遗留token或process引用；本轮witness禁用；空Job或文件lease不能据此认定根因。",
+    "unblock_condition": "确定仍持有新LUID的对象或生命周期差异并修复；保持原期限、两侧回收和完整五场景/三冷恢复验收条件。",
+    "observer_status": "exit0_cleaned",
+    "newly_closed_items": [],
+    "localization": "无需本地化变更；仅记录已核实原生结果",
+    "bounded_lifetime_control_preparation": {
+      "base_commit": "3d47c4b3851f60cc33ebcf2eb85a28685f9c6671",
+      "scope": "四个独立病例：无/有私有设备映射 × 已空 Job 在原 LSA 查询前/后关闭；每例新 nonce、目录和登录会话，顺序一次、零重试。",
+      "production_changed": false,
+      "original_deadlines_unchanged": true,
+      "post_job_close_observation_overwrites_original_failure": false,
+      "local_gate_index_sha256": "b31045e263e16944d03d41b359ccc642dd51d080795840310c7f1d834061b7d7",
+      "local_gate": "Mac cargo check、Windows command 测试目标类型检查、i18n 11 项及 PowerShell Parser 通过；四个短根已清理。",
+      "windows_native_execution": "待冻结提交的既有 g09_netcredentials 工作流；未执行 C helper 原生验收。",
+      "boundary": "只区分所测设备映射/空 Job 生命周期因素，不代表新 LUID AppContainer/console/debugger 组合或完整更新事务通过。",
+      "localization": "无需本地化变更。",
+      "source_review_sha256": "0763d28506a51cc51c40811c5ba602aa1bbf31a7560cd19dbbf1df519a1ef9e3"
+    }
   }
 }

@@ -32,7 +32,8 @@ use windows::Win32::Security::{
 };
 use windows::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
-    FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, GetFileInformationByHandle, READ_CONTROL,
+    FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, GetFileInformationByHandle, QueryDosDeviceW,
+    READ_CONTROL,
 };
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -667,6 +668,86 @@ fn revalidate(held: &[HeldFile]) -> Result<()> {
     Ok(())
 }
 
+fn mapping_target(path: &Path) -> Result<Vec<u16>> {
+    let path: Vec<_> = path.as_os_str().encode_wide().collect();
+    require(
+        path.len() > 7
+            && path[..4] == [92, 92, 63, 92]
+            && path[4] <= 127
+            && (path[4] as u8).is_ascii_alphabetic()
+            && path[5..7] == [58, 92],
+        "device_map_physical_path",
+    )?;
+    let name = [path[4], 58, 0];
+    let mut target = [0u16; 1200];
+    let used = unsafe { QueryDosDeviceW(PCWSTR(name.as_ptr()), Some(&mut target)) } as usize;
+    if used == 0 {
+        return api(
+            "device_map_physical_volume",
+            Err(WindowsError::from_thread()),
+        );
+    }
+    require(used <= target.len(), "device_map_volume_limit")?;
+    let length = target[..used]
+        .iter()
+        .position(|unit| *unit == 0)
+        .ok_or_else(|| failure("device_map_volume", "目标未终止"))?;
+    let prefix: Vec<_> = r"\Device\HarddiskVolume".encode_utf16().collect();
+    require(
+        length > prefix.len()
+            && target[..prefix.len()] == prefix
+            && target[prefix.len()..length]
+                .iter()
+                .all(|unit| (48..=57).contains(unit))
+            && target[length..used].iter().all(|unit| *unit == 0),
+        "device_map_single_physical_volume",
+    )?;
+    let mut result = target[..length].to_vec();
+    result.push(92);
+    result.extend_from_slice(&path[7..]);
+    require(result.len() < 1200, "device_map_target_limit")?;
+    Ok(result)
+}
+
+fn mapping_receipt(
+    bytes: &[u8],
+    nonce: &[u8],
+    process: &Process,
+    target: &[u16],
+    identity: (u32, u32, u32),
+) -> Result<Value> {
+    check_header(bytes, nonce, 7, 2612)?;
+    let actual_process = parse_process(&bytes[HEADER..152]);
+    let length = word(bytes, 184) as usize;
+    let units: Vec<_> = bytes[212..]
+        .chunks_exact(2)
+        .map(|part| u16::from_le_bytes([part[0], part[1]]))
+        .collect();
+    let target_matches = length < units.len()
+        && units[..length] == *target
+        && units[length..].iter().all(|unit| *unit == 0);
+    let target_identity = (word(bytes, 188), word(bytes, 192), word(bytes, 196));
+    let mapped_identity = (word(bytes, 200), word(bytes, 204), word(bytes, 208));
+    let alias = word(bytes, 180);
+    let bound = actual_process.as_ref().is_ok_and(|value| value == process)
+        && target_matches
+        && target_identity == identity
+        && mapped_identity == identity
+        && (b'D' as u32..=b'Z' as u32).contains(&alias);
+    Ok(
+        json!({"stage":word(bytes,152),"win32_error":word(bytes,156),
+        "hresult_from_win32":word(bytes,160),"cleanup_stage":word(bytes,164),"cleanup_error":word(bytes,168),
+        "create_verified":word(bytes,172)==1,"remove_verified":word(bytes,176)==1,
+        "alias_letter":alias,"target_utf16_units":length,"target_matches_bound_directory":target_matches,
+        "target_file_id":target_identity,"mapped_file_id":mapped_identity,"expected_file_id":identity,
+        "process":actual_process.as_ref().map(Process::json).unwrap_or(Value::Null),
+        "process_error":actual_process.err(),"bound":bound,
+        "confirmed":bound && word(bytes,152)==75 && word(bytes,156)==0 && word(bytes,160)==0
+            && word(bytes,164)==76 && word(bytes,168)==0
+            && word(bytes,172)==1 && word(bytes,176)==1}),
+    )
+}
+
 struct Tree {
     job: Option<OwnedHandle>,
     first: Option<OwnedHandle>,
@@ -721,7 +802,7 @@ impl Tree {
         Ok(info.ActiveProcesses)
     }
 
-    fn cleanup(&mut self) -> Value {
+    fn cleanup(&mut self, retain_empty_job: bool) -> Value {
         let naturally_exited = self
             .first
             .iter()
@@ -766,12 +847,7 @@ impl Tree {
             }
             thread::sleep(Duration::from_millis(10));
         };
-        for handle in [
-            &mut self.thread,
-            &mut self.second,
-            &mut self.first,
-            &mut self.job,
-        ] {
+        for handle in [&mut self.thread, &mut self.second, &mut self.first] {
             if let Some(handle) = handle.take() {
                 if let Err(error) = api("close_owned_handle", unsafe {
                     CloseHandle(HANDLE(handle.into_raw_handle()))
@@ -780,14 +856,46 @@ impl Tree {
                 }
             }
         }
-        json!({"naturally_exited":naturally_exited,"job_empty_and_original_processes_signalled":empty,"handle_close_errors":errors,"confirmed":empty && errors.is_empty()})
+        // 只有原进程已退出、Job 已空且句柄关闭无错误，才允许延后关闭这个同一 Job。
+        let retained = retain_empty_job && empty && errors.is_empty();
+        if !retained {
+            if let Some(job) = self.job.take() {
+                if let Err(error) = api("close_owned_job", unsafe {
+                    CloseHandle(HANDLE(job.into_raw_handle()))
+                }) {
+                    errors.push(error);
+                }
+            }
+        }
+        json!({"naturally_exited":naturally_exited,"job_empty_and_original_processes_signalled":empty,
+            "handle_close_errors":errors,"confirmed":empty && errors.is_empty(),
+            "job_retained_for_logon_observation":retained,"job_closed_before_logon_observation":!retained && errors.is_empty()})
+    }
+
+    fn close_retained_job(&mut self) -> Value {
+        if self.job.is_none() {
+            return json!({"retained":false,"confirmed":true});
+        }
+        let active = self.active();
+        if active.as_ref().is_ok_and(|count| *count == 0) {
+            let job = self.job.take().unwrap();
+            let closed = api("close_retained_empty_job", unsafe {
+                CloseHandle(HANDLE(job.into_raw_handle()))
+            });
+            return json!({"retained":true,"active_before_close":0,
+                "confirmed":closed.is_ok(),"close_error":closed.err()});
+        }
+        // 不能把未知或非空 Job 当作空 Job 提前关闭；保留异常并走既有有界清理。
+        let cleanup = self.cleanup(false);
+        json!({"retained":true,"confirmed":false,"active_before_close":active.as_ref().ok(),
+            "accounting_error":active.err(),"fallback_cleanup":cleanup})
     }
 }
 
 impl Drop for Tree {
     fn drop(&mut self) {
         if self.job.is_some() {
-            self.cleanup();
+            self.cleanup(false);
         }
     }
 }
@@ -856,7 +964,7 @@ fn save(path: &Path, bytes: &[u8]) -> Result<()> {
     disk("sync_receipt", file.sync_all())
 }
 
-fn execute() -> Result<Value> {
+fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
     let environment = |suffix: &str| {
         std::env::var_os(format!("{PREFIX}{suffix}")).ok_or_else(|| failure("environment", suffix))
     };
@@ -900,12 +1008,25 @@ fn execute() -> Result<Value> {
     let run = root.join(format!("run-{nonce}"));
     disk("create_run_directory", fs::create_dir(&run))?;
     lock_path(&run, &mut held)?;
+    let mapping = if with_device_map {
+        let identity = held
+            .iter()
+            .find(|item| item.path == run)
+            .ok_or_else(|| failure("device_map_bound_directory", "目录锁缺失"))?
+            .identity;
+        Some((mapping_target(&run)?, identity))
+    } else {
+        None
+    };
     let mut tree = Tree::new()?;
     let mut report = json!({"schema":1,"candidate_only":true,"g09_closed":false,"nonce":nonce,"helper_sha256":expected,
         "validation_scope":"nonadministrator_service_candidate","interactive_user_validation_passed":false,
         "acl_modified":false,"network_called":false,"explicit_station_selection":false,
-        "first_lpdesktop":"NULL","second_lpdesktop":"empty","second_inherit_handles":false});
+        "first_lpdesktop":"NULL","second_lpdesktop":"empty","second_inherit_handles":false,
+        "with_device_map":with_device_map,"retain_empty_job":retain_empty_job,
+        "appcontainer_console_debugger_combination_tested":false});
     let mut first_identity = None;
+    let mut second_identity = None;
     let mut candidate_station = None;
     let mut parent_objects = None;
     let scenario = (|| -> Result<()> {
@@ -948,6 +1069,9 @@ fn execute() -> Result<Value> {
             (format!("{PREFIX}NONCE"), nonce.clone().into()),
             (format!("{PREFIX}STAGE"), "1".into()),
         ];
+        if with_device_map {
+            values.push((format!("{PREFIX}DEVICE_MAP"), "1".into()));
+        }
         values.sort_by_key(|(key, _)| key.to_ascii_uppercase());
         let mut block = Vec::new();
         for (key, value) in values {
@@ -1049,6 +1173,7 @@ fn execute() -> Result<Value> {
         tree.member(first)?;
         revalidate(&held)?;
         report["second_created"] = candidate.json();
+        second_identity = Some(candidate.clone());
         report["second_exact_job_before_resume"] = json!(true);
         let mut authorization = suspended;
         authorization[8..12].copy_from_slice(&4u32.to_le_bytes());
@@ -1122,17 +1247,17 @@ fn execute() -> Result<Value> {
         Ok(())
     })();
     // 无论原生调用还是合同失败，先处理本次确切 Job 与原创建句柄，之后才允许断言。
-    report["cleanup"] = tree.cleanup();
+    report["cleanup"] = tree.cleanup(retain_empty_job);
     report["scenario_ok"] = json!(scenario.is_ok());
     report["scenario_error"] = scenario.err().unwrap_or(Value::Null);
     report["caller_objects_unchanged"] = match parent_objects {
         Some(original) => json!(current_objects().is_ok_and(|actual| actual == original)),
         None => Value::Null,
     };
-    if let Some(identity) = first_identity {
+    if let Some(identity) = &first_identity {
         let deadline = Instant::now() + Duration::from_secs(3);
         loop {
-            let logon = logon_observation(&identity);
+            let logon = logon_observation(identity);
             let station = candidate_station
                 .as_ref()
                 .map(|name| station_observation(name));
@@ -1146,6 +1271,32 @@ fn execute() -> Result<Value> {
             thread::sleep(Duration::from_millis(50));
         }
     }
+    // 原三秒查询结果保持为判定依据；随后关闭已空 Job，只作一次新的观察，不等待或洗掉失败。
+    report["retained_job_release"] = tree.close_retained_job();
+    if retain_empty_job {
+        report["logon_after_job_close"] = first_identity
+            .as_ref()
+            .map(logon_observation)
+            .unwrap_or(Value::Null);
+        report["station_after_job_close"] = candidate_station
+            .as_ref()
+            .map(|name| station_observation(name))
+            .unwrap_or(Value::Null);
+    }
+    if let Some((target, identity)) = mapping {
+        report["device_map_expected_nt_target"] = json!(String::from_utf16(&target).ok());
+        report["device_map"] = match (
+            read_receipt(&run.join("device-map.bin"), 2612),
+            second_identity.as_ref(),
+        ) {
+            (Ok(Some(bytes)), Some(process)) => {
+                mapping_receipt(&bytes, nonce.as_bytes(), process, &target, identity)
+                    .unwrap_or_else(|error| json!({"confirmed":false,"error":error}))
+            }
+            (Err(error), _) => json!({"confirmed":false,"error":error}),
+            (Ok(_), _) => json!({"confirmed":false,"receipt_or_bound_process_missing":true}),
+        };
+    }
     let receipts: Vec<_> = [
         "stage1.bin",
         "suspended2.bin",
@@ -1153,6 +1304,7 @@ fn execute() -> Result<Value> {
         "stage2.bin",
         "stage1-complete.bin",
         "stage2-complete.bin",
+        "device-map.bin",
     ]
     .into_iter()
     .map(|name| match read_receipt(&run.join(name), 33980) {
@@ -1178,6 +1330,9 @@ fn execute() -> Result<Value> {
         }).collect::<Vec<_>>());
     let candidate_passed = report["scenario_ok"] == true
         && report["cleanup"]["confirmed"] == true
+        && report["cleanup"]["job_retained_for_logon_observation"] == retain_empty_job
+        && report["retained_job_release"]["confirmed"] == true
+        && (!with_device_map || report["device_map"]["confirmed"] == true)
         && report["caller_objects_unchanged"] == true
         && report["station_after_exit"]["gone"] == true
         && report["logon_after_exit"]["gone"] == true;
@@ -1191,8 +1346,8 @@ fn execute() -> Result<Value> {
     Ok(report)
 }
 
-pub(super) fn run() {
-    let report = execute()
+pub(super) fn run(with_device_map: bool, retain_empty_job: bool) {
+    let report = execute(with_device_map, retain_empty_job)
         .unwrap_or_else(|error| json!({"passed":false,"setup_error":error,"g09_closed":false}));
     eprintln!("windows_netcredentials_station_candidate={report}");
     assert_eq!(

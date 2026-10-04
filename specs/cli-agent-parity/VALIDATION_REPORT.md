@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 分项证据确认 LSA 残留
+
+`4ff41b614` 的[原完整 Windows 事务矩阵 37163186787](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37163186787)终态 failure，唯一失败为 step60。普通 1193 PASS＝1121 warp＋72 command；43 项必需具名测试各一次普通 PASS，i18n 11；普通门禁无 FAIL／LEAK／RETRY／FLAKY。首 CMD／console／Node／Codex 四个候选进程均正常 EXIT 0，输出 `codex-cli 0.156.1`；196 个调试事件收到、验证和继续，pending 为 null。`updated` 97.97 秒后返回 RecoveryRequired，不计事务成功。
+
+新正常／abort 分项收据均为 `station_absent=true`、`logon_absent=false`，两个查询错误字段为 null，原件 SHA 均为 `0b98c92df109ac1612c942c6cb077224d1695c1b73100aaa87eeecbed2dd6ae2`。双 helper 退出 0、Job 空、桌面关闭与局部 DeviceMap 删除已证，阻塞明确为新 LSA 登录会话仍存在。App 和 command 的普通持有者只读审查没有找到确定的 token／process 句柄遗漏；本轮未启用 native witness，不把取证复制句柄、空 Job 或文件租约猜作根因。原件不含剩余 token 对象和持有者清单，仍需有区分力的生命周期证据，不能靠延长等待或放宽清理获得通过。
+
+三份官方 ZIP 的大小／SHA／CRC、47 份源码引用及 53 份小原件均复核。终审索引仓外 `g08-build-preparation/4ff41b614-windows-ci/final-delivery-index.safe.json`，SHA `301a6428fc1941b6965e215850dc63597131b62f2449caaabe598a20dda464b7`；原生独审 SHA `ce4d3f73d1d26e8491fc2580212b337167204f741a2d1e73c6659e447afa448b`。唯一观察器 `r-v_otj1x7` 已退出并清理。PowerShell、其余四场景及三次冷恢复均未执行；没有重派完整矩阵。**本轮新增关闭 0 项；当前 10 关闭／G09 开放／3 项移交，PR 草稿。** 无需本地化变更。
+
+仅在既有两段 helper 夹具加入一次 2×2 限定对照：无／有局部盘映射，分别在原 LSA 查询前／后关闭已确认空的 Job。四例各用新 nonce、目录和登录会话，顺序一次、零重试；原 3 秒查询结论保留，关闭 Job 后仅另记一次观察，不覆盖失败。生产逻辑和原期限不变。Mac check、Windows command 测试目标类型检查、i18n 11 项和 PowerShell Parser 通过，四个本机短根清理；本机门禁索引 SHA `b31045e263e16944d03d41b359ccc642dd51d080795840310c7f1d834061b7d7`。Windows C 实编和原生结果仍待冻结提交执行；不能用受限对照替代新 LUID AppContainer／console／debugger 组合及原完整更新矩阵。
+
 ## 2026-10-04：G05 原条件补验完成
 
 **本轮补验关闭 G05；当前 10 项关闭、G09 开放、V01／V02／V05 移交，PR 仍为草稿。** 固定 Claude `2.1.280/claude-opus-5-5`、Inherit 根任务，按各真实构建计证，不将旧索引不可达推断为功能退化，也不称当前 HEAD 重跑所有模型链。联合关闭索引位于仓外 `g08-build-preparation/g05-proof-refresh-20261004/g05-current-scope-closure-20261004-v1.safe.json`，SHA `924275d81ad7c606250e631541f38e90f1cf707a7a448043e06af68be658f902`。

@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | Mac 消费者已验；087 Windows首CMD/Node/Codex真实执行退出0，但窗口站或LSA回收未确认；PS、后续场景/冷恢复及最终门禁未完成。新增分项收据用于定位，不计修复或关闭 |
+| G09 | 开放 | Mac 消费者已验；4ff Windows首CMD/Node/Codex真实执行退出0，窗口站已消失，但新LSA会话仍存在，剩余token引用未定位；PS、后续场景/冷恢复及最终门禁未完成。诊断不计修复或关闭 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -277,6 +277,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-04 LSA 回收阻塞已分离，仍开放**：`4ff41b614` 的[完整 Windows 原矩阵](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37163186787)失败；1193 项普通 PASS、43 项必需具名测试及 i18n 11 通过。首 CMD 链正常输出固定 Codex 版本，196 个事件均验证并继续，四个候选进程退出 0；两个 helper 退出 0，Job 为空，桌面关闭，局部盘映射精确移除。正常与 abort 收据均为 `station_absent=true`、`logon_absent=false`、查询无错误，原件 SHA 均为 `0b98c92df109ac1612c942c6cb077224d1695c1b73100aaa87eeecbed2dd6ae2`。App 与 command 普通句柄路径未找到确定遗留引用，本轮 witness 未启用；不把空 Job 或文件租约推定为根因。解除条件是定位实际残留对象／生命周期差异并修复，再通过原五场景／三冷恢复及最终门禁；不延长期限或降低清理条件。终审索引 SHA `301a6428fc1941b6965e215850dc63597131b62f2449caaabe598a20dda464b7`。
 
 - **2026-10-04 首 CMD 原生执行成功，完整回收失败，仍开放**：`087283721` 的[完整 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37160171946)已终态 failure。普通 1191 项 PASS，41 项必需测试逐名一次通过，i18n 11 通过；首 CMD→Node→Codex 实际输出 `codex-cli 0.156.1`，四个候选进程及两个 helper 均正常退出 0，203 个调试事件均继续，桌面关闭及 DeviceMap 移除已确认。但窗口站／LSA 登录会话的联合消失确认超时，正常和 abort 清理均未通过；原收据不能区分两侧。`updated` 为 RecoveryRequired，未执行 PowerShell、其余四场景或三次冷恢复，不将局部正例计为更新成功。三份官方 ZIP 已校验，唯一观察器已退出并清理，终审索引 SHA `1d0cc1eb67fd8abfbd843f26c99b683665ba6c2685b56c92f0d8cb691e6c6506`。
 

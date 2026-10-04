@@ -43,6 +43,17 @@ typedef struct {
     DWORD cleanup_stage, cleanup_error;
 } COMPLETION;
 
+/* 只读收据：固定名字与 FileID，不保存假凭据或其他进程环境。 */
+typedef struct {
+    HEADER header;
+    PROCESS_SNAPSHOT process;
+    DWORD stage, win32_error, hresult_from_win32, cleanup_stage, cleanup_error;
+    DWORD create_verified, remove_verified, alias_letter, target_chars;
+    DWORD volume, index_high, index_low, mapped_volume, mapped_high, mapped_low;
+    WCHAR target[1200];
+} DEVICE_MAP;
+
+typedef char device_map_size[(sizeof(DEVICE_MAP) == 2612) ? 1 : -1];
 typedef char observation_size[(sizeof(OBSERVATION) == 33980) ? 1 : -1];
 typedef char suspended_size[(sizeof(SUSPENDED) == 152) ? 1 : -1];
 typedef char completion_size[(sizeof(COMPLETION) == 80) ? 1 : -1];
@@ -54,6 +65,8 @@ static SUSPENDED suspended, authorization;
 static COMPLETION completion;
 static ULONG_PTR token_buffer[128];
 static BYTE io_buffer[sizeof(SUSPENDED)];
+static DEVICE_MAP device_map;
+static WCHAR device_names[32768], device_query[1200], map_mode[4];
 
 /* volatile 阻止编译器将无 CRT 的清零循环替换为 memset。 */
 static void clear_bytes(void *value, DWORD length) {
@@ -304,6 +317,183 @@ static BOOL stage_one(PROCESS_INFORMATION *child) {
     return GetExitCodeProcess(child->hProcess, &completion.child_exit);
 }
 
+/* QueryDosDevice 的 MULTI_SZ 必须恰好有一个非空目标，不能默默取第一项。 */
+static BOOL single_target(DWORD used, DWORD *length) {
+    if (used < 2 || used > 1200 || device_query[used - 1] != 0) {
+        SetLastError(ERROR_INVALID_DATA); return FALSE;
+    }
+    DWORD end = 0;
+    while (end < used && device_query[end] != 0) ++end;
+    if (end == 0 || end == used) { SetLastError(ERROR_INVALID_DATA); return FALSE; }
+    for (DWORD i = end; i < used; ++i) {
+        if (device_query[i] != 0) { SetLastError(ERROR_INVALID_DATA); return FALSE; }
+    }
+    *length = end;
+    return TRUE;
+}
+
+static BOOL query_absent(const WCHAR *name) {
+    if (QueryDosDeviceW(name, device_query, 1200) != 0) {
+        SetLastError(ERROR_ALREADY_EXISTS); return FALSE;
+    }
+    DWORD error = GetLastError();
+    if (error != ERROR_FILE_NOT_FOUND) { SetLastError(error); return FALSE; }
+    return TRUE;
+}
+
+static BOOL directory_identity(HANDLE file, BY_HANDLE_FILE_INFORMATION *value) {
+    if (!GetFileInformationByHandle(file, value)) return FALSE;
+    if ((value->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 ||
+        (value->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+        SetLastError(ERROR_INVALID_DATA); return FALSE;
+    }
+    return TRUE;
+}
+
+/* 与生产 LocalDeviceMap 相同的局部名称、原生 NT 目标和 create/remove flags。
+ * 仅第二段新 LUID 执行；原基线不进入这里，不增加站切换、网络或 ACL 写入。 */
+static BOOL mapping_create(HANDLE *target_handle, BOOL *active) {
+    PROCESS_SNAPSHOT current;
+    clear_bytes(&current, sizeof(current));
+    device_map.stage = 70;
+    if (!snapshot(GetCurrentProcess(), &current)) return FALSE;
+    if (!equal_bytes(&current, &observation.process, sizeof(current)) ||
+        IsWellKnownSid(current.sid, WinLocalSystemSid)) {
+        SetLastError(ERROR_INVALID_OWNER); return FALSE;
+    }
+    copy_bytes(&device_map.process, &current, sizeof(current));
+    /* root 已由控制器逐祖先锁定，只接受规范本地盘目录，绝不映射卷根。 */
+    DWORD length = 0;
+    while (length < 1024 && root[length] != 0) ++length;
+    if (length < 8 || length == 1024 || root[0] != L'\\' || root[1] != L'\\' ||
+        root[2] != L'?' || root[3] != L'\\' || root[5] != L':' || root[6] != L'\\' ||
+        !((root[4] >= L'A' && root[4] <= L'Z') || (root[4] >= L'a' && root[4] <= L'z'))) {
+        SetLastError(ERROR_INVALID_NAME); return FALSE;
+    }
+    DWORD component = 7;
+    for (DWORD i = 7; i <= length; ++i) {
+        if (root[i] == L'/' || root[i] == L':') { SetLastError(ERROR_INVALID_NAME); return FALSE; }
+        if (root[i] == L'\\' || root[i] == 0) {
+            DWORD count = i - component;
+            if (count == 0 || (count == 1 && root[component] == L'.') ||
+                (count == 2 && root[component] == L'.' && root[component + 1] == L'.')) {
+                SetLastError(ERROR_INVALID_NAME); return FALSE;
+            }
+            component = i + 1;
+        }
+    }
+    device_map.stage = 71;
+    *target_handle = CreateFileW(root, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (*target_handle == INVALID_HANDLE_VALUE) return FALSE;
+    BY_HANDLE_FILE_INFORMATION info;
+    clear_bytes(&info, sizeof(info));
+    if (!directory_identity(*target_handle, &info)) return FALSE;
+    device_map.volume = info.dwVolumeSerialNumber;
+    device_map.index_high = info.nFileIndexHigh;
+    device_map.index_low = info.nFileIndexLow;
+    WCHAR drive[3] = {root[4], L':', 0};
+    device_map.stage = 72;
+    DWORD used = QueryDosDeviceW(drive, device_query, 1200), volume_length = 0;
+    if (used == 0 || !single_target(used, &volume_length)) return FALSE;
+    static const WCHAR prefix[] = L"\\Device\\HarddiskVolume";
+    DWORD prefix_length = (DWORD)(sizeof(prefix) / sizeof(WCHAR)) - 1;
+    if (volume_length <= prefix_length ||
+        !equal_bytes(device_query, prefix, prefix_length * (DWORD)sizeof(WCHAR))) {
+        SetLastError(ERROR_INVALID_NAME); return FALSE;
+    }
+    for (DWORD i = prefix_length; i < volume_length; ++i) {
+        if (device_query[i] < L'0' || device_query[i] > L'9') {
+            SetLastError(ERROR_INVALID_NAME); return FALSE;
+        }
+    }
+    if (volume_length + 1 + length - 7 >= 1200) { SetLastError(ERROR_BUFFER_OVERFLOW); return FALSE; }
+    copy_bytes(device_map.target, device_query, volume_length * (DWORD)sizeof(WCHAR));
+    device_map.target[volume_length] = L'\\';
+    copy_bytes(device_map.target + volume_length + 1, root + 7, (length - 6) * (DWORD)sizeof(WCHAR));
+    device_map.target_chars = volume_length + 1 + length - 7;
+    device_map.stage = 73;
+    used = QueryDosDeviceW(NULL, device_names, 32768);
+    if (used == 0) return FALSE;
+    if (used > 32768 || device_names[used - 1] != 0) { SetLastError(ERROR_INVALID_DATA); return FALSE; }
+    WCHAR alias[3] = {L'D', L':', 0};
+    for (; alias[0] <= L'Z'; ++alias[0]) {
+        BOOL occupied = FALSE;
+        DWORD at = 0;
+        while (at < used && device_names[at] != 0) {
+            DWORD end = at;
+            while (end < used && device_names[end] != 0) ++end;
+            if (end == used) { SetLastError(ERROR_INVALID_DATA); return FALSE; }
+            if (end - at == 2 && CompareStringOrdinal(device_names + at, 2, alias, 2, TRUE) == CSTR_EQUAL) occupied = TRUE;
+            at = end + 1;
+        }
+        if (!occupied) break;
+    }
+    if (alias[0] > L'Z') { SetLastError(ERROR_NO_MORE_ITEMS); return FALSE; }
+    if (!query_absent(alias)) return FALSE;
+    device_map.alias_letter = (DWORD)alias[0];
+    device_map.stage = 74;
+    if (!DefineDosDeviceW(DDD_RAW_TARGET_PATH | DDD_NO_BROADCAST_SYSTEM, alias, device_map.target)) return FALSE;
+    *active = TRUE;
+    device_map.stage = 75;
+    DWORD target_length = 0;
+    used = QueryDosDeviceW(alias, device_query, 1200);
+    if (used == 0 || !single_target(used, &target_length)) return FALSE;
+    if (target_length != device_map.target_chars ||
+        !equal_bytes(device_query, device_map.target, (target_length + 1) * (DWORD)sizeof(WCHAR))) {
+        SetLastError(ERROR_INVALID_DATA); return FALSE;
+    }
+    WCHAR mapped_root[4] = {alias[0], L':', L'\\', 0};
+    HANDLE mapped = CreateFileW(mapped_root, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                               FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (mapped == INVALID_HANDLE_VALUE) return FALSE;
+    BOOL ok = directory_identity(mapped, &info);
+    DWORD error = ok ? ERROR_SUCCESS : GetLastError();
+    if (ok) {
+        device_map.mapped_volume = info.dwVolumeSerialNumber;
+        device_map.mapped_high = info.nFileIndexHigh;
+        device_map.mapped_low = info.nFileIndexLow;
+        if (device_map.mapped_volume != device_map.volume || device_map.mapped_high != device_map.index_high ||
+            device_map.mapped_low != device_map.index_low) { ok = FALSE; error = ERROR_INVALID_DATA; }
+    }
+    if (!CloseHandle(mapped) && ok) { ok = FALSE; error = GetLastError(); }
+    if (ok) device_map.create_verified = 1;
+    SetLastError(error);
+    return ok;
+}
+
+static BOOL mapping_control(void) {
+    header(&device_map.header, 7);
+    HANDLE target = INVALID_HANDLE_VALUE;
+    BOOL active = FALSE;
+    BOOL ok = mapping_create(&target, &active);
+    DWORD error = ok ? ERROR_SUCCESS : GetLastError();
+    device_map.win32_error = error;
+    device_map.hresult_from_win32 = (DWORD)HRESULT_FROM_WIN32(error);
+    if (active) {
+        /* 即使验证失败也只删除本次已创建的精确目标；不重试，不弹出别人的定义。 */
+        WCHAR alias[3] = {(WCHAR)device_map.alias_letter, L':', 0};
+        device_map.cleanup_stage = 76;
+        if (!DefineDosDeviceW(DDD_REMOVE_DEFINITION | DDD_EXACT_MATCH_ON_REMOVE |
+                              DDD_RAW_TARGET_PATH | DDD_NO_BROADCAST_SYSTEM, alias, device_map.target)) {
+            device_map.cleanup_error = GetLastError();
+        } else if (!query_absent(alias)) {
+            device_map.cleanup_stage = 77; device_map.cleanup_error = GetLastError();
+        } else device_map.remove_verified = 1;
+    }
+    if (target != INVALID_HANDLE_VALUE && !CloseHandle(target) && device_map.cleanup_error == 0) {
+        device_map.cleanup_stage = 78; device_map.cleanup_error = GetLastError();
+    }
+    BOOL saved = save(L"device-map.bin", &device_map, sizeof(device_map));
+    DWORD save_error = saved ? ERROR_SUCCESS : GetLastError();
+    if (!ok || device_map.cleanup_error != 0 || !saved) {
+        completion.stage = !saved ? 79 : (ok ? device_map.cleanup_stage : device_map.stage);
+        SetLastError(!ok ? error : (device_map.cleanup_error != 0 ? device_map.cleanup_error : save_error));
+        return FALSE;
+    }
+    return TRUE;
+}
+
 void WINAPI ProbeMain(void) {
     DWORD length = GetEnvironmentVariableW(L"INFINISHELL_WINDOWS_NETCREDENTIALS_RUN_DIR", root, 1024);
     DWORD nonce_length = GetEnvironmentVariableW(L"INFINISHELL_WINDOWS_NETCREDENTIALS_NONCE", nonce_text, 40);
@@ -316,6 +506,16 @@ void WINAPI ProbeMain(void) {
     }
     if (stage_text[0] == L'2') {
         BOOL ok = observe(2);
+        if (ok) {
+            SetLastError(ERROR_SUCCESS);
+            DWORD mode_length = GetEnvironmentVariableW(L"INFINISHELL_WINDOWS_NETCREDENTIALS_DEVICE_MAP", map_mode, 4);
+            DWORD mode_error = GetLastError();
+            if (mode_length == 1 && map_mode[0] == L'1') {
+                ok = mapping_control();
+            } else if (mode_length != 0 || mode_error != ERROR_ENVVAR_NOT_FOUND) {
+                completion.stage = 69; SetLastError(ERROR_INVALID_DATA); ok = FALSE;
+            }
+        }
         DWORD error = ok ? ERROR_SUCCESS : GetLastError();
         /* 即使观察不完整也保留原始字段，由控制器验证长度与阶段。 */
         BOOL saved = save(L"stage2.bin", &observation, sizeof(observation));
