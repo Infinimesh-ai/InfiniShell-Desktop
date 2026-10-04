@@ -1,5 +1,23 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 部分解栈准备修订，Windows 待验
+
+针对 9d31 两次 `invalid_exception_directory` 阻止原线程采样，仅修订四个 feature 诊断／测试文件。PS 先核验全部模块来源、大小、身份及地址集合，坏表仍参与重叠拒绝；随后省略坏表并记录固定身份、异常目录数值及具体失败分支。部分或零可解栈模块都能进入原 CREATE 线程身份、CPU 和 context 路径；未知 PC 在 StackWalk64 前停止，不把省略模块算作可解栈。CMD 仍严格拒绝。单表 768KiB、累计异常表请求 4MiB、64 模块、32 帧及 256KiB 栈读取预算保持；异常表请求在读取前扣除，短读／IO／解析失败不退还，PE 头／节表另有原限额。生产授权、租约、权限、取消、截止和暂停平衡均未改。
+
+Mac `cargo check --locked -p warp`、i18n 11 项及定向格式检查通过，`r-mfad4wlb`／`r-nxtoe9gi`／`r-4fhf4zkx` 均完成进程、FD、launchd 与目录身份核验后归档清理。门禁索引 SHA `a9d015c90620dd6ac8526ded6781624df78b79135847b08dbe763dc65df630cd`；四源冻结 SHA `da9c28ecb4db6fc6948a67ee0232c56af9f31f9bbb0d687a1ea1c10ca27bd1cc`，独立静态审查 SHA `04963a0c8af9cfb00d173c42d588cc7457ff875218503e3d21ff475365b6378c`。新增 7 项 Windows 回归，feature 总 89（19 snapshot／16 temp／14 creation／21 witness／2 authorization／11 Claude／6 env），本机 Mac 不编译这些 Windows cfg，实际执行待精确新提交 CI。
+
+无需本地化变更：没有 GUI／TUI 文案、布局或用户界面语义变化。本修订只消除明确的诊断前置失败，不能宣称 PowerShell 停滞已修。上一轮 9d31 原件最终索引 SHA `37d775f7d641c349a02394c6b3f76d82f51b16ff38955e3467f3f4204b47b0af`，原生首因审查 SHA `dcc214967d73626b240609caefdde1e11484768c9c5732288b6e4771346bbc82`，输出／清理独审 SHA `60bbdd45fcd7013cf81286b163a9b48b93fd5cb3597ada5d7ce030e6e49df60a`，均保留失败边界。**新增关闭 0 项；G09 开放，原完整矩阵、待决 ACL／musl 范围和最终同提交双平台门禁尚未完成，PR 保持草稿。**
+
+## 2026-10-04：G09 模块绑定通过，PowerShell 原生事务仍失败
+
+精确 `9d31cdf462e96b42b32a87453837a6ea52c4c1f2` 的 [Windows run 37188635472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37188635472) 正式 failure，唯一失败步骤为真实 npm 更新验收。普通 nextest 1221 PASS（warp 1133／command 88），63 必需全名各一次 PASS；feature 七组 82 项各一次 ok，含新模块绑定 8 项，i18n 11 已含在普通 warp 内。普通组无 FAIL／LEAK／RETRY／FLAKY；95 条 Rust warning 记录及其他工具警告保留，runner 最后清理 `vctip`，不称全部进程自然退出。完整日志 683807 字节、SHA `a8b7fab9d17ddb8e99db0c0281d825e05d9664b032dc3f44497c12d36b6d3f75`；逐名独审 SHA `9fb96d66bdae6330aac2c66291a549ef0d868233b59cf02390dd2c14db6bbd90`。真实单 `updated` 为 0 PASS／1 FAIL、395.55 秒，返回 `ProbeFailed`；其他四场景／三次冷恢复未执行。
+
+PS 代次 `0fb75e7c-2b9b-4b1d-be17-c1a127d8594f` 的 212 个调试事件均验证并继续，pending 为空，额外 `module_binding` 不再失败。6 次 PE32 记录为 `non_x64_native_unwind`，模块上限后 17 次跳过保留为部分覆盖。两次采样分别开始于 15006ms／240000ms，均在 `root_prepare_modules` 以 `invalid_exception_directory` 返回，实际没有 CPU／context／栈；`complete=true` 只说明这次取证流程结束，CPU 差仍为 `early_root_cpu_unavailable`。源码将目录零值、单表预算和映像边界等分支归为同一错误，原件没有失败模块身份或目录字段，不能指认具体 DLL 或通过放大预算猜测修复。当前明确缺陷是单模块异常表准备失败阻止原 CREATE 主线程身份、CPU 和 context 采样。
+
+CMD 代次 `e2fc6fee-2276-4c34-8857-06413c9a98dc` 创建 Node／Codex，版本输出 18 字节、退出 0，CP936 拒绝访问及 `CODEX_HOME`／PATH aliases 警告保留。PS 未创建 Node，约 289248ms 因原控制取消停止；本轮 `cancelled-candidate-stderr.safe.json` 的 total/captured 均为 0、truncated=false，证明封存时该文件为空，不外推系统无错误或旧 SPM 已修。两代 Job／AppContainer／desktop／DeviceMap／窗口站／LSA 清理确认，helper 均退出 0；PS root／console 在清理中退出 1，内层 Interrupted 与最终资源清理分开保留，不称自然成功或整个 fixture 根已删除。
+
+仓外 `g08-build-preparation/9d31cdf46-windows-ci` 已按官方 API 大小／SHA 与全部 ZIP CRC 核验，79 个成员逐项哈希，安全提取 72 份小原件、249929 字节；提取清单 SHA `ffed289c3ca9c1c2092dc97f232ae97352c4df0b439120e0d189b3049eaf9831`。观察器及提取／审计的本机登记短目录均已归档清理，远端失败业务证据保留。无需本地化变更。**新增关闭 0 项，10 关闭／G09 开放／V01、V02、V05 移交不计通过；原完整矩阵、额外 ACL／Claude musl 待决范围与最终同提交双平台门禁仍未完成，PR 保持草稿。**
+
 ## 2026-10-04：G09 PowerShell 诊断模块绑定修订
 
 仅修正 feature 门控的 PS DLL 额外诊断：缓存的包／组件租约沿用普通 LOAD 的来源授权，重新核验身份、摘要及祖先；System32 DLL 从原事件文件与锁定目录建立拒写租约，不再套用另一套 PE 导入授权。已授权 PE32 DLL 标记 `non_x64_native_unwind` 及覆盖不完整；身份／IO／损坏头仍为失败，CMD/root 路径继续拒绝 PE32。普通加载授权、权限、取消与期限均未改。926 没有失败模块身份或子阶段，此修订不能确定当时触发分支，也不能证明旧 SPM／停滞已修复。

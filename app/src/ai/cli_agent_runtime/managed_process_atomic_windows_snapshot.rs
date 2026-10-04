@@ -42,8 +42,8 @@ mod temp_path;
 
 const MAX_MODULES: usize = 64;
 const MAX_IMAGE_SIZE: u32 = 1024 * 1024 * 1024;
-const MAX_EXCEPTION_BYTES: usize = 768 * 1024;
-const MAX_TOTAL_EXCEPTION_BYTES: usize = 4 * 1024 * 1024;
+pub(super) const MAX_EXCEPTION_BYTES: usize = 768 * 1024;
+pub(super) const MAX_TOTAL_EXCEPTION_BYTES: usize = 4 * 1024 * 1024;
 const MAX_FRAMES: usize = 32;
 const MAX_STACK_SPAN: u64 = 1024 * 1024;
 const MAX_READ_BYTES: usize = 256 * 1024;
@@ -158,6 +158,26 @@ struct Module {
 
 pub(super) struct PreparedModules {
     modules: Vec<Module>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ExceptionDirectory {
+    rva: u32,
+    length: u32,
+    image_size: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub(super) struct OmittedModule {
+    identity: ModuleIdentity,
+    directory: Option<ExceptionDirectory>,
+    failure: Failure,
+}
+
+pub(super) struct PartialModules {
+    pub(super) prepared: PreparedModules,
+    pub(super) omitted: Vec<OmittedModule>,
+    pub(super) exception_bytes_attempted: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -341,6 +361,19 @@ fn parse_functions(bytes: &[u8], image_size: u32) -> Result<Vec<RuntimeFunction>
 }
 
 fn load_functions(file: &File, image_size: u32) -> Result<Vec<RuntimeFunction>, Failure> {
+    let mut remaining = MAX_TOTAL_EXCEPTION_BYTES;
+    load_functions_budgeted(file, image_size, &mut remaining, &mut None)
+}
+
+fn load_functions_budgeted(
+    file: &File,
+    image_size: u32,
+    remaining: &mut usize,
+    directory: &mut Option<ExceptionDirectory>,
+) -> Result<Vec<RuntimeFunction>, Failure> {
+    if *remaining == 0 {
+        return Err(Failure::rejected("exception_total_budget_exhausted"));
+    }
     // Windows seek_read 会修改文件游标，DuplicateHandle 也共享该游标。
     // 只从仍持有的原文件对象建立独立读取句柄，避免改变生产租约的读位置。
     let reader = unsafe {
@@ -378,15 +411,25 @@ fn load_functions(file: &File, image_size: u32) -> Result<Vec<RuntimeFunction>, 
     }
     let rva = u32_at(&optional, 136);
     let length = u32_at(&optional, 140);
+    *directory = Some(ExceptionDirectory {
+        rva,
+        length,
+        image_size,
+    });
     if rva == 0 && length == 0 {
         return Ok(Vec::new());
     }
-    if rva == 0
-        || length == 0
-        || length as usize > MAX_EXCEPTION_BYTES
-        || rva.checked_add(length).is_none_or(|end| end > image_size)
-    {
-        return Err(Failure::rejected("invalid_exception_directory"));
+    if rva == 0 || length == 0 {
+        return Err(Failure::rejected("exception_directory_zero_mismatch"));
+    }
+    if length as usize > MAX_EXCEPTION_BYTES {
+        return Err(Failure::rejected("exception_directory_per_module_budget"));
+    }
+    if rva.checked_add(length).is_none_or(|end| end > image_size) {
+        return Err(Failure::rejected("exception_directory_outside_image"));
+    }
+    if length as usize > *remaining {
+        return Err(Failure::rejected("exception_total_budget_exhausted"));
     }
     let table = read_exact_at(
         file,
@@ -409,11 +452,10 @@ fn load_functions(file: &File, image_size: u32) -> Result<Vec<RuntimeFunction>, 
             offset = Some(u64::from(u32_at(section, 20)) + u64::from(rva - start));
         }
     }
-    let bytes = read_exact_at(
-        file,
-        offset.ok_or_else(|| Failure::rejected("exception_section_missing"))?,
-        length as usize,
-    )?;
+    let offset = offset.ok_or_else(|| Failure::rejected("exception_section_missing"))?;
+    // 在读取前扣除完整请求；短读、I/O 失败和后续解析失败也不能退还诊断预算。
+    *remaining -= length as usize;
+    let bytes = read_exact_at(file, offset, length as usize)?;
     parse_functions(&bytes, image_size)
 }
 
@@ -457,6 +499,63 @@ pub(super) fn prepare_modules(modules: &[VerifiedModule<'_>]) -> Result<Prepared
         });
     }
     Ok(PreparedModules { modules: prepared })
+}
+
+/// PS 原线程取证允许部分解栈；所有来源身份和地址集合仍须先整体通过，坏表不参与展开。
+pub(super) fn prepare_partial_modules(
+    modules: &[VerifiedModule<'_>],
+) -> Result<PartialModules, Failure> {
+    if modules.len() > MAX_MODULES {
+        return Err(Failure::rejected("module_count_out_of_bounds"));
+    }
+    let mut identities = Vec::<ModuleIdentity>::with_capacity(modules.len());
+    for module in modules {
+        if module.size == 0
+            || module.size > MAX_IMAGE_SIZE
+            || !contained(module.base, u64::from(module.size), module.base, 1)
+            || module.sha256.len() != 64
+            || !module.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+            || identities.iter().any(|other| {
+                module.base < other.base + u64::from(other.size)
+                    && other.base < module.base + u64::from(module.size)
+            })
+        {
+            return Err(Failure::rejected("invalid_module_binding"));
+        }
+        let mut info = BY_HANDLE_FILE_INFORMATION::default();
+        unsafe { GetFileInformationByHandle(HANDLE(module.file.as_raw_handle()), &mut info) }
+            .map_err(|error| Failure::windows("GetFileInformationByHandle", error))?;
+        identities.push(ModuleIdentity {
+            base: module.base,
+            size: module.size,
+            volume_serial: info.dwVolumeSerialNumber,
+            file_index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+            sha256: module.sha256.to_owned(),
+        });
+    }
+    // 全部身份先入集合；被排除的坏表模块也不能与后续地址范围重叠。
+    let mut prepared = Vec::new();
+    let mut omitted = Vec::new();
+    let mut remaining = MAX_TOTAL_EXCEPTION_BYTES;
+    for (module, identity) in modules.iter().zip(identities) {
+        let mut directory = None;
+        match load_functions_budgeted(module.file, module.size, &mut remaining, &mut directory) {
+            Ok(functions) => prepared.push(Module {
+                identity,
+                functions,
+            }),
+            Err(failure) => omitted.push(OmittedModule {
+                identity,
+                directory,
+                failure,
+            }),
+        }
+    }
+    Ok(PartialModules {
+        prepared: PreparedModules { modules: prepared },
+        omitted,
+        exception_bytes_attempted: MAX_TOTAL_EXCEPTION_BYTES - remaining,
+    })
 }
 
 struct SuspendedThread {

@@ -10,7 +10,8 @@ use super::creation_witness::{
     CreationWitness, Disposition, Failure as CreationFailure, Summary, VerifiedImage,
 };
 use super::native_snapshot::{
-    CpuSample, Identity, VerifiedModule, capture, identity, prepare_modules,
+    CpuSample, Identity, PreparedModules, VerifiedModule, capture, identity, prepare_modules,
+    prepare_partial_modules,
 };
 use super::*;
 
@@ -29,6 +30,26 @@ enum WitnessMode {
 }
 
 impl WitnessMode {
+    fn prepare_root_modules(
+        self,
+        modules: &[VerifiedModule<'_>],
+    ) -> Result<(PreparedModules, Option<serde_json::Value>, bool), native_snapshot::Failure> {
+        match self {
+            Self::Cmd => prepare_modules(modules).map(|prepared| (prepared, None, false)),
+            Self::PowerShell => {
+                let result = prepare_partial_modules(modules)?;
+                let partial = !result.omitted.is_empty();
+                let evidence = serde_json::json!({
+                    "partial":partial,"omitted":result.omitted,
+                    "exception_bytes_attempted":result.exception_bytes_attempted,
+                    "per_module_budget":native_snapshot::MAX_EXCEPTION_BYTES,
+                    "total_budget":native_snapshot::MAX_TOTAL_EXCEPTION_BYTES,
+                });
+                Ok((result.prepared, Some(evidence), partial))
+            }
+        }
+    }
+
     fn bind_creation(
         self,
         event: &DEBUG_EVENT,
@@ -658,7 +679,7 @@ impl WindowsImageDebugSession {
         self.native_witness.as_mut().unwrap().snapshot =
             Some(serde_json::json!({"started_ms":started_ms,"complete":false}));
         // 根主线程优先使用原 CREATE 句柄，不依赖枚举、重开成功或其他线程占满额度。
-        let (root_main_thread, early_root_cpu, mut balanced) =
+        let (root_main_thread, early_root_cpu, mut balanced, partial_unwind) =
             self.capture_root_snapshot(container, deadline);
         let root_identity = self
             .native_witness
@@ -810,6 +831,7 @@ impl WindowsImageDebugSession {
         }
         let finished_ms = self.native_at_ms();
         let witness = self.native_witness.as_mut().unwrap();
+        witness.module_coverage_partial |= partial_unwind;
         witness.early_root_cpu = early_root_cpu;
         witness.snapshot = Some(
             serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"root_main_thread":root_main_thread,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"unsupported_module_events":witness.unsupported_module_events,"unsupported_module_reason":(witness.unsupported_module_events > 0).then_some("non_x64_native_unwind"),"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
@@ -830,13 +852,14 @@ impl WindowsImageDebugSession {
         &self,
         container: &AppContainerProbe,
         deadline: Instant,
-    ) -> (serde_json::Value, Option<CpuSample>, bool) {
+    ) -> (serde_json::Value, Option<CpuSample>, bool, bool) {
         let observation = (|| {
             if self.snapshot_stopped(deadline) {
                 return Ok((
                     serde_json::json!({"skipped":"cancelled_or_expired_before_capture"}),
                     None,
                     true,
+                    false,
                 ));
             }
             let witness = self.native_witness.as_ref().unwrap();
@@ -863,9 +886,10 @@ impl WindowsImageDebugSession {
                 })
                 .collect::<io::Result<Vec<_>>>()
                 .map_err(|failure| safe_failure("root_module_lease", &failure))?;
-            let prepared = prepare_modules(&bindings).map_err(
-                |failure| serde_json::json!({"stage":"root_prepare_modules","failure":failure}),
-            )?;
+            let (prepared, module_preparation, partial_unwind) =
+                witness.mode.prepare_root_modules(&bindings).map_err(
+                    |failure| serde_json::json!({"stage":"root_prepare_modules","failure":failure}),
+                )?;
             let desktop = container.native_witness_desktop();
             let desktop_failure = desktop
                 .as_ref()
@@ -877,9 +901,10 @@ impl WindowsImageDebugSession {
             // 租约/模块准备后再次处理取消与截止，不能为了采样拖延原终止。
             if self.snapshot_stopped(deadline) {
                 return Ok((
-                    serde_json::json!({"skipped":"cancelled_or_expired_before_capture"}),
+                    serde_json::json!({"skipped":"cancelled_or_expired_before_capture","module_preparation":module_preparation}),
                     None,
                     true,
+                    partial_unwind,
                 ));
             }
             let sampled_at_ms = self.native_at_ms();
@@ -896,14 +921,15 @@ impl WindowsImageDebugSession {
             let balanced = snapshot.suspension_balanced();
             let cpu = snapshot.cpu_sample(sampled_at_ms);
             Ok::<_, serde_json::Value>((
-                serde_json::json!({"sampled_at_ms":sampled_at_ms,"snapshot":snapshot,"desktop_failure":desktop_failure}),
+                serde_json::json!({"sampled_at_ms":sampled_at_ms,"snapshot":snapshot,"desktop_failure":desktop_failure,"module_preparation":module_preparation}),
                 cpu,
                 balanced,
+                partial_unwind,
             ))
         })();
         match observation {
             Ok(observation) => observation,
-            Err(failure) => (serde_json::json!({"failure":failure}), None, true),
+            Err(failure) => (serde_json::json!({"failure":failure}), None, true, false),
         }
     }
 
@@ -918,7 +944,8 @@ impl WindowsImageDebugSession {
         let started_ms = self.native_at_ms();
         self.native_witness.as_mut().unwrap().late_snapshot =
             Some(serde_json::json!({"started_ms":started_ms,"complete":false}));
-        let (observation, cpu, balanced) = self.capture_root_snapshot(container, deadline);
+        let (observation, cpu, balanced, partial_unwind) =
+            self.capture_root_snapshot(container, deadline);
         let cpu_difference = match (
             self.native_witness
                 .as_ref()
@@ -940,6 +967,7 @@ impl WindowsImageDebugSession {
         };
         let finished_ms = self.native_at_ms();
         let witness = self.native_witness.as_mut().unwrap();
+        witness.module_coverage_partial |= partial_unwind;
         witness.late_snapshot = Some(
             serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"observation":observation,"cpu_difference":cpu_difference,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"unsupported_module_events":witness.unsupported_module_events,"unsupported_module_reason":(witness.unsupported_module_events > 0).then_some("non_x64_native_unwind")}),
         );

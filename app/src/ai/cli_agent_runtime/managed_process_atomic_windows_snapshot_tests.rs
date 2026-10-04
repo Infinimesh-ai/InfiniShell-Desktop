@@ -263,6 +263,202 @@ fn truncated_exception_data_is_not_treated_as_a_leaf_function() {
 }
 
 #[test]
+fn partial_preparation_keeps_valid_modules_and_excludes_bad_unwind_tables() {
+    let (_good_directory, good) = leased_pe(&pe_fixture());
+    let mut bytes = pe_fixture();
+    bytes[0x124..0x128].fill(0);
+    let (_bad_directory, bad) = leased_pe(&bytes);
+    let sha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let result = prepare_partial_modules(&[
+        VerifiedModule {
+            file: &bad,
+            base: 0x10000,
+            size: 0x3000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &good,
+            base: 0x20000,
+            size: 0x3000,
+            sha256: sha,
+        },
+    ])
+    .unwrap();
+
+    assert_eq!(result.prepared.modules.len(), 1);
+    assert_eq!(result.omitted.len(), 1);
+    assert_eq!(
+        result.omitted[0].failure.reason,
+        "exception_directory_zero_mismatch"
+    );
+    assert_eq!(result.omitted[0].identity.base, 0x10000);
+    assert_eq!(result.omitted[0].identity.sha256, sha);
+    assert_eq!(result.omitted[0].directory.as_ref().unwrap().rva, 0x1000);
+    assert_eq!(result.omitted[0].directory.as_ref().unwrap().length, 0);
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    unsafe { GetFileInformationByHandle(HANDLE(bad.as_raw_handle()), &mut info) }.unwrap();
+    assert_eq!(
+        result.omitted[0].identity.volume_serial,
+        info.dwVolumeSerialNumber
+    );
+    assert_eq!(
+        result.omitted[0].identity.file_index,
+        (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow)
+    );
+    // walk 在同一 module 查询为 None 时立即停止，不能为坏表生成叶函数或地址归属。
+    assert!(result.prepared.module(0x11100).is_none());
+    assert_eq!(result.prepared.frame(0x11100, 0x80000).module_index, None);
+    assert_eq!(
+        result.prepared.frame(0x21100, 0x80000).module_index,
+        Some(0)
+    );
+}
+
+#[test]
+fn omitted_bad_module_still_participates_in_global_overlap_rejection() {
+    let mut bytes = pe_fixture();
+    bytes[0x124..0x128].fill(0);
+    let (_bad_directory, bad) = leased_pe(&bytes);
+    let (_good_directory, good) = leased_pe(&pe_fixture());
+    let sha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    let result = prepare_partial_modules(&[
+        VerifiedModule {
+            file: &bad,
+            base: 0x10000,
+            size: 0x3000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &good,
+            base: 0x12000,
+            size: 0x3000,
+            sha256: sha,
+        },
+    ]);
+
+    assert_eq!(result.err().unwrap().reason, "invalid_module_binding");
+}
+
+#[test]
+fn exception_directory_budget_and_address_failures_are_distinct() {
+    let mut oversized = pe_fixture();
+    oversized[0x124..0x128].copy_from_slice(&0xc0001u32.to_le_bytes());
+    let (_large_directory, large) = leased_pe(&oversized);
+    assert_eq!(
+        load_functions(&large, 0x3000).unwrap_err().reason,
+        "exception_directory_per_module_budget"
+    );
+
+    let mut outside = pe_fixture();
+    outside[0x120..0x124].copy_from_slice(&0x2fffu32.to_le_bytes());
+    let (_outside_directory, outside) = leased_pe(&outside);
+    assert_eq!(
+        load_functions(&outside, 0x3000).unwrap_err().reason,
+        "exception_directory_outside_image"
+    );
+}
+
+#[test]
+fn failed_exception_table_reads_do_not_refund_the_shared_budget() {
+    let (_directory, file) = leased_pe(&pe_fixture()[..0x210]);
+    let mut remaining = 24;
+    let mut directory = None;
+
+    let failure =
+        load_functions_budgeted(&file, 0x3000, &mut remaining, &mut directory).unwrap_err();
+
+    assert_eq!(failure.reason, "truncated_leased_image");
+    assert_eq!(remaining, 0);
+    assert_eq!(directory.unwrap().length, 24);
+    let mut later_directory = None;
+    let later =
+        load_functions_budgeted(&file, 0x3000, &mut remaining, &mut later_directory).unwrap_err();
+    assert_eq!(later.reason, "exception_total_budget_exhausted");
+    assert!(later_directory.is_none());
+}
+
+fn bad_large_exception_fixture(length: u32) -> Vec<u8> {
+    let mut bytes = pe_fixture();
+    bytes.resize(0x200 + length as usize, 0);
+    bytes[0x200..].fill(0);
+    bytes[0xd0..0xd4].copy_from_slice(&0x100000u32.to_le_bytes());
+    bytes[0x124..0x128].copy_from_slice(&length.to_le_bytes());
+    bytes[0x198..0x19c].copy_from_slice(&length.to_le_bytes());
+    bytes
+}
+
+#[test]
+fn omitted_tables_cannot_multiply_the_total_exception_read_budget() {
+    let (_large_directory, large) = leased_pe(&bad_large_exception_fixture(0xc0000));
+    let (_tail_directory, tail) = leased_pe(&bad_large_exception_fixture(0x40000));
+    let sha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    let result = prepare_partial_modules(&[
+        VerifiedModule {
+            file: &large,
+            base: 0x100000,
+            size: 0x100000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &large,
+            base: 0x200000,
+            size: 0x100000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &large,
+            base: 0x300000,
+            size: 0x100000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &large,
+            base: 0x400000,
+            size: 0x100000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &large,
+            base: 0x500000,
+            size: 0x100000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &tail,
+            base: 0x600000,
+            size: 0x100000,
+            sha256: sha,
+        },
+        VerifiedModule {
+            file: &large,
+            base: 0x700000,
+            size: 0x100000,
+            sha256: sha,
+        },
+    ])
+    .unwrap();
+
+    assert!(result.prepared.modules.is_empty());
+    assert_eq!(result.exception_bytes_attempted, 4_194_304);
+    assert_eq!(result.omitted.len(), 7);
+    assert_eq!(
+        result.omitted[0].failure.reason,
+        "invalid_exception_table_entry"
+    );
+    assert_eq!(
+        result.omitted[5].failure.reason,
+        "invalid_exception_table_size"
+    );
+    assert_eq!(
+        result.omitted[6].failure.reason,
+        "exception_total_budget_exhausted"
+    );
+    assert!(result.omitted[6].directory.is_none());
+}
+
+#[test]
 fn module_overlap_is_rejected_and_unknown_pc_is_not_attributed() {
     let (_directory, file) = leased_pe(&pe_fixture());
     let sha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

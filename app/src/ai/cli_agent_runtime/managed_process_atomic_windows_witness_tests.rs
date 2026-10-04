@@ -358,6 +358,51 @@ fn unreadable_module_is_not_partial_coverage() {
 }
 
 #[test]
+fn powershell_bad_unwind_table_does_not_block_root_capture_preparation() {
+    let mut bytes = module_bytes();
+    bytes[0x120..0x124].copy_from_slice(&0x1000u32.to_le_bytes());
+    let (_directory, file) = module_file(&bytes);
+    let sha = sha256_file(&mut file.try_clone().unwrap()).unwrap();
+    let modules = [VerifiedModule {
+        file: &file,
+        base: 0x10000,
+        size: 0x2000,
+        sha256: &sha,
+    }];
+
+    let (_, evidence, partial) = WitnessMode::PowerShell
+        .prepare_root_modules(&modules)
+        .unwrap();
+
+    assert!(partial);
+    let evidence = evidence.unwrap();
+    assert_eq!(
+        evidence["omitted"][0]["failure"]["reason"],
+        "exception_directory_zero_mismatch"
+    );
+    assert_eq!(evidence["exception_bytes_attempted"], 0);
+    // 同一准备入口返回 Ok，原 root 身份复核和 capture 不再被坏表前置短路；未调用原生线程 API。
+    assert!(WitnessMode::Cmd.prepare_root_modules(&modules).is_err());
+}
+
+#[test]
+fn powershell_root_capture_preparation_still_rejects_invalid_binding() {
+    let (_directory, file) = module_file(&module_bytes());
+    let modules = [VerifiedModule {
+        file: &file,
+        base: 0x10000,
+        size: 0x2000,
+        sha256: "invalid",
+    }];
+
+    assert!(
+        WitnessMode::PowerShell
+            .prepare_root_modules(&modules)
+            .is_err()
+    );
+}
+
+#[test]
 fn authorized_component_bound_imports_keep_the_original_lease() {
     let mut bytes = module_bytes();
     bytes[0x160..0x164].copy_from_slice(&0x1100u32.to_le_bytes());

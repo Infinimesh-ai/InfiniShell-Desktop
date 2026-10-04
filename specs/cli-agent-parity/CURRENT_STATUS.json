@@ -10162,5 +10162,174 @@
       "blocking_findings": 0,
       "scope": "仅两文件静态独审；Windows实际编译和原生结果待验。"
     }
+  },
+  "g09_powershell_module_binding_result_20261004": {
+    "source_commit": "9d31cdf462e96b42b32a87453837a6ea52c4c1f2",
+    "run_id": 37188635472,
+    "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37188635472",
+    "conclusion": "failure",
+    "scope": "首PowerShell单updated诊断；不代替原五场景/三独立冷恢复",
+    "ordinary_pass": {
+      "total": 1221,
+      "warp_including_i18n": 1133,
+      "command": 88
+    },
+    "required_ordinary_tests_each_once": 63,
+    "required_feature_tests_each_once": 82,
+    "new_module_binding_regressions_pass": 8,
+    "i18n_pass_included_in_warp": 11,
+    "ordinary_non_pass": {
+      "fail": 0,
+      "leak": 0,
+      "retry": 0,
+      "flaky": 0
+    },
+    "rust_warning_records_including_summaries": 95,
+    "runner_cleanup_boundary": "最后终止vctip孤儿记录保留，不称全部自然退出。",
+    "native_result": {
+      "case": "updated",
+      "accepted": false,
+      "passed": 0,
+      "failed": 1,
+      "duration_seconds": 395.55,
+      "error": "ProbeFailed",
+      "model_inputs_sent": 0
+    },
+    "cmd": {
+      "generation": "e2fc6fee-2276-4c34-8857-06413c9a98dc",
+      "stdout_bytes": 18,
+      "fixed_version_match": true,
+      "exit_code": 0,
+      "node_and_codex_created": true,
+      "warning": "CP936拒绝访问、CODEX_HOME规范化及PATH aliases警告保留。"
+    },
+    "powershell": {
+      "generation": "0fb75e7c-2b9b-4b1d-be17-c1a127d8594f",
+      "debug_events_received_validated_continued": 212,
+      "pending_event": null,
+      "module_binding_failed": false,
+      "unsupported_pe32_module_events": 6,
+      "skipped_module_events_after_limit": 17,
+      "module_coverage_partial": true,
+      "early_snapshot_started_ms": 15006,
+      "late_snapshot_started_ms": 240000,
+      "both_snapshot_failure_stage": "root_prepare_modules",
+      "both_snapshot_failure_reason": "invalid_exception_directory",
+      "thread_identity_cpu_context_stack_obtained": false,
+      "cpu_difference": "early_root_cpu_unavailable",
+      "node_or_codex_created": false,
+      "control_cancellation_ms": 289248,
+      "root_cleanup_exit_code": 1
+    },
+    "cancelled_stderr": {
+      "receipt_present": true,
+      "total_bytes": 0,
+      "captured_bytes": 0,
+      "truncated": false,
+      "boundary": "确证本轮封存文件为空；不外推系统无错误或旧SPM已经修复。"
+    },
+    "failure_boundary": "模块绑定修订已通过本轮执行；单模块异常表准备失败仍阻止原线程采样。现有错误将目录零值、预算和映像边界合并；缺少失败模块身份/目录字段，不能确定具体DLL、目录分支或PowerShell停滞根因。complete=true不是CPU/栈取证成功。",
+    "cleanup_boundary": "两代Job/AppContainer/桌面/DeviceMap/窗口站/LSA清理确认，helper均退出0；PS清理退出1与内层Interrupted保留，不称自然成功、事务通过或远端全根删除。",
+    "not_executed_cases": [
+      "old_moved",
+      "published_receipt_missing",
+      "external_change_preserved",
+      "candidate_changed_preserved"
+    ],
+    "cold_recovery_executions": 0,
+    "archive": "g08-build-preparation/9d31cdf46-windows-ci",
+    "full_log": {
+      "bytes": 683807,
+      "sha256": "a8b7fab9d17ddb8e99db0c0281d825e05d9664b032dc3f44497c12d36b6d3f75"
+    },
+    "small_extraction": {
+      "files": 72,
+      "bytes": 249929,
+      "sha256": "ffed289c3ca9c1c2092dc97f232ae97352c4df0b439120e0d189b3049eaf9831"
+    },
+    "independent_log_review_sha256": "9fb96d66bdae6330aac2c66291a549ef0d868233b59cf02390dd2c14db6bbd90",
+    "local_registered_runs_cleaned": [
+      "r-27a_xs0x",
+      "r-s41caok_",
+      "r-hmavdwel",
+      "r-_77bye1v"
+    ],
+    "next_action": "保留授权/身份/重叠/读取预算/期限，修复PS原线程采样对全模块异常表准备成功的前置依赖；实际原生根因仍未证，不盲重跑。",
+    "pending_scope_not_waived": [
+      "Unix额外ACL/安全属性",
+      "Claude Linux npm musl"
+    ],
+    "full_matrix_passed": false,
+    "final_same_commit_source_gate_passed": false,
+    "g09_closed": false,
+    "newly_closed_gaps": [],
+    "pr_remains_draft": true,
+    "localization": "仅验收记录，无需本地化变更。",
+    "final_delivery_index_sha256": "37d775f7d641c349a02394c6b3f76d82f51b16ff38955e3467f3f4204b47b0af",
+    "root_cause_review_sha256": "dcc214967d73626b240609caefdde1e11484768c9c5732288b6e4771346bbc82",
+    "output_cleanup_review_sha256": "60bbdd45fcd7013cf81286b163a9b48b93fd5cb3597ada5d7ce030e6e49df60a"
+  },
+  "g09_powershell_partial_unwind_preparation_20261004": {
+    "base_commit": "9d31cdf462e96b42b32a87453837a6ea52c4c1f2",
+    "implementation": "仅PS原线程诊断允许部分解栈模块；先整体核验身份/范围/重叠，坏表记录固定身份和异常目录及分支原因并排除，继续原CREATE主线程身份/CPU/context采样。CMD仍严格准备。",
+    "bounds": "单表768KiB、累计异常表请求4MiB、64模块、32帧、256KiB栈内存读取保持；短读/IO/解析失败不退还已扣异常表预算。4MiB不包含另有限额的PE头/节表读取。",
+    "unchanged": "原生产授权/租约/进程权限/取消/截止/暂停平衡保持；未知PC在StackWalk64前停止，不伪造解栈成功。",
+    "source_freeze_sha256": "da9c28ecb4db6fc6948a67ee0232c56af9f31f9bbb0d687a1ea1c10ca27bd1cc",
+    "source_files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs",
+        "bytes": 36363,
+        "sha256": "0a404a7de5f629acf95a7dcc6ab679c08497d6801266eaa1eae8020286ffa285"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs",
+        "bytes": 19351,
+        "sha256": "49f21fe63f4b24073b25dd2b8543d5059fc7ef2d66360ae910d09fbb1982756e"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_witness.rs",
+        "bytes": 46330,
+        "sha256": "27b594388e9c5afdf83f155db7835e216fbd80fc31361e584f15190efcf75438"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_witness_tests.rs",
+        "bytes": 16949,
+        "sha256": "060327794530a576be2920e9cd21828d34cacddc535423520264a4bfc5ab6823"
+      }
+    ],
+    "root_review_sha256": "2bf6b5337b5d07add998711de1d09b8602cb86d59a2f0a5cf25f8826bfb120ba",
+    "independent_review_sha256": "04963a0c8af9cfb00d173c42d588cc7457ff875218503e3d21ff475365b6378c",
+    "local_gates": {
+      "archive": "g08-build-preparation/g09-ps-partial-unwind-local-gates.safe.json",
+      "sha256": "a9d015c90620dd6ac8526ded6781624df78b79135847b08dbe763dc65df630cd",
+      "cargo_check": "pass",
+      "i18n_pass": 11,
+      "new_format_errors": 0,
+      "registered_runs_cleaned": [
+        "r-mfad4wlb",
+        "r-nxtoe9gi",
+        "r-4fhf4zkx"
+      ]
+    },
+    "windows_feature_tests": {
+      "expected": 89,
+      "new_regressions": 7,
+      "status": "pending",
+      "groups": {
+        "snapshot": 19,
+        "temp": 16,
+        "creation": 14,
+        "witness": 21,
+        "authorization": 2,
+        "claude": 11,
+        "environment": 6
+      }
+    },
+    "next_validation": "提交推送后绑定精确新SHA，现有Windows workflow仅首PS单updated诊断一次；先取得真实采样，再依据证据修复停滞。",
+    "boundary": "Mac门禁不编译Windows cfg；诊断修订本身不证明PowerShell停滞解决，不代替原五场景/三冷恢复、待决ACL/musl范围及最终同提交双平台门禁。",
+    "localization": "无需本地化变更；无GUI/TUI文案、布局或用户语义变化。",
+    "g09_closed": false,
+    "newly_closed_gaps": [],
+    "pr_remains_draft": true
   }
 }
