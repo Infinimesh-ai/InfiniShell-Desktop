@@ -1,7 +1,146 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
+use std::io::Read as _;
+
+use windows::Win32::Foundation::{ERROR_BROKEN_PIPE, GetHandleInformation, HANDLE_FLAG_INHERIT};
+use windows::Win32::System::Pipes::PeekNamedPipe;
 
 use super::*;
+
+fn stream_test_pipe() -> (File, File) {
+    let mut read = HANDLE::default();
+    let mut write = HANDLE::default();
+    unsafe { CreatePipe(&mut read, &mut write, None, 0) }.unwrap();
+    (File::from(owned(read)), File::from(owned(write)))
+}
+
+fn stream_test_file(value: HANDLE) -> File {
+    File::from(
+        unsafe { BorrowedHandle::borrow_raw(value.0) }
+            .try_clone_to_owned()
+            .unwrap(),
+    )
+}
+
+fn stream_flags(value: HANDLE) -> u32 {
+    let mut flags = 0;
+    unsafe { GetHandleInformation(value, &mut flags) }.unwrap();
+    flags
+}
+
+fn stream_bytes_available(value: HANDLE) -> u32 {
+    let mut available = 0;
+    unsafe { PeekNamedPipe(value, None, 0, None, Some(&mut available), None) }.unwrap();
+    available
+}
+
+#[test]
+fn private_version_stdin_reaches_eof_without_consuming_control_input() {
+    let (mut control_read, mut control_write) = stream_test_pipe();
+    control_write.write_all(b"control").unwrap();
+    let current = unsafe { GetCurrentProcess() };
+    let streams = InheritedStreams::from_handles(
+        Some(unsafe { BorrowedHandle::borrow_raw(current.0) }),
+        [
+            HANDLE(control_read.as_raw_handle()),
+            HANDLE(control_write.as_raw_handle()),
+            HANDLE(control_write.as_raw_handle()),
+        ],
+    )
+    .unwrap();
+
+    // 先用非阻塞查询确认所有写端已释放，再实际读取，避免泄漏回归令测试挂住。
+    let failure =
+        unsafe { PeekNamedPipe(streams.handles[0], None, 0, None, None, None) }.unwrap_err();
+    assert_eq!(failure.code(), HRESULT::from_win32(ERROR_BROKEN_PIPE.0));
+    assert_eq!(
+        stream_test_file(streams.handles[0]).read(&mut [0]).unwrap(),
+        0
+    );
+    drop(streams);
+
+    assert_eq!(
+        stream_bytes_available(HANDLE(control_read.as_raw_handle())),
+        7
+    );
+    let mut bytes = [0; 7];
+    control_read.read_exact(&mut bytes).unwrap();
+    assert_eq!(&bytes, b"control");
+}
+
+#[test]
+fn private_version_streams_inherit_only_eof_and_output_copies() {
+    let (input_read, input_write) = stream_test_pipe();
+    let (mut output_read, output_write) = stream_test_pipe();
+    let (mut error_read, error_write) = stream_test_pipe();
+    let current = unsafe { GetCurrentProcess() };
+    let streams = InheritedStreams::from_handles(
+        Some(unsafe { BorrowedHandle::borrow_raw(current.0) }),
+        [
+            HANDLE(input_read.as_raw_handle()),
+            HANDLE(output_write.as_raw_handle()),
+            HANDLE(error_write.as_raw_handle()),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(streams.handles.len(), 3);
+    assert_eq!(stream_flags(streams.handles[0]), HANDLE_FLAG_INHERIT.0);
+    assert_eq!(stream_flags(streams.handles[1]), HANDLE_FLAG_INHERIT.0);
+    assert_eq!(stream_flags(streams.handles[2]), HANDLE_FLAG_INHERIT.0);
+    assert_eq!(stream_flags(HANDLE(input_read.as_raw_handle())), 0);
+    assert_eq!(stream_flags(HANDLE(input_write.as_raw_handle())), 0);
+    assert_eq!(stream_flags(HANDLE(output_write.as_raw_handle())), 0);
+    assert_eq!(stream_flags(HANDLE(error_write.as_raw_handle())), 0);
+    stream_test_file(streams.handles[1])
+        .write_all(b"o")
+        .unwrap();
+    stream_test_file(streams.handles[2])
+        .write_all(b"e")
+        .unwrap();
+    assert_eq!(
+        stream_bytes_available(HANDLE(output_read.as_raw_handle())),
+        1
+    );
+    assert_eq!(
+        stream_bytes_available(HANDLE(error_read.as_raw_handle())),
+        1
+    );
+    let mut output = [0];
+    let mut error = [0];
+    output_read.read_exact(&mut output).unwrap();
+    error_read.read_exact(&mut error).unwrap();
+    assert_eq!(&output, b"o");
+    assert_eq!(&error, b"e");
+}
+
+#[test]
+fn inherited_probe_stdin_remains_connected_to_its_original_pipe() {
+    let (input_read, mut input_write) = stream_test_pipe();
+    let (output_read, output_write) = stream_test_pipe();
+    input_write.write_all(b"input").unwrap();
+    let streams = InheritedStreams::from_handles(
+        None,
+        [
+            HANDLE(input_read.as_raw_handle()),
+            HANDLE(output_write.as_raw_handle()),
+            HANDLE(output_write.as_raw_handle()),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(stream_bytes_available(streams.handles[0]), 5);
+    let mut candidate_input = stream_test_file(streams.handles[0]);
+    let mut bytes = [0; 5];
+    candidate_input.read_exact(&mut bytes).unwrap();
+    assert_eq!(&bytes, b"input");
+    drop(input_write);
+    let failure =
+        unsafe { PeekNamedPipe(streams.handles[0], None, 0, None, None, None) }.unwrap_err();
+    assert_eq!(failure.code(), HRESULT::from_win32(ERROR_BROKEN_PIPE.0));
+    assert_eq!(candidate_input.read(&mut [0]).unwrap(), 0);
+    drop(output_read);
+}
 
 #[test]
 fn profile_environment_replaces_one_case_insensitive_value_without_mutating_input() {

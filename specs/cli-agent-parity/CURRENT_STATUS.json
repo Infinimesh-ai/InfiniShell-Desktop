@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。926729445的Windows单updated诊断0通过/1失败：CMD固定版本18字节输出、退出0但拒绝访问和CODEX_HOME别名警告保留；PS在LOAD序号91约4138ms被诊断module_binding Other提前阻止，无Node/Codex、CLR或早晚快照。两代Job/AppContainer/窗口站/LSA清理确认；没有取消stderr收据，不推断stderr为空，也不称旧SPM或停滞已修复或复现。诊断绑定修订已通过本机check和i18n，Windows仍待验；原完整五场景/三冷恢复、最终同提交双平台源码门禁仍未完成，额外ACL/Claude musl范围冲突待用户决定。",
+  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR #22保持草稿。a2743b4d9的Windows单updated验收仍为0通过/1失败；PS已取得同原主线程的两次CPU/context和相同32帧，栈顶精确对应NtReadFile/ReadFile，具体读取句柄未知。源码确认无输入候选仍继承开放stdin，独立EOF输入修复已完成并通过本机门禁，真实Windows待验；不提前称PowerShell已修。CMD版本成功但警告保留，两代原生资源清理已证。原五场景/三冷恢复、最终同冻结源码双平台门禁和额外ACL/Claude musl待决范围仍未完成。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -1113,14 +1113,14 @@
     },
     "g09_progress": {
       "status": "open",
-      "audit_ref": "g09_scope_audit_20261002",
+      "audit_ref": "g09_powershell_read_wait_result_20261004",
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "Mac已支持安装合同的消费者和英中功能链已有证据；926729445单updated诊断在PS的LOAD诊断绑定提前失败，CMD正确版本退出0但拒绝访问警告保留，两代资源清理成功。未取得PS早晚快照/CLR/Node，不证明旧SPM或停滞已修复或复现；witness.cancelled不是控制取消证明，缺取消stderr收据不等于零stderr。诊断绑定修订已通过本机check/i18n，Windows编译、回归和真实PS仍待验；后4场景/3冷恢复未执行，完整事务和最终同提交双平台源码门禁未完成。额外ACL/Claude musl原范围冲突待用户回答，不能自行豁免或无条件声称仅剩Windows。",
-      "latest_result_ref": "g09_powershell_diagnostic_result_20261004",
-      "latest_result_source_commit": "9267294457f1fbe0cc6c3ee4a55579ef7138c728",
-      "latest_preparation_ref": "g09_powershell_module_binding_fix_20261004"
+      "boundary": "Mac已支持安装合同的消费者和英中链已有证据。a274单updated仍ProbeFailed：PS两次原主线程采样CPU增量0、32帧相同，精确符号为NtReadFile/ReadFile，具体handle及持续等待未证；源码确认无输入候选继承开放stdin。候选独立EOF修复已实现，本机Mac编译/i18n及Windows目标含测试类型检查通过，实际Windows验证待执行。CMD版本成功但警告保留，两代资源清理与PS取消stderr原文件为空均有原件。后四场景/三冷恢复未执行，原完整事务与最终同冻结源码双平台门禁未完成；额外ACL/Claude musl原范围冲突仍待用户决定。",
+      "latest_result_ref": "g09_powershell_read_wait_result_20261004",
+      "latest_result_source_commit": "a2743b4d9ee3317d008378a4904bddb52c0da3bd",
+      "latest_preparation_ref": "g09_version_candidate_stdin_eof_fix_20261004"
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -10331,5 +10331,43 @@
     "g09_closed": false,
     "newly_closed_gaps": [],
     "pr_remains_draft": true
+  },
+  "g09_powershell_read_wait_result_20261004": {
+    "source_commit": "a2743b4d9ee3317d008378a4904bddb52c0da3bd",
+    "run_id": 37194438248,
+    "result": "failure",
+    "newly_closed_items": [],
+    "ordinary_gate": "1221 PASS（warp1133、command88）；63必需各一次PASS，i18n11包含在warp内；普通FAIL/LEAK/RETRY/FLAKY/TIMEOUT均0。",
+    "feature_gate": "89逐名各一次ok（19/16/14/21/2/11/6），新增7项均通过；与普通配置分别计证。",
+    "warnings": "95条Rust warning记录（包含重复汇总）与1条Actions Node20提示保留；runner报告终止vctip，不称全进程自然退出。",
+    "native_result": "仅updated：0 PASS/1 FAIL、395.13秒、ProbeFailed、模型输入0；其他4场景/3冷恢复未执行。",
+    "original_thread": "PS PID8776/TID29824与原出生身份一致；15.247秒和240.237秒CPU累计kernel937500/user2343750均不变，32帧和context相同，暂停0/恢复1平衡。顶两帧经相同SHA PE、PDB GUID/age/节头及pdata范围绑定为NtReadFile/ZwReadFile+0x14、ReadFile+0x8d；具体句柄与整个间隔连续阻塞未证。",
+    "partial_unwind": "同一模块异常表865980字节超过768KiB单表预算，已省略并取得采样；不是已证坏DLL或总预算耗尽。6次PE32和17次容量跳过保留部分覆盖；32帧上限和GetThreadDesktop拒绝仍保留。",
+    "output_cleanup": "CMD真实Node/Codex退出0并输出18字节固定版本，拒绝访问/CODEX_HOME/PATH警告保留；PS无Node/Codex，210事件全部验证并继续，pending空，292651ms原控制取消。PS取消stderr total/captured为0、无截断；两代Job/AppContainer/desktop/DeviceMap/窗口站/LSA/helper清理确认。内层Interrupted保留，不外推远端整个根删除。",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/a2743b4d9-windows-ci",
+    "final_index_sha256": "7f3d8da15d7d455cf66a7b6a5cc568747728da5e5f11952b681ed731ba1dbbc5",
+    "native_review_sha256": "08adb2db494702855ced46bc387b34736dd18fde970bae8a560fc067af8a7b56",
+    "output_cleanup_review_sha256": "ad202b40e431f4fb5b932fa116df6ae57c4650e5c696589962327717fb8b2019",
+    "symbol_review_sha256": "9df5fd983dea2493684503d7b5f69fa9f8fd62fa9f3117db33dba968740dd855",
+    "originals": "官方两ZIP API大小/SHA/CRC已核；79成员哈希、72小件283909字节及50精确Git源码复核；观察/抽取/审计本机短根归档清理。",
+    "next": "依据无输入候选开放stdin的生命周期缺陷修复独立EOF；不放宽权限或延长期限。原完整五场景/三冷恢复及最终同源双平台门禁仍须通过。",
+    "localization": "无需本地化变更。"
+  },
+  "g09_version_candidate_stdin_eof_fix_20261004": {
+    "base_head": "a2743b4d9ee3317d008378a4904bddb52c0da3bd",
+    "status": "implemented_local_gates_passed_windows_functional_matrix_pending",
+    "changed_source_files": [
+      "crates/command/src/windows_appcontainer.rs",
+      "crates/command/src/windows_appcontainer_tests.rs"
+    ],
+    "behavior": "仅私有站无输入版本候选使用独立匿名管道，启动前关闭唯一写端；不触碰宿主stdin生命周期或独立TCP取消/授权，三流白名单与句柄关闭规则保持。",
+    "new_windows_tests": 3,
+    "local_gate_index": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-version-stdin-eof-local-gates.safe.json",
+    "local_gate_index_sha256": "d41416c9b4c6f5940b16570c4a264590d46e308dea072d4a9a705da95f25f5a2",
+    "checks": "cargo check --locked -p warp；cargo check --locked -p command --tests --target x86_64-pc-windows-msvc；i18n11；定向rustfmt及diffcheck通过。全部登记短根已清。",
+    "independent_review_sha256": "202e07daaae16df5d7bf5f2a52b42051b984f67b7fc8b6b8328984301fec84ba",
+    "localization": "无需本地化变更：内部句柄处理与回归，不改GUI/TUI文案或布局。",
+    "next": "直接恢复既有原完整5场景/3独立冷恢复的功能验收，witness=false；普通Windows nextest沿既有重试配置并完整记录RETRY/FLAKY，原生矩阵零自动重试。无新近似探针。",
+    "G09_closed": false
   }
 }

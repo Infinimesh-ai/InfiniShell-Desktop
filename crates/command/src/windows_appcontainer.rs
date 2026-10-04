@@ -42,6 +42,7 @@ use windows::Win32::System::JobObjects::{
     JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
+use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
     CREATE_NEW_CONSOLE, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
     CreateProcessW, DEBUG_PROCESS, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
@@ -489,16 +490,40 @@ impl<'a> InheritedStreams<'a> {
         parent: Option<BorrowedHandle<'a>>,
         output: Option<&CapturedOutput>,
     ) -> io::Result<Self> {
+        let original =
+            [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE].map(|stream| {
+                match (stream, output) {
+                    (STD_OUTPUT_HANDLE, Some(output)) => Ok(output.stdout_handle()),
+                    (STD_ERROR_HANDLE, Some(output)) => Ok(output.stderr_handle()),
+                    _ => unsafe { GetStdHandle(stream) }.map_err(io::Error::other),
+                }
+            });
+        let [input, output, error] = original;
+        Self::from_handles(parent, [input?, output?, error?])
+    }
+
+    fn from_handles(
+        parent: Option<BorrowedHandle<'a>>,
+        mut original: [HANDLE; 3],
+    ) -> io::Result<Self> {
+        // 私有站版本候选没有输入；独立 EOF 不能关闭监督者用于控制生命周期的 stdin。
+        // 原管道两端均不可继承，唯一写端在复制读端之前释放。
+        let input = if parent.is_some() {
+            let mut read = HANDLE::default();
+            let mut write = HANDLE::default();
+            unsafe { CreatePipe(&mut read, &mut write, None, 0) }.map_err(io::Error::other)?;
+            let read = owned(read);
+            drop(owned(write));
+            original[0] = handle(&read);
+            Some(read)
+        } else {
+            None
+        };
         let mut result = Self {
             parent,
             handles: Vec::new(),
         };
-        for stream in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
-            let original = match (stream, output) {
-                (STD_OUTPUT_HANDLE, Some(output)) => output.stdout_handle(),
-                (STD_ERROR_HANDLE, Some(output)) => output.stderr_handle(),
-                _ => unsafe { GetStdHandle(stream) }.map_err(io::Error::other)?,
-            };
+        for original in original {
             let mut duplicate = HANDLE::default();
             unsafe {
                 DuplicateHandle(
@@ -514,6 +539,7 @@ impl<'a> InheritedStreams<'a> {
             .map_err(io::Error::other)?;
             result.handles.push(duplicate);
         }
+        drop(input);
         Ok(result)
     }
 
@@ -713,7 +739,8 @@ impl AppContainerProbe {
         )
     }
 
-    /// 新站由精确绑定的两段 helper 持有；仅向本轮 AppContainer SID 授权。
+    /// 新站由精确绑定的两段 helper 持有；无输入版本候选从独立管道立即获得 EOF。
+    /// 仅向本轮 AppContainer SID 授权，监督者的标准输入与取消生命周期保持不变。
     pub fn spawn_package_suspended_with_station(
         program: &Path,
         cwd: &Path,

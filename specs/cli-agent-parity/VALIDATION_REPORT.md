@@ -1,5 +1,25 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 无输入版本候选提供独立 EOF
+
+修复限定`windows_appcontainer.rs`和对应测试：私有站版本候选使用新的匿名输入管道，启动前释放唯一写端；原宿主stdin、TCP取消授权、三流继承及远端关闭流程保持。新增3项Windows真实管道回归，先用非阻塞查询核无写端再读取EOF，并检查原输入未消费、输出通路及普通继承保持。实际Windows执行尚待验收；本地交叉类型检查不冒充测试通过。
+
+`cargo check --locked -p warp`、Windows目标`command --tests`类型检查、i18n11及定向格式通过，登记短根归档清理。门禁索引`g09-version-stdin-eof-local-gates.safe.json` SHA `d41416c9b4c6f5940b16570c4a264590d46e308dea072d4a9a705da95f25f5a2`；两文件独审SHA `202e07daaae16df5d7bf5f2a52b42051b984f67b7fc8b6b8328984301fec84ba`，无静态阻断。无需本地化变更：内部句柄生命周期和开发测试，无GUI／TUI文案与布局变化。
+
+下一步直接恢复既有五场景／三独立冷恢复功能验收，`witness=false`，不新增相近探针。原生矩阵不自动重试；普通Windows nextest保留原配置，实际RETRY／FLAKY逐条计证，不称整轮零重试。此修复尚未证明a274的ReadFile句柄就是stdin或PowerShell已恢复。**新增关闭0项，G09及最终同冻结源码双平台门禁仍开放，PR保持草稿。**
+
+## 2026-10-04：G09 取得原线程读取栈，更新仍未通过
+
+精确 `a2743b4d9ee3317d008378a4904bddb52c0da3bd` 的 [Windows run 37194438248](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37194438248) 正式 failure。普通 1221 PASS（warp1133／command88），63 必需各一次 PASS，i18n11包含其中；feature89及新增7各一次ok，两种配置分别计证。普通 FAIL／LEAK／RETRY／FLAKY／TIMEOUT 均0，95条Rust warning及1条Actions提示保留。唯一失败步骤为真实npm更新，单updated为0 PASS／1 FAIL、395.13秒、ProbeFailed；其余四场景和三次冷恢复未执行。
+
+本轮成功取得同出生身份的PS原主线程：15.247秒与240.237秒CPU累计计数相同、32帧及寄存器相同，暂停／恢复平衡。重新核验既有同SHA原PE、微软PDB的GUID／age／节头及唯一pdata范围，顶两帧分别为`NtReadFile/ZwReadFile+0x14`和`ReadFile+0x8d`。具体读取句柄、整个间隔连续阻塞及其他线程状态未证；不把两点零CPU推断成全进程死锁。单个异常表865980字节超过768KiB预算被省略，未放大预算；PE32／容量遗漏、32帧上限及desktop查询拒绝继续记录为部分覆盖。
+
+源码独审确认无输入版本候选仍继承宿主开放stdin，消费者等待stdout结束后才关闭输入；提前关闭监督者stdin又会触发原取消路径。下一修复只给私有站版本候选独立EOF管道，保留监督者与TCP取消生命周期、三流白名单、原权限、官方入口及期限。当前ReadFile句柄未直接绑定stdin，因此此修复针对已证生命周期缺陷，实际PowerShell效果待验。
+
+CMD真实Node／Codex退出0、输出18字节固定版本，但拒绝访问／CODEX_HOME／PATH警告保留。PS无Node／Codex，210调试事件全验证并继续、pending空，292651ms原控制取消；取消stderr原文件total/captured均0且无截断。两代Job、AppContainer、desktop、DeviceMap、窗口站、LSA和helper清理确认；内层Interrupted和runner终止vctip原文保留，不外推整个远端目录已删除。
+
+终审索引`a2743b4d9-windows-ci/final-delivery-index.safe.json`（47612字节，SHA `7f3d8da15d7d455cf66a7b6a5cc568747728da5e5f11952b681ed731ba1dbbc5`）绑定50份精确源码、两官方ZIP、79成员／72份小件283909字节、逐名日志、原生／输出清理／符号独审；本机观察与审计短根已归档清理。符号独审SHA `9df5fd983dea2493684503d7b5f69fa9f8fd62fa9f3117db33dba968740dd855`。无需本地化变更。**新增关闭0项，保持10关闭／G09开放／V01、V02、V05移交不计通过；完整矩阵、待决范围和最终同冻结源码双平台门禁仍未完成，PR保持草稿。**
+
 ## 2026-10-04：G09 部分解栈准备修订，Windows 待验
 
 针对 9d31 两次 `invalid_exception_directory` 阻止原线程采样，仅修订四个 feature 诊断／测试文件。PS 先核验全部模块来源、大小、身份及地址集合，坏表仍参与重叠拒绝；随后省略坏表并记录固定身份、异常目录数值及具体失败分支。部分或零可解栈模块都能进入原 CREATE 线程身份、CPU 和 context 路径；未知 PC 在 StackWalk64 前停止，不把省略模块算作可解栈。CMD 仍严格拒绝。单表 768KiB、累计异常表请求 4MiB、64 模块、32 帧及 256KiB 栈读取预算保持；异常表请求在读取前扣除，短读／IO／解析失败不退还，PE 头／节表另有原限额。生产授权、租约、权限、取消、截止和暂停平衡均未改。
