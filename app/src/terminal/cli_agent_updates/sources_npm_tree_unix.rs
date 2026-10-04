@@ -1111,11 +1111,18 @@ impl Directory {
                 )
             } else {
                 let parent = path.parent().ok_or(Error::InvalidRelease)?;
-                let (_, _, parent_acl) = permissions.get(parent).ok_or(Error::InvalidRelease)?;
+                let (_, parent_gid, parent_acl) =
+                    permissions.get(parent).ok_or(Error::InvalidRelease)?;
                 let (inherited, mode) = parent_acl
                     .inherit(node.sha256.is_none(), default_mode)
                     .map_err(|_| Error::UnsupportedSource)?;
-                (mode, old.root.gid, inherited)
+                // Mac 新对象继承直接父目录的组；Linux 保留既有安装器的包根组策略。
+                let gid = if cfg!(target_os = "macos") {
+                    *parent_gid
+                } else {
+                    old.root.gid
+                };
+                (mode, gid, inherited)
             };
             permissions.insert(path.clone(), desired);
         }

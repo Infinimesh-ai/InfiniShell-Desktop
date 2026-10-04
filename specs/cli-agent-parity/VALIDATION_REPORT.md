@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：Mac 只读 ACL 真实升级与冷恢复通过独审
+
+`b5d9d9fb689d470c40c2abb50bfc0c11bcb63767` 的 `r-t3ha378w` 仅运行 `updated` 与 `swap_receipt_missing`：公开入口升级至2.1.280；交换收据缺失后由独立进程恢复2.1.278，恢复后完整快照与更新前逐字节相同。两场景的before／prepared／after均为15节点、11文件；原权限和非空只读ACL逐项保持，实际四份官方tgz的SRI及成员内容已独立重核。真实路径集合未增加，不将本轮计为新增路径继承验收。
+
+两代候选的manifest、launch、exit、coalition和原生输出配对，均退出0并确认清理。签名后worker和supervisor完整原字节均已归档；19项绑定源码逐个对照b5 Git blob，不使用后续工作树。短根先保全小证据，再确认进程／launchd／打开文件释放；只对两个精确0500私有快照目录补owner写位且复核ACL不变，最后按登记身份清理。独审 `g09-claude-npm-acl-macos-runs/r-t3ha378w/independent-native-acl-review.safe.json` SHA `c0a7d802e3143f687b494a61a5b8ff88f585e8ae1bd6f2b45211557383ed5ad5`；根复核30份小原件、冷恢复完整快照及清理登记，SHA `111a3076ef0b08918a312fe942c053194378505f49f6665bc1b12f287f5e9842`。这是两场景／一次冷恢复，未重跑原五场景、GUI或模型。
+
+新增路径审查发现Mac子目录与包根gid不同的确定缺陷。先运行真实内核组继承基准的红测 `r-bh6r4shq`，新文件错误取得20而非父目录12，失败日志 SHA `15f9f1b3e4a0da02670fce6168c80b79b56d9be0d701997ca24c10fe56a02377` 已保留；现仅将Mac新节点组来源改为最终直接父目录，既有节点原gid及Linux历史包根组策略保持。修复后更新379/379（`r-hcnt3_8v`，日志SHA `0ca9e538df973d3d884da3c8c5d039f883ce4fe22cbb2c2b90d48471ada22a29`）、i18n11/11（`r-t50ilrd0`）及 `cargo check --locked -p warp`（`r-ubbxsw_k`）通过，短根均已清理。两文件独审SHA `5fcab89654b1393e4a5abf6e7b9d91325076aabb6da074b65a51a915dc7db2c1`，本轮门禁索引 `g09-mac-parent-gid-local-gates-v1.safe.json` SHA `a9cc25cc51cad662325d81e6078c0a5f7c0d75732f9c6cb599b5515307c84510`。不将前述b5真实事务重标为新源码重跑。
+
+Linux源码门禁 [37215103046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37215103046) 绑定b5，仅Linux／source_gate_only，25输入已核；尚无终态，不是最终双平台门禁。Windows `37209945616` 原完整矩阵失败仍保留，缺少PS启动Node时具体失败操作／错误码，或实际重定向与标准流对象事实；不凭CREATE顺序推定ShellExecute回退，不重复相近探针。额外安全属性范围仍待用户决定。英中安装来源、权限、变更和恢复提示已复核，无需本地化变更，无布局变化。**本轮新增关闭0项；10关闭／G09开放／V01、V02、V05移交，PR保持草稿。**
+
 ## 2026-10-04：G09 Unix 只读 ACL 实现通过本机门禁，真实事务待验
 
 Windows a5 原生终审补充：三个正式ZIP均重核API摘要、长度和全部CRC；71份小原件257716字节已独审。首 `updated` 仍为 `ProbeFailed`：CMD退出0／18字节正确版本，PS根7836ms退出1，Codex在10732ms才创建，后续Codex／Node分别退出0；PS捕获stdout为0字节。202／415个事件均验证及Continue，pending为空，未观察控制取消；两代原生退出与Job、AppContainer、helper、desktop、DeviceMap、窗口站及LSA清理全部确认。后四场景／三冷恢复未执行。新空输入／流式输出参数由精确源码和实际启动代次绑定，未单列最终命令行、ExpectingInput或管道句柄，不能把语法意图当作同步捕获证明。与旧2d9相比，PS根由0变1而零输出及提前退出仍在；不由此推定ShellExecute分支、保留初始LASTEXITCODE或CLR异常根因。独审 SHA `f9ea149c550e3eeaa258bd6a7367ef0806e8ba3cf06c38470302b55f16fe27fc`，小原件索引 SHA `bca8978a66be934b840cd8bad7448f0ab0996a0fdaa6406f56a2f8be84a3c9c5`，均位于 `g09-ps-pipeline-full-matrix-a5ecc6848-ci`。

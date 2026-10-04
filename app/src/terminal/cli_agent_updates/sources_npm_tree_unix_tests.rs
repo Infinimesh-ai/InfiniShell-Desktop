@@ -227,6 +227,66 @@ fn replacement_preserves_existing_acl_and_inherits_new_members_before_exchange()
     assert!(!root.join("stage").exists());
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn new_members_inherit_the_final_parent_group_on_macos() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let old = directory(&root, "package", b"old");
+    let old_child = old.create(OsStr::new("existing-directory")).unwrap();
+    let root_gid = old.file.metadata().unwrap().gid();
+    let count = unsafe { libc::getgroups(0, std::ptr::null_mut()) };
+    assert!(count > 0, "异组继承验收需要真实的补充组");
+    let mut groups = vec![0; count as usize];
+    assert_eq!(
+        unsafe { libc::getgroups(count, groups.as_mut_ptr()) },
+        count
+    );
+    let child_gid = groups
+        .into_iter()
+        .find(|gid| *gid != root_gid)
+        .expect("异组继承验收需要当前用户属于另一个组");
+    assert_eq!(
+        unsafe { libc::fchown(old_child.file.as_raw_fd(), libc::geteuid(), child_gid) },
+        0
+    );
+    let inherited = set_readonly_acl(&old_child.file, true);
+    // 同一父目录下的原生创建提供组继承基准，不从权限计划计算预期。
+    let native_file = root.join("package/existing-directory/native-reference");
+    fs::write(&native_file, b"native group").unwrap();
+    assert_eq!(fs::metadata(&native_file).unwrap().gid(), child_gid);
+    let original = old.snapshot().unwrap();
+    let new = directory(&root, "stage", b"new");
+    fs::create_dir_all(root.join("stage/existing-directory/new-directory")).unwrap();
+    for path in [
+        "existing-directory/new-file",
+        "existing-directory/new-directory/new-file",
+    ] {
+        fs::write(root.join("stage").join(path), b"new member").unwrap();
+    }
+
+    new.apply_permissions(&original, &BTreeMap::new()).unwrap();
+    let prepared = new.snapshot().unwrap();
+    assert_eq!(prepared.root.gid, root_gid);
+    assert_eq!(
+        prepared.nodes[Path::new("existing-directory")].identity.acl,
+        inherited.into_optional()
+    );
+    for path in [
+        "existing-directory",
+        "existing-directory/new-file",
+        "existing-directory/new-directory",
+        "existing-directory/new-directory/new-file",
+    ] {
+        assert_eq!(
+            prepared.nodes[Path::new(path)].identity.gid,
+            child_gid,
+            "{path}"
+        );
+    }
+    assert_eq!(old.snapshot().unwrap(), original);
+}
+
 #[test]
 fn acl_change_after_snapshot_preserves_backup_for_recovery() {
     let temporary = tempfile::tempdir().unwrap();
