@@ -182,7 +182,7 @@ def main():
     settings.write_text(json.dumps({"disableAllHooks": True, "enableAllProjectMcpServers": False,
         "permissions": {"defaultMode": "default", "ask": ["Skill"],
                         "deny": ["Bash", "Read", "Edit", "Write", "Grep", "Glob", "WebFetch", "WebSearch",
-                                 "Agent", "Task", "NotebookEdit", "TodoWrite", "mcp__*"]}}) + "\n")
+                                 "Agent", "Task", "NotebookEdit", "TodoWrite", "ToolSearch", "mcp__*"]}}) + "\n")
     settings_hash = digest(settings)
     marker = (".infinishell-claude-image-multi-skill-probe" if args.multi
               else ".infinishell-claude-image-skill-probe")
