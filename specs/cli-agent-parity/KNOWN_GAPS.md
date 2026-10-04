@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | Mac 消费者已验；5d Windows首场景updated失败：CMD版本候选成功但保留CODEX_HOME拒绝访问警告，PS初始化失败且未创建Node。两代Job/AppContainer/站/LSA清理成功；后4场景、3冷恢复和最终同提交门禁未完成，不计关闭 |
+| G09 | 开放 | Mac 消费者已验；542 Windows首场景updated失败：CMD版本候选成功但保留CODEX_HOME拒绝访问警告，PS未创建Node并在期限后取消。最终Job/AppContainer/站/LSA清理成功，但取消路径未保留PS自身stderr，停滞根因未证；后4场景、3冷恢复和最终同提交门禁未完成 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -277,6 +277,9 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-04 定向诊断已准备，未新增关闭**：取消时最多保全 8192 字节原 stderr；仅首 PS 原主线程 15/240 秒配对快照，额外诊断模块上限不放宽原映像授权。工作流复用既有 scope 保持 25 输入与默认 CMD。本机 check、Windows command 类型检查、中英文 11、驱动 22／范围 8 与语法检查通过；门禁索引 SHA `43406b6dc7537b6afae035d1c31958e931f63ce921844e86fcd9d0e4029d11cb`。无需本地化变更。实际取证、原 5 场景／3 冷恢复与最终同源门禁仍未通过。
+- **2026-10-04 路径修订后仍停在 PowerShell，原矩阵失败**：精确 `542a2d81a` 的 [run 37178488175](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37178488175) 为 failure。普通 1217 PASS、59 必需逐名各一次 PASS、i18n 11，通过范围不含原生更新；原生首 `updated` 为 0 PASS／1 FAIL、386.17 秒。CMD 实际输出固定版本并退出 0，既有警告保留；PS 未创建 Node，在原期限后控制取消，最终 exit 1。最初 16 条 first-chance CLR 事件、3 条溢出不足以确定根因。两代最终 Job／AppContainer／站／LSA 回收已证，但 PS 内层 Interrupted 仍保留；取消检查使原 stderr 在读取前关闭删除，不能据宿主日志缺文认定旧 SPM 问题已解除。49 份精确源码及 23 份小原件根审 SHA `0a773146053f7c80b804cff52221e9ce1d146bf116d6b4603bb65fa907640b4c`，日志独审 SHA `13a317bbab6c69d4fcd6e1bfca48021ddb44fe55333822b1b1115b2d29c985a5`；原件位于仓外 `g08-build-preparation/542a2d81a-windows-ci`。后四场景、三冷恢复与最终同源门禁未完成；先补有界取消 stderr 和首 PS 线程取证，不将诊断准备计为缺口关闭。
 
 - **2026-10-04 启动路径兼容修复待原生验收，仍开放**：helper 最终 application 路径对齐 Rust 1.92 的短路径规范化，直接核同 FileID；canonical 请求、argv0、映像租约与原审核不变。另保留最初 16 条 CLR HRESULT，避免被后续事件覆盖；不改变权限或期限，不称完整内层异常链。Mac check、Windows command 测试类型检查、i18n 11、Python 21 通过，门禁索引 SHA `69ae482c4d7d794714afd56f3e975c190371bce4a6bf05c30315fe61ac7e6097`。来源 49 份、必选 59 项已接线，原矩阵实际结果待验，尚不能认定 PowerShell 故障解决。无需本地化变更，新增关闭 0 项。
 

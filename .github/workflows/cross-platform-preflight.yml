@@ -105,7 +105,7 @@ on:
         default: false
         type: boolean
       run_windows_npm_native_witness:
-        description: 仅固定 Codex npm 首 CMD 候选的取消前原生因果取证；不计完整验收
+        description: 仅固定 Codex npm 首个选定模式候选的取消前原生取证；不计完整验收
         required: true
         default: false
         type: boolean
@@ -120,7 +120,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 专项范围；g09_image_contract 只读固定系统映像，其他选项保留原生调试或 hooks 验证
+        description: Windows 专项范围；g09_image_contract 只读固定映像，g09_npm_powershell 选择首 PS 快照
         required: true
         default: all
         type: choice
@@ -133,6 +133,7 @@ on:
           - g09_stdio_lifetime
           - codex_hooks
           - g09_image_contract
+          - g09_npm_powershell
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -183,6 +184,8 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("windows_atomic_debug_scope") == "g09_npm_powershell" and not inputs.get("run_windows_npm_native_witness", False):
+              sys.exit("PowerShell 原生取证范围必须显式开启限定 witness")
           if inputs.get("windows_atomic_debug_scope") == "g09_stdio_lifetime":
               required = {"run_windows", "run_atomic_windows_debug"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -203,10 +206,10 @@ jobs:
                   sys.exit("固定 Codex hooks 复验只允许单独 Windows 范围：" + ", ".join(sorted(conflicts)))
           if inputs.get("run_windows_npm_native_witness", False):
               required = {"run_windows", "windows_grok_installer_only", "run_windows_codex_npm_updates", "run_windows_npm_native_witness"}
-              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "all", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "g09_npm_powershell" if inputs.get("windows_atomic_debug_scope") == "g09_npm_powershell" else "all", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
               conflicts = [name for name, value in inputs.items() if name not in required and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if conflicts or not all(inputs.get(name, False) for name in required):
-                  sys.exit("原生因果取证只允许单独 Windows 首 CMD 范围：" + ", ".join(sorted(conflicts)))
+                  sys.exit("原生取证只允许单独 Windows 首个选定模式范围：" + ", ".join(sorted(conflicts)))
           if not inputs.get("source_gate_only", False):
               sys.exit(0)
           allowed = {"source_gate_only", "run_linux", "run_windows"}
@@ -2080,7 +2083,7 @@ jobs:
             $unitBinary = $executables[0]
             $listedTests = @(& $unitBinary --list)
             if ($LASTEXITCODE -ne 0) { throw 'Witness unit test discovery failed' }
-            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::native_snapshot::temp_path::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'sources::claude_downgrade::tests::', 'sources::npm_windows::live_tests::windows_npm_witness_environment_')) {
+            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::native_snapshot::temp_path::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'managed_process::tests::native_witness_', 'sources::claude_downgrade::tests::', 'sources::npm_windows::live_tests::windows_npm_witness_environment_')) {
               if (@($listedTests | Where-Object { $_.Contains($filter) -and $_.EndsWith(': test') }).Count -eq 0) { throw "Missing witness unit group: $filter" }
               & $unitBinary $filter --test-threads=1
               if ($LASTEXITCODE -ne 0) { throw "Witness unit group failed: $filter" }
@@ -2111,7 +2114,11 @@ jobs:
           $npmPath = Join-Path (Split-Path -Parent $nodePath) 'node_modules/npm/bin/npm-cli.js'
           if (-not (Test-Path -LiteralPath $npmPath -PathType Leaf)) { throw 'Fixed Node npm entry is missing' }
           $witnessArguments = @()
-          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $witnessArguments = @('--native-witness', '--case', 'updated') }
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') {
+            $witnessMode = 'cmd'
+            if ('${{ inputs.windows_atomic_debug_scope }}' -eq 'g09_npm_powershell') { $witnessMode = 'powershell' }
+            $witnessArguments = @('--native-witness', '--native-witness-mode', $witnessMode, '--case', 'updated')
+          }
           python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --station-bootstrap $stationBootstrap --station-bootstrap-sha256 (Get-ParityDigest $stationBootstrap) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath) @witnessArguments
           if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm transaction failed; original receipts are preserved' }
 

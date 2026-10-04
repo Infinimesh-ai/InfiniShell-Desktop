@@ -1568,3 +1568,84 @@ fn authoritative_child_image_is_bound_to_transaction_and_rejects_invalid_identit
         assert!(original.clone().with_child_image(bad).is_err());
     }
 }
+
+#[cfg(all(windows, feature = "cli-agent-native-witness"))]
+#[test]
+fn native_witness_claims_only_the_first_selected_powershell_generation() {
+    let claimed = AtomicBool::new(false);
+    let kind = Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1);
+    assert_eq!(
+        claim_native_witness(
+            kind,
+            Some("cmd"),
+            Some("codex-npm-first-powershell-v1"),
+            &claimed
+        ),
+        None
+    );
+    assert!(!claimed.load(Ordering::Acquire));
+    assert_eq!(
+        claim_native_witness(
+            kind,
+            Some("powershell"),
+            Some("codex-npm-first-powershell-v1"),
+            &claimed
+        ),
+        Some("powershell")
+    );
+    assert_eq!(
+        claim_native_witness(
+            kind,
+            Some("powershell"),
+            Some("codex-npm-first-powershell-v1"),
+            &claimed
+        ),
+        None
+    );
+}
+
+#[cfg(all(windows, feature = "cli-agent-native-witness"))]
+#[test]
+fn native_witness_claim_rejects_wrong_kind_mode_or_permit_without_consuming() {
+    let claimed = AtomicBool::new(false);
+    let kind = Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1);
+    assert_eq!(
+        claim_native_witness(None, Some("cmd"), Some("codex-npm-first-cmd-v1"), &claimed),
+        None
+    );
+    assert_eq!(
+        claim_native_witness(
+            kind,
+            Some("powershell"),
+            Some("codex-npm-first-cmd-v1"),
+            &claimed
+        ),
+        None
+    );
+    assert_eq!(
+        claim_native_witness(
+            kind,
+            Some("pwsh"),
+            Some("codex-npm-first-powershell-v1"),
+            &claimed
+        ),
+        None
+    );
+    assert_eq!(
+        claim_native_witness(kind, Some("cmd"), Some("codex-npm-first-cmd-v1 "), &claimed),
+        None
+    );
+    assert_eq!(
+        claim_native_witness(kind, Some("cmd"), None, &claimed),
+        None
+    );
+    assert!(!claimed.load(Ordering::Acquire));
+    assert_eq!(
+        claim_native_witness(kind, Some("cmd"), Some("codex-npm-first-cmd-v1"), &claimed),
+        Some("cmd")
+    );
+    assert_eq!(
+        claim_native_witness(kind, Some("cmd"), Some("codex-npm-first-cmd-v1"), &claimed),
+        None
+    );
+}

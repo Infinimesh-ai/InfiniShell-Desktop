@@ -1743,24 +1743,29 @@ async fn spawn_configured_inner(
     }
     let manifest_path = directory.join("manifest.json");
     let mut command = Command::new(worker);
-    #[cfg(all(windows, feature = "cli-agent-native-witness"))]
-    command.env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION");
+    #[cfg(windows)]
+    command
+        .env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW")
+        .env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION")
+        .env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE");
     #[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
     {
-        // 仅显式原生测试驱动的首个固定 Codex CMD 候选取证；后续代次不继承授权。
+        // 仅显式原生测试驱动的首个选定模式候选取证；其他模式和后续代次不继承授权。
         static CLAIMED: AtomicBool = AtomicBool::new(false);
-        if manifest.atomic_launch_kind == Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1)
-            && manifest.arguments.first().and_then(|value| value.to_str()) == Some("cmd")
-            && std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW").as_deref()
-                == Ok("codex-npm-first-cmd-v1")
-            && CLAIMED
-                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-        {
-            command.env(
-                "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",
-                generation.to_string(),
-            );
+        if let Some(mode) = claim_native_witness(
+            manifest.atomic_launch_kind,
+            manifest.arguments.first().and_then(|value| value.to_str()),
+            std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW")
+                .ok()
+                .as_deref(),
+            &CLAIMED,
+        ) {
+            command
+                .env(
+                    "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",
+                    generation.to_string(),
+                )
+                .env("INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE", mode);
         }
     }
     command
@@ -3443,6 +3448,27 @@ fn unsafe_dynamic_loader_environment(name: &std::ffi::OsStr) -> bool {
 fn unsafe_dynamic_loader_environment(name: &std::ffi::OsStr) -> bool {
     name.to_str()
         .is_some_and(|name| name.eq_ignore_ascii_case("__COMPAT_LAYER"))
+}
+
+#[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
+fn claim_native_witness(
+    kind: Option<AtomicLaunchKind>,
+    mode: Option<&str>,
+    permit: Option<&str>,
+    claimed: &AtomicBool,
+) -> Option<&'static str> {
+    if kind != Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1) {
+        return None;
+    }
+    let selected = match (mode, permit) {
+        (Some("cmd"), Some("codex-npm-first-cmd-v1")) => "cmd",
+        (Some("powershell"), Some("codex-npm-first-powershell-v1")) => "powershell",
+        _ => return None,
+    };
+    claimed
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
+        .then_some(selected)
 }
 
 #[cfg(test)]

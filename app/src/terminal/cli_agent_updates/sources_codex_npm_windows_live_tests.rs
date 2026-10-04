@@ -325,6 +325,10 @@ const SOURCES: &[(&str, &[u8])] = &[
         ),
     ),
     (
+        "app/src/ai/cli_agent_runtime/managed_process_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_tests.rs"),
+    ),
+    (
         "crates/command/src/windows.rs",
         include_bytes!("../../../../crates/command/src/windows.rs"),
     ),
@@ -529,7 +533,10 @@ fn validate_inherited_environment(
             cfg!(feature = "cli-agent-native-witness")
                 && case == "updated"
                 && step == "execute"
-                && value.to_str() == Some("codex-npm-first-cmd-v1")
+                && matches!(
+                    value.to_str(),
+                    Some("codex-npm-first-cmd-v1" | "codex-npm-first-powershell-v1")
+                )
         } else {
             allowed.contains(name.as_str())
         };
@@ -1101,6 +1108,8 @@ fn windows_npm_witness_environment_rejects_generation_and_unknown_names() {
     for name in [
         "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",
         "infinishell_windows_native_witness_generation",
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE",
+        "infinishell_windows_native_witness_mode",
         "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW_EXTRA",
         "OPENAI_API_KEY",
     ] {
@@ -1118,4 +1127,39 @@ fn windows_npm_witness_environment_rejects_generation_and_unknown_names() {
             );
         }
     }
+}
+
+#[test]
+fn windows_npm_witness_environment_powershell_requires_updated_execute_and_feature() {
+    let variable = || {
+        [(
+            OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+            OsString::from("codex-npm-first-powershell-v1"),
+        )]
+    };
+    let result = validate_inherited_environment("updated", "execute", variable());
+    if cfg!(feature = "cli-agent-native-witness") {
+        assert_eq!(result, Ok(()));
+    } else {
+        assert_eq!(result, Err("inherited_environment".to_string()));
+    }
+    assert_eq!(
+        validate_inherited_environment("updated", "recover", variable()),
+        Err("inherited_environment".to_string())
+    );
+    assert_eq!(
+        validate_inherited_environment("old_moved", "execute", variable()),
+        Err("inherited_environment".to_string())
+    );
+    assert_eq!(
+        validate_inherited_environment(
+            "updated",
+            "execute",
+            [(
+                OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                OsString::from("codex-npm-first-powershell-v1 ")
+            )]
+        ),
+        Err("inherited_environment".to_string())
+    );
 }

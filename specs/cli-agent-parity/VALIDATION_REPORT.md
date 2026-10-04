@@ -1,5 +1,29 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 取消错误输出保全与首 PowerShell 取证准备
+
+取消发生后，固定版本候选最多保留 8192 字节原始 stderr 到本代私有新收据，记录总长、截断和原始字节；不覆盖旧文件，不回放已取消输出，不改变原错误优先级，并在原生清理前释放候选输出句柄。PowerShell 取证只授权测试首个匹配代次与模式，15/240 秒读取原 CREATE 主线程及 CPU 差，不启用 CMD 的寄存器断点，不枚举其他线程。诊断模块超过 64 时仅 PS 标记覆盖不完整，普通 CREATE/LOAD 授权、权限、期限和严格清理保持不变。
+
+工作流保留 25 个输入与默认 CMD，通过既有 `windows_atomic_debug_scope=g09_npm_powershell` 和原四个布尔开关选择一次 `updated`；其他原生、源码、全量和 Linux 模式不能混入。源码绑定为 50 项（28 生产／22 验收），新增授权测试来源纳入验收闭包。
+
+本机 `cargo check --locked -p warp`、Windows command 含测试类型检查、中英文 11、Python 驱动 22、workflow 范围 8、actionlint（显式已知 runner label）及修改块 PowerShell 语法检查通过。Rust 格式仅保留与 HEAD 相同的既有差异。全部登记短目录已清理，门禁索引 `g09-ps-snapshot-local-gates.safe.json` SHA `43406b6dc7537b6afae035d1c31958e931f63ce921844e86fcd9d0e4029d11cb`；源冻结 SHA `e5f87e4895e1be32b103aa5c4750c8b4fbcb5fffa000c14bdf3961c8406cff77`。中英文审计：**无需本地化变更**，本补丁不改变 GUI/TUI 文案、布局或用户语义。
+
+上述仅为诊断准备；实际 Windows 快照和取消收据待验，不能声称 PowerShell 已修复或 G09 已关闭。原完整 5 场景／3 次冷恢复与最终同提交双平台源码门禁仍待通过，PR 保持草稿。
+
+## 2026-10-04：G09 启动路径修订后的 PowerShell 仍未完成候选启动
+
+精确 `542a2d81af96b87d5eb179e65f963d5920ae3e98` 的 [Windows run 37178488175](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37178488175) 已正式 failure。普通 nextest 1217 PASS（1132 warp＋85 command），59 项必需测试各一次普通 PASS，包含路径 5 项、CLR 3 项及 output 8 项；i18n 11 包含在 warp 计数内。普通 FAIL／LEAK／RETRY／FLAKY／TIMEOUT 均为 0，跳过项及编译 warning 不改记通过或无警告。日志独审 SHA `13a317bbab6c69d4fcd6e1bfca48021ddb44fe55333822b1b1115b2d29c985a5`。
+
+原生矩阵仅首个 `updated` 执行，0 PASS／1 FAIL、386.17 秒，返回 `ProbeFailed`。CMD 代次 `4cc2211c-d6aa-4579-8a62-1e667c84a1c7` 的 Node／Codex 均真实启动并退出 0，输出固定版本 18 字节；仍保留 `CODEX_HOME` 拒绝访问及 PATH aliases 警告。PowerShell 代次 `54beaf30-3c19-4408-9cb8-04a40b9fe436` 未创建 Node；其 210 个调试事件均校验并继续，无 pending 事件，在约 284760ms 记录控制取消，最终 `stop_requested`／exit 1，不能称自然退出或启动成功。最初 16 条 CLR first-chance 事件和 3 条溢出已记录；HRESULT 不证明具体异常对象、访问目标或完整内部异常链。
+
+两代最终 Job 空、AppContainer 清理确认，helper 退出 0，桌面／DeviceMap／窗口站／LSA 均释放。PowerShell 内层 `cleanup_failed`／`cleanup_unconfirmed` 的 Interrupted 原文仍保留，与外层最终资源收敛分开记录。另核实：取消标记会在 `CapturedOutput::seal` 读取原 stderr 前返回，随后关闭即删除的候选文件被释放。因此本轮没有保留 PowerShell 自身的 stderr，不能据宿主日志缺少旧 `ServicePointManager` 文本推断该问题消失。原生停滞原因继续未证，不能试探性放宽 ACL、能力或超时。
+
+根独审逐份核对 23 份小原件和 49 份精确 Git 源码，SHA `0a773146053f7c80b804cff52221e9ce1d146bf116d6b4603bb65fa907640b4c`。主 ZIP 大小 463714233 字节，SHA `689225148b1a2f0ec316a166e8f668b69d4138c69b3ff0792a8e2d61601446b9`，API 大小／SHA／CRC 已核；唯一观察器短根 `r-75mzlga6` 已退出并归档清理，远端失败原件保留。后四场景与三次冷恢复未执行，模型输入 0；本次不证明失败后的其他前缀／配置全树不变。
+
+现有 10 项关闭依据另经 35 份关键收据及 54 组源码比对复核，收据 SHA `959ab1b234df039547a692a5cd5ada44184196ef60f12c1ba42264fd4db64b34`，未发现新增 Mac 业务验收缺项；不把历史模型／GUI 结果重标为当前二进制重跑。**本轮新增关闭 0 项，G09 与最终同提交双平台门禁仍未完成；V01／V02／V05 移交不计通过，PR 保持草稿。** 本节仅更新证据，无需本地化变更。
+
+最终交付索引 `542a2d81a-windows-ci/final-delivery-index.safe.json`（54,991 字节，SHA `48475ad2e23d560ca1e1cb01c4dfcb35cce26cbe4e5b2b592b579ed277931b12`）已复核三份 ZIP、49 份源码绑定、59 个必需测试及原生失败与清理边界；该索引没有新增关闭结论。
+
 ## 2026-10-04：G09 启动路径兼容修复已实现，PowerShell 实际结果待验
 
 窗口站 helper 的最终 `lpApplicationName` 对齐 Rust 1.92 短路径规范化规则：只有 Win32 解析逐码位不变且直接 `CreateFileW` 核同 FileID 时才使用 DOS 表示。canonical 请求、argv0、原租约、摘要和首 CREATE 审核保持；长路径／不同语义保留原表示。官方标准库与原 helper 的路径差异已证，但尚未取得真实 PowerShell 内层异常，不能据此认定 `System.Net.ServicePointManager` 根因或修复结果。失败摘要另外保留最初 16 条 CLR HRESULT 和对应校验／Continue 状态、溢出计数；不采其他地址、字符串或堆，也不改变原期限、权限和事件处理。

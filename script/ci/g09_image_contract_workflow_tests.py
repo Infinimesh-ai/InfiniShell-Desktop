@@ -89,6 +89,26 @@ class ImageContractScopeTests(unittest.TestCase):
         self.assertFalse(accepted(dict(hooks, run_windows_npm_native_witness=True)))
         self.assertFalse(accepted(dict(witness, source_gate_only=True)))
 
+    def test_powershell_witness_uses_existing_scope_and_only_the_original_four_flags(self):
+        base = defaults()
+        base.update(run_linux=False, run_windows=True, windows_grok_installer_only=True,
+                    run_windows_codex_npm_updates=True, run_windows_npm_native_witness=True,
+                    windows_atomic_debug_scope="g09_npm_powershell")
+        self.assertEqual(len(INPUTS), 25)
+        self.assertTrue(accepted(base))
+        self.assertEqual([name for name, job in DATA["jobs"].items()
+                          if name != "validate_scope" and enabled(job["if"], base)], ["windows"])
+        for name in ("run_windows", "windows_grok_installer_only", "run_windows_codex_npm_updates",
+                     "run_windows_npm_native_witness"):
+            with self.subTest(required=name):
+                self.assertFalse(accepted(dict(base, **{name:False})))
+        for name, spec in INPUTS.items():
+            if spec["type"] == "boolean" and not base[name]:
+                with self.subTest(forbidden=name):
+                    self.assertFalse(accepted(dict(base, **{name:True})))
+        self.assertFalse(accepted(dict(base, windows_atomic_debug_scope="codex_hooks")))
+        self.assertFalse(accepted(dict(base, windows_atomic_debug_scope="unknown")))
+
     def test_independent_job_has_only_checkout_collection_and_preservation(self):
         job = DATA["jobs"]["windows_g09_image_contract"]
         self.assertEqual(job["needs"], "validate_scope")

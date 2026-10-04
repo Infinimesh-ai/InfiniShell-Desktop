@@ -20,6 +20,8 @@ use super::{
 
 // 与更新器现有 stdout 上限一致；stderr 没有新增长度限制。
 const MAX_STDOUT: u64 = 1024 * 1024;
+const MAX_CANCELLED_STDERR: u64 = 8192;
+const CANCELLED_STDERR_RECEIPT: &str = "cancelled-candidate-stderr.safe.json";
 
 struct OutputFile {
     file: File,
@@ -143,6 +145,58 @@ impl CapturedOutput {
         HANDLE(self.stderr.file.as_raw_handle())
     }
 
+    fn preserve_cancelled_stderr(&mut self) -> io::Result<()> {
+        for (file, identity) in &self.directories {
+            if profile_directory_identity(file)? != *identity {
+                return Err(io::Error::other("版本探针取消输出目录身份变化"));
+            }
+        }
+        let before = self.stderr.identity()?;
+        let mut prefix = vec![0; before.3.min(MAX_CANCELLED_STDERR) as usize];
+        self.stderr.file.rewind()?;
+        self.stderr.file.read_exact(&mut prefix)?;
+        if self.stderr.identity()? != before {
+            return Err(io::Error::other("版本探针取消后 stderr 发生变化"));
+        }
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "schema": 1,
+            "cancelled": true,
+            "total_bytes": before.3,
+            "captured_bytes": prefix.len(),
+            "truncated": before.3 > prefix.len() as u64,
+            "prefix_bytes": prefix,
+        }))
+        .map_err(io::Error::other)?;
+        // 只写锁定代次目录的新文件；候选从未继承此句柄，原始字节不进入日志或调用方管道。
+        let mut receipt = OutputFile {
+            file: OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .share_mode(0)
+                .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+                .open(self.directory.join(CANCELLED_STDERR_RECEIPT))?,
+            path: self.directory.join(CANCELLED_STDERR_RECEIPT),
+        };
+        let created = receipt.identity()?;
+        if created.3 != 0 {
+            return Err(io::Error::other("版本探针取消收据不是新空文件"));
+        }
+        receipt.file.write_all(&bytes)?;
+        receipt.file.flush()?;
+        if receipt.identity()? != (created.0, created.1, created.2, bytes.len() as u64)
+            || self.stderr.identity()? != before
+        {
+            return Err(io::Error::other("版本探针取消收据或 stderr 身份变化"));
+        }
+        for (file, identity) in &self.directories {
+            if profile_directory_identity(file)? != *identity {
+                return Err(io::Error::other("版本探针取消输出目录身份变化"));
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn seal(
         mut self,
         check_cancelled: &mut impl FnMut() -> io::Result<()>,
@@ -159,6 +213,16 @@ impl CapturedOutput {
                 .copy_to(&mut stdout.file, Some(MAX_STDOUT), check_cancelled);
         // stdout 拒绝或写失败也不能静默吞掉本轮 stderr。
         let copied_stderr = self.stderr.copy_to(&mut stderr.file, None, check_cancelled);
+        let cancelled = [copied_stdout.as_ref(), copied_stderr.as_ref()]
+            .iter()
+            .any(|result| result.is_err_and(|error| error.kind() == io::ErrorKind::Interrupted));
+        if cancelled {
+            // 取消仍是原失败；仅保留有界诊断，取证错误不能覆盖它或阻断原句柄释放。
+            if let Err(error) = self.preserve_cancelled_stderr() {
+                let kind = error.kind();
+                log::debug!("版本探针取消 stderr 收据未完成: {kind:?}");
+            }
+        }
         let closed_stdout = self.stdout.close();
         let closed_stderr = self.stderr.close();
         let failure = copied_stdout
@@ -171,6 +235,7 @@ impl CapturedOutput {
             stderr,
             directories: self.directories,
             failure,
+            cancelled,
         })
     }
 }
@@ -181,6 +246,7 @@ pub(super) struct ReplayOutput {
     // 保留原目录身份到 worker-only 文件已关闭；候选从未得到这些文件句柄。
     directories: Vec<(File, ProfileDirectoryIdentity)>,
     failure: Option<io::Error>,
+    cancelled: bool,
 }
 
 impl ReplayOutput {
@@ -190,6 +256,13 @@ impl ReplayOutput {
         stderr: &mut impl Write,
         check_cancelled: &mut impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
+        if self.cancelled {
+            let failure = self.failure.take().unwrap();
+            let _ = self.stdout.close();
+            let _ = self.stderr.close();
+            drop(self.directories);
+            return Err(failure);
+        }
         let out = self
             .stdout
             .copy_to(stdout, Some(MAX_STDOUT), check_cancelled);

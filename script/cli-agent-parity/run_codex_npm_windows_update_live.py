@@ -54,6 +54,7 @@ ACCEPTANCE_SOURCE_FILES = (
     "crates/command/Cargo.toml",
     "app/src/terminal/cli_agent_updates/sources_codex_npm_windows_live_tests.rs",
     *["app/src/ai/cli_agent_runtime/" + name for name in (
+        "managed_process_tests.rs",
         "managed_process_atomic_windows_tests.rs",
         "managed_process_atomic_windows_creation_witness_tests.rs",
         "managed_process_atomic_windows_snapshot_tests.rs",
@@ -344,13 +345,22 @@ def parser():
         result.add_argument("--" + role + "-sha256", required=True)
     result.add_argument("--case", choices=CASES, action="append")
     result.add_argument("--native-witness", action="store_true",
-                        help="仅首个 updated CMD 候选的一次原生因果取证；不视为完整验收")
+                        help="仅首个 updated 选定模式候选的一次原生取证；不视为完整验收")
+    result.add_argument("--native-witness-mode", choices=("cmd", "powershell"), default="cmd",
+                        help="默认保留 CMD 因果取证；PowerShell 仅采原主线程快照")
     return result
+
+
+def native_witness_permit(requested, mode, cases):
+    require(mode in ("cmd", "powershell"), "witness_mode_invalid")
+    require(requested or mode == "cmd", "witness_mode_requires_witness")
+    require(not requested or cases == ["updated"], "witness_requires_one_updated_case")
+    return "codex-npm-first-" + mode + "-v1" if requested else None
 
 
 def main():
     args = parser().parse_args()
-    require(not args.native_witness or args.case == ["updated"], "witness_requires_one_updated_case")
+    witness_permit = native_witness_permit(args.native_witness, args.native_witness_mode, args.case)
     require(platform.system() == "Windows" and platform.machine().lower() in ("amd64", "x86_64"), "windows_x64_only")
     args.repo = canonical(args.repo)
     args.official_inputs = canonical(args.official_inputs) if args.official_inputs else None
@@ -393,7 +403,8 @@ def main():
         "source_roles":{"supervisor_embedded":SUPERVISOR_SOURCE_FILES,"acceptance_only":ACCEPTANCE_SOURCE_FILES},
         "platform":"windows-x64","consumer_channel_discovery_covered":False,
         "native_witness_requested":args.native_witness,
-        "native_witness_scope":"first_codex_cmd_generation" if args.native_witness else None})
+        "native_witness_mode":args.native_witness_mode if args.native_witness else None,
+        "native_witness_scope":"first_codex_" + args.native_witness_mode + "_generation" if args.native_witness else None})
     cache = args.output / "official-inputs"
     cache.mkdir()
     packages = {version:official_package(version, cache, args.official_inputs) for version in INTEGRITIES}
@@ -405,7 +416,7 @@ def main():
         root, manifest = fixture(args, case, binaries, sources, old, manager_tree, system_root)
         execute_environment = environment(root, binaries, system_root, "execute")
         if args.native_witness:
-            execute_environment["INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"] = "codex-npm-first-cmd-v1"
+            execute_environment["INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"] = witness_permit
         run_test(binaries["worker"]["path"], TEST, root / "project", execute_environment, root / "execute", True)
         result = json.loads((root / "result-execute.safe.json").read_bytes())
         if case in COLD_CASES:
@@ -422,6 +433,7 @@ def main():
         cases.append({"case":case,"root":str(root),"result":result})
     write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"cases":cases,"model_inputs_sent":0,
         "native_witness_requested":args.native_witness,"full_case_matrix_covered":not args.native_witness and not args.case,
+        "native_witness_mode":args.native_witness_mode if args.native_witness else None,
         "fixed_release_test_hook_used":True,"consumer_channel_discovery_covered":False,"gui_covered":False,
         "busy_or_plugin_recheck_covered":False,"private_npm_registration_executed":True,
         "npm_lifecycle_executed":False,"npm_installer_tree_cleanup_covered":False,

@@ -90,22 +90,153 @@ fn output_cancelled_while_sealing_releases_every_owned_file() {
         .file
         .write_all(b"partial native output")
         .unwrap();
-    let replay = output
-        .seal(&mut || Err(io::ErrorKind::Interrupted.into()))
+    output
+        .stderr
+        .file
+        .write_all(b"\xff\0native failure\r\n")
         .unwrap();
+    let mut checks = 0;
+    let replay = output
+        .seal(&mut || {
+            checks += 1;
+            // stdout 已经转存，随后取消仍不能把这部分输出回放到调用方。
+            if checks < 3 {
+                Ok(())
+            } else {
+                Err(io::Error::new(io::ErrorKind::Interrupted, "原取消"))
+            }
+        })
+        .unwrap();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
 
     let failure = replay
-        .replay(&mut Vec::new(), &mut Vec::new(), &mut || Ok(()))
+        .replay(&mut stdout, &mut stderr, &mut || Ok(()))
         .unwrap_err();
 
     assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
-    assert!(remaining_names(directory.path()).is_empty());
+    assert_eq!(failure.to_string(), "原取消");
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+    assert_eq!(
+        remaining_names(directory.path()),
+        [CANCELLED_STDERR_RECEIPT]
+    );
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.path().join(CANCELLED_STDERR_RECEIPT)).unwrap())
+            .unwrap();
+    assert_eq!(receipt["total_bytes"], 18);
+    assert_eq!(receipt["captured_bytes"], 18);
+    assert_eq!(receipt["truncated"], false);
+    assert_eq!(
+        serde_json::from_value::<Vec<u8>>(receipt["prefix_bytes"].clone()).unwrap(),
+        b"\xff\0native failure\r\n"
+    );
+    fs::remove_file(directory.path().join(CANCELLED_STDERR_RECEIPT)).unwrap();
     fs::rename(
         directory.path(),
         directory.path().with_extension("released"),
     )
     .unwrap();
     fs::remove_dir(directory.path().with_extension("released")).unwrap();
+}
+
+#[test]
+fn output_cancelled_stderr_receipt_bounds_prefix_and_records_full_length() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut output = CapturedOutput::create(directory.path()).unwrap();
+    output.stderr.file.write_all(&[0xfe; 8192]).unwrap();
+    output.stderr.file.write_all(b"excluded tail").unwrap();
+    let replay = output
+        .seal(&mut || Err(io::ErrorKind::Interrupted.into()))
+        .unwrap();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+
+    let failure = replay
+        .replay(&mut stdout, &mut stderr, &mut || Ok(()))
+        .unwrap_err();
+
+    assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+    assert_eq!(
+        remaining_names(directory.path()),
+        [CANCELLED_STDERR_RECEIPT]
+    );
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.path().join(CANCELLED_STDERR_RECEIPT)).unwrap())
+            .unwrap();
+    assert_eq!(receipt["total_bytes"], 8205);
+    assert_eq!(receipt["captured_bytes"], 8192);
+    assert_eq!(receipt["truncated"], true);
+    assert_eq!(
+        serde_json::from_value::<Vec<u8>>(receipt["prefix_bytes"].clone()).unwrap(),
+        [0xfe; 8192]
+    );
+}
+
+#[test]
+fn output_cancelled_stderr_receipt_never_overwrites_an_existing_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut output = CapturedOutput::create(directory.path()).unwrap();
+    output
+        .stderr
+        .file
+        .write_all(b"cancelled native stderr")
+        .unwrap();
+    fs::write(
+        directory.path().join(CANCELLED_STDERR_RECEIPT),
+        b"unrelated",
+    )
+    .unwrap();
+    let replay = output
+        .seal(&mut || Err(io::Error::new(io::ErrorKind::Interrupted, "原取消")))
+        .unwrap();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+
+    let failure = replay
+        .replay(&mut stdout, &mut stderr, &mut || Ok(()))
+        .unwrap_err();
+
+    assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    assert_eq!(failure.to_string(), "原取消");
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+    assert_eq!(
+        remaining_names(directory.path()),
+        [CANCELLED_STDERR_RECEIPT]
+    );
+    assert_eq!(
+        fs::read(directory.path().join(CANCELLED_STDERR_RECEIPT)).unwrap(),
+        b"unrelated"
+    );
+}
+
+#[test]
+fn output_cancelled_seal_preserves_prior_failure_without_replay() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut output = CapturedOutput::create(directory.path()).unwrap();
+    output.stdout.file.set_len(1_048_577).unwrap();
+    output.stderr.file.write_all(b"original stderr").unwrap();
+    let replay = output
+        .seal(&mut || Err(io::ErrorKind::Interrupted.into()))
+        .unwrap();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+
+    let failure = replay
+        .replay(&mut stdout, &mut stderr, &mut || Ok(()))
+        .unwrap_err();
+
+    assert_eq!(failure.to_string(), "版本探针 stdout 超出原有上限");
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+    assert_eq!(
+        remaining_names(directory.path()),
+        [CANCELLED_STDERR_RECEIPT]
+    );
 }
 
 #[test]

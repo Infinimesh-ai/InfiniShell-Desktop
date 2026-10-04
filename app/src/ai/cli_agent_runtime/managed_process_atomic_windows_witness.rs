@@ -1,4 +1,4 @@
-//! 仅一次、精确 generation 的 npm CMD 因果取证；不参与普通映像授权。
+//! 仅一次、精确 generation/mode 的 npm 原生取证；不参与普通映像授权。
 
 use std::os::windows::ffi::OsStrExt as _;
 use std::os::windows::io::BorrowedHandle;
@@ -6,7 +6,9 @@ use std::os::windows::io::BorrowedHandle;
 use windows::Win32::System::Threading::{PROCESS_NAME_WIN32, QueryFullProcessImageNameW};
 use windows::core::PWSTR;
 
-use super::creation_witness::{CreationWitness, Disposition, Summary, VerifiedImage};
+use super::creation_witness::{
+    CreationWitness, Disposition, Failure as CreationFailure, Summary, VerifiedImage,
+};
 use super::native_snapshot::{
     CpuSample, Identity, VerifiedModule, capture, identity, prepare_modules,
 };
@@ -17,6 +19,39 @@ const LATE_SNAPSHOT_AFTER: Duration = Duration::from_secs(240);
 const MAX_WITNESS_MODULES: usize = 64;
 const MAX_WITNESS_THREADS: usize = 16;
 const GENERATION_ENV: &str = "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION";
+const MODE_ENV: &str = "INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+enum WitnessMode {
+    Cmd,
+    PowerShell,
+}
+
+impl WitnessMode {
+    fn bind_creation(
+        self,
+        event: &DEBUG_EVENT,
+        root: VerifiedImage<'_>,
+        birth: u64,
+        at_ms: u128,
+    ) -> Result<Option<CreationWitness>, CreationFailure> {
+        match self {
+            Self::Cmd => CreationWitness::new(event, root, birth, at_ms).map(Some),
+            // PS 只读取原主线程；不能构造 CMD 专用导入观察或设置调试寄存器。
+            Self::PowerShell => Ok(None),
+        }
+    }
+
+    fn retain_module(self, count: usize, duplicate: bool) -> io::Result<bool> {
+        if duplicate || count >= MAX_WITNESS_MODULES && self == Self::Cmd {
+            return Err(error(
+                "managed_process.native_witness_module_limit_or_duplicate",
+            ));
+        }
+        Ok(count < MAX_WITNESS_MODULES)
+    }
+}
 
 #[derive(Debug)]
 struct BoundModule {
@@ -86,7 +121,10 @@ impl BoundModule {
 #[derive(Debug)]
 pub(super) struct NativeWitness {
     generation: Uuid,
+    mode: WitnessMode,
     modules: HashMap<u32, Vec<BoundModule>>,
+    module_coverage_partial: bool,
+    skipped_module_events: u64,
     births: HashMap<u32, u64>,
     creation: Option<CreationWitness>,
     completed_creation: Option<Summary>,
@@ -101,8 +139,20 @@ pub(super) struct NativeWitness {
     exit_confirmed: bool,
 }
 
-fn enabled(generation: Uuid, mode: &str, value: Option<&str>) -> bool {
-    mode == "cmd" && value.is_some_and(|value| value == generation.to_string())
+fn enabled(
+    generation: Uuid,
+    mode: &str,
+    value: Option<&str>,
+    authorized_mode: Option<&str>,
+) -> Option<WitnessMode> {
+    if authorized_mode != Some(mode) || value != Some(generation.to_string().as_str()) {
+        return None;
+    }
+    match mode {
+        "cmd" => Some(WitnessMode::Cmd),
+        "powershell" => Some(WitnessMode::PowerShell),
+        _ => None,
+    }
 }
 
 fn expected_temp_environment(environment: &[(OsString, OsString)]) -> Option<[Vec<u16>; 3]> {
@@ -169,15 +219,23 @@ impl WindowsImageDebugSession {
         environment: &[(OsString, OsString)],
     ) -> io::Result<()> {
         let value = std::env::var(GENERATION_ENV).ok();
-        if enabled(generation, mode, value.as_deref())
-            && self.package_images.is_some()
+        let authorized_mode = std::env::var(MODE_ENV).ok();
+        if let Some(mode) = enabled(
+            generation,
+            mode,
+            value.as_deref(),
+            authorized_mode.as_deref(),
+        ) && self.package_images.is_some()
             && self.npm_diagnostics.is_some()
         {
             let expected_temp_environment = expected_temp_environment(environment)
                 .ok_or_else(|| error("native_witness.temp_environment_invalid"))?;
             self.native_witness = Some(NativeWitness {
                 generation,
+                mode,
                 modules: HashMap::new(),
+                module_coverage_partial: false,
+                skipped_module_events: 0,
                 births: HashMap::new(),
                 creation: None,
                 completed_creation: None,
@@ -230,6 +288,17 @@ impl WindowsImageDebugSession {
         {
             return Ok(());
         }
+        // 调用方已完成独立 CREATE/LOAD 映像授权；容量只限制额外诊断租约。
+        let witness = self.native_witness.as_mut().unwrap();
+        let modules = witness.modules.entry(pid).or_default();
+        if !witness.mode.retain_module(
+            modules.len(),
+            modules.iter().any(|module| module.base == base),
+        )? {
+            witness.module_coverage_partial = true;
+            witness.skipped_module_events = witness.skipped_module_events.saturating_add(1);
+            return Ok(());
+        }
         // 仅在原 CREATE/LOAD 授权通过后取得独立拒写租约；路径只找回原 file identity。
         let prepared = (|| {
             let lease = lease_mapped_image(file, &final_path_from_handle(file)?, dll, false)?;
@@ -246,12 +315,6 @@ impl WindowsImageDebugSession {
             .modules
             .entry(pid)
             .or_default();
-        if modules.len() >= MAX_WITNESS_MODULES || modules.iter().any(|module| module.base == base)
-        {
-            return Err(error(
-                "managed_process.native_witness_module_limit_or_duplicate",
-            ));
-        }
         modules.push(BoundModule {
             lease,
             base,
@@ -304,8 +367,8 @@ impl WindowsImageDebugSession {
                 process_created: birth,
             });
             let root = witness.modules[&event.dwProcessId][0].creation_image();
-            match CreationWitness::new(event, root, birth, at_ms) {
-                Ok(creation) => witness.creation = Some(creation),
+            match witness.mode.bind_creation(event, root, birth, at_ms) {
+                Ok(creation) => witness.creation = creation,
                 Err(failure) if failure.coverage_unavailable() => {
                     // new 从未写线程寄存器；只保留覆盖未知，仍使用原映像/Job 的快照边界。
                     witness.creation_unavailable = Some(
@@ -497,7 +560,11 @@ impl WindowsImageDebugSession {
             .root_thread
             .as_ref()
             .map(|root| root.identity);
-        let (expected_desktop, desktop_failure) = if balanced && !self.snapshot_stopped(deadline) {
+        let root_only = self.native_witness.as_ref().unwrap().mode == WitnessMode::PowerShell;
+        let (expected_desktop, desktop_failure) = if root_only {
+            // PS 的桌面已由原主线程快照记录，不枚举或重开其他线程。
+            (None, None)
+        } else if balanced && !self.snapshot_stopped(deadline) {
             match container.native_witness_desktop() {
                 Ok(desktop) => (desktop, None),
                 Err(failure) => (None, Some(safe_failure("expected_desktop", &failure))),
@@ -510,7 +577,7 @@ impl WindowsImageDebugSession {
         };
         let mut observations = Vec::new();
         let mut thread_count = 1;
-        let processes = if balanced && !self.snapshot_stopped(deadline) {
+        let processes = if !root_only && balanced && !self.snapshot_stopped(deadline) {
             container.native_witness_processes()
         } else {
             Ok(Vec::new())
@@ -638,7 +705,7 @@ impl WindowsImageDebugSession {
         let witness = self.native_witness.as_mut().unwrap();
         witness.early_root_cpu = early_root_cpu;
         witness.snapshot = Some(
-            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"root_main_thread":root_main_thread,"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
+            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"root_main_thread":root_main_thread,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
         );
         if let Some(creation) = &mut witness.creation
             && let Err(failure) =
@@ -765,8 +832,9 @@ impl WindowsImageDebugSession {
             (Some(_), None) => serde_json::json!({"unknown":"late_root_cpu_unavailable"}),
         };
         let finished_ms = self.native_at_ms();
-        self.native_witness.as_mut().unwrap().late_snapshot = Some(
-            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"observation":observation,"cpu_difference":cpu_difference}),
+        let witness = self.native_witness.as_mut().unwrap();
+        witness.late_snapshot = Some(
+            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"observation":observation,"cpu_difference":cpu_difference,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events}),
         );
         if !balanced {
             return Err(error("managed_process.native_witness_suspend_unbalanced"));
@@ -896,7 +964,7 @@ impl WindowsImageDebugSession {
 
     pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
-            let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
+            let summary = serde_json::json!({"generation":witness.generation,"mode":witness.mode,"creation_enabled":witness.mode == WitnessMode::Cmd,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
             // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

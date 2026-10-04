@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。5d8075c52的Windows完整矩阵在首场景updated返回ProbeFailed：CMD实际输出固定版本并退出0，但CODEX_HOME拒绝访问警告保留；PowerShell初始化失败、未创建Node。两代Job/AppContainer/窗口站/LSA清理均确认成功；后4场景与3次冷恢复未执行，完整矩阵及最终同提交双平台源码门禁仍待完成。",
+  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。542a2d81a的Windows完整矩阵在首场景updated返回ProbeFailed：CMD实际输出固定版本并退出0，CODEX_HOME警告保留；PowerShell未创建Node并在原期限后取消。两代最终Job/AppContainer/窗口站/LSA清理确认；取消路径未保留PS自身stderr，不能据宿主缺文认定旧SPM问题已修。后4场景与3次冷恢复未执行，完整矩阵及最终同提交双平台源码门禁待完成。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -23,7 +23,16 @@
     "g03_private_lifecycle_boundary": "原GUI和所属进程已退出，私有现场不能唯一界定默认原生会话的SID/提示范围，cleanup_ready=false并保留；未读取默认认证或原生历史，不新增功能关闭条件。",
     "final_goal_gate": "阶段门禁按各提交独立计证；最终Goal仍须同一冻结源码提交的相关双平台门禁，不能合并ce49/bfb不同SHA冒记最终通过。",
     "newly_closed_items": [],
-    "localization": "本轮仅更新验收和当前支持说明，无需本地化变更。"
+    "localization": "本轮仅更新验收和当前支持说明，无需本地化变更。",
+    "latest_closures_continuity_review": {
+      "source_commit": "542a2d81af96b87d5eb179e65f963d5920ae3e98",
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/final-merge-audit-542a2d81a/closed-items-continuity-review-v1.safe.json",
+      "sha256": "959ab1b234df039547a692a5cd5ada44184196ef60f12c1ba42264fd4db64b34",
+      "small_receipts_verified": 35,
+      "critical_source_comparisons_verified": 54,
+      "root_independent_recheck": "35份收据共417777字节及54组原/现源码均匹配；不是新的功能验收。",
+      "conclusion": "既有10项Mac范围关闭仍有支持；G05两旧索引仍不可达，其当前依据已被明确的新补验替代；最终同源门禁仍待完成。"
+    }
   },
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
@@ -9857,5 +9866,165 @@
     "localization": "无需本地化变更：内部启动路径及结构化诊断沿用既有英中错误映射，无文案或布局变化。",
     "g09_closed": false,
     "newly_closed_items": []
+  },
+  "g09_application_path_native_result_20261004": {
+    "status": "first_updated_failed_powershell_cancelled_before_node",
+    "source_commit": "542a2d81af96b87d5eb179e65f963d5920ae3e98",
+    "run_id": 37178488175,
+    "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37178488175",
+    "windows_job_id": 111366031182,
+    "official_conclusion": "failure",
+    "ordinary_pass": 1217,
+    "ordinary_breakdown": {
+      "warp": 1132,
+      "command": 85
+    },
+    "required_named_tests_pass": 59,
+    "i18n_pass": 11,
+    "ordinary_non_pass": {
+      "fail": 0,
+      "leak": 0,
+      "retry": 0,
+      "flaky": 0,
+      "timeout": 0
+    },
+    "native_result": {
+      "passed": 0,
+      "failed": 1,
+      "case": "updated",
+      "accepted": false,
+      "error": "ProbeFailed",
+      "duration_seconds": 386.17,
+      "model_inputs_sent": 0
+    },
+    "cmd": {
+      "generation": "4cc2211c-d6aa-4579-8a62-1e667c84a1c7",
+      "exit_code": 0,
+      "stdout_bytes": 18,
+      "node_and_codex_created": true,
+      "warning": "CODEX_HOME拒绝访问与PATH aliases警告保留。"
+    },
+    "powershell": {
+      "generation": "54beaf30-3c19-4408-9cb8-04a40b9fe436",
+      "exit_reason": "stop_requested",
+      "exit_code": 1,
+      "caller_stdout_bytes": 0,
+      "node_created": false,
+      "normal_phase_failure": "Interrupted at 284760ms; wait_cancelled",
+      "debug_events_received_validated_continued": 210,
+      "pending_event": null,
+      "initial_clr_events": 16,
+      "dropped_clr_events": 3,
+      "all_initial_clr_first_chance": true,
+      "root_cause_proven": false
+    },
+    "powershell_stderr_boundary": "取消标记在seal原stderr读取前返回，随后DELETE_ON_CLOSE关闭；本轮未保留PS自身stderr，不将宿主缺少SPM文字解释为零stderr或SPM已解除。",
+    "cleanup_boundary": "保留PS内层cleanup_failed/unconfirmed Interrupted；两代外层exit、AppContainer标记及station cleanup/release-state均确认最终Job、helper、桌面、DeviceMap、站、LSA收敛，不等于PS自然成功。",
+    "not_executed_cases": [
+      "old_moved",
+      "published_receipt_missing",
+      "external_change_preserved",
+      "candidate_changed_preserved"
+    ],
+    "cold_recovery_executions": 0,
+    "source_files_verified": 49,
+    "supplemental_source_files": 0,
+    "main_artifact": {
+      "id": 11294199170,
+      "bytes": 463714233,
+      "sha256": "689225148b1a2f0ec316a166e8f668b69d4138c69b3ff0792a8e2d61601446b9",
+      "api_digest_size_crc_verified": true
+    },
+    "root_native_review_sha256": "0a773146053f7c80b804cff52221e9ce1d146bf116d6b4603bb65fa907640b4c",
+    "independent_log_review_sha256": "13a317bbab6c69d4fcd6e1bfca48021ddb44fe55333822b1b1115b2d29c985a5",
+    "ps_diagnostic_review_sha256": "0990ffeeab987c9bfba916aa8e96918da1b0ae14ba9a7e5c9a75b4c768319f5f",
+    "observer": {
+      "run_id": "r-75mzlga6",
+      "status": "cleaned",
+      "log_sha256": "71a6a9e008133213d21abfb684f529630016d386980e77b56ab1f796628dd9e5"
+    },
+    "remote_failed_root_retained": true,
+    "post_failure_other_prefix_or_config_full_inventory_proven": false,
+    "next_action": "补齐取消stderr有界私有证据并准备仅首PS原线程只读配对快照；不放宽期限、权限、清理，不计原生修复或关闭。",
+    "localization": "本节只更新验收证据，无需本地化变更。",
+    "g09_closed": false,
+    "newly_closed_items": [],
+    "final_delivery_index": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/542a2d81a-windows-ci/final-delivery-index.safe.json",
+      "sha256": "48475ad2e23d560ca1e1cb01c4dfcb35cce26cbe4e5b2b592b579ed277931b12",
+      "bytes": 54991,
+      "source_files": 49,
+      "ordinary_pass": 1217,
+      "mandatory_each_once": 59,
+      "newly_closed_gaps": []
+    }
+  },
+  "g09_powershell_diagnostic_preparation_20261004": {
+    "status": "implemented_local_gates_passed_native_diagnostic_pending",
+    "scope": "只补取消stderr保全与首PowerShell原主线程快照，停滞根因未修，G09仍开放",
+    "cancelled_stderr": {
+      "max_bytes": 8192,
+      "receipt": "cancelled-candidate-stderr.safe.json",
+      "raw_bytes_array": true,
+      "total_and_truncation_recorded": true,
+      "create_new_only": true,
+      "candidate_handles_closed_before_native_cleanup": true,
+      "cancelled_output_replayed": false,
+      "original_error_priority_preserved": true
+    },
+    "powershell_snapshot": {
+      "one_updated_case_only": true,
+      "exact_generation_and_mode": true,
+      "original_root_thread_only": true,
+      "at_seconds": [
+        15,
+        240
+      ],
+      "creation_breakpoint_enabled": false,
+      "module_cap": 64,
+      "overflow": "仅PS额外诊断租约标partial；独立CREATE/LOAD映像授权不变",
+      "deadline_permissions_cleanup_unchanged": true
+    },
+    "workflow": {
+      "inputs_count": 25,
+      "scope": "g09_npm_powershell",
+      "required_true": [
+        "run_windows",
+        "windows_grok_installer_only",
+        "run_windows_codex_npm_updates",
+        "run_windows_npm_native_witness"
+      ],
+      "remaining_inputs": "false/default",
+      "default_cmd_compatible": true
+    },
+    "source_binding_files": 50,
+    "supervisor_source_files": 28,
+    "acceptance_source_files": 22,
+    "source_freeze": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-ps-snapshot-source-freeze.safe.json",
+    "source_freeze_sha256": "e5f87e4895e1be32b103aa5c4750c8b4fbcb5fffa000c14bdf3961c8406cff77",
+    "local_gates": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-ps-snapshot-local-gates.safe.json",
+    "local_gates_sha256": "43406b6dc7537b6afae035d1c31958e931f63ce921844e86fcd9d0e4029d11cb",
+    "passed": {
+      "cargo_check_warp": true,
+      "command_windows_tests_typecheck": true,
+      "i18n": 11,
+      "python_runner": 22,
+      "workflow_scope": 8,
+      "actionlint_with_known_runner_label": true,
+      "changed_powershell_block_parser": true,
+      "new_rustfmt_deviations": 0
+    },
+    "localization": "无需本地化变更；诊断/错误保全不改变GUI/TUI文案、布局或语义。",
+    "windows_native_execution": "pending",
+    "newly_closed_gaps": [],
+    "full_matrix_passed": false,
+    "final_source_gate_passed": false,
+    "pr_remains_draft": true,
+    "independent_review": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-ps-snapshot-independent-review.safe.json",
+      "sha256": "27b364c257ed176782a644599a7f3e00ea125e6ffcdf00f324edca4f65f1cb93",
+      "blocking_findings": 0,
+      "scope": "独立审查9份PS补丁；输出保全部分由root复核"
+    }
   }
 }

@@ -84,19 +84,84 @@ fn snapshots_require_the_original_root_binding() {
 }
 
 #[test]
-fn witness_requires_exact_generation_and_first_cmd_mode() {
+fn witness_requires_exact_generation_and_authorized_mode() {
     let generation = Uuid::new_v4();
     let value = generation.to_string();
-    assert!(enabled(generation, "cmd", Some(&value)));
-    assert!(!enabled(generation, "powershell", Some(&value)));
-    assert!(!enabled(generation, "cmd", None));
-    assert!(!enabled(generation, "cmd", Some("1")));
-    assert!(!enabled(
-        generation,
-        "cmd",
-        Some(&Uuid::new_v4().to_string())
-    ));
-    assert!(!enabled(generation, "cmd", Some(&format!("{value} "))));
+    assert_eq!(
+        enabled(generation, "cmd", Some(&value), Some("cmd")),
+        Some(WitnessMode::Cmd)
+    );
+    assert_eq!(
+        enabled(generation, "powershell", Some(&value), Some("powershell")),
+        Some(WitnessMode::PowerShell)
+    );
+    assert_eq!(
+        enabled(generation, "powershell", Some(&value), Some("cmd")),
+        None
+    );
+    assert_eq!(
+        enabled(generation, "cmd", Some(&value), Some("powershell")),
+        None
+    );
+    assert_eq!(
+        enabled(generation, "pwsh", Some(&value), Some("pwsh")),
+        None
+    );
+    assert_eq!(enabled(generation, "cmd", Some(&value), None), None);
+    assert_eq!(enabled(generation, "cmd", None, Some("cmd")), None);
+    assert_eq!(enabled(generation, "cmd", Some("1"), Some("cmd")), None);
+    assert_eq!(
+        enabled(
+            generation,
+            "cmd",
+            Some(&Uuid::new_v4().to_string()),
+            Some("cmd")
+        ),
+        None
+    );
+    assert_eq!(
+        enabled(generation, "cmd", Some(&format!("{value} ")), Some("cmd")),
+        None
+    );
+}
+
+#[test]
+fn powershell_never_binds_creation_or_debug_registers() {
+    let file = tempfile::tempfile().unwrap();
+    let event = DEBUG_EVENT::default();
+    let root = || VerifiedImage {
+        file: &file,
+        base: 0,
+        size: 0,
+        sha256: "",
+    };
+    assert!(
+        WitnessMode::PowerShell
+            .bind_creation(&event, root(), 0, 0)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        WitnessMode::Cmd
+            .bind_creation(&event, root(), 0, 0)
+            .is_err()
+    );
+}
+
+#[test]
+fn powershell_module_overflow_is_partial_but_cmd_still_rejects() {
+    assert!(WitnessMode::PowerShell.retain_module(63, false).unwrap());
+    assert!(!WitnessMode::PowerShell.retain_module(64, false).unwrap());
+    assert!(!WitnessMode::PowerShell.retain_module(65, false).unwrap());
+    assert!(WitnessMode::Cmd.retain_module(63, false).unwrap());
+    assert!(WitnessMode::Cmd.retain_module(64, false).is_err());
+}
+
+#[test]
+fn partial_module_coverage_never_admits_a_duplicate_binding() {
+    assert!(WitnessMode::PowerShell.retain_module(64, true).is_err());
+    assert!(WitnessMode::PowerShell.retain_module(1, true).is_err());
+    assert!(WitnessMode::Cmd.retain_module(1, true).is_err());
 }
 
 #[test]
