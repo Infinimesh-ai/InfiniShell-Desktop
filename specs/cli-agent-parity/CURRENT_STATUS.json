@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭，G05待补验、G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05现存原件不足以复核纯PNG及同轮图片加单技能和特定GUI恢复，不推断历史功能失败；保留旧结论，按原条件补证。G09新087实际首CMD返回正确版本且候选/辅助进程退出，最后窗口站或LSA登录会话回收未确认；PS及后续矩阵未执行。最终同提交相关双平台门禁仍待完成。",
+  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05按原关闭条件完成纯PNG、同轮图片加单技能、恢复/保稿和英中补验并独审，历史失败保留。G09的Windows窗口站或LSA登录会话回收仍待解决；原完整矩阵与最终同提交双平台源码门禁仍待完成。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -35,6 +35,7 @@
       "G02",
       "G03",
       "G04",
+      "G05",
       "G06",
       "G07",
       "G08",
@@ -47,11 +48,10 @@
       "V05"
     ],
     "remaining_items": [
-      "G05",
       "G09"
     ],
-    "remaining_count": 2,
-    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。 G10真实父权限、命令/技能审批、越界、运行取消及清理、双向ACK、冷恢复和结果已齐备，实际宿主审批英中布局通过。04ac两平台最终源码门禁success、两新Grok回归普通PASS；Windows菜单测试1条LEAK独立保留，不称全体普通PASS或无残留，不扩展原G10条件。 G03普通PTY剪贴板/拖放、真实首拖、正确会话与图片字节/顺序、焦点/审批失败保稿和英中布局按各原构建齐备，三平台固定.5工件与原生合同已核。bfb Linux与产品等价ce49 Windows阶段源码门禁分别通过，必要回归逐名普通PASS；旧Linux失败与历史LEAK不改写，最终Goal同提交门禁仍待完成。 2026-10-04最终证据充分性复核：G05原件链尚不足，当前移回待补验；不改写历史通过结论或缩减原条件。",
+    "remaining_count": 1,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。 G10真实父权限、命令/技能审批、越界、运行取消及清理、双向ACK、冷恢复和结果已齐备，实际宿主审批英中布局通过。04ac两平台最终源码门禁success、两新Grok回归普通PASS；Windows菜单测试1条LEAK独立保留，不称全体普通PASS或无残留，不扩展原G10条件。 G03普通PTY剪贴板/拖放、真实首拖、正确会话与图片字节/顺序、焦点/审批失败保稿和英中布局按各原构建齐备，三平台固定.5工件与原生合同已核。bfb Linux与产品等价ce49 Windows阶段源码门禁分别通过，必要回归逐名普通PASS；旧Linux失败与历史LEAK不改写，最终Goal同提交门禁仍待完成。 2026-10-04 G05按原条件补齐纯PNG、PNG加单技能新建/冷恢复、GUI拒绝保稿及同host重关联和英中原件，联合独审通过；两次补验失败与旧原件不可达事实保留，恢复本次Mac范围关闭。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -65,9 +65,11 @@
       "accepted": "纯 PNG 及 PNG 加单技能生产适配器新建与冷恢复；GUI 原生 Skill/图片、重关联和零重投按各自构建计证",
       "source_binding_sha256": "613cb19968667392a08829f4f831030af6da4a2fca7d9fa58ef538e4e6b80060",
       "boundary": "不外推所有格式组合、固定策略、父权限或多技能；模型轮次与恢复应用分别绑定，不称当前构建重跑。",
-      "status": "revalidation_required_evidence_chain_unavailable",
+      "status": "closed_in_current_mac_scope",
       "historical_acceptance_preserved": true,
-      "current_review_ref": "g05_evidence_revalidation_20261004"
+      "current_review_ref": "g05_revalidation_completed_20261004",
+      "closure_ref": "g05_revalidation_completed_20261004",
+      "current_accepted": "纯PNG零文字及同SID冷恢复；PNG加单技能两代精确AllowOnce、零额外工具/零重投；GUI拒绝保稿、同host重关联与英中布局，均以2026-10-04新原件独审通过"
     },
     "other_platforms": {
       "owner": "用户后续运行验收",
@@ -77,7 +79,7 @@
         "windows-x64"
       ]
     },
-    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。 G10实际宿主命令审批在同一任务先英文后中文实窗审计，完整说明、参数和按钮均可读；本次关闭记录无需本地化变更。 G03既有英中卡片、占位及能力拒绝完整Toast按原构建已审；首拖修复无新文案/布局，Mac及两平台i18n通过。本次关闭文档无需本地化变更。",
+    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。 G10实际宿主命令审批在同一任务先英文后中文实窗审计，完整说明、参数和按钮均可读；本次关闭记录无需本地化变更。 G03既有英中卡片、占位及能力拒绝完整Toast按原构建已审；首拖修复无新文案/布局，Mac及两平台i18n通过。本次关闭文档无需本地化变更。 G05补验的英文审批/结果及中文恢复布局由委托代理原始CUA实屏审计；本次仅验收时序和私有配置，无需本地化变更。",
     "source_gate": {
       "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
       "result": "passed",
@@ -1942,7 +1944,6 @@
   },
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
-    "G05",
     "G09"
   ],
   "remaining_items_interpretation": "本次 Mac 范围仍开放项；其他平台移交不计通过，全平台原始清单见 current_goal_scope。",
@@ -1987,8 +1988,8 @@
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
-  "documentation_updated_at": "2026-10-03",
-  "documentation_source_commit": "50c64e9e31f2ee014da10cc944534ebca727f75f",
+  "documentation_updated_at": "2026-10-04",
+  "documentation_source_commit": "7a8c03bd2301d982625a3bac41047aa9d69f4ecc",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -6699,13 +6700,14 @@
       "G02",
       "G03",
       "G04",
+      "G05",
       "G06",
       "G07",
       "G08",
       "G10",
       "V03"
     ],
-    "remaining_count": 2,
+    "remaining_count": 1,
     "merge_allowed": false,
     "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
     "deferred_items": [
@@ -9479,7 +9481,8 @@
     "online_inputs_executed": 0,
     "newly_closed_items": [],
     "localization": "无需本地化变更；仅开发验收脚本与状态记录",
-    "local_gates_sha256": "8f0eebf36e18f6da8a55f3a208e7983f0d40a8fd8b54288df9adc62d2871bde9"
+    "local_gates_sha256": "8f0eebf36e18f6da8a55f3a208e7983f0d40a8fd8b54288df9adc62d2871bde9",
+    "resolution_ref": "g05_revalidation_completed_20261004"
   },
   "g09_station_release_boundary_20261004": {
     "base_commit": "0872837213970cad26dcd484132ee46b9a11f9b1",
@@ -9520,5 +9523,40 @@
       "python_source_contract_passed": 21,
       "new_windows_native_tests": "not_executed"
     }
+  },
+  "g05_revalidation_completed_20261004": {
+    "status": "closed_in_current_mac_scope",
+    "closure_receipt": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g05-proof-refresh-20261004/g05-current-scope-closure-20261004-v1.safe.json",
+      "sha256": "924275d81ad7c606250e631541f38e90f1cf707a7a448043e06af68be658f902"
+    },
+    "pure_png_source": "4ff41b6146932dc89155f6a24c7a6e0e8e243ea9",
+    "single_skill_source": "7a8c03bd2301d982625a3bac41047aa9d69f4ecc",
+    "gui_build_source": "0872837213970cad26dcd484132ee46b9a11f9b1",
+    "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit 根任务",
+    "pure_png_text_bytes": 0,
+    "single_skill_inputs": 2,
+    "single_skill_approvals": 2,
+    "extra_native_tools": 0,
+    "input_replays": 0,
+    "same_session_cold_resume": true,
+    "gui_rejection_preserves_draft": true,
+    "gui_restart_preserves_same_host_native_and_history": true,
+    "natural_exit_and_cleanup_confirmed": true,
+    "english_chinese_layout": "委托代理原始CUA实屏；根代理独审数据原件，不冒记另看截图",
+    "historical_failures_preserved": [
+      "r-ak0cfkqj queued时序夹具误判",
+      "r-hn0k2xxz 实际ToolSearch额外调用，严格失败"
+    ],
+    "python_tests_passed": 68,
+    "pairing_regression_tests_passed": 8,
+    "existing_identity_regression_passed": 1,
+    "i18n_tests_passed": 11,
+    "cargo_check": "passed",
+    "localization": "无需本地化变更；无产品语义变化，GUI英中布局按原构建已审",
+    "platform_boundary": "Linux/Windows实机移交，最终Goal同提交双平台源码门禁仍待完成",
+    "newly_closed_items": [
+      "G05"
+    ]
   }
 }

@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G05 原条件补验完成
+
+**本轮补验关闭 G05；当前 10 项关闭、G09 开放、V01／V02／V05 移交，PR 仍为草稿。** 固定 Claude `2.1.280/claude-opus-5-5`、Inherit 根任务，按各真实构建计证，不将旧索引不可达推断为功能退化，也不称当前 HEAD 重跑所有模型链。联合关闭索引位于仓外 `g08-build-preparation/g05-proof-refresh-20261004/g05-current-scope-closure-20261004-v1.safe.json`，SHA `924275d81ad7c606250e631541f38e90f1cf707a7a448043e06af68be658f902`。
+
+- **纯 PNG**：`4ff41b614`／`r-fb8vkfxb` 的原生图片输入恰一个 image 块、零文字，PNG 原字节相同，正确识别四象限；换进程后同 SID 回忆一致。三条产品输入各一次、零工具，两代自然退出 0 并清理。独审 SHA `b508e9c6503eb3512b43c3bbcec25a39dd1a188730dceae606a28887c978e7e4`。
+- **PNG＋单技能**：`7a8c03bd2`／`r-45i17a5t` 的两次不同 PNG、完整原生数组与登记附件逐字节对应；每轮唯一所选 Skill、精确一次 AllowOnce，正确返回技能独有标记与图色。同 SID 两代、首代清理后恢复，零额外工具和零重投，两代自然退出 0。独立复核 23 份原件，审计 SHA `2d55af46a3f6077afd5d00c47e654fae4cf2b55e087001171ce37f843cb93f08`；原生历史 SHA `014ba917e7a047557ebc224b3b8394c35d9116b6b0d19812828136618d8aaae1`。
+- **GUI 拒绝与恢复**：`087283721` 产品构建／`r-rp5ac3x9` 缺技能时拒绝并保留文字、图片和技能卡，前后数据库任务／消息均零；实际 PNG＋Skill 经一次审批完成。正常退出后重开保持原任务、host、原生进程、SID 和运行代，owner epoch 1→2，原生历史字节不变且未重投；断开后精确进程、coalition、launchd 均退出，小证据先归档再清理本轮目录。28 份归档索引 SHA `6235452288f1aff0a8dd1d2698ba1a3b44f1bae2af0cdf772a8f55bdee6b68d9`，根代理独审 SHA `0a1e4d8853500f87cbde0e9eebfce557056e2883c256fba76deb0a9140a2896b`，清理 SHA `a763dfab9a92ea24700af36084269734a80fb81660c9dbca7018a531830689c7`。英文审批／结果和中文恢复布局由委托代理原始 CUA 实屏核验；未伪造磁盘截图或声称根代理另看截图。拒绝前 host 目录 glob 错误不计证明，保稿实屏与前后数据库零任务／消息独立保留。
+
+补验中两次失败不改写：首轮夹具把 queued 早于 system/init 错判为缺失身份，`5533cbfa2` 仅等待原配对合同、继续拒绝重复／错身份；第二轮实际额外调用 ToolSearch，原严格运行器正确失败。`7a8c03bd2` 仅在本次私有项目 deny 增加 ToolSearch，Skill 仍逐次询问，生产代码、模型、输入及全部严格断言不变。该准备符合固定二进制和[官方工具搜索配置](https://code.claude.com/docs/en/mcp#configure-tool-search)，不更改用户默认配置。
+
+对应本地门禁 cargo check、68 项相关 Python 回归、8 项新增时序回归与 1 项既有身份回归、i18n 11 项均通过；所有完成短根已按记录清理。门禁索引 SHA `6098155b97bb07dc7faf4133f6a07ae089dde6c8414b845cb457af69cb58f8d7`、`92fba6d941dda0bbb5c947df53e7526c1a7dbc317426737a7bb0922c174c9d12`。**无需本地化变更**：仅验收时序和私有配置，产品英中语义不变，真实英中布局按 GUI 构建计证。不外推所有格式组合、固定权限、父权限或多技能；其他平台实机仍移交，最终 Goal 同提交双平台源码门禁仍待完成。
+
 ## 2026-10-04：G09 首 CMD 正例与回收阻塞
 
 **2026-10-04 首 CMD 原生执行成功，完整回收失败，仍开放**：`087283721` 的[完整 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37160171946)已终态 failure。普通 1191 项 PASS，41 项必需测试逐名一次通过，i18n 11 通过；首 CMD→Node→Codex 实际输出 `codex-cli 0.156.1`，四个候选进程及两个 helper 均正常退出 0，203 个调试事件均继续，桌面关闭及 DeviceMap 移除已确认。但窗口站／LSA 登录会话的联合消失确认超时，正常和 abort 清理均未通过；原收据不能区分两侧。`updated` 为 RecoveryRequired，未执行 PowerShell、其余四场景或三次冷恢复，不将局部正例计为更新成功。三份官方 ZIP 已校验，唯一观察器已退出并清理，终审索引 SHA `1d0cc1eb67fd8abfbd843f26c99b683665ba6c2685b56c92f0d8cb691e6c6506`。
