@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | Mac 消费者已验；4ff Windows候选退出0但新LSA仍存在。3c470已复现写读后管道持有新LUID、只关管道后回收，生产候选输出隔离已实现且本机门禁通过；PS、完整场景/冷恢复及最终门禁未完成，诊断不计关闭 |
+| G09 | 开放 | Mac 消费者已验；5d Windows首场景updated失败：CMD版本候选成功但保留CODEX_HOME拒绝访问警告，PS初始化失败且未创建Node。两代Job/AppContainer/站/LSA清理成功；后4场景、3冷恢复和最终同提交门禁未完成，不计关闭 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -277,6 +277,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-04 输出隔离实际验收：CMD成功、PS初始化失败，仍开放**：`5d8075c524ee33fedef71c301484a9441a7679f9` 的 [run 37175216018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37175216018) 正式 failure；普通 1209 PASS（1129 warp＋80 command）、必需 51 项及新增 output 8 项逐名通过，i18n 11 通过，普通组无 FAIL／LEAK／RETRY／FLAKY。首场景 `updated` 为 `ProbeFailed`：CMD 实际创建 Node／Codex、输出固定版本并退出 0，但 `CODEX_HOME` 拒绝访问和 PATH aliases 创建失败警告保留；PowerShell 的 `System.Net.ServicePointManager` 初始化异常、退出 -65536、零输出且未创建 Node，底层异常原因未证。两实际代次的 Job／AppContainer／桌面／DeviceMap／窗口站／LSA 清理均确认成功。后四场景与三次冷恢复未执行，远端现场保留，不能声称完整事务或其他前缀／配置全树验收通过。终审索引 SHA `2295a35ec843716440c0ea8a75694285351d1715b14a3e6ee593f5d8b37bbcbc`，根复核 SHA `a71d4433a6baa0ab142163eedffe010ec29001d195fc0857a49b89c9214cbab2`；索引位于仓外 `g08-build-preparation/5d8075c52-windows-ci/final-delivery-index.safe.json`。本轮新增关闭 0 项；完整原矩阵与最终同提交双平台门禁仍待完成。
 
 - **2026-10-04 候选输出隔离已实现，仍开放**：只为固定 npm 版本候选捕获私有普通文件；真实退出和严格 Job 空后封存、关闭候选句柄，再做原站／LSA 清理，最后重放原字节。stdin、官方 shim、权限和原期限保持；输出错误与取消不标成功。Mac check、Windows command 测试类型检查、i18n 11、Python 21 及工作流门禁通过，收据 SHA `9719596188e21d33bf4167bd9b658afcbb60dda1a0ca49986762f611f3e86c88`；源码独审无阻断。新增 8 项 output 回归及来源绑定已接线，实际 Windows 原矩阵和最终同提交双平台门禁待验，不能计为 G09 关闭。无需本地化变更。
 

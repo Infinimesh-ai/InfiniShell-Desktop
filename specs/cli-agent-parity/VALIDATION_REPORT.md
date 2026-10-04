@@ -1,5 +1,16 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 输出隔离越过 LSA 阻塞，PowerShell 初始化仍失败
+
+精确提交 `5d8075c524ee33fedef71c301484a9441a7679f9` 的 [Windows run 37175216018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37175216018) 正式 failure，只有原完整矩阵的首场景 `updated` 执行并返回 `ProbeFailed`。普通门禁 1209 PASS（1129 warp＋80 command），51 项必需具名测试各一次 PASS，包含新增 output 8 项；i18n 11 通过，普通组 FAIL／LEAK／RETRY／FLAKY 均为 0。原生部分独立为 0 PASS／1 FAIL，104.90 秒；不把普通门禁成功代记为完整更新通过。
+
+CMD 代次 `553971f6-df80-425d-b13a-b7d1ddc5f479` 实际创建 Node／Codex，输出 18 字节 `codex-cli 0.156.1` 加换行，进程退出 0；仍保留 `CODEX_HOME` 规范化拒绝访问及 PATH aliases 创建失败警告。PowerShell 代次 `fbb75fc7-2d7d-4b13-a87c-199edcda82dc` 在 `System.Net.ServicePointManager` 类型初始化时失败，退出 -65536、零输出，未创建 Node／Codex，未取得内部异常链，不能先定底层原因。两代调试事件均完成验证和继续，无未处理事件；原 Job 空、AppContainer 清理确认，helper 退出 0，桌面／DeviceMap／窗口站／LSA 回收均成功。此结果证明本轮两候选输出隔离后的清理成功，不能把新 PowerShell 失败继续归因旧 LSA 残留。
+
+实际来源为 Node 20.9.0／npm 10.1.0，模型输入 0。后四场景 `old_moved`、`published_receipt_missing`、`external_change_preserved`、`candidate_changed_preserved` 和三次独立冷恢复均未执行，无完整矩阵成功收据；未证明失败后其他前缀／配置全树不变或完整事务发布／回滚。三份官方 ZIP 的 API 大小、SHA 和全 CRC、79 个成员及官方包完整 SRI／成员均已核验；展开共 466771676 字节，安全提取 76 份小文件共 3669710 字节。唯一观察器 `r-5aykha7x` 已退出、归档并清理，远端原件根保留。
+
+终审索引 `g08-build-preparation/5d8075c52-windows-ci/final-delivery-index.safe.json` SHA `2295a35ec843716440c0ea8a75694285351d1715b14a3e6ee593f5d8b37bbcbc`，根独立复核 SHA `a71d4433a6baa0ab142163eedffe010ec29001d195fc0857a49b89c9214cbab2`，原生独审 SHA `c4237179922ca8433491406bc90b9252bcbcfa3dcf529227bc4b28423e1eea91`。本轮文档引用的 `cargo check --locked -p warp` 收据 `r-1mgigg_5` 为 exit 0／cleaned，日志 SHA `c8c11fff895a449f5b3143a07c029122b7cde5b595457e1b6d72d26ba315579f`。无需本地化变更：仅更新验收记录，既有用户文案和布局不变。**新增关闭 0 项，保持 10 关闭／G09 开放／3 移交；完整原矩阵与最终同提交双平台源码门禁仍待完成，PR 保持草稿。**
+
+
 ## 2026-10-04：G09 候选输出生命周期修复已实现，完整原生矩阵待验
 
 固定 Windows npm `--version` 候选的 stdout／stderr 改由私有普通文件捕获；`create_new`、不共享、关闭即删除，祖先目录和文件身份被绑定。原候选进程退出且严格 Job 为空后，分块封存精确输出到候选从未继承的 worker 文件，并关闭候选输出句柄；原窗口站／LSA 清理完成后才重放宿主流。保留原 stdin、官方 CMD／PowerShell shim、ACL／零 capability、取消、stdout 1 MiB 上限和原清理期限，stderr 不新增长度上限。输出复制、关闭、重放或 flush 失败均不标成功；没有修改全局监督管道。
