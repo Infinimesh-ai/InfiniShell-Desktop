@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05按原关闭条件完成纯PNG、同轮图片加单技能、恢复/保稿和英中补验并独审，历史失败保留。G09的Windows新LSA登录会话回收仍待解决；原完整矩阵与最终同提交双平台源码门禁仍待完成。4ff原矩阵已确认窗口站消失、LSA仍存在且查询无错误；未定位剩余token引用，原生修复尚未证明。",
+  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05按原关闭条件完成纯PNG、同轮图片加单技能、恢复/保稿和英中补验并独审，历史失败保留。G09的Windows新LSA登录会话回收仍待解决；原完整矩阵与最终同提交双平台源码门禁仍待完成。4ff原矩阵已确认窗口站消失、LSA仍存在且查询无错误；未定位剩余token引用，原生修复尚未证明。999ff的四组设备映射/空Job对照均在原查询内回收；此受限对照不能替代生产AppContainer/console/debugger组合或原更新矩阵。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -9608,5 +9608,48 @@
       "localization": "无需本地化变更。",
       "source_review_sha256": "0763d28506a51cc51c40811c5ba602aa1bbf31a7560cd19dbbf1df519a1ef9e3"
     }
+  },
+  "g09_lifetime_controls_20261004": {
+    "source_commit": "999ff00d6e4338a6c2b755e27d55744cf3c69fdb",
+    "run_id": 37168344636,
+    "windows_job_id": 111335963730,
+    "run_conclusion": "success",
+    "scope": "四个独立新LUID的两段helper：私有设备映射无/有 × 空Job查询前/后关闭；每例只执行一次，原期限不变。",
+    "ordinary_pass": 637,
+    "ordinary_by_crate": {
+      "warp": 565,
+      "command": 72
+    },
+    "i18n_pass": 11,
+    "native_cases_passed_once": 4,
+    "raw_receipts_verified": 26,
+    "native_review": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/999ff00d6-windows-ci/independent-lifetime-controls-native-review-v1.safe.json",
+      "sha256": "cf99093f259d58dc413e19a0a2faf2e59cfc4897ae191c82ff96776bc7222307"
+    },
+    "root_review_sha256": "170b7778baf2378530493900e39934558b8162b937c268aabe520051308881f6",
+    "terminal_log_audit_sha256": "fe51faa29c63a9f52f6fc46ba91e21c3440832bdc84f4a049ca92623d158a44c",
+    "all_helpers_naturally_exited_zero": true,
+    "all_stations_absent_in_original_observation": true,
+    "all_logons_absent_in_original_observation": true,
+    "retained_job_cases_logon_absent_before_job_close": true,
+    "device_map_cases_exact_create_remove_and_file_id_confirmed": true,
+    "conclusion": "这些因素单独及组合在本轮高IL Session0两段helper对照中不足以重现LSA留存；不能排除生产新LUID AppContainer/console/debugger/stdio与多层Job交互，不据此修改超时或提前拆Job。",
+    "production_changed": false,
+    "cli_update_matrix_executed": false,
+    "final_same_commit_source_gate": false,
+    "g09_closed": false,
+    "remaining_blocker": "4ff生产原件仍为窗口站已消失、新LSA仍存在；实际token引用持有者未知。",
+    "next_action": "只读核对生产标准流等尚存资源生命周期；仅依据具体差分决定下一步，不重复映射/一般空Job探针。",
+    "observer_status": "r-wj9uvy0n_exit0_cleaned",
+    "remote_evidence_root_cleanup_ready": false,
+    "pre_commit_cargo_check": {
+      "run_id": "r-p48ptfjo",
+      "exit_code": 0,
+      "status": "cleaned",
+      "log_sha256": "5bbbc90a74a649aa33cc92970f5f72f9690bdcd4e50d71e8c72906f1d959e24a"
+    },
+    "newly_closed_items": [],
+    "localization": "无需本地化变更；仅补核实证据和范围说明。"
   }
 }

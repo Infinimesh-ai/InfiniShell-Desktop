@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 四组生命周期对照完成，生产阻塞保留
+
+**2026-10-04 设备映射／空 Job 对照已核，仍开放**：`999ff00d6` 的[Windows 37168344636](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37168344636)正式成功，637 项普通 PASS（565 warp＋72 command）、i18n 11，以及四个 ignored 原生病例各一次通过。四例使用互异新 LUID／nonce，8 个 helper 自然退出 0；26 份原始二进制收据独立解码、身份和摘要吻合。四例原查询均为 LSA `0xc000005f`、站 `0x80070002`；保留空 Job 的两例在关闭 Job 前已经回收，两映射例精确创建／删除及 FileID 绑定通过。独审 SHA `cf99093f259d58dc413e19a0a2faf2e59cfc4897ae191c82ff96776bc7222307`，根复核 SHA `170b7778baf2378530493900e39934558b8162b937c268aabe520051308881f6`。只排除这些因素在本轮高 IL、Session 0 两段 helper 对照中足以重现留存，不外推生产 AppContainer／控制台／调试／标准流及多层 Job 组合。生产代码未改；4ff 的 LSA 残留、原五场景／三冷恢复和最终同提交源码门禁仍待解决。不再重复相近映射／一般空 Job 对照。**新增关闭 0 项**；无需本地化变更。
+
+原件位于仓外 `g08-build-preparation/999ff00d6-windows-ci`。主 ZIP `11291565394` 为 38318 字节，SHA `5151e24da50c7c23f6a95fd1489b6f6b03e1b43cef0672b6b570761aedc43103`；大小、SHA、CRC、37 个解压成员和冻结源码均复核。四例整项耗时依次为 0.224／0.208／0.236／0.197 秒，不以关闭 Job 后的观察覆盖原失败。普通日志无 FAIL／LEAK／RETRY／FLAKY／TIMEOUT，日志审计 SHA `fe51faa29c63a9f52f6fc46ba91e21c3440832bdc84f4a049ca92623d158a44c`。唯一观察器 `r-wj9uvy0n` 已退出并清理；远端证据根仍保留 `cleanup_ready=false`，不把日志成功外推为整根删除。文档提交前本机 `cargo check -p warp`（既定取证／测试嵌入 features）通过，`r-p48ptfjo` 已清理，日志 SHA `5bbbc90a74a649aa33cc92970f5f72f9690bdcd4e50d71e8c72906f1d959e24a`。
+
 ## 2026-10-04：G09 分项证据确认 LSA 残留
 
 `4ff41b614` 的[原完整 Windows 事务矩阵 37163186787](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37163186787)终态 failure，唯一失败为 step60。普通 1193 PASS＝1121 warp＋72 command；43 项必需具名测试各一次普通 PASS，i18n 11；普通门禁无 FAIL／LEAK／RETRY／FLAKY。首 CMD／console／Node／Codex 四个候选进程均正常 EXIT 0，输出 `codex-cli 0.156.1`；196 个调试事件收到、验证和继续，pending 为 null。`updated` 97.97 秒后返回 RecoveryRequired，不计事务成功。
