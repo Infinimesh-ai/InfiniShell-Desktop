@@ -1,5 +1,27 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 PowerShell 诊断模块绑定修订
+
+仅修正 feature 门控的 PS DLL 额外诊断：缓存的包／组件租约沿用普通 LOAD 的来源授权，重新核验身份、摘要及祖先；System32 DLL 从原事件文件与锁定目录建立拒写租约，不再套用另一套 PE 导入授权。已授权 PE32 DLL 标记 `non_x64_native_unwind` 及覆盖不完整；身份／IO／损坏头仍为失败，CMD/root 路径继续拒绝 PE32。普通加载授权、权限、取消与期限均未改。926 没有失败模块身份或子阶段，此修订不能确定当时触发分支，也不能证明旧 SPM／停滞已修复。
+
+新增 8 项 Windows 回归，witness 组总 19 项、feature 总 82 项，均待 Windows 实际编译运行。本机 `cargo check --locked -p warp`、带规定本机 features 的 i18n 11 项及定向格式检查通过；三个登记短目录 `r-5la1tbq5`／`r-cr8n6je0`／`r-h183ozs0` 已清理。源码冻结 SHA `8c53ed7dc2537acd79171b2896ac367b95bdd842ad9a51e5ab4e1d1272a85bd9`；门禁索引 `g09-ps-module-binding-local-gates.safe.json` SHA `41c8f0dc443f3b504f4dc7e9edc6224ec816ec46b07ad1026ed60efc8eab19f8`。Mac 门禁不编译 Windows cfg 分支，不替代单 PS 诊断、原完整五场景／三冷恢复及最终同提交双平台门禁。
+
+两文件独审无阻断，收据 SHA `cbe530d02f93bd6f4bdd181ced6c2b65f3ba0ddd95dc5df81ad5c21f10e62250`；静态审查不替代 Windows 实际运行。
+
+英中审计：无需本地化变更；仅诊断绑定、安全数值字段及回归，无 GUI/TUI 文案、布局或界面语义变化。**新增关闭 0 项，10 关闭／G09 开放／3 移交不计通过，PR 保持草稿；额外 ACL／Claude musl 待用户决定。**
+
+## 2026-10-04：G09 首 PowerShell 诊断在 LOAD 绑定提前失败
+
+精确提交 `9267294457f1fbe0cc6c3ee4a55579ef7138c728` 的 [Windows run 37183471233](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37183471233) 正式 failure。本轮为首 PowerShell 代次的单 `updated` 诊断，原生 0 PASS／1 FAIL、107.31 秒，返回 `ProbeFailed`。普通门禁 1221 PASS（1133 warp＋88 command），63 个必需测试各一次 PASS；feature 七组 74 个必需测试各一次 ok，i18n 11 已含在 warp 内。同名测试按普通／feature 两种配置分别计证，不相互替代。普通 FAIL／LEAK／RETRY／FLAKY／TIMEOUT 均为 0，96 次编译 warning 保留；不把单元门禁通过写成整轮通过。完整日志独审 SHA `8c7c0b5dd0663d5b5c08546022d38d02281835f2d03e49e7b3f2aea581fa7fd7`。冻结离线审计器原先要求步骤名前缀，与官方纯时间戳日志不适配；独审按官方步骤起止时间逐项关联，未把准备器匹配问题记作测试缺失，也未修改原日志或审计器。
+
+CMD 代次 `282fa13e-1320-4a78-b5de-e37c583c6645` 真实启动 Node／Codex，输出固定版本 18 字节并退出 0；CP936“拒绝访问。”及 `CODEX_HOME` 规范化／PATH aliases 警告仍保留。PowerShell 代次 `02a04afb-6681-4d74-a297-a4008dbafdd6` 在 LOAD 序号 91、约 4138ms 的诊断 `module_binding` 阶段返回 Other，Win32／HRESULT 均未取得。此前 90 个事件已验证并继续；本次未到 15 秒，无早晚线程快照、CPU 差、CLR 或 Node／Codex。原普通 LOAD 授权先通过，失败发生于额外诊断绑定；源码已确认额外 `protected=false` 租约与仅 PE32+ 限定同生产授权不等价，但没有失败模块身份或内部子阶段，不能确定具体 DLL 或哪一差异触发。诊断修订正在进行，本地门禁及 Windows 实际结果待验，不称旧 `ServicePointManager`／停滞已修复或被本轮复现。
+
+两代 manifest／launch／exit／helper 身份绑定闭合，原 Job 空、helper 双退出 0、桌面／DeviceMap／窗口站／LSA／AppContainer 清理均确认。PS root／console 由错误清理退出 1，不是自然启动成功。`witness.cancelled=true` 为错误清理标记，本轮 `cancel_observed=false` 且不是 seal Interrupted；没有 `cancelled-candidate-stderr.safe.json`，不能据此认定原 stderr 为空或旧错误消失，也不证明取消收据路径已验。原生审计 SHA `9eae08158f5bbdcfee072f390726bde30680cfcc87b2d9b8630942d2900ed277`，输出／清理独审 SHA `ff52e1be875d72b337041acb627e16e6fca47626ae2b4f6900711f5dc5dbbb0b`，首因审查 SHA `f9c93f2cc4b09f928a6a23e973fa9f79c4ed7436d0af3e44e031f57922c8aed0`。仓外 `g08-build-preparation/926729445-windows-ci` 安全提取 71 份小件、241763 字节，清单 SHA `8479796f816b89ac3464e83eab112dd110e8b2300a75a7cc4c7af97e16f022bd`；不外推远端全根删除或其他前缀／配置全树已验证。
+
+本轮总索引 `926729445-windows-ci/final-delivery-index.safe.json`（42627 字节，SHA `5216af442b6068145b7c232a67c2b51b86fa504081ceb082576669d4a3ab1cf5`）另核 50 份精确提交源码、71 份小原件、两份 ZIP 及归档／审计／观察器清理记录；不把本机观察器清理等同远端全根删除。
+
+其余四场景和三次冷恢复未执行，原完整矩阵与最终同提交双平台源码门禁仍未通过。原关闭条件映射 `g09-final-condition-map-20261004.safe.json` SHA `b946f1667c72a76ecc5fe8ef9de4ee77d0866c24031eae1be2eba43f203d613f` 及根复核 SHA `ee2a7fb93cfe5be9b700f2481f4987c1f964638dadf499ea1ead21ef4058c083` 保留 Unix 额外 ACL／安全属性和 Claude Linux npm musl 的原范围冲突；用户尚未回答，不自行豁免或无条件收敛为仅剩 Windows。**新增关闭 0 项，10 关闭／G09 开放／V01、V02、V05 移交不计通过，PR 保持草稿。** 以下历史结果与准备阶段记录不回写为本轮通过。仅更新验收记录，无需本地化变更。
+
 ## 2026-10-04：G09 取消错误输出保全与首 PowerShell 取证准备
 
 取消发生后，固定版本候选最多保留 8192 字节原始 stderr 到本代私有新收据，记录总长、截断和原始字节；不覆盖旧文件，不回放已取消输出，不改变原错误优先级，并在原生清理前释放候选输出句柄。PowerShell 取证只授权测试首个匹配代次与模式，15/240 秒读取原 CREATE 主线程及 CPU 差，不启用 CMD 的寄存器断点，不枚举其他线程。诊断模块超过 64 时仅 PS 标记覆盖不完整，普通 CREATE/LOAD 授权、权限、期限和严格清理保持不变。

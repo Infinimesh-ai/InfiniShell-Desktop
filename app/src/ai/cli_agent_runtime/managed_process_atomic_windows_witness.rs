@@ -125,6 +125,7 @@ pub(super) struct NativeWitness {
     modules: HashMap<u32, Vec<BoundModule>>,
     module_coverage_partial: bool,
     skipped_module_events: u64,
+    unsupported_module_events: u64,
     births: HashMap<u32, u64>,
     creation: Option<CreationWitness>,
     completed_creation: Option<Summary>,
@@ -186,29 +187,48 @@ fn safe_failure(stage: &'static str, failure: &io::Error) -> serde_json::Value {
     serde_json::json!({"stage": stage, "kind": format!("{:?}", failure.kind()), "hresult":hresult,"win32_error":win32_error})
 }
 
-fn mapped_image_size(file: &File) -> io::Result<u32> {
+fn mapped_image_size(file: &File, mode: WitnessMode, dll: bool) -> io::Result<Option<u32>> {
     let mut file = file.try_clone()?;
     let file_size = inspect_handle(&file)?.size;
+    if &read_at::<2>(&mut file, 0, file_size)? != b"MZ" {
+        return Err(error("native_witness.pe_signature"));
+    }
     let offset = u64::from(read_u32(&mut file, DOS_HEADER_PE_OFFSET, file_size)?);
-    if offset > MAX_PE_HEADER_OFFSET {
+    if !(64..=MAX_PE_HEADER_OFFSET).contains(&offset) {
         return Err(error("native_witness.pe_offset"));
     }
     let header = read_at::<24>(&mut file, offset, file_size)?;
-    if &header[..4] != b"PE\0\0" || u16::from_le_bytes([header[4], header[5]]) != 0x8664 {
-        return Err(error("native_witness.pe_machine"));
+    if &header[..4] != b"PE\0\0" {
+        return Err(error("native_witness.pe_signature"));
     }
+    let machine = u16::from_le_bytes([header[4], header[5]]);
+    let optional_size = u64::from(u16::from_le_bytes([header[20], header[21]]));
     let optional = offset
         .checked_add(24)
         .ok_or_else(|| error("native_witness.pe_offset"))?;
-    let header = read_at::<60>(&mut file, optional, file_size)?;
-    if u16::from_le_bytes([header[0], header[1]]) != 0x20b {
+    checked_end(optional, optional_size, file_size)?;
+    if optional_size < 60 {
         return Err(error("native_witness.pe_optional"));
     }
+    let header = read_at::<60>(&mut file, optional, file_size)?;
+    let magic = u16::from_le_bytes([header[0], header[1]]);
+    let native_x64 = match (machine, magic) {
+        (0x8664, 0x20b) if optional_size >= 112 => true,
+        (0x014c, 0x10b) if optional_size >= 96 => false,
+        _ => return Err(error("native_witness.pe_machine_or_optional")),
+    };
     let size = u32::from_le_bytes(header[56..60].try_into().unwrap());
     if size == 0 || u64::from(size) > MAX_NATIVE_EXECUTABLE_BYTES {
         return Err(error("native_witness.pe_image_size"));
     }
-    Ok(size)
+    if native_x64 {
+        Ok(Some(size))
+    } else if mode == WitnessMode::PowerShell && dll {
+        // 仅表示已授权模块不适用于 x64 原生解栈，不代表完整 PE 或托管栈已经验证。
+        Ok(None)
+    } else {
+        Err(error("native_witness.pe_machine"))
+    }
 }
 
 impl WindowsImageDebugSession {
@@ -236,6 +256,7 @@ impl WindowsImageDebugSession {
                 modules: HashMap::new(),
                 module_coverage_partial: false,
                 skipped_module_events: 0,
+                unsupported_module_events: 0,
                 births: HashMap::new(),
                 creation: None,
                 completed_creation: None,
@@ -299,15 +320,26 @@ impl WindowsImageDebugSession {
             witness.skipped_module_events = witness.skipped_module_events.saturating_add(1);
             return Ok(());
         }
+        let mode = witness.mode;
         // 仅在原 CREATE/LOAD 授权通过后取得独立拒写租约；路径只找回原 file identity。
         let prepared = (|| {
-            let lease = lease_mapped_image(file, &final_path_from_handle(file)?, dll, false)?;
-            let size = mapped_image_size(&lease.program)?;
+            let lease = if mode == WitnessMode::PowerShell && dll {
+                self.clone_authorized_native_module(pid, file)?
+            } else {
+                lease_mapped_image(file, &final_path_from_handle(file)?, dll, false)?
+            };
+            let size = mapped_image_size(&lease.program, mode, dll)?;
             Ok::<_, io::Error>((lease, size))
         })();
         let (lease, size) = prepared.map_err(|failure| {
             self.native_failure("module_binding", safe_failure("module_binding", &failure))
         })?;
+        let Some(size) = size else {
+            let witness = self.native_witness.as_mut().unwrap();
+            witness.module_coverage_partial = true;
+            witness.unsupported_module_events = witness.unsupported_module_events.saturating_add(1);
+            return Ok(());
+        };
         let modules = self
             .native_witness
             .as_mut()
@@ -322,6 +354,81 @@ impl WindowsImageDebugSession {
             dll,
         });
         Ok(())
+    }
+
+    fn clone_authorized_native_module(
+        &self,
+        pid: u32,
+        file: &File,
+    ) -> io::Result<SystemHelperLease> {
+        let identity = inspect_handle(file)?;
+        let cached = self
+            .package_images
+            .as_ref()
+            .and_then(|images| {
+                images.iter().find_map(|(dll, lease)| {
+                    (*dll && lease.identity.id == identity.id).then_some(lease)
+                })
+            })
+            .or_else(|| {
+                self.component_images
+                    .get(&pid)
+                    .and_then(|images| images.iter().find(|lease| lease.identity.id == identity.id))
+            });
+        if let Some(lease) = cached {
+            // 普通 LOAD 已按来源完成 PE 和权限审核；不能再套用另一套包映像语法。
+            lease.verify_image(file)?;
+            let cloned = lease.try_clone()?;
+            cloned.verify_image(file)?;
+            return Ok(cloned);
+        }
+
+        // System32 授权不缓存每个 DLL；仍须从原事件与原目录身份建立拒写租约。
+        self.verify_system_image(file)?;
+        let path = final_path_from_handle(file)?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| error("native_witness.module_parent"))?;
+        let mut paths: Vec<_> = parent.ancestors().collect();
+        paths.reverse();
+        let ancestors = paths
+            .into_iter()
+            .map(|path| {
+                let file = open_ancestor(path)?;
+                let identity = inspect_handle(&file)?;
+                if !is_plain_kind(identity.attributes, true) {
+                    return Err(error("managed_process.atomic_windows_ancestor_not_plain"));
+                }
+                Ok(AncestorLease { file, identity })
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        if ancestors.last().map(|ancestor| ancestor.identity)
+            != Some(self.system_directory.identity)
+        {
+            return Err(error(
+                "managed_process.atomic_windows_system_directory_changed",
+            ));
+        }
+        let mut program = open_program(&path)?;
+        if inspect_handle(&program)? != identity
+            || identity.size == 0
+            || identity.size > MAX_NATIVE_EXECUTABLE_BYTES
+            || !is_plain_kind(identity.attributes, false)
+        {
+            return Err(error(
+                "managed_process.atomic_windows_loaded_image_not_plain",
+            ));
+        }
+        let lease = SystemHelperLease {
+            sha256: sha256_file(&mut program)?,
+            program,
+            identity,
+            ancestors,
+            npm_role: NpmProcessRole::Unknown,
+        };
+        self.verify_system_image(file)?;
+        lease.verify_image(file)?;
+        Ok(lease)
     }
 
     pub(super) fn native_witness_create(
@@ -705,7 +812,7 @@ impl WindowsImageDebugSession {
         let witness = self.native_witness.as_mut().unwrap();
         witness.early_root_cpu = early_root_cpu;
         witness.snapshot = Some(
-            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"root_main_thread":root_main_thread,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
+            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"root_main_thread":root_main_thread,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"unsupported_module_events":witness.unsupported_module_events,"unsupported_module_reason":(witness.unsupported_module_events > 0).then_some("non_x64_native_unwind"),"suspension_balanced":balanced,"desktop_failure":desktop_failure,"processes":observations}),
         );
         if let Some(creation) = &mut witness.creation
             && let Err(failure) =
@@ -834,7 +941,7 @@ impl WindowsImageDebugSession {
         let finished_ms = self.native_at_ms();
         let witness = self.native_witness.as_mut().unwrap();
         witness.late_snapshot = Some(
-            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"observation":observation,"cpu_difference":cpu_difference,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events}),
+            serde_json::json!({"started_ms":started_ms,"finished_ms":finished_ms,"complete":true,"observation":observation,"cpu_difference":cpu_difference,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"unsupported_module_events":witness.unsupported_module_events,"unsupported_module_reason":(witness.unsupported_module_events > 0).then_some("non_x64_native_unwind")}),
         );
         if !balanced {
             return Err(error("managed_process.native_witness_suspend_unbalanced"));
@@ -964,7 +1071,7 @@ impl WindowsImageDebugSession {
 
     pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
-            let summary = serde_json::json!({"generation":witness.generation,"mode":witness.mode,"creation_enabled":witness.mode == WitnessMode::Cmd,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
+            let summary = serde_json::json!({"generation":witness.generation,"mode":witness.mode,"creation_enabled":witness.mode == WitnessMode::Cmd,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"unsupported_module_events":witness.unsupported_module_events,"unsupported_module_reason":(witness.unsupported_module_events > 0).then_some("non_x64_native_unwind"),"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
             // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

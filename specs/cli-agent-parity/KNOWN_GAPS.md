@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | Mac 消费者已验；542 Windows首场景updated失败：CMD版本候选成功但保留CODEX_HOME拒绝访问警告，PS未创建Node并在期限后取消。最终Job/AppContainer/站/LSA清理成功，但取消路径未保留PS自身stderr，停滞根因未证；后4场景、3冷恢复和最终同提交门禁未完成 |
+| G09 | 开放 | Mac已支持安装合同已有验收；926单updated诊断在PS的LOAD绑定提前失败，无早晚快照/CLR/Node。CMD版本成功但拒绝访问警告保留，两代资源清理成功；不证明旧SPM/停滞已修或复现。诊断修订待验，原五场景/三冷恢复及最终同提交门禁未完成；额外ACL/Claude musl范围冲突待用户决定 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -277,6 +277,11 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-04 诊断模块绑定修订，本机门禁通过、Windows待验**：仅 PS DLL 的额外取证复用普通 LOAD 已有租约；System32 仍绑定原文件／锁定目录身份与拒写句柄。已授权 PE32 DLL 标记原生解栈覆盖不完整，身份／IO／损坏头仍失败，CMD/root 严格路径保留。新增 8 项 Windows 回归（witness 总 19）待实际运行；Mac `cargo check -p warp`、i18n 11 和定向格式检查通过，3 个登记短目录均已清理。门禁索引 SHA `41c8f0dc443f3b504f4dc7e9edc6224ec816ec46b07ad1026ed60efc8eab19f8`。无需本地化变更；不据此确认旧 PS 初始化问题修复，新增关闭 0 项。
+
+- **2026-10-04 首PS诊断被模块绑定阻止，仍开放**：精确 `926729445` 的 [run 37183471233](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37183471233) 为 failure。本轮仅 `updated`，0 PASS／1 FAIL、107.31 秒、`ProbeFailed`；普通 1221 PASS（1133 warp＋88 command）、63 必需各一次 PASS，feature 74 各一次 ok，i18n 11 已含在 warp 内。CMD 真实版本输出 18 字节、退出 0，仍保留“拒绝访问。”及 `CODEX_HOME`／PATH aliases 警告。PS 的 LOAD 序号 91 约 4138ms 在诊断 `module_binding` 返回 Other，未到 15 秒，无早晚快照、CLR 或 Node／Codex；不能称旧 SPM／停滞已修或复现。两代 Job／AppContainer／桌面／DeviceMap／窗口站／LSA 清理确认；`witness.cancelled` 只是错误清理标记，不证明控制取消；没有取消 stderr 收据，不推断原 stderr 为空。源码确认额外租约参数及 PE32+ 限定与生产授权不等价，但没有失败模块身份／内部子阶段，具体触发分支未证；修订中且待门禁。原生审计 SHA `9eae08158f5bbdcfee072f390726bde30680cfcc87b2d9b8630942d2900ed277`，清理独审 SHA `ff52e1be875d72b337041acb627e16e6fca47626ae2b4f6900711f5dc5dbbb0b`，首因审查 SHA `f9c93f2cc4b09f928a6a23e973fa9f79c4ed7436d0af3e44e031f57922c8aed0`，均位于仓外 `g08-build-preparation/926729445-windows-ci`；总索引 SHA `5216af442b6068145b7c232a67c2b51b86fa504081ceb082576669d4a3ab1cf5`。后四场景／三冷恢复未执行，完整原矩阵及最终同提交门禁未完成，新增关闭 0 项。
+- **原范围冲突仍待用户决定**：`g09-final-condition-map-20261004.safe.json`（SHA `b946f1667c72a76ecc5fe8ef9de4ee77d0866c24031eae1be2eba43f203d613f`）与根复核（SHA `ee2a7fb93cfe5be9b700f2481f4987c1f964638dadf499ea1ead21ef4058c083`）明确 Unix 额外 ACL／安全属性、Claude Linux npm musl 的起点文档范围冲突尚未获用户决定；不把不支持／拒绝或其他平台实机移交当豁免，不无条件声称只剩 Windows。既有 Mac 功能证据和全部失败历史保留。
 
 - **2026-10-04 定向诊断已准备，未新增关闭**：取消时最多保全 8192 字节原 stderr；仅首 PS 原主线程 15/240 秒配对快照，额外诊断模块上限不放宽原映像授权。工作流复用既有 scope 保持 25 输入与默认 CMD。本机 check、Windows command 类型检查、中英文 11、驱动 22／范围 8 与语法检查通过；门禁索引 SHA `43406b6dc7537b6afae035d1c31958e931f63ce921844e86fcd9d0e4029d11cb`。无需本地化变更。实际取证、原 5 场景／3 冷恢复与最终同源门禁仍未通过。
 - **2026-10-04 路径修订后仍停在 PowerShell，原矩阵失败**：精确 `542a2d81a` 的 [run 37178488175](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37178488175) 为 failure。普通 1217 PASS、59 必需逐名各一次 PASS、i18n 11，通过范围不含原生更新；原生首 `updated` 为 0 PASS／1 FAIL、386.17 秒。CMD 实际输出固定版本并退出 0，既有警告保留；PS 未创建 Node，在原期限后控制取消，最终 exit 1。最初 16 条 first-chance CLR 事件、3 条溢出不足以确定根因。两代最终 Job／AppContainer／站／LSA 回收已证，但 PS 内层 Interrupted 仍保留；取消检查使原 stderr 在读取前关闭删除，不能据宿主日志缺文认定旧 SPM 问题已解除。49 份精确源码及 23 份小原件根审 SHA `0a773146053f7c80b804cff52221e9ce1d146bf116d6b4603bb65fa907640b4c`，日志独审 SHA `13a317bbab6c69d4fcd6e1bfca48021ddb44fe55333822b1b1115b2d29c985a5`；原件位于仓外 `g08-build-preparation/542a2d81a-windows-ci`。后四场景、三冷恢复与最终同源门禁未完成；先补有界取消 stderr 和首 PS 线程取证，不将诊断准备计为缺口关闭。
