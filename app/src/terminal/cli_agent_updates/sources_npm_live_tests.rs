@@ -532,12 +532,18 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
         if manifest.case == "unreviewed_downgrade_rejected" {
             let updated = tree(root)?;
             let refused = inspect(manifest, "2.1.278").await.map_err(mapped)?;
+            save(
+                &root.join("downgrade-refusal.safe.json"),
+                &json!({"error":refused.error.as_ref().map(|error| format!("{error:?}")),
+                    "plan_absent":refused.plan.is_none(),"selected_channel":"latest"}),
+            )?;
+            // 280→278 已有 Stable 合同；本例明确选择 Latest，必须按渠道不匹配拒绝。
             check(
-                refused.error == Some(Error::InvalidRelease) && refused.plan.is_none(),
+                refused.error == Some(Error::ChannelMismatch) && refused.plan.is_none(),
                 "unreviewed_downgrade_not_rejected",
             )?;
             check(tree(root)? == updated, "downgrade_changed_installation")?;
-            expected_failure = Some("InvalidRelease");
+            expected_failure = Some("ChannelMismatch");
         }
     } else {
         let point = if manifest.case == "candidate_changed_preserved" {

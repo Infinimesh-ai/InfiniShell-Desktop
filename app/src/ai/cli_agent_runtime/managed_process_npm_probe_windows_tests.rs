@@ -40,7 +40,7 @@ fn mapped_powershell_keeps_alongside_node_selection_without_a_path_override() {
     let (arguments, environment) = mapped_command("powershell", root, true).unwrap();
     assert_eq!(
         arguments,
-        r#"-NoLogo -NoProfile -NonInteractive -File "D:\install\codex.ps1" --version"#
+        r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; @() | & 'D:\install\codex.ps1' --version | & { process { $_ } }; exit $global:LASTEXITCODE""#
     );
     let baseline = candidate_environment("powershell", root).unwrap();
     assert_eq!(
@@ -59,8 +59,12 @@ fn mapped_commands_reject_non_root_and_unbound_drive_representations() {
         r"z:\",
         r"\\server\share",
         r"Z:\&",
+        r"Z:\'; exit 0; #",
+        r#"Z:\"; exit 0; #"#,
+        r"Z:\$(exit 0)",
     ] {
         assert!(mapped_command("cmd", Path::new(root), false).is_err());
+        assert!(mapped_command("powershell", Path::new(root), false).is_err());
     }
     assert!(mapped_command("other", Path::new(r"Z:\"), false).is_err());
 }

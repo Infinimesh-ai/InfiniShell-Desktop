@@ -137,7 +137,13 @@ fn mapped_command(
     }))?;
     let arguments = match mode {
         "cmd" => format!("/d /v:off /s /c \"\"{entry}\" --version\""),
-        "powershell" => format!("-NoLogo -NoProfile -NonInteractive -File \"{entry}\" --version"),
+        "powershell" => {
+            // 空输入和流式输出让原 shim 请求独立管道，不保证禁止系统启动回退。
+            // 非零初值避免未取得原生退出码时沿用成功状态。
+            format!(
+                r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; @() | & '{entry}' --version | & {{ process {{ $_ }} }}; exit $global:LASTEXITCODE""#
+            )
+        }
         _ => return Err(invalid()),
     };
     let mut environment = candidate_environment(mode, root)?;

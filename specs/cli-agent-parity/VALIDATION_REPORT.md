@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 PowerShell 管道兼容候选与 Mac 降级断言修订
+
+Windows 受管版本入口改为通过官方 `codex.ps1 --version` 请求空输入和流式输出管道，保留显式原生退出码；初值1避免未取得退出码时沿用成功状态。盘根严格限于 D–Z，拼接路径固定，官方包／Node选路、环境、Job、AppContainer、映像授权、取消期限与完整清理标准均保持。静态独审 SHA `b046e46011afa93d08f678cfcdc8fe3a864bbc0f43d8a192cf31d0ea1d4f858b` 无阻断，但不证明禁止系统回退、旧零输出根因或真实修复；仍须原五场景／三次独立冷恢复，`witness=false`。
+
+`cf18c6cdd` 的 Mac `r-75gduwee` 前四场景通过，含两次独立冷恢复；最后 `unreviewed_downgrade_rejected` 在旧 `InvalidRelease` 断言失败，整轮仍失败。既有产品合同对 Latest 的280→278精确返回 `ChannelMismatch`；现仅同步该断言和结果字段，保留无更新计划及安装树不变，新增小型实际拒绝字段收据。原失败没有保存 `refused.error`，不把源码推断回填为运行观测。64份小原件、18份cf18来源及四代原生退出0／完整清理绑定已独审，SHA `9ff10abfc80baf116200168af06d10c4d55626a7e64ee18b8af04bb8a6119448`；`cleanup_ready=false` 是失败现场保留机制，不等于已证产品资源泄漏。两次历史失败现场均保留，完整矩阵仍须重跑。
+
+本机 `cargo check --locked -p warp`、i18n11项及三文件定向格式通过，短根已归档清理。门禁索引 `g09-ps-pipeline-mac-channel-local-gates-v1.safe.json` SHA `8a7becbd1667b34ba05f7702aa09ced8d31d8d0905445be495323ecbc487ba75`；Windows专属参数回归没有在Mac执行，不计目标平台通过。无需本地化变更：内部版本入口和开发验收，不改变GUI／TUI文案与布局。
+
+Linux Claude npm 工件补保存已有无凭据夹具的 `manifest.private.json`，以保全精确平台和源码输入；不改变执行范围。工作流12项范围回归（`r-ycdp5d90`）与完整actionlint（`r-ka0ob89z`）通过，原自托管标签配置保持。Linux源码 run37204698590仍运行；musl原生事务尚未派发。环境中Landlock ABI1及userns不可用不会直接阻断Claude npm的sealed ELF路径，完整加载器绑定和真实运行仍待验。**新增关闭0项；G09、额外ACL／安全属性待决范围及最终同冻结源码双平台门禁仍开放，PR草稿。**
+
 ## 2026-10-04：G09 Windows 版本输出未满足；Mac 候选拒绝验收器修订
 
 精确 `2d9b3d4f49c26e7464a5666c8c0db833d48c9bdf` 的 Windows run37200286598 原件已独审：普通1224 PASS（warp1133／command91）、66必需及i18n11各一次PASS，96条warning保留；真实首 `updated` 为0通过／1失败、113.08秒、`ProbeFailed`。CMD输出18字节固定版本；PS已经创建Node／Codex及两个console，均退出0，但捕获stdout为0字节。PS root先退出、后代随后退出，不再表述为未启动或取消超时。两代Job、AppContainer、helper、desktop、DeviceMap、窗口站和LSA清理确认；CMD拒绝访问／PATH警告及runner清理孤儿进程原文保留。后四场景与三次冷恢复未执行，发布后的入口、配置和完整目录不变性也未验。

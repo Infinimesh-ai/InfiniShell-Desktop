@@ -701,6 +701,7 @@ jobs:
           name: cli-linux-claude-npm-updates-${{ github.sha }}
           path: |
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.safe.json
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/manifest.private.json
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.metadata.json
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.stdout
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.stderr
