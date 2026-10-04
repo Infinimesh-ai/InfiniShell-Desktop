@@ -193,7 +193,7 @@ static BOOL read_stdio_record(const WCHAR *name, STDIO_RECORD *value, DWORD wait
         HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                                   FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
         if (file != INVALID_HANDLE_VALUE) {
-            LARGE_INTEGER size;
+            LARGE_INTEGER size = {0};
             BY_HANDLE_FILE_INFORMATION information;
             DWORD used = 0;
             BOOL ok = GetFileInformationByHandle(file, &information);

@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-04 标准流对照编译失败，病例未执行**：`17c583371` 的 [run 37173102898](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37173102898) 在固定 C helper 的 `/W4 /WX` 门禁报 C4701（局部 `size` 可能未初始化），两例尚未启动，不能得出任何 LSA 新结论。当前仅补显式零初始化，原成功判定、字节数、期限及告警门禁不变；Mac check 已过，修订的 Windows 目标结果仍待验。原失败完整保留，G09 不关闭。
+
 - **2026-10-04 标准流差分待原生执行**：前四例未覆盖生产仍持有的 Rust `Stdio::piped`；新增不写／写 nonce 两例，保留原三秒 LSA 结果，再只关管道而保留旧宿主作单次后查。写例包含读取和缓存安全上下文取证，不能单独归因 WriteFile 或替代完整 AppContainer／console／debugger 组合。本机类型／check／i18n／脚本门禁已过，Windows 原生结果尚无；诊断不计关闭，4ff 生产残留和原矩阵仍是阻塞。
 
 - **2026-10-04 设备映射／空 Job 对照已核，仍开放**：`999ff00d6` 的[Windows 37168344636](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37168344636)正式成功，637 项普通 PASS（565 warp＋72 command）、i18n 11，以及四个 ignored 原生病例各一次通过。四例使用互异新 LUID／nonce，8 个 helper 自然退出 0；26 份原始二进制收据独立解码、身份和摘要吻合。四例原查询均为 LSA `0xc000005f`、站 `0x80070002`；保留空 Job 的两例在关闭 Job 前已经回收，两映射例精确创建／删除及 FileID 绑定通过。独审 SHA `cf99093f259d58dc413e19a0a2faf2e59cfc4897ae191c82ff96776bc7222307`，根复核 SHA `170b7778baf2378530493900e39934558b8162b937c268aabe520051308881f6`。只排除这些因素在本轮高 IL、Session 0 两段 helper 对照中足以重现留存，不外推生产 AppContainer／控制台／调试／标准流及多层 Job 组合。生产代码未改；4ff 的 LSA 残留、原五场景／三冷恢复和最终同提交源码门禁仍待解决。不再重复相近映射／一般空 Job 对照。**新增关闭 0 项**；无需本地化变更。

@@ -1,5 +1,12 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 标准流对照被 MSVC 初始化告警阻止
+
+`17c583371` 的 [Windows run 37173102898](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37173102898) 已正式失败；失败发生于固定 C helper 构建，`read_stdio_record` 的局部 `LARGE_INTEGER size` 被 `/W4 /WX` 报 C4701／C2220。两例原生诊断均未执行，无原期限或后置 LSA 结果。官方 ZIP `11292381264` 仅有编译脚本、编译日志和两份阶段收据，SHA `b1ed599418d0abf89399db41527f961b4f004fcfcc08519aacabcbf9ae9597bb`；根独审 SHA `66c7f0ee90e7e9a95005bd1f254b9f1696be0271a21f3845212fcea87ba87adc`。普通 command 72 项逐名 PASS，零 FAIL／LEAK／RETRY／FLAKY；唯一观察器 `r-4ctywwsm` 已退出并清理。完整终审索引 SHA `68a61af4df27e884832756967324415c8766f8bd8b22a1c7bb826a89ddf8188c`。之前 runner 离线和随后恢复在线的 API 原件分别保留。
+
+修订只把该局部变量显式零初始化，保留 `GetFileSizeEx` 成功判定、文件大小合同、原期限和全部告警门禁。Mac `cargo check -p warp` 通过，`r-j94zarn5` 已归档清理，日志 SHA `5fcc2c323ffb4bff5515761017fc135d6c8f9a10d418110a78c2da0516a3b466`；Rust／工作流／PowerShell 源码未变，先前对应类型、语法、范围和 i18n 11 门禁仍按各原件计证。修订的 MSVC 编译和实际两例结果待验，不把新源码验证称为原失败重试。无需本地化变更。**新增关闭 0 项，G09 与最终同提交双平台门禁仍未完成，PR 保持草稿。**
+
+
 ## 2026-10-04：G09 标准流生命周期差分准备完成，原生结果待验
 
 `543cfe27e` 后的测试增量针对生产路径中仍保留的 Rust `Stdio::piped` 原读写端。沿固定 C helper 新增旧 LUID 宿主，两个新 LUID 病例分别不写／写 44 字节 nonce；新 LUID helper 已退出、原 Job 已空后，保留管道完成原三秒 LSA／窗口站查询，再只关闭管道并确认原宿主仍存活，独立保存单次后查。原失败绝不被后置消失覆盖。写例还读取 marker 并在独立线程查询管道缓存 AuthenticationId／模拟级别，显式关闭 token、恢复身份和 join 后才查 LSA，因此最多定位写／读后安全上下文路径，不能单独归因一次 WriteFile，也不能替代生产 AppContainer／console／debugger 与三标准流继承组合。

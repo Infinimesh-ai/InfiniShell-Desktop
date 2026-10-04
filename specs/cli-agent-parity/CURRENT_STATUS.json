@@ -9681,6 +9681,32 @@
     "g09_closed": false,
     "newly_closed_items": [],
     "localization": "无需本地化变更；仅测试和验证工作流，新增英中用户文案均0，i18n11通过。",
-    "source_review_sha256": "e790e0d9afa7626ed38a9cf9e6766c224b95d0183f8013f10e2cee7f54bb2f43"
+    "source_review_sha256": "e790e0d9afa7626ed38a9cf9e6766c224b95d0183f8013f10e2cee7f54bb2f43",
+    "windows_attempt": {
+      "source_commit": "17c583371ad9e04ca52dfa8f5fd671a19780f595",
+      "run_id": 37173102898,
+      "windows_job_id": 111349960891,
+      "conclusion": "failure",
+      "failure_stage": "MSVC helper build /W4 /WX C2220+C4701",
+      "native_cases_executed": 0,
+      "lsa_result": null,
+      "artifact_id": 11292381264,
+      "artifact_sha256": "b1ed599418d0abf89399db41527f961b4f004fcfcc08519aacabcbf9ae9597bb",
+      "root_review_sha256": "66c7f0ee90e7e9a95005bd1f254b9f1696be0271a21f3845212fcea87ba87adc",
+      "fix": "仅将read_stdio_record局部LARGE_INTEGER size显式零初始化，仍要求GetFileSizeEx成功和精确大小；不改原超时、告警门禁或断言。",
+      "fixed_helper_source_sha256": "2994b6a74f5d7f3288a5fcd2efca884762c0e32d72dcd5d259870cfea103c237",
+      "pre_commit_check": {
+        "run_id": "r-j94zarn5",
+        "exit_code": 0,
+        "status": "cleaned",
+        "log_sha256": "5fcc2c323ffb4bff5515761017fc135d6c8f9a10d418110a78c2da0516a3b466"
+      },
+      "new_native_execution": "修订冻结后待验；不重跑17c失败源码",
+      "newly_closed_items": [],
+      "localization": "无需本地化变更；测试夹具单行初始化，无用户文案变化。",
+      "ordinary_command_pass": 72,
+      "final_index_sha256": "68a61af4df27e884832756967324415c8766f8bd8b22a1c7bb826a89ddf8188c",
+      "observer_status": "r-4ctywwsm_exit0_cleaned"
+    }
   }
 }
