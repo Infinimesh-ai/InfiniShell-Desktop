@@ -108,6 +108,8 @@ async fn image_skill_turn(
     let turn = id.to_string();
     let mut accepted = false;
     let mut started = false;
+    let mut paired_native_id = session.native_id.clone();
+    let mut pending_ack = None;
     let mut approved = Vec::new();
     let mut approvals = HashSet::new();
     let mut responses = HashSet::new();
@@ -124,25 +126,35 @@ async fn image_skill_turn(
         let native = event.native_session_id;
         match event.kind {
             RuntimeEventKind::SessionReady {
+                verified_cli_version,
                 effective_permissions,
-                ..
             } => {
+                if let Some(version) = verified_cli_version {
+                    if version != "2.1.280"
+                        || native.is_none()
+                        || paired_native_id
+                            .as_ref()
+                            .is_some_and(|previous| native.as_ref() != Some(previous))
+                    {
+                        return Err("图片技能版本或原生会话配对不匹配".into());
+                    }
+                    paired_native_id = native.clone();
+                } else if native.is_some() || paired_native_id.is_some() {
+                    return Err("图片技能版本或原生会话配对不匹配".into());
+                }
                 record_permissions(evidence, &effective_permissions, native.as_deref())?;
             }
             RuntimeEventKind::MessageAccepted {
                 message_id,
                 turn_id,
             } => {
-                if accepted
-                    || message_id != id
-                    || turn_id.as_deref() != Some(&turn)
-                    || native.is_none()
-                {
+                if accepted || message_id != id || turn_id.as_deref() != Some(&turn) {
                     return Err("图片技能原生 ACK 重复或身份不匹配".into());
                 }
                 accepted = true;
-                evidence.record(json!({"event":"accepted","generation":session.generation,
-                    "message_id":id,"turn_id":turn,"native_session_id":native}))?;
+                // queued 可以先于 system/init；精确 ACK 先暂存，正式配对后才生成关联收据。
+                pending_ack = Some(json!({"event":"accepted","generation":session.generation,
+                    "message_id":id,"turn_id":turn,"native_session_id":native}));
             }
             RuntimeEventKind::TurnStarted { turn_id } => {
                 if !accepted || started || turn_id != turn {
@@ -157,6 +169,8 @@ async fn image_skill_turn(
                 details,
             } => {
                 let exact = started
+                    && native.is_some()
+                    && native == paired_native_id
                     && approved.len() < commands.len()
                     && approvals.is_empty()
                     && responses.is_empty()
@@ -237,6 +251,9 @@ async fn image_skill_turn(
                     "skill_response_dispatched":responses.is_empty(),"approved_commands":approved}))?;
                 if !accepted
                     || !started
+                    || paired_native_id.is_none()
+                    || native != paired_native_id
+                    || pending_ack.is_some()
                     || !approvals.is_empty()
                     || !responses.is_empty()
                     || approved.as_slice() != commands
@@ -268,6 +285,21 @@ async fn image_skill_turn(
             | RuntimeEventKind::Disconnected { .. } => {
                 return Err("图片技能收到未预期运行时事件".into());
             }
+        }
+        if let Some(native) = paired_native_id.as_deref()
+            && let Some(mut receipt) = pending_ack.take()
+        {
+            if receipt["native_session_id"]
+                .as_str()
+                .is_some_and(|observed| observed != native)
+            {
+                return Err("图片技能原生 ACK 会话身份变化".into());
+            }
+            // 保留观测时身份；补配对不能伪称 queued 原事件已经携带已验证的会话身份。
+            receipt["native_session_id_at_observation"] = receipt["native_session_id"].clone();
+            receipt["identity_bound_after_pairing"] = json!(receipt["native_session_id"].is_null());
+            receipt["native_session_id"] = json!(native);
+            evidence.record(receipt)?;
         }
     }
 }
@@ -550,3 +582,7 @@ async fn real_claude_managed_image_multi_skill_resume() {
         "图片加双技能的生产适配器验收失败，保留原始结果"
     );
 }
+
+#[cfg(test)]
+#[path = "claude_image_skill_live_tests_tests.rs"]
+mod tests;
