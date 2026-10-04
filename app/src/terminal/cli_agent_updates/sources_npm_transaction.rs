@@ -25,6 +25,12 @@ use super::{claude_downgrade, npm_codex};
 use super::package_tree as tree;
 use tree::{ClaudeHardlink, Directory, Identity, Snapshot};
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct ClaudePlatformBinding {
+    pub(super) platform: String,
+    original: Snapshot,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EntryLink {
@@ -84,6 +90,8 @@ struct Journal {
     intent: String,
     #[serde(default)]
     downgrade: Option<claude_downgrade::Intent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    claude_platform: Option<String>,
     stage_name: OsString,
     phase: Phase,
     original: Snapshot,
@@ -98,34 +106,58 @@ struct Journal {
 }
 
 pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
-    target()?;
+    supports_for_platform(agent, version, &target()?)
+}
+
+pub(super) fn supports_for_platform(
+    agent: CLIAgent,
+    version: &str,
+    platform: &str,
+) -> Result<(), Error> {
+    if !matches!(
+        platform,
+        "darwin-arm64" | "darwin-x64" | "linux-arm64" | "linux-x64" | "linux-x64-musl"
+    ) {
+        return Err(Error::UnsupportedPlatform);
+    }
     if agent == CLIAgent::Codex {
         return npm_codex::supports(version);
     }
     if agent != CLIAgent::Claude {
         return Err(Error::UnsupportedSource);
     }
+    if platform == "linux-x64-musl" {
+        return super::claude_current_release::supports(version, platform);
+    }
     match version {
         "2.1.280" => Ok(()),
-        claude_downgrade::TO => claude_downgrade::platform().map(|_| ()),
+        claude_downgrade::TO if matches!(platform, "darwin-arm64" | "linux-x64") => Ok(()),
+        claude_downgrade::TO => Err(Error::UnsupportedPlatform),
         super::claude_current_release::V285 | super::claude_current_release::V287 => {
-            super::claude_current_release::supports(version, &target()?)
+            super::claude_current_release::supports(version, platform)
         }
         _ => Err(Error::InvalidRelease),
     }
 }
 
-fn claude_hardlink(agent: CLIAgent, version: &str) -> Result<Option<ClaudeHardlink>, Error> {
+fn claude_hardlink(
+    agent: CLIAgent,
+    version: &str,
+    platform: &str,
+) -> Result<Option<ClaudeHardlink>, Error> {
     if agent != CLIAgent::Claude {
         return Ok(None);
     }
-    let platform = target()?;
-    if !matches!(platform.as_str(), "darwin-arm64" | "linux-x64") {
+    if platform == "linux-x64-musl" {
+        let (length, digest) = super::claude_current_release::native(version, platform)?;
+        return ClaudeHardlink::new(platform, length, digest).map(Some);
+    }
+    if !matches!(platform, "darwin-arm64" | "linux-x64") {
         return Ok(None);
     }
     let native = match version {
         claude_downgrade::TO => {
-            let files = claude_downgrade::files(&platform)?;
+            let files = claude_downgrade::files(platform)?;
             let (length, digest, _) = files
                 .get(Path::new("claude"))
                 .ok_or(Error::InvalidRelease)?;
@@ -147,11 +179,157 @@ fn claude_hardlink(agent: CLIAgent, version: &str) -> Result<Option<ClaudeHardli
             (length, super::brew::decode_sha256(digest)?)
         }
         super::claude_current_release::V285 | super::claude_current_release::V287 => {
-            super::claude_current_release::native(version, &platform)?
+            super::claude_current_release::native(version, platform)?
         }
         _ => return Ok(None),
     };
-    ClaudeHardlink::new(&platform, native.0, native.1).map(Some)
+    ClaudeHardlink::new(platform, native.0, native.1).map(Some)
+}
+
+pub(super) fn capture_claude_platform(
+    installation: &Installation,
+    version: &str,
+) -> Result<ClaudePlatformBinding, Error> {
+    let owner = Owner::capture(
+        CLIAgent::Claude,
+        installation,
+        version,
+        Path::new("bin/claude.exe"),
+    )?;
+    let directory = Directory::open(&owner.package_root)?;
+    let binding = capture_claude_tree(&directory, version, &target()?, installation.stamp.digest)?;
+    owner.verify_external()?;
+    Ok(binding)
+}
+
+fn capture_claude_tree(
+    directory: &Directory,
+    version: &str,
+    platform: &str,
+    public_digest: [u8; 32],
+) -> Result<ClaudePlatformBinding, Error> {
+    let candidates = if platform == "linux-x64" {
+        vec![platform, "linux-x64-musl"]
+    } else {
+        vec![platform]
+    };
+    let dependencies = directory
+        .child("node_modules".as_ref())?
+        .child("@anthropic-ai".as_ref())?;
+    let mut selected = None;
+    for candidate in candidates {
+        let name = format!("claude-code-{candidate}");
+        if dependencies.has_child(name.as_ref())? {
+            if selected.is_some() {
+                return Err(Error::UnsupportedSource);
+            }
+            let bytes = dependencies
+                .child(name.as_ref())?
+                .read_manifest(Path::new("package.json"))?;
+            validate_platform_manifest(&bytes, version, candidate)?;
+            selected = Some((candidate.to_owned(), bytes));
+        }
+    }
+    let (platform, metadata) = selected.ok_or(Error::UnsupportedSource)?;
+    let link = claude_hardlink(CLIAgent::Claude, version, &platform)?;
+    let original = original_snapshot(directory, link.as_ref())?;
+    let dependency = PathBuf::from(format!("node_modules/@anthropic-ai/claude-code-{platform}"));
+    original.verify_file(
+        &dependency.join("package.json"),
+        metadata.len() as u64,
+        Sha256::digest(&metadata).into(),
+    )?;
+    let files = original.file_manifest();
+    let native = files
+        .get(&dependency.join("claude"))
+        .ok_or(Error::UnsupportedSource)?;
+    original.verify_file(Path::new("bin/claude.exe"), native.0, native.1)?;
+    if native.1 != public_digest || original.claude_platform()? != platform {
+        return Err(Error::SourceChanged);
+    }
+    if platform == "linux-x64-musl" {
+        original.verify_release_files(&super::claude_current_release::installed_files(
+            version, &platform,
+        )?)?;
+    }
+    Ok(ClaudePlatformBinding { platform, original })
+}
+
+fn validate_platform_manifest(bytes: &[u8], version: &str, platform: &str) -> Result<(), Error> {
+    let value: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|_| Error::UnsupportedSource)?;
+    let mut parts = platform.split('-');
+    let os = parts.next().ok_or(Error::UnsupportedPlatform)?;
+    let cpu = parts.next().ok_or(Error::UnsupportedPlatform)?;
+    let libc = if platform.ends_with("-musl") {
+        "musl"
+    } else {
+        "glibc"
+    };
+    if value["name"] != format!("@anthropic-ai/claude-code-{platform}")
+        || value["version"] != version
+        || value["os"] != serde_json::json!([os])
+        || value["cpu"] != serde_json::json!([cpu])
+        || os == "linux" && value["libc"] != serde_json::json!([libc])
+    {
+        return Err(Error::UnsupportedSource);
+    }
+    Ok(())
+}
+
+fn journal_platform(journal: &Journal) -> Result<String, Error> {
+    if journal.agent != "claude" {
+        if journal.claude_platform.is_some() {
+            return Err(Error::RecoveryRequired);
+        }
+        return target();
+    }
+    if journal.claude_platform.is_none() {
+        // 旧 schema 1 可只保存入口文件；沿用当时的宿主平台和快照恢复合同。
+        // 新 musl 树不能通过删掉平台字段冒充旧账本，原树和候选都要检查。
+        if journal.original.contains_claude_musl()
+            || journal
+                .prepared
+                .as_ref()
+                .is_some_and(Snapshot::contains_claude_musl)
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        return target();
+    }
+    let actual = journal.original.claude_platform()?;
+    if journal
+        .claude_platform
+        .as_ref()
+        .is_some_and(|expected| expected != &actual)
+        || journal
+            .prepared
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.claude_platform().as_ref() != Ok(&actual))
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    if actual == "linux-x64-musl" {
+        journal
+            .original
+            .verify_release_files(&super::claude_current_release::installed_files(
+                &journal.old_version,
+                &actual,
+            )?)?;
+        if let Some(prepared) = &journal.prepared {
+            prepared.verify_release_files(&super::claude_current_release::installed_files(
+                &journal.target_version,
+                &actual,
+            )?)?;
+        }
+        super::claude_current_release::verify_archive_digests(
+            &journal.target_version,
+            &actual,
+            journal.wrapper_archive_sha256,
+            journal.platform_archive_sha256,
+        )?;
+    }
+    Ok(actual)
 }
 
 fn original_snapshot(
@@ -411,13 +589,26 @@ pub(super) async fn execute(
     root: &Path,
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
-    supports(plan.agent, &plan.target_version)?;
+    let platform = if plan.agent == CLIAgent::Claude {
+        let binding = plan
+            .claude_npm_platform
+            .as_ref()
+            .ok_or(Error::SourceChanged)?;
+        if capture_claude_platform(&plan.installation, &plan.installed_version)? != *binding {
+            return Err(Error::SourceChanged);
+        }
+        binding.platform.clone()
+    } else {
+        target()?
+    };
+    supports_for_platform(plan.agent, &plan.target_version, &platform)?;
     if plan.agent == CLIAgent::Claude {
-        claude_downgrade::validate(
+        claude_downgrade::validate_unix_npm(
             plan.downgrade,
             &plan.installed_version,
             &plan.target_version,
             &plan.config,
+            &platform,
         )?;
     }
     if journal_path(root, plan.agent)
@@ -462,7 +653,6 @@ pub(super) async fn execute(
         )?;
         return Ok(plan.target_version.clone());
     }
-    let platform = target()?;
     if plan.agent == CLIAgent::Codex
         && !matches!(plan.installed_version.as_str(), "0.155.1" | "0.156.1")
     {
@@ -516,8 +706,15 @@ pub(super) async fn execute(
         .file_name()
         .ok_or(Error::UnsupportedSource)?
         .to_owned();
-    let original_link = claude_hardlink(plan.agent, &plan.installed_version)?;
+    let original_link = claude_hardlink(plan.agent, &plan.installed_version, &platform)?;
     let original = original_snapshot(&parent.child(&package_name)?, original_link.as_ref())?;
+    if plan
+        .claude_npm_platform
+        .as_ref()
+        .is_some_and(|binding| binding.original != original)
+    {
+        return Err(Error::SourceChanged);
+    }
     let protected_config = protected_config(plan.agent)?;
     let claude_policy = if plan.agent == CLIAgent::Claude {
         let config = plan.config.as_ref().ok_or(Error::UnsupportedSource)?;
@@ -560,10 +757,12 @@ pub(super) async fn execute(
         )?;
     } else if plan.target_version == claude_downgrade::TO {
         claude_downgrade::verify_archives(&platform, &wrapper_verified, &platform_verified)?;
-    } else if matches!(
-        plan.target_version.as_str(),
-        super::claude_current_release::V285 | super::claude_current_release::V287
-    ) {
+    } else if platform == "linux-x64-musl"
+        || matches!(
+            plan.target_version.as_str(),
+            super::claude_current_release::V285 | super::claude_current_release::V287
+        )
+    {
         super::claude_current_release::verify_archives(
             &plan.target_version,
             &platform,
@@ -602,6 +801,7 @@ pub(super) async fn execute(
         target_version: plan.target_version.clone(),
         intent: plan.intent.clone(),
         downgrade: plan.downgrade,
+        claude_platform: (plan.agent == CLIAgent::Claude).then(|| platform.clone()),
         stage_name,
         phase: Phase::Allocating,
         original,
@@ -799,6 +999,8 @@ async fn probe_version(
     let program_stamp = stamp(program)?;
     let digest_bytes = if codex_closure.is_some() {
         serde_json::to_vec(&(&program_stamp, "--version", journal.id, &codex_closure))
+    } else if let Some(platform) = &journal.claude_platform {
+        serde_json::to_vec(&(&program_stamp, "--version", journal.id, platform))
     } else {
         // Claude 保留既有收据绑定格式，不能因扩展 Codex 入口改变旧事务合同。
         serde_json::to_vec(&(&program_stamp, "--version", journal.id))
@@ -903,7 +1105,7 @@ fn verify_swapped(journal: &Journal) -> Result<Directory, Error> {
     } else {
         CLIAgent::Codex
     };
-    let link = claude_hardlink(agent, &journal.old_version)?;
+    let link = claude_hardlink(agent, &journal.old_version, &journal_platform(journal)?)?;
     verify_swapped_with_link(journal, link.as_ref())
 }
 
@@ -940,13 +1142,15 @@ fn probe_binding(
 }
 
 fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Error> {
-    supports(agent, &journal.target_version)?;
+    let platform = journal_platform(journal)?;
+    supports_for_platform(agent, &journal.target_version, &platform)?;
     if agent == CLIAgent::Claude {
-        claude_downgrade::validate(
+        claude_downgrade::validate_unix_npm(
             journal.downgrade,
             &journal.old_version,
             &journal.target_version,
             &journal.config,
+            &platform,
         )?;
     } else if journal.downgrade.is_some() {
         return Err(Error::RecoveryRequired);
@@ -1025,6 +1229,17 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
             }
         } else if probe.codex_closure.is_some()
             || probe.program != stage.join(&journal.owner.public_relative)
+            || journal.claude_platform.as_ref().is_some_and(|platform| {
+                !serde_json::to_vec(&(&probe.program_stamp, "--version", journal.id, platform))
+                    .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+                    .is_ok_and(|digest| digest == probe.binding_digest)
+                    || journal.prepared.as_ref().is_none_or(|prepared| {
+                        prepared
+                            .file_manifest()
+                            .get(&journal.owner.public_relative)
+                            .is_none_or(|(_, digest)| *digest != probe.program_stamp.digest)
+                    })
+            })
         {
             return Err(Error::RecoveryRequired);
         }
@@ -1081,7 +1296,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     let mut journal: Journal = serde_json::from_slice(&read_limited(&path, 12 * MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
     validate(agent, entry, &journal)?;
-    let link = claude_hardlink(agent, &journal.old_version)?;
+    let link = claude_hardlink(agent, &journal.old_version, &journal_platform(&journal)?)?;
     recover_validated(agent, root, &path, &mut journal, link.as_ref())
 }
 
@@ -1170,7 +1385,7 @@ fn finish_committed(
     path: &Path,
     journal: &Journal,
 ) -> Result<(), Error> {
-    let link = claude_hardlink(agent, &journal.old_version)?;
+    let link = claude_hardlink(agent, &journal.old_version, &journal_platform(journal)?)?;
     finish_committed_with_link(root, agent, path, journal, link.as_ref())
 }
 

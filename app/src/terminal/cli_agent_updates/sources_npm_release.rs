@@ -140,10 +140,11 @@ impl NpmRelease {
             return Err(Error::InvalidRelease);
         };
         if agent == CLIAgent::Claude
-            && matches!(
-                version,
-                super::claude_current_release::V285 | super::claude_current_release::V287
-            )
+            && (target == "linux-x64-musl"
+                || matches!(
+                    version,
+                    super::claude_current_release::V285 | super::claude_current_release::V287
+                ))
         {
             if windows_claude_consumer {
                 #[cfg(windows)]

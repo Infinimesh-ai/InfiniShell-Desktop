@@ -150,12 +150,14 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 93] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 95] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
     include_bytes!("sources_claude_current_release.rs"),
     include_bytes!("sources_claude_current_release.json"),
+    include_bytes!("sources_claude_musl_release.json"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_musl.rs"),
     include_bytes!("sources_npm.rs"),
     include_bytes!("sources_npm_grok.rs"),
     include_bytes!("sources_npm_grok_contract.rs"),
@@ -604,6 +606,8 @@ pub(super) struct UpdatePlan {
     config: Option<ConfigBackup>,
     intent: String,
     downgrade: Option<claude_downgrade::Intent>,
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    claude_npm_platform: Option<npm_transaction::ClaudePlatformBinding>,
 }
 
 impl UpdatePlan {
@@ -625,7 +629,17 @@ impl UpdatePlan {
         tasks: impl Iterator<Item = &'a crate::persistence::model::LocalCliTask>,
     ) -> bool {
         match self.downgrade {
-            Some(intent) => claude_downgrade::compatible_history(intent, tasks),
+            Some(intent) => {
+                #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+                if let Some(binding) = &self.claude_npm_platform {
+                    return claude_downgrade::compatible_history_for_platform(
+                        intent,
+                        Some(&binding.platform),
+                        tasks,
+                    );
+                }
+                claude_downgrade::compatible_history(intent, tasks)
+            }
             None => true,
         }
     }
@@ -749,9 +763,28 @@ pub(super) async fn inspect(
     let target_version = latest(agent, installation.channel, client).await?;
     // 这里只开放宿主负责的已登记 npm 布局；ManualOnly 的 npm/Node 启动合同保持禁止执行。
     #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    let claude_npm_platform = if installation.source == Source::Npm && agent == CLIAgent::Claude {
+        npm_transaction::capture_claude_platform(&installation, &installed_version).map(Some)
+    } else {
+        Ok(None)
+    };
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
     if installation.source == Source::Npm {
         installation.error = if agent == CLIAgent::Grok {
             npm_grok::supports(agent, &target_version).err()
+        } else if agent == CLIAgent::Claude {
+            claude_npm_platform
+                .as_ref()
+                .map_err(Clone::clone)
+                .and_then(|binding| {
+                    let binding = binding.as_ref().ok_or(Error::UnsupportedSource)?;
+                    npm_transaction::supports_for_platform(
+                        agent,
+                        &target_version,
+                        &binding.platform,
+                    )
+                })
+                .err()
         } else {
             npm_transaction::supports(agent, &target_version).err()
         };
@@ -794,13 +827,29 @@ pub(super) async fn inspect(
     }
     let version_matches = installed_version == target_version;
     let mut error = installation.error;
-    let downgrade = match claude_downgrade::select(
-        agent,
-        installation.source,
-        &installed_version,
-        &target_version,
-        channel,
-    ) {
+    let selected_downgrade = || {
+        claude_downgrade::select(
+            agent,
+            installation.source,
+            &installed_version,
+            &target_version,
+            channel,
+        )
+    };
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    let selected_downgrade = if let Ok(Some(binding)) = &claude_npm_platform {
+        claude_downgrade::select_unix_npm(
+            &installed_version,
+            &target_version,
+            channel,
+            &binding.platform,
+        )
+    } else {
+        selected_downgrade()
+    };
+    #[cfg(not(all(feature = "local_fs", any(target_os = "macos", target_os = "linux"))))]
+    let selected_downgrade = selected_downgrade();
+    let downgrade = match selected_downgrade {
         Ok(intent) => intent,
         Err(reason) => {
             error.get_or_insert(reason);
@@ -891,6 +940,8 @@ pub(super) async fn inspect(
             config,
             intent,
             downgrade,
+            #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+            claude_npm_platform: claude_npm_platform.ok().flatten(),
         });
     Ok(CheckReport {
         failed_target,
@@ -3170,6 +3221,19 @@ pub(super) async fn execute(
     let installation = &plan.installation;
     verify_installation_identity(installation)?;
     if plan.agent == CLIAgent::Claude && installation.source == Source::Npm {
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        claude_downgrade::validate_unix_npm(
+            plan.downgrade,
+            &plan.installed_version,
+            &plan.target_version,
+            &plan.config,
+            &plan
+                .claude_npm_platform
+                .as_ref()
+                .ok_or(Error::SourceChanged)?
+                .platform,
+        )?;
+        #[cfg(not(all(feature = "local_fs", any(target_os = "macos", target_os = "linux"))))]
         claude_downgrade::validate(
             plan.downgrade,
             &plan.installed_version,
@@ -4152,6 +4216,8 @@ pub(super) fn plan_for_test() -> UpdatePlan {
         config: None,
         intent: "synthetic-intent".to_owned(),
         downgrade: None,
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        claude_npm_platform: None,
     }
 }
 

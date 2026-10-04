@@ -310,6 +310,67 @@ fn claude_hardlink_tree(root: &Path) -> (Directory, ClaudeHardlink) {
 }
 
 #[test]
+fn musl_two_names_survive_partial_cleanup_without_relaxing_ordinary_snapshots() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, _) = claude_hardlink_tree(&root);
+    fs::rename(
+        root.join("claude/node_modules/@anthropic-ai/claude-code-darwin-arm64"),
+        root.join("claude/node_modules/@anthropic-ai/claude-code-linux-x64-musl"),
+    )
+    .unwrap();
+    let link = ClaudeHardlink::new(
+        "linux-x64-musl",
+        15,
+        Sha256::digest(b"reviewed native").into(),
+    )
+    .unwrap();
+    let original = package.claude_snapshot(&link).unwrap();
+    assert!(package.snapshot().is_err());
+    fs::remove_file(root.join("claude/bin/claude.exe")).unwrap();
+    Directory::open(&root)
+        .unwrap()
+        .remove_claude_matching(OsStr::new("claude"), &original, &link)
+        .unwrap();
+    assert!(!root.join("claude").exists());
+}
+
+#[test]
+fn musl_two_names_reject_a_third_external_link() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, _) = claude_hardlink_tree(&root);
+    fs::rename(
+        root.join("claude/node_modules/@anthropic-ai/claude-code-darwin-arm64"),
+        root.join("claude/node_modules/@anthropic-ai/claude-code-linux-x64-musl"),
+    )
+    .unwrap();
+    let link = ClaudeHardlink::new(
+        "linux-x64-musl",
+        15,
+        Sha256::digest(b"reviewed native").into(),
+    )
+    .unwrap();
+    fs::hard_link(root.join("claude/bin/claude.exe"), root.join("external")).unwrap();
+    assert!(package.claude_snapshot(&link).is_err());
+    assert_eq!(fs::read(root.join("external")).unwrap(), b"reviewed native");
+}
+
+#[test]
+fn descriptor_bound_manifest_rejects_a_symbolic_link() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    fs::write(root.join("real.json"), b"{}").unwrap();
+    symlink("real.json", root.join("package.json")).unwrap();
+    assert!(
+        Directory::open(&root)
+            .unwrap()
+            .read_manifest(Path::new("package.json"))
+            .is_err()
+    );
+}
+
+#[test]
 fn claude_fixed_two_names_preserve_the_existing_snapshot_schema() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path().canonicalize().unwrap();

@@ -96,6 +96,7 @@ pub(super) fn select(
 }
 
 fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
+    #[cfg(windows)]
     use claude_current_release::{V285, V287};
 
     #[cfg(windows)]
@@ -105,8 +106,20 @@ fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
         }
         return windows_npm_transition(installed, target);
     }
+    transition_for_platform(installed, target, platform().unwrap_or(""))
+}
+
+fn transition_for_platform(
+    installed: &str,
+    target: &str,
+    platform: &str,
+) -> Result<Option<Intent>, Error> {
+    use claude_current_release::{V285, V287};
+
     if target == TO {
-        platform()?;
+        if !matches!(platform, "darwin-arm64" | "linux-x64" | "linux-x64-musl") {
+            return Err(Error::UnsupportedPlatform);
+        }
         return match installed {
             TO => Ok(None),
             FROM => Ok(Some(Intent::ClaudeNpmStable21280To21278)),
@@ -114,7 +127,7 @@ fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
         };
     }
     if matches!(target, V285 | V287) {
-        claude_current_release::supports(target, platform()?)?;
+        claude_current_release::supports(target, platform)?;
         return match (installed, target) {
             (FROM, V285 | V287) | (V285, V287) | (V285, V285) | (V287, V287) => Ok(None),
             (V287, V285) => Ok(Some(Intent::ClaudeNpmStable21287To21285)),
@@ -126,6 +139,37 @@ fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
         return Err(Error::InvalidRelease);
     }
     Ok(None)
+}
+
+pub(super) fn select_unix_npm(
+    installed: &str,
+    target: &str,
+    selected: Channel,
+    platform: &str,
+) -> Result<Option<Intent>, Error> {
+    let intent = transition_for_platform(installed, target, platform)?;
+    if intent.is_some() && selected != Channel::Stable {
+        return Err(Error::ChannelMismatch);
+    }
+    Ok(intent)
+}
+
+pub(super) fn validate_unix_npm(
+    intent: Option<Intent>,
+    installed: &str,
+    target: &str,
+    config: &Option<ConfigBackup>,
+    platform: &str,
+) -> Result<(), Error> {
+    let expected = transition_for_platform(installed, target, platform)
+        .map_err(|_| Error::RecoveryRequired)?;
+    if intent != expected {
+        return Err(Error::RecoveryRequired);
+    }
+    if intent.is_some() {
+        validate_stable_config(config)?;
+    }
+    Ok(())
 }
 
 #[cfg(any(windows, test))]
@@ -285,6 +329,15 @@ pub(super) fn compatible_history<'a>(
     intent: Intent,
     tasks: impl Iterator<Item = &'a crate::persistence::model::LocalCliTask>,
 ) -> bool {
+    compatible_history_for_platform(intent, platform().ok(), tasks)
+}
+
+#[cfg(feature = "local_fs")]
+pub(super) fn compatible_history_for_platform<'a>(
+    intent: Intent,
+    platform: Option<&str>,
+    tasks: impl Iterator<Item = &'a crate::persistence::model::LocalCliTask>,
+) -> bool {
     use crate::ai::cli_agent_runtime::permissions::ClaudeFileProfile;
     use crate::ai::cli_agent_runtime::{PermissionPolicy, coordinator};
     use crate::persistence::model::LocalCliTaskState;
@@ -354,7 +407,9 @@ pub(super) fn compatible_history<'a>(
                 };
                 profile.policy() == PermissionPolicy::ClaudeRestrictedFilesV1
                     && profile.validate(Path::new(&task.working_directory)).is_ok()
-                    && native_digest()
+                    && platform
+                        .ok_or(Error::UnsupportedPlatform)
+                        .and_then(native_digest)
                         .is_ok_and(|digest| config["claude_profile"]["executableSha256"] == digest)
             }
             PermissionPolicy::ReadOnly
@@ -374,15 +429,21 @@ pub(super) fn compatible_history<'a>(
     })
 }
 
-fn native_digest() -> Result<&'static str, Error> {
-    files(platform()?)?
+fn native_digest(platform: &str) -> Result<String, Error> {
+    if platform == "linux-x64-musl" {
+        return claude_current_release::native(TO, platform).map(|(_, digest)| hex::encode(digest));
+    }
+    files(platform)?
         .get(Path::new("claude"))
-        .map(|(_, sha, _)| *sha)
+        .map(|(_, sha, _)| (*sha).to_owned())
         .ok_or(Error::InvalidRelease)
 }
 
 #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
 pub(super) fn verify_metadata(platform: &str, wrapper: &[u8], native: &[u8]) -> Result<(), Error> {
+    if platform == "linux-x64-musl" {
+        return claude_current_release::verify_metadata(TO, platform, wrapper, native);
+    }
     let integrity = match platform {
         "darwin-arm64" => {
             "sha512-Jgl//CpT1KR1N8uxAN0CmkFu3eESU7GYzPOwdGH1pCENysJqYgo2LwsIrTol+EequNMrTG3kkrNW9mIoS8eWLg=="
@@ -426,6 +487,9 @@ pub(super) fn verify_archives(
     wrapper: &super::npm_release::VerifiedNpmArchive,
     native: &super::npm_release::VerifiedNpmArchive,
 ) -> Result<(), Error> {
+    if platform == "linux-x64-musl" {
+        return claude_current_release::verify_archives(TO, platform, wrapper, native);
+    }
     for (archive, contract) in [(wrapper, files("wrapper")?), (native, files(platform)?)] {
         if archive.files.len() != contract.len() {
             return Err(Error::InvalidRelease);

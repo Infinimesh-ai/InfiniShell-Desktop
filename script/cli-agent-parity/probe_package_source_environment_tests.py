@@ -3,6 +3,7 @@
 import ctypes
 import importlib.util
 import json
+import errno
 from pathlib import Path
 import subprocess
 import sys
@@ -71,12 +72,35 @@ class PackageSourceEnvironmentTests(unittest.TestCase):
         with patch.object(PROBE.platform, "system", return_value="Linux"), \
              patch.object(PROBE, "linux_identity", return_value=identity()), \
              patch.object(PROBE, "probe_namespaces", return_value=result), \
+             patch.object(PROBE, "musl_loader", return_value={"entry":{"state":"absent"}, "execution_verified":False}), \
              patch.object(PROBE, "landlock_abi", return_value={"state": "available", "abi": 6}):
             receipt = PROBE.probe()
         self.assertFalse(receipt["transaction_execution_verified"])
         self.assertFalse(receipt["filesystem_mounts_performed"])
         self.assertEqual(receipt["linux"]["production_uid_contract"], "requires_validation")
         self.assertEqual(receipt["linux"]["bind_mount_capability"], "not_tested")
+
+    def test_musl_loader_does_not_treat_access_failure_as_absence(self):
+        for error, state in ((FileNotFoundError(errno.ENOENT, "missing"), "absent"),
+                             (PermissionError(errno.EACCES, "private error text"), "unreadable")):
+            with self.subTest(state=state), patch.object(PROBE.os, "lstat", side_effect=error), patch.object(PROBE.os, "stat") as target:
+                result = PROBE.musl_loader()
+                self.assertEqual(result["entry"]["state"], state)
+                self.assertFalse(result["execution_verified"])
+                self.assertNotIn("private error text", json.dumps(result))
+                target.assert_not_called()
+            with self.subTest(target_state=state), patch.object(PROBE, "path_identity", return_value={"state":"present", "symlink":True}), patch.object(PROBE.os, "stat", side_effect=error):
+                result = PROBE.musl_loader()
+                self.assertEqual(result["target"]["state"], state)
+                self.assertFalse(result["execution_verified"])
+
+    def test_musl_loader_presence_is_only_metadata_evidence(self):
+        metadata = SimpleNamespace(st_mode=0o100755, st_uid=0, st_gid=0, st_dev=12, st_ino=34, st_size=56)
+        with patch.object(PROBE, "path_identity", return_value={"state":"present", "symlink":True}), patch.object(PROBE.os, "stat", return_value=metadata) as target:
+            result = PROBE.musl_loader()
+        target.assert_called_once_with("/lib/ld-musl-x86_64.so.1")
+        self.assertTrue(result["target"]["regular_file"])
+        self.assertFalse(result["execution_verified"])
 
     def test_namespace_command_success_without_new_namespaces_is_not_accepted(self):
         result, _ = self.run_namespace(json.dumps(identity()).encode())

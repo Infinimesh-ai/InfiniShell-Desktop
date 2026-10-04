@@ -166,6 +166,7 @@ struct Manifest {
     schema: u32,
     scope: String,
     case: String,
+    claude_platform: String,
     root: PathBuf,
     node: Binary,
     npm_cli: Binary,
@@ -207,6 +208,22 @@ const SOURCES: &[(&str, &[u8])] = &[
         include_bytes!("sources_npm_live_tests.rs"),
     ),
     (
+        "app/src/terminal/cli_agent_updates/sources_claude_downgrade.rs",
+        include_bytes!("sources_claude_downgrade.rs"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources_claude_current_release.rs",
+        include_bytes!("sources_claude_current_release.rs"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources_claude_current_release.json",
+        include_bytes!("sources_claude_current_release.json"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources_claude_musl_release.json",
+        include_bytes!("sources_claude_musl_release.json"),
+    ),
+    (
         "app/src/ai/cli_agent_runtime/managed_process.rs",
         include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
     ),
@@ -225,6 +242,10 @@ const SOURCES: &[(&str, &[u8])] = &[
     (
         "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",
         include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_musl.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_musl.rs"),
     ),
     (
         "script/cli-agent-parity/run_claude_npm_update_live.py",
@@ -291,7 +312,7 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
     let root = &manifest.root;
     let metadata = fs::symlink_metadata(root).map_err(|_| "fixture_missing")?;
     check(
-        manifest.schema == 1
+        manifest.schema == 2
             && manifest.scope == SCOPE
             && path == root.join("manifest.private.json")
             && root.canonicalize().ok().as_ref() == Some(root)
@@ -451,7 +472,15 @@ async fn prepare(manifest: &Manifest, target: &str) -> Result<UpdatePlan, String
         report.source == Source::Npm && report.error.is_none() && report.latest_version == target,
         "product_npm_plan_mismatch",
     )?;
-    report.plan.ok_or_else(|| "product_npm_plan_missing".into())
+    let plan = report.plan.ok_or("product_npm_plan_missing")?;
+    check(
+        plan.claude_npm_platform
+            .as_ref()
+            .map(|binding| binding.platform.as_str())
+            == Some(manifest.claude_platform.as_str()),
+        "product_npm_platform_mismatch",
+    )?;
+    Ok(plan)
 }
 
 fn verify_preserved_permissions(
@@ -656,7 +685,9 @@ async fn cold_recover(manifest: &Manifest) -> Result<Value, String> {
     )
     .map_err(|_| "checkpoint_invalid")?;
     check(
-        saved.phase == super::Phase::SwapIntent && saved.owner.package_root == package(root),
+        saved.phase == super::Phase::SwapIntent
+            && saved.owner.package_root == package(root)
+            && saved.claude_platform.as_deref() == Some(manifest.claude_platform.as_str()),
         "cold_checkpoint_invalid",
     )?;
     let journal_root = sources::journal_root().map_err(mapped)?;
@@ -761,7 +792,7 @@ async fn real_claude_npm_update_without_model() {
     validate(&manifest, &path).expect("验收授权、环境或构建绑定不匹配");
     save(
         &manifest.root.join(format!("started-{}.safe.json", step())),
-        &json!({"scope":SCOPE,"case":manifest.case,"source_sha256":manifest.source_sha256}),
+        &json!({"scope":SCOPE,"case":manifest.case,"claude_platform":manifest.claude_platform,"source_sha256":manifest.source_sha256}),
     )
     .unwrap();
     let result = EVIDENCE
@@ -773,12 +804,13 @@ async fn real_claude_npm_update_without_model() {
             }
         })
         .await;
-    let evidence = match &result {
+    let mut evidence = match &result {
         Ok(value) => value.clone(),
         Err(error) => {
             json!({"case":manifest.case,"accepted":false,"error":error,"model_inputs_sent":0})
         }
     };
+    evidence["claude_platform"] = json!(manifest.claude_platform);
     save(
         &manifest.root.join(format!("result-{}.safe.json", step())),
         &evidence,

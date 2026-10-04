@@ -265,9 +265,25 @@ fn legacy_unlinked_snapshot_roundtrip_keeps_its_existing_shape() {
     let fixture = fixture();
     let value = serde_json::to_value(&fixture.journal).unwrap();
     assert!(value.get("claude_hardlink").is_none());
+    assert!(value.get("claude_platform").is_none());
     assert_eq!(value["schema"], 1);
+    assert!(
+        !fixture
+            .journal
+            .owner
+            .package_root
+            .join("node_modules")
+            .exists()
+    );
+    assert_eq!(fixture.journal.original.file_manifest().len(), 1);
     let restored: Journal = serde_json::from_value(value).unwrap();
     save(&journal_path(&fixture.root, CLIAgent::Claude), &restored).unwrap();
+    restored
+        .owner
+        .verify_external()
+        .unwrap()
+        .exchange("claude-code".as_ref(), &restored.stage_name)
+        .unwrap();
 
     assert_eq!(
         recover(CLIAgent::Claude, &restored.owner.entry, &fixture.root).unwrap(),

@@ -31,6 +31,26 @@ def archive(entries):
 
 
 class BoundaryTests(unittest.TestCase):
+    def test_explicit_musl_selection_does_not_reuse_the_glibc_package(self):
+        with patch.object(runner.platform, "system", return_value="Linux"), patch.object(runner.platform, "machine", return_value="x86_64"):
+            self.assertEqual(runner.selected_platform("glibc"), "linux-x64")
+            self.assertEqual(runner.selected_platform("musl"), "linux-x64-musl")
+        for system, machine in (("Darwin", "arm64"), ("Linux", "aarch64")):
+            with self.subTest(system=system, machine=machine), patch.object(runner.platform, "system", return_value=system), patch.object(runner.platform, "machine", return_value=machine):
+                with self.assertRaisesRegex(ValueError, "musl_requires_linux_x64"):
+                    runner.selected_platform("musl")
+
+    def test_official_package_rejects_libc_metadata_disagreement(self):
+        name = "@anthropic-ai/claude-code-linux-x64-musl"
+        embedded = {"name":name, "version":runner.OLD, "libc":["musl"]}
+        raw, sri = archive([("package/package.json", json.dumps(embedded).encode(), tarfile.REGTYPE)])
+        metadata = dict(embedded, libc=["glibc"], dist={"integrity":sri,
+            "tarball":"https://registry.npmjs.org/" + name + "/-/claude-code-linux-x64-musl-" + runner.OLD + ".tgz"})
+        with tempfile.TemporaryDirectory() as temporary, patch.object(runner, "get", side_effect=[json.dumps(metadata).encode(), raw]):
+            with self.assertRaisesRegex(ValueError, "metadata_manifest_contract"):
+                runner.official_package(name, runner.OLD, Path(temporary))
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
     def test_valid_archive_preserves_exact_bytes(self):
         raw, sri = archive([("package/package.json", b"{}", tarfile.REGTYPE), ("package/bin/claude.exe", b"official", tarfile.REGTYPE)])
         self.assertEqual(runner.archive_members(raw, sri)["bin/claude.exe"][0], b"official")
@@ -127,7 +147,7 @@ class BoundaryTests(unittest.TestCase):
             path = package / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
-        journal = {"wrapper_archive_sha256":list(hashlib.sha256(wrapper).digest()),"platform_archive_sha256":list(hashlib.sha256(native).digest()),
+        journal = {"claude_platform":"darwin-arm64", "wrapper_archive_sha256":list(hashlib.sha256(wrapper).digest()),"platform_archive_sha256":list(hashlib.sha256(native).digest()),
                    "prepared":{"nodes":{name:{"sha256":list(hashlib.sha256(content).digest()),"length":len(content)} for name,content in contents.items()}}}
         (root / "prepared-journal.safe.json").write_text(json.dumps(journal))
         return package, journal
@@ -136,7 +156,7 @@ class BoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.product_receipt(root)
-            runner.verify_product_archives(root, "updated", root / "unused-old")
+            runner.verify_product_archives(root, "updated", root / "unused-old", "darwin-arm64")
             self.assertTrue(json.loads((root / "independent-archive-check.safe.json").read_text())["sri_verified"])
 
     def test_independent_archive_check_rejects_forged_prepared_digest(self):
@@ -146,7 +166,7 @@ class BoundaryTests(unittest.TestCase):
             journal["prepared"]["nodes"]["bin/claude.exe"]["sha256"] = [0] * 32
             (root / "prepared-journal.safe.json").write_text(json.dumps(journal))
             with self.assertRaises(ValueError):
-                runner.verify_product_archives(root, "updated", root / "unused-old")
+                runner.verify_product_archives(root, "updated", root / "unused-old", "darwin-arm64")
 
     def test_independent_archive_check_rejects_changed_published_file(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -154,7 +174,7 @@ class BoundaryTests(unittest.TestCase):
             package, _ = self.product_receipt(root)
             (package / "bin/claude.exe").write_bytes(b"later changed")
             with self.assertRaises(ValueError):
-                runner.verify_product_archives(root, "updated", root / "unused-old")
+                runner.verify_product_archives(root, "updated", root / "unused-old", "darwin-arm64")
 
     def test_external_change_exception_is_exactly_one_owned_marker(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -163,7 +183,23 @@ class BoundaryTests(unittest.TestCase):
             (package / "external-npm-change").write_bytes(b"later external install must survive\n")
             (package / "unexpected-extra").write_bytes(b"not part of the specified external change")
             with self.assertRaises(ValueError):
-                runner.verify_product_archives(root, "external_change_preserved", root / "unused-old")
+                runner.verify_product_archives(root, "external_change_preserved", root / "unused-old", "darwin-arm64")
+
+    def test_independent_archive_check_rejects_another_platform(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.product_receipt(root)
+            with self.assertRaisesRegex(ValueError, "product_registry_identity"):
+                runner.verify_product_archives(root, "updated", root / "unused-old", "linux-x64-musl")
+
+    def test_independent_archive_check_requires_the_journal_platform_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, journal = self.product_receipt(root)
+            journal["claude_platform"] = "linux-x64-musl"
+            (root / "prepared-journal.safe.json").write_text(json.dumps(journal))
+            with self.assertRaisesRegex(ValueError, "product_platform_binding"):
+                runner.verify_product_archives(root, "updated", root / "unused-old", "darwin-arm64")
 
     def test_case_scope_does_not_claim_downgrade_support(self):
         self.assertIn("unreviewed_downgrade_rejected", runner.CASES)

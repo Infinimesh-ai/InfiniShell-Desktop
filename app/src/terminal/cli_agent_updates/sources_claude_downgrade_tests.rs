@@ -1,6 +1,79 @@
 use super::*;
 
 #[test]
+fn bound_musl_platform_preserves_both_stable_downgrade_intents() {
+    assert_eq!(
+        select_unix_npm("2.1.280", "2.1.278", Channel::Stable, "linux-x64-musl"),
+        Ok(Some(Intent::ClaudeNpmStable21280To21278))
+    );
+    assert_eq!(
+        select_unix_npm("2.1.287", "2.1.285", Channel::Stable, "linux-x64-musl"),
+        Ok(Some(Intent::ClaudeNpmStable21287To21285))
+    );
+    assert_eq!(
+        select_unix_npm("2.1.287", "2.1.285", Channel::Latest, "linux-x64-musl"),
+        Err(Error::ChannelMismatch)
+    );
+    assert_eq!(
+        select_unix_npm(
+            "2.1.280",
+            "2.1.278",
+            Channel::FollowInstallation,
+            "linux-x64-musl"
+        ),
+        Err(Error::ChannelMismatch)
+    );
+}
+
+#[test]
+fn bound_musl_upgrades_do_not_open_unknown_versions_or_old_target_downgrades() {
+    assert_eq!(
+        select_unix_npm("2.1.278", "2.1.280", Channel::Latest, "linux-x64-musl"),
+        Ok(None)
+    );
+    assert_eq!(
+        select_unix_npm("2.1.280", "2.1.285", Channel::Latest, "linux-x64-musl"),
+        Ok(None)
+    );
+    assert_eq!(
+        select_unix_npm("2.1.280", "2.1.287", Channel::Latest, "linux-x64-musl"),
+        Ok(None)
+    );
+    assert_eq!(
+        select_unix_npm("2.1.285", "2.1.287", Channel::Latest, "linux-x64-musl"),
+        Ok(None)
+    );
+    assert_eq!(
+        select_unix_npm("2.1.286", "2.1.287", Channel::Latest, "linux-x64-musl"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        select_unix_npm("2.1.287", "2.1.280", Channel::Stable, "linux-x64-musl"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        select_unix_npm("2.1.280", "2.1.285", Channel::Latest, "linux-arm64-musl"),
+        Err(Error::UnsupportedPlatform)
+    );
+}
+
+#[test]
+fn legacy_history_native_digest_uses_the_bound_platform() {
+    assert_eq!(
+        native_digest("linux-x64-musl").unwrap(),
+        "e21d4818a7282c1b18f7949af863a58e640f017a8ffa4053f5ae927ac95d954a"
+    );
+    assert_eq!(
+        native_digest("linux-x64").unwrap(),
+        "5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab"
+    );
+    assert_ne!(
+        native_digest("linux-x64-musl").unwrap(),
+        native_digest("linux-x64").unwrap()
+    );
+}
+
+#[test]
 fn historical_downgrade_intent_keeps_its_persisted_name() {
     let old = r#""claude_npm_stable21280_to21278""#;
     assert_eq!(

@@ -30,16 +30,16 @@ fn failure(code: &'static str) -> io::Error {
 }
 
 #[derive(Debug)]
-struct BoundFile {
+pub(super) struct BoundFile {
     path: PathBuf,
-    canonical: PathBuf,
-    file: File,
-    identity: (u64, u64, u64, u32),
+    pub(super) canonical: PathBuf,
+    pub(super) file: File,
+    pub(super) identity: (u64, u64, u64, u32),
     sha256: String,
 }
 
 impl BoundFile {
-    fn capture(path: &Path, limit: u64) -> io::Result<Self> {
+    pub(super) fn capture(path: &Path, limit: u64) -> io::Result<Self> {
         let (mut file, canonical) = open_system_file(path)?;
         let metadata = file.metadata()?;
         if metadata.len() == 0 || metadata.len() > limit {
@@ -59,7 +59,7 @@ impl BoundFile {
         })
     }
 
-    fn verify(&self) -> io::Result<()> {
+    pub(super) fn verify(&self) -> io::Result<()> {
         let (mut current, canonical) = open_system_file(&self.path)?;
         if canonical != self.canonical
             || identity(&current.metadata()?) != self.identity
@@ -219,7 +219,7 @@ fn require_no_preload() -> io::Result<()> {
     }
 }
 
-fn system_library_path(path: &Path) -> bool {
+pub(super) fn system_library_path(path: &Path) -> bool {
     ["/lib", "/lib64", "/usr/lib", "/usr/lib64"]
         .iter()
         .any(|root| path.starts_with(root))
@@ -371,13 +371,22 @@ fn normalize(path: &Path) -> io::Result<PathBuf> {
 }
 
 #[derive(Debug)]
-struct ElfImage {
-    interpreter: Option<String>,
-    soname: Option<String>,
-    needed: Vec<String>,
+pub(super) struct ElfImage {
+    pub(super) executable_type: u16,
+    pub(super) interpreter: Option<String>,
+    pub(super) soname: Option<String>,
+    pub(super) needed: Vec<String>,
 }
 
 fn parse_elf(file: &File, size: u64) -> io::Result<ElfImage> {
+    parse_elf_with_interpreter(file, size, INTERPRETER)
+}
+
+pub(super) fn parse_elf_with_interpreter(
+    file: &File,
+    size: u64,
+    expected_interpreter: &str,
+) -> io::Result<ElfImage> {
     let header = read(file, 0, 64, size)?;
     if &header[..7] != b"\x7fELF\x02\x01\x01"
         || u16_at(&header, 18)? != 62
@@ -442,10 +451,12 @@ fn parse_elf(file: &File, size: u64) -> io::Result<ElfImage> {
                     return Err(invalid());
                 }
                 let value = read(file, offset, bytes as usize, size)?;
-                if value != b"/lib64/ld-linux-x86-64.so.2\0" {
+                if value.last() != Some(&0)
+                    || value[..value.len() - 1] != *expected_interpreter.as_bytes()
+                {
                     return Err(invalid());
                 }
-                interpreter = Some(INTERPRETER.to_owned());
+                interpreter = Some(expected_interpreter.to_owned());
             }
             0x6474_e551 if u32_at(header, 4)? & 1 != 0 => return Err(invalid()),
             _ => {}
@@ -526,6 +537,7 @@ fn parse_elf(file: &File, size: u64) -> io::Result<ElfImage> {
         .collect::<io::Result<_>>()?;
     let soname = soname.map(read_name).transpose()?;
     Ok(ElfImage {
+        executable_type: u16_at(&header, 16)?,
         interpreter,
         soname,
         needed,

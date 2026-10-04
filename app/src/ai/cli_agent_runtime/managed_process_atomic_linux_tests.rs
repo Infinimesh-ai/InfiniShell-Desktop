@@ -274,7 +274,7 @@ fn unsupported_interpreter_dependency_closure_is_rejected() {
 
     assert_eq!(
         prepare(&expected(&program)).unwrap_err().to_string(),
-        "managed_process.linux_glibc_elf_invalid"
+        "managed_process.linux_atomic_interpreter_invalid"
     );
 }
 
@@ -522,6 +522,41 @@ fn glibc_system_elf_executes_from_sealed_memfd_with_bound_cache_closure() {
 }
 
 #[test]
+#[cfg(target_arch = "x86_64")]
+#[ignore = "仅显式指定已审核 Claude musl 原件及已安装系统 musl 时运行；无模型请求"]
+fn real_fixed_claude_musl_executes_from_sealed_memfd() {
+    let executable = PathBuf::from(
+        env::var_os("INFINISHELL_LINUX_CLAUDE_MUSL_ELF")
+            .expect("必须显式提供固定官方 Claude musl 原件"),
+    );
+    assert!(executable.is_absolute());
+    let identity = expected(&executable);
+    let version = match identity.sha256.as_str() {
+        "7b4414af1bc06eb6d91730759bd01c4c02a4976d0b8526237e9a6d8c33eaf102" => "2.1.285",
+        "ba22ce4b5744c6016e3076ccbd692a059fc4e9f1592f21361859a73938f4e722" => "2.1.287",
+        _ => panic!("官方 musl 原件摘要未获审核"),
+    };
+    let state = tempfile::tempdir().unwrap();
+    for name in ["home", "config", "cache", "data", "tmp"] {
+        fs::create_dir(state.path().join(name)).unwrap();
+    }
+
+    let output = execveat_helper("system-musl", &executable, state.path());
+
+    assert!(
+        output.status.success(),
+        "musl execveat 失败：{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout
+            .lines()
+            .any(|line| line == format!("{version} (Claude Code)"))
+    );
+}
+
+#[test]
 #[ignore = "仅由 Linux execveat 多进程测试派生"]
 fn execveat_process_helper() {
     let executable = PathBuf::from(env::var_os(PROCESS_EXECUTABLE_ENV).unwrap())
@@ -549,6 +584,23 @@ fn execveat_process_helper() {
     }
     let snapshot = ManuallyDrop::new(prepare(&expected(&executable)).unwrap());
     match role.as_str() {
+        "system-musl" => {
+            assert!(matches!(
+                &snapshot.system_closure,
+                Some(SystemClosure::Musl(_))
+            ));
+            assert_eq!(snapshot.seals().unwrap() & REQUIRED_SEALS, REQUIRED_SEALS);
+            assert!(matches!(
+                snapshot.sha256(),
+                "7b4414af1bc06eb6d91730759bd01c4c02a4976d0b8526237e9a6d8c33eaf102"
+                    | "ba22ce4b5744c6016e3076ccbd692a059fc4e9f1592f21361859a73938f4e722"
+            ));
+            let environment =
+                super::super::version_probe::environment(&env::current_dir().unwrap());
+            super::super::version_probe::deny_network().unwrap();
+            let error = execute(&snapshot, &executable, &["--version".into()], &environment);
+            panic!("musl execveat 没有替换辅助进程：{error}");
+        }
         "system-glibc" => {
             assert!(snapshot.system_closure.is_some());
             assert_eq!(snapshot.seals().unwrap() & REQUIRED_SEALS, REQUIRED_SEALS);

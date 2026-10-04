@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR #22保持草稿。a2743b4d9的Windows单updated验收仍为0通过/1失败；PS已取得同原主线程的两次CPU/context和相同32帧，栈顶精确对应NtReadFile/ReadFile，具体读取句柄未知。源码确认无输入候选仍继承开放stdin，独立EOF输入修复已完成并通过本机门禁，真实Windows待验；不提前称PowerShell已修。CMD版本成功但警告保留，两代原生资源清理已证。原五场景/三冷恢复、最终同冻结源码双平台门禁和额外ACL/Claude musl待决范围仍未完成。",
+  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR #22保持草稿。Claude musl固定四版原生加载、npm实际安装平台绑定及旧账本兼容已实现，本机check、342回归、i18n11、Python117/10通过；Linux真实执行与新增平台绑定的Mac事务待验。2d9 Windows run37200286598正式failure，普通1224 PASS及66必需各一次PASS，真实npm步骤失败原件独审中；完整五场景/三冷恢复未通过。额外ACL/安全属性范围仍待用户决定，最终同冻结源码双平台门禁未完成。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -1117,10 +1117,10 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "Mac已支持安装合同的消费者和英中链已有证据。a274单updated仍ProbeFailed：PS两次原主线程采样CPU增量0、32帧相同，精确符号为NtReadFile/ReadFile，具体handle及持续等待未证；源码确认无输入候选继承开放stdin。候选独立EOF修复已实现，本机Mac编译/i18n及Windows目标含测试类型检查通过，实际Windows验证待执行。CMD版本成功但警告保留，两代资源清理与PS取消stderr原文件为空均有原件。后四场景/三冷恢复未执行，原完整事务与最终同冻结源码双平台门禁未完成；额外ACL/Claude musl原范围冲突仍待用户决定。",
+      "boundary": "Mac原安装合同已有功能及双语证据；新实际平台捕获路径仍需真实Mac回归。musl固定四版加载与事务实现已完成，本机门禁通过，12项Linux专用回归和真实musl执行/更新/显式降级待验。2d9 Windows完整矩阵在step60失败，原件独审中；不把普通1224 PASS和66必需PASS视作原生事务完成。额外ACL/安全属性范围尚待用户决定，最终同冻结源码Linux/Windows源码门禁仍未完成。",
       "latest_result_ref": "g09_powershell_read_wait_result_20261004",
       "latest_result_source_commit": "a2743b4d9ee3317d008378a4904bddb52c0da3bd",
-      "latest_preparation_ref": "g09_version_candidate_stdin_eof_fix_20261004"
+      "latest_preparation_ref": "g09_claude_musl_implementation_20261004"
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -10369,5 +10369,79 @@
     "localization": "无需本地化变更：内部句柄处理与回归，不改GUI/TUI文案或布局。",
     "next": "直接恢复既有原完整5场景/3独立冷恢复的功能验收，witness=false；普通Windows nextest沿既有重试配置并完整记录RETRY/FLAKY，原生矩阵零自动重试。无新近似探针。",
     "G09_closed": false
+  },
+  "g09_claude_musl_implementation_20261004": {
+    "status": "implemented_local_gate_passed_native_acceptance_pending",
+    "base_commit": "2d9b3d4f49c26e7464a5666c8c0db833d48c9bdf",
+    "source_file_count": 25,
+    "versions": [
+      "2.1.278",
+      "2.1.280",
+      "2.1.285",
+      "2.1.287"
+    ],
+    "evidence": {
+      "source_freeze": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-source-freeze-v2.safe.json",
+        "sha256": "92b8da321b5f0c38ec5267feb8d24c837285169c71e2c7729d6e91d974d50774"
+      },
+      "local_gates": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-local-gates-v1.safe.json",
+        "sha256": "2ebb1fab9b6de2370b61a62f9d1a6e15ed84850b37002ba7cd43669e4f5b5498"
+      },
+      "official_archive_contract": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-official-contract-review.safe.json",
+        "sha256": "410f2d3058e5e99b973e0edc964721b9afd4b358125ab670638be2f6a3d1409d"
+      },
+      "native_review": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-native-independent-review.safe.json",
+        "sha256": "40e3476d82fcdd50fa12a9990439dedd5882dc0f46afc4a7593d1d54fa3f17bf"
+      },
+      "npm_review": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-npm-independent-review.safe.json",
+        "sha256": "67a523fe98f328e57caf6be4ae01289be9049f06524eab6dcc786b22b06e63dc"
+      },
+      "npm_type_fix_review": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-npm-independent-review-type-fix-v1.safe.json",
+        "sha256": "6de4010a96ad06f859eba47f8274b07c603152aad01d6a42494cab61491cb951"
+      },
+      "live_wiring_review": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-musl-live-wiring-review.safe.json",
+        "sha256": "1922d88f0812c709a2cdc25e44193d26bff1119001cd221a4a2aea2f38889faa"
+      }
+    },
+    "behavior": [
+      "Linux x64固定系统musl加载器身份与摘要绑定，保持密封memfd/execveat及原安全策略。",
+      "从实际npm安装manifest/入口摘要/完整原快照绑定平台，执行重验，账本和候选摘要保存平台；冷恢复不按交换后当前树重选。",
+      "保留旧schema1无平台bin-only恢复合同；拒绝musl树删除平台字段冒充旧账本。",
+      "保留280→278和287→285两种显式降级合同；八个官方归档逐成员实际验证。"
+    ],
+    "local_validation": {
+      "cargo_check": "passed",
+      "updates_nextest_pass": 342,
+      "new_npm_tests_each_once": 18,
+      "i18n_pass": 11,
+      "shared_npm_python_pass": 117,
+      "environment_python_pass": 10,
+      "linux_new_tests_not_executed_on_mac": 12,
+      "records_archived_and_cleaned": true
+    },
+    "preserved_failure": "r-a35b_pmf测试编译E0308，先反序列化为Journal后重跑342通过，原日志保留。",
+    "localization": "无需本地化变更：内部加载、平台和恢复合同复用既有英中提示，无新用户文案或布局变化。",
+    "mac_real_transaction_pending": true,
+    "linux_native_pending": true,
+    "windows_run": {
+      "id": 37200286598,
+      "head": "2d9b3d4f49c26e7464a5666c8c0db833d48c9bdf",
+      "conclusion": "failure",
+      "ordinary_pass": 1224,
+      "required_each_once_pass": 66,
+      "failed_step": 60,
+      "native_artifact_review_pending": true
+    },
+    "acl_scope_decision_pending": true,
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "pr_must_remain_draft": true
   }
 }

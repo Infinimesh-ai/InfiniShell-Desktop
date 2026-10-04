@@ -64,10 +64,6 @@ pub(super) struct Snapshot {
 }
 
 impl Snapshot {
-    #[cfg(any(
-        all(target_os = "macos", target_arch = "aarch64"),
-        all(target_os = "linux", target_arch = "x86_64")
-    ))]
     pub(super) fn file_manifest(&self) -> BTreeMap<PathBuf, (u64, [u8; 32])> {
         self.nodes
             .iter()
@@ -78,10 +74,6 @@ impl Snapshot {
             .collect()
     }
 
-    #[cfg(any(
-        all(target_os = "macos", target_arch = "aarch64"),
-        all(target_os = "linux", target_arch = "x86_64")
-    ))]
     pub(super) fn verify_file(
         &self,
         path: &Path,
@@ -96,6 +88,42 @@ impl Snapshot {
             return Err(Error::InvalidRelease);
         }
         Ok(())
+    }
+
+    pub(super) fn contains_claude_musl(&self) -> bool {
+        self.nodes
+            .keys()
+            .any(|path| path.starts_with("node_modules/@anthropic-ai/claude-code-linux-x64-musl"))
+    }
+
+    /// 只从保存的完整树识别平台，不读取交换后的当前安装或宿主 libc。
+    pub(super) fn claude_platform(&self) -> Result<String, Error> {
+        let mut selected = None;
+        for platform in [
+            "darwin-arm64",
+            "darwin-x64",
+            "linux-arm64",
+            "linux-x64",
+            "linux-x64-musl",
+        ] {
+            let root = PathBuf::from(format!("node_modules/@anthropic-ai/claude-code-{platform}"));
+            if self.nodes.contains_key(&root) {
+                if selected.is_some()
+                    || !self
+                        .nodes
+                        .get(&root.join("package.json"))
+                        .is_some_and(|node| node.sha256.is_some())
+                    || !self
+                        .nodes
+                        .get(&root.join("claude"))
+                        .is_some_and(|node| node.sha256.is_some())
+                {
+                    return Err(Error::RecoveryRequired);
+                }
+                selected = Some(platform.to_owned());
+            }
+        }
+        selected.ok_or(Error::RecoveryRequired)
     }
 
     pub(super) fn verify_remaining(&self, expected: &Self) -> Result<(), Error> {
@@ -148,7 +176,7 @@ pub(super) struct ClaudeHardlink {
 
 impl ClaudeHardlink {
     pub(super) fn new(platform: &str, length: u64, sha256: [u8; 32]) -> Result<Self, Error> {
-        if !matches!(platform, "darwin-arm64" | "linux-x64") {
+        if !matches!(platform, "darwin-arm64" | "linux-x64" | "linux-x64-musl") {
             return Err(Error::UnsupportedPlatform);
         }
         Ok(Self {
@@ -557,6 +585,31 @@ impl Directory {
                 libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK,
             )
         })
+    }
+
+    /// 清单沿原目录描述符读取；不追随中间目录或文件链接。
+    pub(super) fn read_manifest(&self, relative: &Path) -> Result<Vec<u8>, Error> {
+        let (parent, leaf) = self.relative_parent(relative, false)?;
+        let mut opened = parent.read_file(&leaf)?;
+        reject_extra_permissions(&opened)?;
+        let before = opened.metadata().map_err(|_| Error::SourceChanged)?;
+        let identity = Identity::read(&before)?;
+        if !before.is_file() || before.nlink() != 1 || before.len() > 64 * 1024 {
+            return Err(Error::UnsupportedSource);
+        }
+        let mut bytes = Vec::new();
+        (&mut opened)
+            .take(64 * 1024 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| Error::SourceChanged)?;
+        let after = opened.metadata().map_err(|_| Error::SourceChanged)?;
+        if bytes.len() as u64 != before.len()
+            || after.len() != before.len()
+            || Identity::read(&after)? != identity
+        {
+            return Err(Error::SourceChanged);
+        }
+        Ok(bytes)
     }
 
     pub(super) fn snapshot(&self) -> Result<Snapshot, Error> {

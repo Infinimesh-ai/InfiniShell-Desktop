@@ -56,6 +56,7 @@ fn fixture() -> Fixture {
         target_version: "2.1.280".into(),
         intent: "fixed-test-intent".into(),
         downgrade: None,
+        claude_platform: None,
         stage_name,
         phase: Phase::SwapIntent,
         original,
@@ -658,3 +659,203 @@ fn platform_native_probe_cannot_substitute_for_public_entry() {
 ))]
 #[path = "sources_npm_hardlink_tests.rs"]
 mod hardlink_tests;
+
+fn platform_fixture() -> Fixture {
+    let mut fixture = fixture();
+    let journal = &mut fixture.journal;
+    let stage = journal
+        .owner
+        .package_root
+        .parent()
+        .unwrap()
+        .join(&journal.stage_name);
+    for root in [&journal.owner.package_root, &stage] {
+        let dependency = root.join(format!(
+            "node_modules/@anthropic-ai/claude-code-{}",
+            target().unwrap()
+        ));
+        fs::create_dir_all(&dependency).unwrap();
+        fs::write(dependency.join("package.json"), b"{}").unwrap();
+        fs::copy(root.join("bin/claude.exe"), dependency.join("claude")).unwrap();
+    }
+    journal.original = Directory::open(&journal.owner.package_root)
+        .unwrap()
+        .snapshot()
+        .unwrap();
+    journal.prepared = Some(Directory::open(&stage).unwrap().snapshot().unwrap());
+    fixture
+}
+
+#[test]
+fn saved_npm_platform_mismatch_preserves_the_original_tree_and_journal() {
+    let mut fixture = platform_fixture();
+    fixture.journal.claude_platform = Some("linux-x64-musl".into());
+    save(
+        &journal_path(&fixture.root, CLIAgent::Claude),
+        &fixture.journal,
+    )
+    .unwrap();
+    assert_eq!(
+        recover(
+            CLIAgent::Claude,
+            &fixture.journal.owner.entry,
+            &fixture.root
+        ),
+        Err(Error::RecoveryRequired)
+    );
+    assert_eq!(
+        fs::read(&fixture.journal.owner.entry).unwrap(),
+        b"old public binary"
+    );
+    assert!(journal_path(&fixture.root, CLIAgent::Claude).exists());
+}
+
+#[test]
+fn new_platform_bound_journal_recovers_without_reselecting_the_public_tree() {
+    let mut fixture = platform_fixture();
+    fixture.journal.claude_platform = Some(target().unwrap());
+    save(
+        &journal_path(&fixture.root, CLIAgent::Claude),
+        &fixture.journal,
+    )
+    .unwrap();
+    fixture
+        .journal
+        .owner
+        .verify_external()
+        .unwrap()
+        .exchange("claude-code".as_ref(), &fixture.journal.stage_name)
+        .unwrap();
+    assert_eq!(
+        recover(
+            CLIAgent::Claude,
+            &fixture.journal.owner.entry,
+            &fixture.root
+        ),
+        Ok(None)
+    );
+    assert_eq!(
+        fs::read(&fixture.journal.owner.entry).unwrap(),
+        b"old public binary"
+    );
+    assert!(!journal_path(&fixture.root, CLIAgent::Claude).exists());
+}
+
+#[test]
+fn new_platform_probe_requires_its_own_digest_and_prepared_image() {
+    let mut fixture = platform_fixture();
+    let journal = &mut fixture.journal;
+    journal.claude_platform = Some(target().unwrap());
+    let program = journal
+        .owner
+        .package_root
+        .parent()
+        .unwrap()
+        .join(&journal.stage_name)
+        .join("bin/claude.exe");
+    let identity = stamp(&program).unwrap();
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                &identity,
+                "--version",
+                journal.id,
+                journal.claude_platform.as_ref().unwrap()
+            ))
+            .unwrap()
+        )
+    );
+    journal.probe = Some(Probe {
+        generation: Uuid::new_v4(),
+        program,
+        program_stamp: identity,
+        binding_digest: digest,
+        observed_version: None,
+        codex_closure: None,
+    });
+    assert_eq!(
+        validate(CLIAgent::Claude, &journal.owner.entry, journal),
+        Ok(())
+    );
+    journal.probe.as_mut().unwrap().binding_digest = "1".repeat(64);
+    assert_eq!(
+        validate(CLIAgent::Claude, &journal.owner.entry, journal),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[test]
+fn actual_platform_manifest_and_public_image_determine_the_npm_binding() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let native = root.join("node_modules/@anthropic-ai/claude-code-linux-x64");
+    fs::create_dir_all(&native).unwrap();
+    fs::create_dir(root.join("bin")).unwrap();
+    // 未知旧版保持原来的独立文件快照路径；不借此允许未知目标或 musl 固定映像。
+    fs::write(native.join("package.json"), br#"{"name":"@anthropic-ai/claude-code-linux-x64","version":"2.1.279","os":["linux"],"cpu":["x64"],"libc":["glibc"]}"#).unwrap();
+    fs::write(native.join("claude"), b"same original native").unwrap();
+    fs::write(root.join("bin/claude.exe"), b"same original native").unwrap();
+    let directory = Directory::open(&root).unwrap();
+    let digest = Sha256::digest(b"same original native").into();
+    let binding = capture_claude_tree(&directory, "2.1.279", "linux-x64", digest).unwrap();
+    assert_eq!(binding.platform, "linux-x64");
+    fs::write(root.join("bin/claude.exe"), b"replaced public entry").unwrap();
+    assert!(capture_claude_tree(&directory, "2.1.279", "linux-x64", digest).is_err());
+    fs::write(root.join("bin/claude.exe"), b"same original native").unwrap();
+    fs::create_dir(root.join("node_modules/@anthropic-ai/claude-code-linux-x64-musl")).unwrap();
+    assert!(capture_claude_tree(&directory, "2.1.279", "linux-x64", digest).is_err());
+}
+
+#[test]
+fn platform_manifest_cannot_relabel_glibc_as_musl() {
+    let bytes = br#"{"name":"@anthropic-ai/claude-code-linux-x64-musl","version":"2.1.280","os":["linux"],"cpu":["x64"],"libc":["glibc"]}"#;
+    assert_eq!(
+        validate_platform_manifest(bytes, "2.1.280", "linux-x64-musl"),
+        Err(Error::UnsupportedSource)
+    );
+}
+
+#[test]
+fn platformless_journal_rejects_original_or_prepared_musl_markers() {
+    for original in [true, false] {
+        let mut fixture = fixture();
+        let root = if original {
+            fixture.journal.owner.package_root.clone()
+        } else {
+            fixture
+                .journal
+                .owner
+                .package_root
+                .parent()
+                .unwrap()
+                .join(&fixture.journal.stage_name)
+        };
+        fs::create_dir_all(root.join("node_modules/@anthropic-ai/claude-code-linux-x64-musl"))
+            .unwrap();
+        let snapshot = Directory::open(&root).unwrap().snapshot().unwrap();
+        if original {
+            fixture.journal.original = snapshot;
+        } else {
+            fixture.journal.prepared = Some(snapshot);
+        }
+        fixture.journal.claude_platform = Some("linux-x64-musl".into());
+        let mut stripped = serde_json::to_value(&fixture.journal).unwrap();
+        stripped.as_object_mut().unwrap().remove("claude_platform");
+        let stripped: Journal = serde_json::from_value(stripped).unwrap();
+        save(&journal_path(&fixture.root, CLIAgent::Claude), &stripped).unwrap();
+        assert_eq!(
+            recover(
+                CLIAgent::Claude,
+                &fixture.journal.owner.entry,
+                &fixture.root
+            ),
+            Err(Error::RecoveryRequired)
+        );
+        assert_eq!(
+            fs::read(&fixture.journal.owner.entry).unwrap(),
+            b"old public binary"
+        );
+        assert!(journal_path(&fixture.root, CLIAgent::Claude).exists());
+    }
+}

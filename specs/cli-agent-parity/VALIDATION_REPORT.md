@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 补齐 Claude musl 实现，本机门禁通过
+
+Linux x64 固定 musl 映像保持密封 memfd／execveat 路径，新增 `/lib/ld-musl-x86_64.so.1` 的系统身份与摘要绑定，仅接受自包含加载器及主映像唯一 libc 依赖。npm 计划从真实安装 manifest、原入口摘要和完整快照取得平台，执行重验并将平台写入事务账本；冷恢复沿用保存的平台。旧 schema 1 无平台、bin-only 账本保留原恢复合同，新 musl 树不能删除平台字段冒充旧账本。显式 `2.1.280→2.1.278` 与 `2.1.287→2.1.285` 降级合同均保留。
+
+四版 `2.1.278/280/285/287` 的八个官方 wrapper／musl 原始归档已逐项复核 SRI、归档摘要、成员长度／摘要／模式；没有执行安装脚本。产品合同独审索引 `g09-musl-official-contract-review.safe.json` SHA `410f2d3058e5e99b973e0edc964721b9afd4b358125ab670638be2f6a3d1409d`。25 源文件冻结 `g09-musl-source-freeze-v2.safe.json` SHA `92b8da321b5f0c38ec5267feb8d24c837285169c71e2c7729d6e91d974d50774`。
+
+本机 `cargo check --locked -p warp`、更新回归 342 项（含新增 npm 18 项及旧账本恢复）、i18n 11 项、共享 npm Python 117 项、环境 Python 10 项均通过；初次测试编译 E0308 原件保留，修正反序列化类型后重跑通过。全部登记短目录完成归档清理。门禁索引 `g09-musl-local-gates-v1.safe.json` SHA `2ebb1fab9b6de2370b61a62f9d1a6e15ed84850b37002ba7cd43669e4f5b5498`，位于仓外 `g08-build-preparation`。Linux 专用新增 12 项尚未在 Mac 执行，真实 musl 执行／更新／降级及新增平台捕获的 Mac 真实事务回归仍待验，不以静态原件审查代替功能验收。
+
+无需本地化变更：内部加载、安装平台和恢复合同复用既有英中错误提示，无新用户文案或布局变化。额外 ACL／安全属性范围仍待用户决定，没有获得豁免。EOF 修复所在 `2d9b3d4f4` 的 [Windows run 37200286598](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37200286598) 已正式失败：普通 1224 PASS（warp1133／command91），66 必需各一次 PASS，i18n11包含其中；真实 npm step60 失败原件正在独审，不提前认定完整矩阵或 PowerShell 成功。**新增关闭 0 项，G09 和最终同冻结源码 Linux／Windows 门禁保持开放，PR 保持草稿。**
+
 ## 2026-10-04：G09 无输入版本候选提供独立 EOF
 
 修复限定`windows_appcontainer.rs`和对应测试：私有站版本候选使用新的匿名输入管道，启动前释放唯一写端；原宿主stdin、TCP取消授权、三流继承及远端关闭流程保持。新增3项Windows真实管道回归，先用非阻塞查询核无写端再读取EOF，并检查原输入未消费、输出通路及普通继承保持。实际Windows执行尚待验收；本地交叉类型检查不冒充测试通过。

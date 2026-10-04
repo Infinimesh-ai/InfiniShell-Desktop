@@ -27,9 +27,10 @@ BUSY_TESTS = (
 SOURCE_FILES = (
     "app/src/terminal/cli_agent_updates.rs",
     *["app/src/terminal/cli_agent_updates/" + name for name in (
-        "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_transaction.rs", "sources_npm_tree_unix.rs", "sources_npm_live_tests.rs")],
+        "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_transaction.rs", "sources_npm_tree_unix.rs", "sources_npm_live_tests.rs",
+        "sources_claude_downgrade.rs", "sources_claude_current_release.rs", "sources_claude_current_release.json", "sources_claude_musl_release.json")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
-        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_macos.rs", "managed_process_atomic_linux.rs", "managed_process_atomic_linux_glibc.rs")],
+        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_macos.rs", "managed_process_atomic_linux.rs", "managed_process_atomic_linux_glibc.rs", "managed_process_atomic_linux_musl.rs")],
     "script/cli-agent-parity/run_claude_npm_update_live.py",
 )
 MAX_ARCHIVE = 512 * 1024 * 1024
@@ -104,7 +105,7 @@ def official_package(package, version, cache):
     members = archive_members(raw, metadata["dist"]["integrity"])
     embedded = json.loads(members["package.json"][0])
     require(embedded.get("name") == package and embedded.get("version") == version, "embedded_identity")
-    for field in ("bin", "scripts", "dependencies", "optionalDependencies", "os", "cpu"):
+    for field in ("bin", "scripts", "dependencies", "optionalDependencies", "os", "cpu", "libc"):
         require(embedded.get(field) == metadata.get(field), "metadata_manifest_contract")
     write(cache / (slug + ".metadata.json"), metadata_bytes)
     write(cache / (slug + ".tgz"), raw)
@@ -119,11 +120,19 @@ def write_members(root, members):
         path.chmod(0o755 if executable else 0o644)
 
 
-def prepare_old(cache):
+def selected_platform(linux_libc):
     require(platform.system() in ("Darwin", "Linux"), "unix_only")
+    require(linux_libc in ("glibc", "musl"), "unsupported_libc")
     cpu = {"arm64":"arm64", "aarch64":"arm64", "x86_64":"x64"}.get(platform.machine())
     require(cpu is not None, "unsupported_arch")
     target = ("darwin" if platform.system() == "Darwin" else "linux") + "-" + cpu
+    if linux_libc == "musl":
+        require(target == "linux-x64", "musl_requires_linux_x64")
+        target += "-musl"
+    return target
+
+
+def prepare_old(cache, target):
     package = "@anthropic-ai/claude-code"
     top, metadata = official_package(package, OLD, cache)
     require(metadata.get("bin") == {"claude":"bin/claude.exe"}, "old_public_layout")
@@ -196,7 +205,8 @@ def fixture(args, case, old, sources, binaries):
     os.symlink("../lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe", root / "prefix/bin/claude")
     os.symlink(binaries["node"]["path"], root / "tools/node")
     os.symlink(binaries["npm_cli"]["path"], root / "tools/npm")
-    manifest = dict(schema=1, scope=SCOPE, case=case, root=str(root), old_public_sha256=sha(package / "bin/claude.exe"), source_sha256=sources, **binaries)
+    manifest = dict(schema=2, scope=SCOPE, case=case, root=str(root), claude_platform=args.claude_platform,
+        old_public_sha256=sha(package / "bin/claude.exe"), source_sha256=sources, **binaries)
     write(root / "manifest.private.json", manifest)
     return root, manifest
 
@@ -217,11 +227,11 @@ def verify_embedded(supervisor, repo):
     require(all(found), "supervisor_source_binding")
 
 
-def verify_product_archives(root, case, old):
+def verify_product_archives(root, case, old, target_platform):
     wrapper_meta = json.loads((root / "verified-wrapper.metadata.json").read_bytes())
     platform_meta = json.loads((root / "verified-platform.metadata.json").read_bytes())
     require(wrapper_meta["name"] == "@anthropic-ai/claude-code" and wrapper_meta["version"] == TARGET
-            and platform_meta["name"].startswith("@anthropic-ai/claude-code-") and platform_meta["version"] == TARGET,
+            and platform_meta["name"] == "@anthropic-ai/claude-code-" + target_platform and platform_meta["version"] == TARGET,
             "product_registry_identity")
     wrapper = archive_members((root / "verified-wrapper.tgz").read_bytes(), wrapper_meta["dist"]["integrity"])
     native = archive_members((root / "verified-platform.tgz").read_bytes(), platform_meta["dist"]["integrity"])
@@ -229,6 +239,7 @@ def verify_product_archives(root, case, old):
     expected.update({"node_modules/" + platform_meta["name"] + "/" + path: member for path, member in native.items()})
     expected["bin/claude.exe"] = native["claude"]
     journal = json.loads((root / "prepared-journal.safe.json").read_bytes())
+    require(journal.get("claude_platform") == target_platform, "product_platform_binding")
     require(bytes(journal["wrapper_archive_sha256"]).hex() == sha(root / "verified-wrapper.tgz")
             and bytes(journal["platform_archive_sha256"]).hex() == sha(root / "verified-platform.tgz"), "product_archive_receipt_binding")
     prepared = journal["prepared"]["nodes"]
@@ -252,7 +263,7 @@ def verify_product_archives(root, case, old):
             require(relative in expected and sha(path) == hashlib.sha256(expected[relative][0]).hexdigest(), "published_member_digest")
     require(actual == set(expected), "published_member_set")
     write(root / "independent-archive-check.safe.json", {"sri_verified":True,"prepared_members":len(prepared_files),
-        "published_members":len(actual),"target":TARGET,"old":OLD,"global_installation_changed":False})
+        "published_members":len(actual),"target":TARGET,"old":OLD,"claude_platform":target_platform,"global_installation_changed":False})
 
 
 def main():
@@ -263,7 +274,9 @@ def main():
         parser.add_argument("--" + role, type=Path, required=True)
         parser.add_argument("--" + role + "-sha256", required=True)
     parser.add_argument("--case", choices=CASES, action="append")
+    parser.add_argument("--linux-libc", choices=("glibc", "musl"), default="glibc")
     args = parser.parse_args()
+    args.claude_platform = selected_platform(args.linux_libc)
     args.repo = args.repo.resolve(strict=True)
     require(not args.output.exists(), "output_must_be_new")
     args.output.mkdir(mode=0o700, parents=True)
@@ -288,11 +301,11 @@ def main():
     require(re.fullmatch(r"[0-9a-f]{40}", revision), "source_commit_invalid")
     dirty = bool(subprocess.run(["git", "-C", str(args.repo), "status", "--porcelain", "--untracked-files=no"], capture_output=True, check=True).stdout)
     write(args.output / "source.safe.json", {"source_sha256":source,"binaries":binaries,"commit":revision,"working_tree_dirty":dirty,
-        "platform":{"system":platform.system(),"machine":platform.machine()},"mode":"official_npm_single_package_tree",
+        "platform":{"system":platform.system(),"machine":platform.machine()},"claude_platform":args.claude_platform,"mode":"official_npm_single_package_tree",
         "old_version":OLD,"target_version":TARGET,"base_patch":"c06688d3c246f08eb49838cade5e24223a243ea1169f0205281c0bacb141f72f"})
     cache = args.output / "official-inputs"
     cache.mkdir(mode=0o700)
-    old = prepare_old(cache)
+    old = prepare_old(cache, args.claude_platform)
     results = []
     for case in args.case or CASES:
         root, manifest = fixture(args, case, old, source, binaries)
@@ -306,10 +319,10 @@ def main():
             require(result.get("needs_cold_recovery") is True and result.get("accepted") is False, "checkpoint_not_observed")
             run_test(binaries["worker"]["path"], TEST, root / "project", environment(root, manifest, "recover"), root / "recover", True)
             result = json.loads((root / "result-recover.safe.json").read_text())
-        require(result.get("accepted") is True, "case_not_accepted")
-        verify_product_archives(root, case, old)
+        require(result.get("accepted") is True and result.get("claude_platform") == args.claude_platform, "case_not_accepted")
+        verify_product_archives(root, case, old, args.claude_platform)
         results.append({"case":case,"root":str(root),"result":result})
-    write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"cases":results,"model_inputs_sent":0,
+    write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"claude_platform":args.claude_platform,"cases":results,"model_inputs_sent":0,
         "busy_scope":"existing product model state-machine tests only", "plugin_recheck_covered":False,
         "g09_closed":False,"consumer_channels_unchanged":True})
 

@@ -35,6 +35,13 @@ struct File {
 }
 
 pub(super) fn supports(version: &str, platform: &str) -> Result<(), Error> {
+    if platform == "linux-x64-musl" {
+        return if matches!(version, "2.1.278" | "2.1.280" | V285 | V287) {
+            Ok(())
+        } else {
+            Err(Error::InvalidRelease)
+        };
+    }
     if !matches!(version, V285 | V287) {
         return Err(Error::InvalidRelease);
     }
@@ -46,9 +53,13 @@ pub(super) fn supports(version: &str, platform: &str) -> Result<(), Error> {
 
 fn release(version: &str, platform: &str) -> Result<Release, Error> {
     supports(version, platform)?;
+    let bytes: &[u8] = if platform == "linux-x64-musl" {
+        include_bytes!("sources_claude_musl_release.json")
+    } else {
+        include_bytes!("sources_claude_current_release.json")
+    };
     let mut releases: BTreeMap<String, Release> =
-        serde_json::from_slice(include_bytes!("sources_claude_current_release.json"))
-            .map_err(|_| Error::InvalidRelease)?;
+        serde_json::from_slice(bytes).map_err(|_| Error::InvalidRelease)?;
     releases.remove(version).ok_or(Error::InvalidRelease)
 }
 
@@ -70,13 +81,10 @@ pub(super) fn verify_metadata(
     native: &[u8],
 ) -> Result<(), Error> {
     let release = release(version, platform)?;
+    let platform_name = format!("@anthropic-ai/claude-code-{platform}");
     for (bytes, name, expected) in [
         (wrapper, "@anthropic-ai/claude-code", &release.wrapper),
-        (
-            native,
-            "@anthropic-ai/claude-code-darwin-arm64",
-            &release.platform,
-        ),
+        (native, platform_name.as_str(), &release.platform),
     ] {
         let value: Value = serde_json::from_slice(bytes).map_err(|_| Error::InvalidRelease)?;
         let short = name
@@ -93,6 +101,46 @@ pub(super) fn verify_metadata(
         {
             return Err(Error::InvalidRelease);
         }
+    }
+    Ok(())
+}
+
+/// 已安装布局把 wrapper 占位入口替换为同版原生映像；恢复只接受这份完整清单。
+pub(super) fn installed_files(
+    version: &str,
+    platform: &str,
+) -> Result<BTreeMap<PathBuf, (u64, [u8; 32])>, Error> {
+    let release = release(version, platform)?;
+    let native = native(version, platform)?;
+    let dependency = PathBuf::from(format!("node_modules/@anthropic-ai/claude-code-{platform}"));
+    let mut files = BTreeMap::new();
+    for (path, file) in release.wrapper.files {
+        files.insert(
+            path,
+            (file.length, super::brew::decode_sha256(&file.sha256)?),
+        );
+    }
+    for (path, file) in release.platform.files {
+        files.insert(
+            dependency.join(path),
+            (file.length, super::brew::decode_sha256(&file.sha256)?),
+        );
+    }
+    files.insert("bin/claude.exe".into(), native);
+    Ok(files)
+}
+
+pub(super) fn verify_archive_digests(
+    version: &str,
+    platform: &str,
+    wrapper: [u8; 32],
+    native: [u8; 32],
+) -> Result<(), Error> {
+    let release = release(version, platform)?;
+    if hex::encode(wrapper) != release.wrapper.sha256
+        || hex::encode(native) != release.platform.sha256
+    {
+        return Err(Error::InvalidRelease);
     }
     Ok(())
 }
@@ -135,3 +183,11 @@ pub(super) fn verify_archives(
 ))]
 #[path = "sources_claude_current_release_tests.rs"]
 mod tests;
+
+#[cfg(all(
+    test,
+    feature = "local_fs",
+    any(target_os = "macos", target_os = "linux", windows)
+))]
+#[path = "sources_claude_musl_release_tests.rs"]
+mod musl_tests;
