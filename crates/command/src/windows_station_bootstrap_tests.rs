@@ -1,6 +1,87 @@
 use super::*;
 
 #[test]
+fn application_path_normalizes_short_unicode_and_spaces_without_releasing_identity() {
+    let temporary = tempfile::tempdir().unwrap();
+    let path = temporary.path().join("中文 程序.exe");
+    fs::write(&path, b"original").unwrap();
+    let lease = PathLease::capture(&path).unwrap();
+    let canonical = lease.path().to_owned();
+    let expected = canonical.to_str().unwrap().strip_prefix(r"\\?\").unwrap();
+    assert!(wide(canonical.as_os_str()).unwrap().len() <= MAX_PATH as usize);
+
+    let application = lease.application_path().unwrap();
+
+    assert_eq!(application, wide(OsStr::new(expected)).unwrap());
+    assert_eq!(lease.path(), canonical);
+    assert_eq!(
+        file_identity(&open_path_locked(Path::new(expected)).unwrap()).unwrap(),
+        lease.entries[0].2
+    );
+    lease.verify().unwrap();
+}
+
+#[test]
+fn application_path_does_not_select_another_file_by_trimming_a_verbatim_name() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let verbatim = root.join("program.exe.");
+    let ordinary = root.join("program.exe");
+    fs::write(&verbatim, b"verbatim").unwrap();
+    fs::write(&ordinary, b"ordinary").unwrap();
+    let lease = PathLease::capture(&verbatim).unwrap();
+    assert_ne!(
+        file_identity(&open_path_locked(&ordinary).unwrap()).unwrap(),
+        lease.entries[0].2
+    );
+
+    let application = lease.application_path();
+
+    // 系统可以保留 verbatim 表示或拒绝转换，但不得选中去尾点后的另一文件。
+    assert!(
+        application.is_err() || application.unwrap() == wide(lease.path().as_os_str()).unwrap()
+    );
+    lease.verify().unwrap();
+}
+
+#[test]
+fn application_path_preserves_long_verbatim_paths() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("长目录甲".repeat(30))
+        .join("长目录乙".repeat(30));
+    fs::create_dir_all(&root).unwrap();
+    let path = root.join("program.exe");
+    fs::write(&path, b"original").unwrap();
+    let lease = PathLease::capture(&path).unwrap();
+    let expected = wide(lease.path().as_os_str()).unwrap();
+    assert!(expected.len() > MAX_PATH as usize);
+
+    assert_eq!(lease.application_path().unwrap(), expected);
+    lease.verify().unwrap();
+}
+
+#[test]
+fn application_path_keeps_the_original_file_locked_against_replacement() {
+    let temporary = tempfile::tempdir().unwrap();
+    let path = temporary.path().join("program.exe");
+    let replacement = temporary.path().join("replacement.exe");
+    fs::write(&path, b"original").unwrap();
+    fs::write(&replacement, b"replacement").unwrap();
+    let lease = PathLease::capture(&path).unwrap();
+    let application = lease.application_path().unwrap();
+
+    assert!(fs::rename(&replacement, &path).is_err());
+
+    assert_eq!(lease.application_path().unwrap(), application);
+    assert_eq!(fs::read(&path).unwrap(), b"original");
+    lease.verify().unwrap();
+}
+
+#[test]
 fn release_observation_distinguishes_remaining_station_from_remaining_logon() {
     let station_remaining = release_observation(&Ok(false), &Ok(true));
     assert_eq!(station_remaining["station_absent"], false);

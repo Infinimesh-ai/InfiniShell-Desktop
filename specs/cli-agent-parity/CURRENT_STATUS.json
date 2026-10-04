@@ -9839,5 +9839,23 @@
     "localization": "无需本地化变更：本轮仅补验收文档，既有用户文案和布局不变。",
     "g09_closed": false,
     "newly_closed_items": []
+  },
+  "g09_application_path_compatibility_20261004": {
+    "status": "implemented_local_gates_passed_windows_native_pending",
+    "base_commit": "b19a6f1964b624ef165645139a25b387ec24e002",
+    "implementation": "窗口站helper最终lpApplicationName按Rust1.92短路径规则规范化，直接CreateFileW核同FileID；原canonical请求、argv0、租约、摘要和CREATE事件审核不变。长路径或Win32语义改变时保留原表示。",
+    "diagnostics": "失败时独立保留最初16条CLR事件的HRESULT及原校验/Continue状态，另计溢出；不采其余地址、字符串或托管堆，不改变原期限、权限、取消或事件处理。事件序列不冒称完整InnerException链。",
+    "root_cause_boundary": "公开标准启动与原helper的application表示不同已由官方源码核实；实际System.Net.ServicePointManager失败内因仍未证，不能提前称修复。",
+    "source_freeze_sha256": "91e1880ded279f227550200ea7b7bf27a2ce94951a6d4b1dfa6b180b2c866037",
+    "source_review_sha256": "df60c98214ac40df830dc2b1d673fdfbaf1ed5ebd164a9374f38c1f63c09e2ee",
+    "local_gate_index_sha256": "69ae482c4d7d794714afd56f3e975c190371bce4a6bf05c30315fe61ac7e6097",
+    "local_gates": "Mac cargo check、Windows command测试类型检查、i18n11和Python21通过；四个注册短根已清理。",
+    "test_compilation_fix": "独立Rust1.92最小编译发现union数组索引赋值E0133，已改完整数组赋值、不新增unsafe；原失败收据r-gv_vhv70保留。Windows app实际编译及测试仍待验。",
+    "required_native_tests": 59,
+    "acceptance_source_files": 49,
+    "native_matrix": "仍需原五场景、CMD/PowerShell、三次独立冷恢复及全部资源清理/来源绑定；未缩范围，native witness关闭。",
+    "localization": "无需本地化变更：内部启动路径及结构化诊断沿用既有英中错误映射，无文案或布局变化。",
+    "g09_closed": false,
+    "newly_closed_items": []
   }
 }

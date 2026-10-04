@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-04 启动路径兼容修复待原生验收，仍开放**：helper 最终 application 路径对齐 Rust 1.92 的短路径规范化，直接核同 FileID；canonical 请求、argv0、映像租约与原审核不变。另保留最初 16 条 CLR HRESULT，避免被后续事件覆盖；不改变权限或期限，不称完整内层异常链。Mac check、Windows command 测试类型检查、i18n 11、Python 21 通过，门禁索引 SHA `69ae482c4d7d794714afd56f3e975c190371bce4a6bf05c30315fe61ac7e6097`。来源 49 份、必选 59 项已接线，原矩阵实际结果待验，尚不能认定 PowerShell 故障解决。无需本地化变更，新增关闭 0 项。
+
 - **2026-10-04 输出隔离实际验收：CMD成功、PS初始化失败，仍开放**：`5d8075c524ee33fedef71c301484a9441a7679f9` 的 [run 37175216018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37175216018) 正式 failure；普通 1209 PASS（1129 warp＋80 command）、必需 51 项及新增 output 8 项逐名通过，i18n 11 通过，普通组无 FAIL／LEAK／RETRY／FLAKY。首场景 `updated` 为 `ProbeFailed`：CMD 实际创建 Node／Codex、输出固定版本并退出 0，但 `CODEX_HOME` 拒绝访问和 PATH aliases 创建失败警告保留；PowerShell 的 `System.Net.ServicePointManager` 初始化异常、退出 -65536、零输出且未创建 Node，底层异常原因未证。两实际代次的 Job／AppContainer／桌面／DeviceMap／窗口站／LSA 清理均确认成功。后四场景与三次冷恢复未执行，远端现场保留，不能声称完整事务或其他前缀／配置全树验收通过。终审索引 SHA `2295a35ec843716440c0ea8a75694285351d1715b14a3e6ee593f5d8b37bbcbc`，根复核 SHA `a71d4433a6baa0ab142163eedffe010ec29001d195fc0857a49b89c9214cbab2`；索引位于仓外 `g08-build-preparation/5d8075c52-windows-ci/final-delivery-index.safe.json`。本轮新增关闭 0 项；完整原矩阵与最终同提交双平台门禁仍待完成。
 
 - **2026-10-04 候选输出隔离已实现，仍开放**：只为固定 npm 版本候选捕获私有普通文件；真实退出和严格 Job 空后封存、关闭候选句柄，再做原站／LSA 清理，最后重放原字节。stdin、官方 shim、权限和原期限保持；输出错误与取消不标成功。Mac check、Windows command 测试类型检查、i18n 11、Python 21 及工作流门禁通过，收据 SHA `9719596188e21d33bf4167bd9b658afcbb60dda1a0ca49986762f611f3e86c88`；源码独审无阻断。新增 8 项 output 回归及来源绑定已接线，实际 Windows 原矩阵和最终同提交双平台门禁待验，不能计为 G09 关闭。无需本地化变更。

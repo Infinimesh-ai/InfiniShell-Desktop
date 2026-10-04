@@ -19,7 +19,8 @@ use uuid::Uuid;
 use windows::Win32::Foundation::{
     DUPLICATE_HANDLE_OPTIONS, DuplicateHandle, ERROR_FILE_NOT_FOUND, ERROR_NO_DATA,
     ERROR_NO_MORE_FILES, ERROR_NO_TOKEN, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, FILETIME,
-    GENERIC_READ, GENERIC_WRITE, HANDLE, HLOCAL, LUID, LocalFree, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    GENERIC_READ, GENERIC_WRITE, HANDLE, HLOCAL, LUID, LocalFree, MAX_PATH, WAIT_OBJECT_0,
+    WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authentication::Identity::{
     LsaFreeReturnBuffer, LsaGetLogonSessionData,
@@ -35,9 +36,9 @@ use windows::Win32::Security::{
 use windows::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, CreateDirectoryW, CreateFileW, FILE_ATTRIBUTE_REPARSE_POINT,
     FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OPEN_REPARSE_POINT,
-    FILE_SHARE_MODE, FILE_SHARE_READ, FILE_SHARE_WRITE, GetFileInformationByHandle, OPEN_EXISTING,
-    PIPE_ACCESS_DUPLEX, READ_CONTROL, ReadFile, SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
-    WriteFile,
+    FILE_SHARE_MODE, FILE_SHARE_READ, FILE_SHARE_WRITE, GetFileInformationByHandle,
+    GetFullPathNameW, OPEN_EXISTING, PIPE_ACCESS_DUPLEX, READ_CONTROL, ReadFile,
+    SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT, WriteFile,
 };
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
@@ -353,6 +354,51 @@ impl PathLease {
     fn path(&self) -> &Path {
         &self.entries[0].0
     }
+
+    fn application_path(&self) -> io::Result<Vec<u16>> {
+        self.verify()?;
+        let original = wide(self.path().as_os_str())?;
+        // 对齐 Rust 1.92 的 to_user_path：仅在 Win32 解析不改变短路径时去掉前缀。
+        // 请求、argv0 和原映像租约仍使用 canonical 路径，不改变被审核的文件身份。
+        if original.len() > MAX_PATH as usize
+            || !original.starts_with(&[b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16])
+            || original.get(5) != Some(&(b':' as u16))
+            || original.get(6) != Some(&(b'\\' as u16))
+        {
+            return Ok(original);
+        }
+        let candidate = &original[4..];
+        let mut normalized = [0; MAX_PATH as usize];
+        let count =
+            unsafe { GetFullPathNameW(PCWSTR(candidate.as_ptr()), Some(&mut normalized), None) }
+                as usize;
+        if count == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if count >= normalized.len() || normalized[..count] != candidate[..candidate.len() - 1] {
+            return Ok(original);
+        }
+        // 直接按这串 Win32 名称打开，避免标准库再次添加 verbatim 前缀后才比较身份。
+        let handle = unsafe {
+            CreateFileW(
+                PCWSTR(normalized.as_ptr()),
+                GENERIC_READ.0,
+                FILE_SHARE_READ,
+                None,
+                OPEN_EXISTING,
+                FILE_FLAG_OPEN_REPARSE_POINT,
+                None,
+            )
+        }
+        .map_err(io::Error::other)?;
+        let file = unsafe { File::from_raw_handle(handle.0) };
+        require(
+            file_identity(&file)? == self.entries[0].2,
+            "窗口站引导执行路径身份变化",
+        )?;
+        Ok(normalized[..=count].to_vec())
+    }
+
     pub(super) fn verify(&self) -> io::Result<()> {
         for (path, file, identity) in &self.entries {
             require(

@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 启动路径兼容修复已实现，PowerShell 实际结果待验
+
+窗口站 helper 的最终 `lpApplicationName` 对齐 Rust 1.92 短路径规范化规则：只有 Win32 解析逐码位不变且直接 `CreateFileW` 核同 FileID 时才使用 DOS 表示。canonical 请求、argv0、原租约、摘要和首 CREATE 审核保持；长路径／不同语义保留原表示。官方标准库与原 helper 的路径差异已证，但尚未取得真实 PowerShell 内层异常，不能据此认定 `System.Net.ServicePointManager` 根因或修复结果。失败摘要另外保留最初 16 条 CLR HRESULT 和对应校验／Continue 状态、溢出计数；不采其他地址、字符串或堆，也不改变原期限、权限和事件处理。
+
+新增路径 5 项及 CLR 3 项回归，全部 59 项必选和 49 份验收来源已接线。独立最小 Rust 1.92 编译发现测试 union 索引赋值 E0133，已改整体数组赋值且未新增 unsafe；旧失败收据保留。Mac `cargo check --locked -p warp`、Windows command `--tests` 类型检查、i18n 11、Python 21 通过；四个注册短根归档清理。门禁索引 SHA `69ae482c4d7d794714afd56f3e975c190371bce4a6bf05c30315fe61ac7e6097`，源码审查 SHA `df60c98214ac40df830dc2b1d673fdfbaf1ed5ebd164a9374f38c1f63c09e2ee`。变动 Rust 格式已审，bootstrap 两处既有格式差异与基线相同。无需本地化变更：既有英中错误映射、文案及布局不变。原五场景、三冷恢复及最终同提交双平台门禁仍待验。**新增关闭 0 项，10 关闭／G09 开放／3 移交，PR 仍草稿。**
+
 ## 2026-10-04：G09 输出隔离越过 LSA 阻塞，PowerShell 初始化仍失败
 
 精确提交 `5d8075c524ee33fedef71c301484a9441a7679f9` 的 [Windows run 37175216018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37175216018) 正式 failure，只有原完整矩阵的首场景 `updated` 执行并返回 `ProbeFailed`。普通门禁 1209 PASS（1129 warp＋80 command），51 项必需具名测试各一次 PASS，包含新增 output 8 项；i18n 11 通过，普通组 FAIL／LEAK／RETRY／FLAKY 均为 0。原生部分独立为 0 PASS／1 FAIL，104.90 秒；不把普通门禁成功代记为完整更新通过。

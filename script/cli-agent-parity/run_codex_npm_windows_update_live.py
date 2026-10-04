@@ -54,6 +54,7 @@ ACCEPTANCE_SOURCE_FILES = (
     "crates/command/Cargo.toml",
     "app/src/terminal/cli_agent_updates/sources_codex_npm_windows_live_tests.rs",
     *["app/src/ai/cli_agent_runtime/" + name for name in (
+        "managed_process_atomic_windows_tests.rs",
         "managed_process_atomic_windows_creation_witness_tests.rs",
         "managed_process_atomic_windows_snapshot_tests.rs",
         "managed_process_atomic_windows_snapshot_temp_tests.rs",

@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use command::blocking::Command as BlockingCommand;
 use command::managed::{Containment, ManagedTree};
 use command::windows::SuspendedChild;
+use windows::Win32::Foundation::NTSTATUS;
 use windows::Win32::Storage::FileSystem::{
     FILE_TYPE_CHAR, FILE_TYPE_DISK, FILE_TYPE_PIPE, GetFileType,
 };
@@ -1448,6 +1449,116 @@ fn debug_backend_cannot_change_after_the_root_was_bound() {
     assert!(session.bind_station_debugger(None).is_err());
     assert_eq!(session.root_process_id, 41);
     assert!(session.station_debugger.is_none());
+}
+
+#[test]
+fn initial_clr_failure_survives_later_debug_events() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        dwProcessId: 41,
+        dwThreadId: 43,
+        ..Default::default()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(0xe0434352_u32 as i32);
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    event.u.Exception.ExceptionRecord.ExceptionInformation =
+        [0x80131534, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    event.u.Exception.dwFirstChance = 1;
+    trace.received(&event, 10, 43, false);
+    trace.validated(NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43), "root");
+    trace.continued(
+        NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43),
+        DBG_EXCEPTION_NOT_HANDLED.0,
+    );
+    event.dwDebugEventCode = EXIT_THREAD_DEBUG_EVENT;
+    for _ in 0..MAX_NPM_DEBUG_EVENTS {
+        trace.received(&event, 20, 43, true);
+        trace.validated(
+            NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43),
+            "console",
+        );
+        trace.continued(
+            NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43),
+            DBG_CONTINUE.0,
+        );
+    }
+
+    assert_eq!(trace.dropped_events, 1);
+    assert_eq!(trace.initial_clr_exceptions.len(), 1);
+    let failure = &trace.initial_clr_exceptions[0];
+    assert_eq!(failure.sequence, 1);
+    assert_eq!(failure.clr_hresult, Some(0x80131534));
+    assert_eq!(failure.first_chance, Some(1));
+    assert_eq!(failure.role, "root");
+    assert_eq!(failure.mode, "normal");
+    assert!(failure.validation.as_ref().unwrap().ok);
+    assert!(failure.continuation.as_ref().unwrap().ok);
+    assert_eq!(failure.continue_status, Some(DBG_EXCEPTION_NOT_HANDLED.0));
+}
+
+#[test]
+fn clr_failure_history_is_bounded_without_replacing_the_first_exception() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        ..Default::default()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(0xe0434352_u32 as i32);
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    event.u.Exception.ExceptionRecord.ExceptionInformation =
+        [0x80070005, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for _ in 0..MAX_NPM_DEBUG_EVENTS {
+        trace.received(&event, 10, 43, false);
+    }
+    event.u.Exception.ExceptionRecord.ExceptionInformation =
+        [0x80131534, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    trace.received(&event, 20, 43, true);
+    trace.validated(NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43), "root");
+
+    assert_eq!(trace.initial_clr_exceptions.len(), MAX_NPM_DEBUG_EVENTS);
+    assert_eq!(trace.dropped_clr_exceptions, 1);
+    assert_eq!(trace.initial_clr_exceptions[0].sequence, 1);
+    assert_eq!(
+        trace.initial_clr_exceptions[0].clr_hresult,
+        Some(0x80070005)
+    );
+    assert!(
+        trace
+            .initial_clr_exceptions
+            .last()
+            .unwrap()
+            .validation
+            .is_none()
+    );
+    assert_eq!(trace.recent.back().unwrap().clr_hresult, Some(0x80131534));
+}
+
+#[test]
+fn clr_hresult_requires_a_declared_parameter_and_does_not_record_addresses() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        ..Default::default()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(0xe0434352_u32 as i32);
+    event.u.Exception.ExceptionRecord.ExceptionInformation = [
+        0x80131534, 0x12345678, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    trace.received(&event, 10, 43, false);
+    event.u.Exception.ExceptionRecord.NumberParameters = 16;
+    trace.received(&event, 20, 43, false);
+    event.u.Exception.ExceptionRecord.ExceptionCode = EXCEPTION_BREAKPOINT;
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    trace.received(&event, 30, 43, false);
+
+    assert_eq!(trace.initial_clr_exceptions.len(), 2);
+    assert_eq!(trace.initial_clr_exceptions[0].clr_hresult, None);
+    assert_eq!(trace.initial_clr_exceptions[1].clr_hresult, None);
+    assert_eq!(trace.recent.back().unwrap().clr_hresult, None);
+    let recorded = serde_json::to_string(&trace.initial_clr_exceptions).unwrap();
+    assert!(!recorded.contains("305419896"));
+    assert!(!recorded.contains("12345678"));
 }
 
 #[test]

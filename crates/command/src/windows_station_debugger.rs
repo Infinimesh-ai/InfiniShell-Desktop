@@ -514,7 +514,7 @@ impl Package {
                 && request.environment.ends_with(&[0, 0]),
             "调试创建参数终止符无效",
         )?;
-        let program = wide(request.program.as_os_str())?;
+        let program = image.application_path()?;
         let mut command = request.command;
         let mut handles = request
             .streams

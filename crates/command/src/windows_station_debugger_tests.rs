@@ -1,4 +1,32 @@
+use std::fs;
+
 use super::*;
+
+#[test]
+fn application_path_normalization_preserves_canonical_request_and_argv0() {
+    let temporary = tempfile::tempdir().unwrap();
+    let path = temporary.path().join("中文 程序.exe");
+    fs::write(&path, b"original").unwrap();
+    let canonical = path.canonicalize().unwrap();
+    let command = wide(format!("\"{}\" --version", canonical.display()).as_ref()).unwrap();
+    let (request, image) = Spawn::new(
+        &path,
+        command.clone(),
+        vec![0, 0],
+        temporary.path(),
+        [HANDLE::default(); 3],
+        false,
+    )
+    .unwrap();
+
+    let application = image.application_path().unwrap();
+
+    assert_eq!(request.program, canonical);
+    assert_eq!(request.command, command);
+    assert_eq!(request.program_identity, image.entries[0].2);
+    assert_ne!(application, wide(request.program.as_os_str()).unwrap());
+    image.verify().unwrap();
+}
 
 #[test]
 fn replayed_resume_is_rejected_before_native_dispatch() {

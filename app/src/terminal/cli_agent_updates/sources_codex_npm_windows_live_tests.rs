@@ -283,6 +283,10 @@ const SOURCES: &[(&str, &[u8])] = &[
         ),
     ),
     (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs"),
+    ),
+    (
         "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness_tests.rs",
         include_bytes!(
             "../../ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness_tests.rs"

@@ -259,9 +259,11 @@ struct NpmDebugTrace {
     continued: u64,
     dropped_events: u64,
     recent: VecDeque<NpmDebugEvent>,
+    initial_clr_exceptions: Vec<NpmDebugEvent>,
+    dropped_clr_exceptions: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 struct NpmDebugEvent {
     sequence: u64,
     process_id: u32,
@@ -273,12 +275,13 @@ struct NpmDebugEvent {
     role: &'static str,
     exception_code: Option<i32>,
     first_chance: Option<u32>,
+    clr_hresult: Option<u32>,
     validation: Option<NpmDebugResult>,
     continuation: Option<NpmDebugResult>,
     continue_status: Option<i32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 struct NpmDebugResult {
     ok: bool,
     elapsed_ms: u128,
@@ -322,6 +325,8 @@ impl NpmDebugTrace {
             continued: 0,
             dropped_events: 0,
             recent: VecDeque::with_capacity(MAX_NPM_DEBUG_EVENTS),
+            initial_clr_exceptions: Vec::with_capacity(MAX_NPM_DEBUG_EVENTS),
+            dropped_clr_exceptions: 0,
         }
     }
 
@@ -352,7 +357,9 @@ impl NpmDebugTrace {
         }
         let exception =
             (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT).then(|| unsafe { event.u.Exception });
-        self.recent.push_back(NpmDebugEvent {
+        let clr =
+            exception.filter(|value| value.ExceptionRecord.ExceptionCode.0 as u32 == 0xe0434352);
+        let recorded = NpmDebugEvent {
             sequence: self.received,
             process_id: event.dwProcessId,
             thread_id: event.dwThreadId,
@@ -363,10 +370,26 @@ impl NpmDebugTrace {
             role: "unknown",
             exception_code: exception.map(|value| value.ExceptionRecord.ExceptionCode.0),
             first_chance: exception.map(|value| value.dwFirstChance),
+            // CLR 异常的首参数为 HRESULT；不采集其余地址、托管堆或用户字符串。
+            clr_hresult: clr.and_then(|value| {
+                let record = value.ExceptionRecord;
+                (record.NumberParameters > 0
+                    && record.NumberParameters as usize <= record.ExceptionInformation.len())
+                .then_some(record.ExceptionInformation[0] as u32)
+            }),
             validation: None,
             continuation: None,
             continue_status: None,
-        });
+        };
+        if clr.is_some() {
+            // 保留最初的 CLR 异常事件，避免它被后续 DLL、线程和退出事件挤出最近环。
+            if self.initial_clr_exceptions.len() < MAX_NPM_DEBUG_EVENTS {
+                self.initial_clr_exceptions.push(recorded.clone());
+            } else {
+                self.dropped_clr_exceptions = self.dropped_clr_exceptions.saturating_add(1);
+            }
+        }
+        self.recent.push_back(recorded);
     }
 
     fn validated(&mut self, result: NpmDebugResult, role: &'static str) {
@@ -377,9 +400,13 @@ impl NpmDebugTrace {
             "validation_failed"
         };
         self.validated = self.validated.saturating_add(u64::from(result.ok));
-        if let Some(event) = self.recent.back_mut() {
+        for event in self.recent.back_mut().into_iter().chain(
+            self.initial_clr_exceptions
+                .last_mut()
+                .filter(|event| event.sequence == self.received),
+        ) {
             event.role = role;
-            event.validation = Some(result);
+            event.validation = Some(result.clone());
         }
     }
 
@@ -391,9 +418,13 @@ impl NpmDebugTrace {
             "continue_failed"
         };
         self.continued = self.continued.saturating_add(u64::from(result.ok));
-        if let Some(event) = self.recent.back_mut() {
+        for event in self.recent.back_mut().into_iter().chain(
+            self.initial_clr_exceptions
+                .last_mut()
+                .filter(|event| event.sequence == self.received),
+        ) {
             event.continue_status = Some(status);
-            event.continuation = Some(result);
+            event.continuation = Some(result.clone());
         }
     }
 }
@@ -758,13 +789,15 @@ impl WindowsImageDebugSession {
         }
         if failed {
             summary["recent"] = serde_json::json!(trace.recent);
+            summary["initial_clr_exceptions"] = serde_json::json!(trace.initial_clr_exceptions);
+            summary["dropped_clr_exceptions"] = serde_json::json!(trace.dropped_clr_exceptions);
         }
         Some(summary)
     }
 
     pub(super) fn record_package_probe_result(&self, result: Result<u32, &io::Error>) {
         if let Some(summary) = self.package_debug_summary(result) {
-            // 隐藏 worker 未初始化 GUI 日志；成功只记总计，失败只记最近 16 个事件。
+            // 隐藏 worker 未初始化 GUI 日志；失败记录最近 16 个事件及最初 16 个 CLR 异常。
             // 不逐次输出 100 ms 等待，也不改变原生 API 返回值或待继续事件的所有权。
             warp_core::safe_eprintln!(
                 safe: ("managed_process.windows_npm_debug_summary={summary}"),
