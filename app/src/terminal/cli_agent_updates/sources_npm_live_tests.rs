@@ -633,7 +633,29 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
     check(observed == expected, "public_version_after")?;
     let mut receipts = Vec::new();
     let processes = journal_root.join("cli-agent-processes");
-    for child in fs::read_dir(&processes).map_err(|_| "supervisor_generations_missing")? {
+    // 候选改写可在已保存 probe generation 后、创建监督者目录前被镜像绑定拒绝。
+    // 只在这一负例允许目录缺失；读取失败或实际启动仍须按原合同拒绝。
+    let directories = match fs::read_dir(&processes) {
+        Ok(directories) => {
+            check(
+                fs::symlink_metadata(&processes)
+                    .map(|metadata| metadata.is_dir())
+                    .unwrap_or(false),
+                "supervisor_generations_not_directory",
+            )?;
+            Some(directories)
+        }
+        Err(error)
+            if manifest.case == "candidate_changed_preserved"
+                && error.kind() == std::io::ErrorKind::NotFound
+                && matches!(fs::symlink_metadata(&processes), Err(error)
+                    if error.kind() == std::io::ErrorKind::NotFound) =>
+        {
+            None
+        }
+        Err(_) => return Err("supervisor_generations_missing".into()),
+    };
+    for child in directories.into_iter().flatten() {
         let directory = child.map_err(|_| "supervisor_generation_invalid")?.path();
         let generation = directory
             .file_name()
@@ -658,7 +680,10 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
         )?;
         receipts.push(serde_json::to_value(receipt).map_err(|_| "receipt_invalid")?);
     }
-    check(!receipts.is_empty(), "no_supervisor_evidence")?;
+    check(
+        manifest.case == "candidate_changed_preserved" || !receipts.is_empty(),
+        "no_supervisor_evidence",
+    )?;
     Ok(
         json!({"case":manifest.case,"accepted":true,"public_version":observed,"expected_failure":expected_failure,
         "recover_invoked":recover_invoked,"entry_link_preserved":true,"cleanup_receipts":receipts,

@@ -145,7 +145,7 @@ on:
           - claude
           - grok
       linux_atomic_agent:
-        description: 原生补验模式的 Linux 升级对象；默认和全量模式始终验三款
+        description: 原生补验模式的 Linux 升级对象；claude_musl 仅用于独立 Claude npm musl 验收
         required: true
         default: all
         type: choice
@@ -154,6 +154,7 @@ on:
           - codex
           - claude
           - grok
+          - claude_musl
 # 自托管 runner 只需要读取代码。这个 workflow 不接收部署密钥，也不向仓库写入内容。
 permissions:
   contents: read
@@ -184,6 +185,12 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("linux_atomic_agent") == "claude_musl":
+              required = {"run_linux", "native_acceptance_only", "run_claude_npm_updates"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "all", "windows_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"linux_atomic_agent"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name) is True for name in required):
+                  sys.exit("Claude npm musl 验收只允许独立 Linux 原生补验，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
           if inputs.get("windows_atomic_debug_scope") == "g09_npm_powershell" and not inputs.get("run_windows_npm_native_witness", False):
               sys.exit("PowerShell 原生取证范围必须显式开启限定 witness")
           if inputs.get("windows_atomic_debug_scope") == "g09_stdio_lifetime":
@@ -659,6 +666,8 @@ jobs:
         if: ${{ !cancelled() && inputs.run_claude_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 45
+        env:
+          CLAUDE_NPM_MUSL: ${{ inputs.linux_atomic_agent == 'claude_musl' }}
         run: |
           set -euo pipefail
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
@@ -673,12 +682,17 @@ jobs:
           digest() { sha256sum "$1" | cut -d ' ' -f 1; }
           test "$(digest "$target_dir/debug/infinishell-tui")" = "$(digest "$fixture_parent/supervisor")"
           test "$(digest "$test_binary")" = "$(digest "$fixture_parent/warp-libtest")"
+          # 仅显式 musl 范围改变平台参数，其他范围继续使用驱动原默认值。
+          libc_args=()
+          if [ "$CLAUDE_NPM_MUSL" = "true" ]; then
+            libc_args=(--linux-libc musl)
+          fi
           python3 -B script/cli-agent-parity/run_claude_npm_update_live.py \
             --repo "$GITHUB_WORKSPACE" --output "$fixture_parent/evidence" \
             --test-binary "$fixture_parent/warp-libtest" --test-binary-sha256 "$(digest "$fixture_parent/warp-libtest")" \
             --supervisor "$fixture_parent/supervisor" --supervisor-sha256 "$(digest "$fixture_parent/supervisor")" \
             --node "$node_path" --node-sha256 "$(digest "$node_path")" \
-            --npm-cli "$npm_path" --npm-cli-sha256 "$(digest "$npm_path")"
+            --npm-cli "$npm_path" --npm-cli-sha256 "$(digest "$npm_path")" ${libc_args[@]+"${libc_args[@]}"}
 
       - name: Preserve Linux Claude npm update receipts
         if: ${{ !cancelled() && inputs.run_claude_npm_updates && steps.claude_npm_updates.outcome != 'skipped' && env.CLAUDE_NPM_EVIDENCE != '' }}

@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 Windows 版本输出未满足；Mac 候选拒绝验收器修订
+
+精确 `2d9b3d4f49c26e7464a5666c8c0db833d48c9bdf` 的 Windows run37200286598 原件已独审：普通1224 PASS（warp1133／command91）、66必需及i18n11各一次PASS，96条warning保留；真实首 `updated` 为0通过／1失败、113.08秒、`ProbeFailed`。CMD输出18字节固定版本；PS已经创建Node／Codex及两个console，均退出0，但捕获stdout为0字节。PS root先退出、后代随后退出，不再表述为未启动或取消超时。两代Job、AppContainer、helper、desktop、DeviceMap、窗口站和LSA清理确认；CMD拒绝访问／PATH警告及runner清理孤儿进程原文保留。后四场景与三次冷恢复未执行，发布后的入口、配置和完整目录不变性也未验。
+
+官方三ZIP按API大小／SHA与全部CRC核验，小原件72份逐项独审，50份源码重新对应2d9 Git blob。根索引 `g09-version-stdin-eof-full-matrix-ci/root-delivery-index.safe.json` SHA `fc65bafb1f3ae018a8bf8389ecee99a252b89800501e4b9765a506cab66f09a6`；原生独审SHA `dd9277c49e3945c3d5f84efa460bc355d42433a3774770c98131738002e4e26e`。目前不能确定PS内部首次启动错误或子进程标准流目标；旧公开PowerShell桌面参考源码的ShellExecute回退可解释现象，但没有精确5.1运行证据，不能当根因或据此盲改启动参数。
+
+`926af2b65` 的新平台绑定已进入Mac真实五场景：正常更新与两次独立冷恢复完成，第四个改写候选按预期返回RecoveryRequired，旧安装／候选／Preparing账本保留、公开版本仍为278。账本已有probe generation，但新平台摘要校验在生成监督者目录之前拒绝；验收器无条件要求该目录存在，整轮因此失败，第五场景未执行。`r-bn8_xz96` 全现场与原失败保留，cleanup_ready=false，不改记通过。
+
+仅修订该负例的验收器：允许真实缺失或空监督者目录，拒绝可解析／悬空符号链接及读取错误；存在的收据仍须cleanup_confirmed且not_started，其他场景仍要求非空收据。原树、候选、账本和公开旧版本断言保持。源码SHA `5f5e8990eba32725b8e2d1113dd5658140767f9db524b6f10b55d183606a29e1`，独审SHA `5cab039129febfe05b58fae9a5e3bc0d273626336d942efa71b6a06c490be828`；完整五场景仍须重新绑定运行。无需本地化变更，仅真实验收合同调整。
+
+验收器修订与 musl 工作流接线的本机 `cargo check -p warp`、i18n11、作用域／实际参数组装12项、定向rustfmt及配置既有runner标签后的完整actionlint通过。原actionlint缺少既有自托管标签配置的失败日志保留；没有关闭lint规则。工作流仍为25输入，`claude_musl`仅允许独立Linux原生Claude npm范围，原默认和完整五场景／两冷恢复保持；尚未派发该原生范围。门禁索引 `g09-musl-harness-workflow-local-gates-v1.safe.json` SHA `59a0846d649dd090d76e20bbbe721f61d8bfaf8fe02508c68711e2fc794bd92d`。
+
+新musl源码的 [Linux run37204698590](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37204698590) 绑定926并运行中；仅源码门禁，不代表最终双平台或真实musl交易。官方环境工件确认固定musl加载器存在、目标root所有且0755，execution_verified=false；Landlock ABI1等原环境边界保留。**新增关闭0项，G09、额外ACL／安全属性待决范围和最终同冻结源码双平台门禁仍开放，PR保持草稿。**
+
 ## 2026-10-04：G09 补齐 Claude musl 实现，本机门禁通过
 
 Linux x64 固定 musl 映像保持密封 memfd／execveat 路径，新增 `/lib/ld-musl-x86_64.so.1` 的系统身份与摘要绑定，仅接受自包含加载器及主映像唯一 libc 依赖。npm 计划从真实安装 manifest、原入口摘要和完整快照取得平台，执行重验并将平台写入事务账本；冷恢复沿用保存的平台。旧 schema 1 无平台、bin-only 账本保留原恢复合同，新 musl 树不能删除平台字段冒充旧账本。显式 `2.1.280→2.1.278` 与 `2.1.287→2.1.285` 降级合同均保留。

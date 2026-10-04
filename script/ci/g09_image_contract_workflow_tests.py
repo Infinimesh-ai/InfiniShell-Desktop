@@ -136,5 +136,71 @@ class ImageContractScopeTests(unittest.TestCase):
         self.assertFalse(enabled(condition, defaults()))
 
 
+class ClaudeMuslScopeTests(unittest.TestCase):
+    def values(self):
+        values = defaults()
+        values.update(run_linux=True, run_windows=False, native_acceptance_only=True,
+                      run_claude_npm_updates=True, linux_atomic_agent="claude_musl")
+        return values
+
+    def test_musl_requires_only_linux_native_claude_npm_and_keeps_25_inputs(self):
+        values = self.values()
+        self.assertEqual(len(INPUTS), 25)
+        self.assertTrue(accepted(values))
+        self.assertEqual([name for name, job in DATA["jobs"].items()
+                          if name != "validate_scope" and enabled(job["if"], values)], ["linux"])
+        self.assertEqual(DATA["jobs"]["linux"]["needs"], "validate_scope")
+        for name in ("run_linux", "native_acceptance_only", "run_claude_npm_updates"):
+            with self.subTest(required=name):
+                self.assertFalse(accepted(dict(values, **{name: False})))
+
+    def test_musl_rejects_every_other_boolean_and_nondefault_choice(self):
+        values = self.values()
+        for name, spec in INPUTS.items():
+            if spec["type"] == "boolean" and not values[name]:
+                with self.subTest(forbidden=name):
+                    self.assertFalse(accepted(dict(values, **{name: True})))
+            elif spec["type"] == "choice" and name != "linux_atomic_agent":
+                for value in spec["options"]:
+                    if value != spec["default"]:
+                        with self.subTest(forbidden=name, value=value):
+                            self.assertFalse(accepted(dict(values, **{name: value})))
+
+    def test_existing_linux_agent_choices_keep_their_native_scope(self):
+        self.assertEqual(INPUTS["linux_atomic_agent"]["default"], "all")
+        for agent in ("all", "codex", "claude", "grok"):
+            with self.subTest(agent=agent):
+                values = defaults()
+                values.update(run_windows=False, native_acceptance_only=True,
+                              run_cli_atomic_updates=True, linux_atomic_agent=agent)
+                self.assertTrue(accepted(values))
+
+    def test_only_musl_passes_the_libc_argument_to_the_original_driver(self):
+        step = next(step for step in DATA["jobs"]["linux"]["steps"]
+                    if step.get("id") == "claude_npm_updates")
+        self.assertEqual(step["timeout-minutes"], 45)
+        command = step["run"][step["run"].index("libc_args=()") :]
+        # 运行原参数组装片段，用Shell函数接收argv；不执行驱动、CLI或二进制。
+        capture = "digest() { printf 'fixed-sha'; }; python3() { printf '%s\\0' \"$@\"; };\n"
+        common = ["-B", "script/cli-agent-parity/run_claude_npm_update_live.py",
+                  "--repo", "/source fixture", "--output", "/private fixture/evidence",
+                  "--test-binary", "/private fixture/warp-libtest", "--test-binary-sha256", "fixed-sha",
+                  "--supervisor", "/private fixture/supervisor", "--supervisor-sha256", "fixed-sha",
+                  "--node", "/runtime fixture/node", "--node-sha256", "fixed-sha",
+                  "--npm-cli", "/runtime fixture/npm", "--npm-cli-sha256", "fixed-sha"]
+        for agent in INPUTS["linux_atomic_agent"]["options"]:
+            with self.subTest(agent=agent):
+                values = dict(self.values(), linux_atomic_agent=agent)
+                environment = dict(os.environ, GITHUB_WORKSPACE="/source fixture",
+                                   fixture_parent="/private fixture", node_path="/runtime fixture/node",
+                                   npm_path="/runtime fixture/npm",
+                                   CLAUDE_NPM_MUSL="true" if enabled(step["env"]["CLAUDE_NPM_MUSL"], values) else "false")
+                result = subprocess.run(["bash", "-euo", "pipefail", "-c", capture + command],
+                                        env=environment, capture_output=True, text=True, check=True)
+                expected = common + (["--linux-libc", "musl"] if agent == "claude_musl" else [])
+                self.assertEqual(result.stdout.split("\0"), expected + [""])
+                self.assertEqual(result.stderr, "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
