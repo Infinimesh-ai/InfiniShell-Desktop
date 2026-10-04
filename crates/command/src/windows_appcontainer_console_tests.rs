@@ -32,6 +32,18 @@ fn netcredentials_two_stage_private_device_map_retained_empty_job_records_identi
 }
 
 #[test]
+#[ignore = "仅固定 Rust stdio 管道不写入的生命周期对照，不代表 G09 通过"]
+fn netcredentials_stdio_without_write_records_original_and_released_lifetime() {
+    netcredentials::run_stdio(false);
+}
+
+#[test]
+#[ignore = "仅固定 Rust stdio 管道写入 nonce 的生命周期对照，不代表 G09 通过"]
+fn netcredentials_stdio_with_write_records_original_and_released_lifetime() {
+    netcredentials::run_stdio(true);
+}
+
+#[test]
 fn no_window_mode_preserves_redirected_standard_handles_without_show_flags() {
     // 仅比较启动结构中的哨兵值，不把它们交给任何句柄 API。
     let mut startup = STARTUPINFOW {

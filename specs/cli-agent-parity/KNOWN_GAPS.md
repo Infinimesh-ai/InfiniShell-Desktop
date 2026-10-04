@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-04 标准流差分待原生执行**：前四例未覆盖生产仍持有的 Rust `Stdio::piped`；新增不写／写 nonce 两例，保留原三秒 LSA 结果，再只关管道而保留旧宿主作单次后查。写例包含读取和缓存安全上下文取证，不能单独归因 WriteFile 或替代完整 AppContainer／console／debugger 组合。本机类型／check／i18n／脚本门禁已过，Windows 原生结果尚无；诊断不计关闭，4ff 生产残留和原矩阵仍是阻塞。
+
 - **2026-10-04 设备映射／空 Job 对照已核，仍开放**：`999ff00d6` 的[Windows 37168344636](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37168344636)正式成功，637 项普通 PASS（565 warp＋72 command）、i18n 11，以及四个 ignored 原生病例各一次通过。四例使用互异新 LUID／nonce，8 个 helper 自然退出 0；26 份原始二进制收据独立解码、身份和摘要吻合。四例原查询均为 LSA `0xc000005f`、站 `0x80070002`；保留空 Job 的两例在关闭 Job 前已经回收，两映射例精确创建／删除及 FileID 绑定通过。独审 SHA `cf99093f259d58dc413e19a0a2faf2e59cfc4897ae191c82ff96776bc7222307`，根复核 SHA `170b7778baf2378530493900e39934558b8162b937c268aabe520051308881f6`。只排除这些因素在本轮高 IL、Session 0 两段 helper 对照中足以重现留存，不外推生产 AppContainer／控制台／调试／标准流及多层 Job 组合。生产代码未改；4ff 的 LSA 残留、原五场景／三冷恢复和最终同提交源码门禁仍待解决。不再重复相近映射／一般空 Job 对照。**新增关闭 0 项**；无需本地化变更。
 
 - **2026-10-04 LSA 回收阻塞已分离，仍开放**：`4ff41b614` 的[完整 Windows 原矩阵](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37163186787)失败；1193 项普通 PASS、43 项必需具名测试及 i18n 11 通过。首 CMD 链正常输出固定 Codex 版本，196 个事件均验证并继续，四个候选进程退出 0；两个 helper 退出 0，Job 为空，桌面关闭，局部盘映射精确移除。正常与 abort 收据均为 `station_absent=true`、`logon_absent=false`、查询无错误，原件 SHA 均为 `0b98c92df109ac1612c942c6cb077224d1695c1b73100aaa87eeecbed2dd6ae2`。App 与 command 普通句柄路径未找到确定遗留引用，本轮 witness 未启用；不把空 Job 或文件租约推定为根因。解除条件是定位实际残留对象／生命周期差异并修复，再通过原五场景／三冷恢复及最终门禁；不延长期限或降低清理条件。终审索引 SHA `301a6428fc1941b6965e215850dc63597131b62f2449caaabe598a20dda464b7`。

@@ -9651,5 +9651,36 @@
     },
     "newly_closed_items": [],
     "localization": "无需本地化变更；仅补核实证据和范围说明。"
+  },
+  "g09_stdio_lifetime_preparation_20261004": {
+    "parent_commit": "543cfe27e5a29a16c3c4e6f371ad48c87b65dee5",
+    "status": "local_gates_passed_native_pending",
+    "production_difference": "生产 worker 的 Rust Stdio::piped 原写端与 supervisor 原读端会跨新LUID候选退出保留；前四例未覆盖该标准流链。",
+    "scope": "同固定helper增加旧LUID stdio宿主；两个新LUID病例分别不写/写44B nonce。原读写端保留至原3秒LSA与站查询，再只关管道、保持宿主原身份存活，单次后查独立记录。",
+    "interpretation_boundary": "写例也读取marker并在独立线程查询管道缓存AuthenticationId与模拟级别；只定位写/读后安全上下文路径，不单独归因WriteFile。未覆盖实际候选后代三标准流、AppContainer、console或debugger组合。",
+    "local_gates": {
+      "index": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-stdio-local-gates-v1.safe.json",
+      "sha256": "62ad3baa33c34b78b7d734bb952c9c4b2b543cb516fc91f94c1be1873aa0f11f",
+      "passed": "Windows command --tests类型检查、Mac warp check、i18n11、PowerShell Parser、actionlint及1接受/28冲突拒绝/5旧范围不变；四短根已归档清理。"
+    },
+    "remote_plan": {
+      "workflow": "cross-platform-preflight.yml",
+      "scope": "g09_stdio_lifetime",
+      "true_inputs": [
+        "run_windows",
+        "run_atomic_windows_debug"
+      ],
+      "other_booleans": false,
+      "job": "windows_stdio_lifetime",
+      "case_set": "Stdio",
+      "native_cases": 2,
+      "retries": 0
+    },
+    "native_executed": false,
+    "production_changed": false,
+    "g09_closed": false,
+    "newly_closed_items": [],
+    "localization": "无需本地化变更；仅测试和验证工作流，新增英中用户文案均0，i18n11通过。",
+    "source_review_sha256": "e790e0d9afa7626ed38a9cf9e6766c224b95d0183f8013f10e2cee7f54bb2f43"
   }
 }

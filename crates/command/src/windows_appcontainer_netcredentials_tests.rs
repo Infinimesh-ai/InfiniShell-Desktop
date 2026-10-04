@@ -8,14 +8,15 @@ use std::os::windows::ffi::{OsStrExt as _, OsStringExt as _};
 use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
 use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, IntoRawHandle as _, OwnedHandle};
 use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdout, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use windows::Win32::Foundation::{
-    CloseHandle, ERROR_FILE_NOT_FOUND, ERROR_NO_TOKEN, FILETIME, HANDLE, LUID, WAIT_OBJECT_0,
-    WAIT_TIMEOUT,
+    CloseHandle, DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_FILE_NOT_FOUND, ERROR_NO_TOKEN,
+    FILETIME, HANDLE, LUID, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authentication::Identity::{
     LsaFreeReturnBuffer, LsaGetLogonSessionData,
@@ -26,14 +27,15 @@ use windows::Win32::Security::{
     GetSecurityDescriptorDacl, GetSecurityDescriptorOwner, GetSidSubAuthority,
     GetSidSubAuthorityCount, GetTokenInformation, GetUserObjectSecurity, IsValidSecurityDescriptor,
     IsValidSid, LABEL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
-    SecurityIdentification, TOKEN_DUPLICATE, TOKEN_ELEVATION, TOKEN_INFORMATION_CLASS,
-    TOKEN_MANDATORY_LABEL, TOKEN_QUERY, TOKEN_STATISTICS, TOKEN_USER, TokenElevation,
-    TokenIntegrityLevel, TokenSessionId, TokenStatistics, TokenUser, WinBuiltinAdministratorsSid,
+    RevertToSelf, SECURITY_IMPERSONATION_LEVEL, SecurityIdentification, TOKEN_DUPLICATE,
+    TOKEN_ELEVATION, TOKEN_INFORMATION_CLASS, TOKEN_MANDATORY_LABEL, TOKEN_QUERY, TOKEN_STATISTICS,
+    TOKEN_USER, TokenElevation, TokenImpersonationLevel, TokenIntegrityLevel, TokenSessionId,
+    TokenStatistics, TokenUser, WinBuiltinAdministratorsSid,
 };
 use windows::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
-    FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, GetFileInformationByHandle, QueryDosDeviceW,
-    READ_CONTROL,
+    FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, FILE_TYPE_PIPE, GetFileInformationByHandle,
+    GetFileType, QueryDosDeviceW, READ_CONTROL,
 };
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -41,6 +43,7 @@ use windows::Win32::System::JobObjects::{
     JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
+use windows::Win32::System::Pipes::{ImpersonateNamedPipeClient, PeekNamedPipe};
 use windows::Win32::System::StationsAndDesktops::{
     CloseWindowStation, GetProcessWindowStation, GetThreadDesktop, GetUserObjectInformationW,
     OpenWindowStationW, UOI_FLAGS, UOI_NAME, USEROBJECTFLAGS,
@@ -900,6 +903,383 @@ impl Drop for Tree {
     }
 }
 
+// 只提供 Rust 1.92 Stdio::piped 的原管道，不能用另一种管道的阴性结果替代。
+struct StdioKeeper {
+    run: PathBuf,
+    child: Option<Child>,
+    reader: Option<ChildStdout>,
+    tree: Tree,
+    identity: Option<Process>,
+    ready: Vec<u8>,
+    closed: Option<Vec<u8>>,
+}
+
+impl StdioKeeper {
+    fn start(
+        helper: &Path,
+        run: &Path,
+        nonce: &[u8],
+        environment: &[(String, OsString)],
+        caller: &Process,
+    ) -> Result<Self> {
+        let mut keeper = Self {
+            run: run.to_path_buf(),
+            child: None,
+            reader: None,
+            tree: Tree::new()?,
+            identity: None,
+            ready: Vec::new(),
+            closed: None,
+        };
+        let mut command = crate::blocking::Command::new_with_managed_process_group(helper);
+        command
+            .env_clear()
+            .envs(environment.iter().map(|(key, value)| (key, value)))
+            .env(format!("{PREFIX}STAGE"), "0")
+            .current_dir(run)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        keeper.child = Some(disk("stdio_keeper_spawn", command.spawn())?);
+        let child = keeper.child.as_mut().unwrap();
+        let process = HANDLE(child.as_raw_handle());
+        keeper.reader = child.stdout.take();
+        let mut duplicate = HANDLE::default();
+        api("stdio_keeper_original_process_duplicate", unsafe {
+            DuplicateHandle(
+                GetCurrentProcess(),
+                process,
+                GetCurrentProcess(),
+                &mut duplicate,
+                0,
+                false,
+                DUPLICATE_SAME_ACCESS,
+            )
+        })?;
+        keeper.tree.first = Some(owned(duplicate));
+        api("stdio_keeper_assign_job", unsafe {
+            AssignProcessToJobObject(raw(keeper.tree.job.as_ref().unwrap()), process)
+        })?;
+        keeper.tree.assigned = true;
+        keeper.tree.member(process)?;
+        let identity = process_snapshot(process)?;
+        require(
+            identity.pid == child.id()
+                && identity.same_local_token(caller)
+                && identity.same_logon(caller)
+                && image_path(process)? == helper,
+            "stdio_keeper_identity",
+        )?;
+        let ready = wait_file(&run.join("stdio-keeper-ready.bin"), 184, process)?;
+        check_header(&ready, nonce, 8, 184)?;
+        require(
+            parse_process(&ready[HEADER..152])? == identity
+                && ready[160..].iter().all(|byte| *byte == 0),
+            "stdio_keeper_ready_identity",
+        )?;
+        require(keeper.reader.is_some(), "stdio_keeper_reader")?;
+        keeper.identity = Some(identity);
+        keeper.ready = ready;
+        keeper.live()?;
+        Ok(keeper)
+    }
+
+    fn live(&self) -> Result<()> {
+        let process = HANDLE(
+            self.child
+                .as_ref()
+                .ok_or_else(|| failure("stdio_keeper", "宿主缺失"))?
+                .as_raw_handle(),
+        );
+        require(
+            unsafe { WaitForSingleObject(process, 0) } == WAIT_TIMEOUT,
+            "stdio_keeper_alive",
+        )?;
+        require(
+            self.identity.as_ref() == Some(&process_snapshot(process)?),
+            "stdio_keeper_original_identity",
+        )?;
+        self.tree.member(process)
+    }
+
+    fn authorize(
+        &self,
+        first: HANDLE,
+        identity: &Process,
+        run: &Path,
+        write_marker: bool,
+    ) -> Result<()> {
+        self.live()?;
+        let source = HANDLE(
+            ((u64::from(word(&self.ready, 156)) << 32) | u64::from(word(&self.ready, 152))) as usize
+                as *mut c_void,
+        );
+        let mut local = HANDLE::default();
+        api("stdio_keeper_pipe_check_duplicate", unsafe {
+            DuplicateHandle(
+                HANDLE(self.child.as_ref().unwrap().as_raw_handle()),
+                source,
+                GetCurrentProcess(),
+                &mut local,
+                0,
+                false,
+                DUPLICATE_SAME_ACCESS,
+            )
+        })?;
+        let local = owned(local);
+        require(
+            unsafe { GetFileType(raw(&local)) } == FILE_TYPE_PIPE,
+            "stdio_keeper_pipe_type",
+        )?;
+        let mut transferred = HANDLE::default();
+        api("stdio_transfer_to_suspended_first", unsafe {
+            DuplicateHandle(
+                GetCurrentProcess(),
+                raw(&local),
+                first,
+                &mut transferred,
+                0,
+                false,
+                DUPLICATE_SAME_ACCESS,
+            )
+        })?;
+        // 新副本只属于仍挂起且已绑定的 first；后续失败由该原进程的有界清理释放。
+        let mut authorization = self.ready.clone();
+        authorization[8..12].copy_from_slice(&9u32.to_le_bytes());
+        let identity_bytes =
+            unsafe { std::slice::from_raw_parts((identity as *const Process).cast(), 108) };
+        authorization[HEADER..152].copy_from_slice(identity_bytes);
+        authorization[152..160].copy_from_slice(&(transferred.0 as usize as u64).to_le_bytes());
+        authorization[160..164].copy_from_slice(&u32::from(write_marker).to_le_bytes());
+        save(&run.join("stdio-first-authorized.bin"), &authorization)
+    }
+
+    fn observe(
+        &mut self,
+        run: &Path,
+        nonce: &[u8],
+        identity: &Process,
+        write_marker: bool,
+    ) -> Result<Value> {
+        self.live()?;
+        let completion = read_receipt(&run.join("stdio-first-complete.bin"), 184)?
+            .ok_or_else(|| failure("stdio_first_completion", "收据缺失"))?;
+        check_header(&completion, nonce, 10, 184)?;
+        require(
+            parse_process(&completion[HEADER..152])? == *identity
+                && word(&completion, 160) == u32::from(write_marker)
+                && word(&completion, 164) == if write_marker { HEADER as u32 } else { 0 }
+                && word(&completion, 168) == 1
+                && word(&completion, 176) == 0
+                && word(&completion, 180) == 0,
+            "stdio_first_write_and_close",
+        )?;
+        let reader = self
+            .reader
+            .as_mut()
+            .ok_or_else(|| failure("stdio_reader", "原读端缺失"))?;
+        let pipe = HANDLE(reader.as_raw_handle());
+        let mut available = 0;
+        let deadline = Instant::now() + WAIT;
+        loop {
+            api("stdio_peek_marker", unsafe {
+                PeekNamedPipe(pipe, None, 0, None, Some(&mut available), None)
+            })?;
+            // 不写病例绝不等待 marker；写病例只有完整定长数据可读后才进入 ReadFile。
+            if !write_marker || available >= HEADER as u32 {
+                break;
+            }
+            require(Instant::now() < deadline, "stdio_marker_deadline")?;
+            thread::sleep(Duration::from_millis(10));
+        }
+        require(
+            available == if write_marker { HEADER as u32 } else { 0 },
+            "stdio_exact_available_bytes",
+        )?;
+        let context = if write_marker {
+            let mut marker = [0; HEADER];
+            disk("stdio_read_marker", reader.read_exact(&mut marker))?;
+            check_header(&marker, nonce, 15, HEADER)?;
+            // 原读端仍由本对象持有；独立线程 join 后才允许进入 LSA 查询。
+            let pipe_value = pipe.0 as usize;
+            let mut observation = thread::scope(|scope| scope.spawn(move || pipe_context(pipe_value)).join())
+                .unwrap_or_else(|_| json!({"query_succeeded":false,"resources_released":false,"thread_panicked":true}));
+            observation["thread_joined"] = json!(true);
+            observation["cached_authentication_id_matches_writer"] =
+                if observation["query_succeeded"] == true {
+                    json!(
+                        observation["token"]["auth_low"] == identity.auth_low
+                            && observation["token"]["auth_high"] == identity.auth_high
+                    )
+                } else {
+                    Value::Null
+                };
+            observation
+        } else {
+            json!({"attempted":false,"reason":"无写基线不模拟不存在的已读消息"})
+        };
+        Ok(
+            json!({"write_marker":write_marker,"marker_bytes_read":if write_marker {HEADER} else {0},
+            "no_write_did_not_wait_for_marker":!write_marker,"first_pipe_copy_closed":true,
+            "context":context,"keeper_original_identity":self.identity.as_ref().map(Process::json),
+            "keeper_exact_job":true,"old_reader_and_writer_still_held":true}),
+        )
+    }
+
+    fn close_pipe(&mut self, run: &Path, nonce: &[u8]) -> Value {
+        let closed = (|| -> Result<()> {
+            self.live()?;
+            let mut request = self.ready.clone();
+            request[8..12].copy_from_slice(&11u32.to_le_bytes());
+            save(&run.join("stdio-keeper-close.bin"), &request)?;
+            let response = wait_file(
+                &run.join("stdio-keeper-closed.bin"),
+                184,
+                HANDLE(self.child.as_ref().unwrap().as_raw_handle()),
+            )?;
+            check_header(&response, nonce, 12, 184)?;
+            let mut expected = self.ready.clone();
+            expected[8..12].copy_from_slice(&12u32.to_le_bytes());
+            expected[168..172].copy_from_slice(&1u32.to_le_bytes());
+            require(response == expected, "stdio_keeper_exact_close_ack")?;
+            self.closed = Some(response);
+            let reader = self
+                .reader
+                .take()
+                .ok_or_else(|| failure("stdio_close_reader", "原读端缺失"))?;
+            api("stdio_close_original_reader", unsafe {
+                CloseHandle(HANDLE(reader.into_raw_handle()))
+            })?;
+            self.live()?;
+            Ok(())
+        })();
+        json!({"confirmed":closed.is_ok(),"error":closed.err(),
+            "keeper_stays_alive":self.live().is_ok(),"reader_released":self.reader.is_none()})
+    }
+
+    fn finish(&mut self, run: &Path, nonce: &[u8]) -> Value {
+        let natural = (|| -> Result<()> {
+            self.live()?;
+            let mut request = self
+                .closed
+                .clone()
+                .ok_or_else(|| failure("stdio_keeper_finish", "尚无关闭确认"))?;
+            request[8..12].copy_from_slice(&13u32.to_le_bytes());
+            save(&run.join("stdio-keeper-stop.bin"), &request)?;
+            let process = HANDLE(self.child.as_ref().unwrap().as_raw_handle());
+            require(
+                unsafe { WaitForSingleObject(process, WAIT.as_millis() as u32) } == WAIT_OBJECT_0,
+                "stdio_keeper_exit",
+            )?;
+            let mut exit = 0;
+            api("stdio_keeper_exit_code", unsafe {
+                GetExitCodeProcess(process, &mut exit)
+            })?;
+            require(exit == 0, "stdio_keeper_success")?;
+            let response = read_receipt(&run.join("stdio-keeper-complete.bin"), 184)?
+                .ok_or_else(|| failure("stdio_keeper_complete", "缺失"))?;
+            check_header(&response, nonce, 14, 184)?;
+            request[8..12].copy_from_slice(&14u32.to_le_bytes());
+            require(response == request, "stdio_keeper_complete_identity")?;
+            Ok(())
+        })();
+        let cleanup = self.cleanup();
+        json!({"natural_exit_confirmed":natural.is_ok(),"natural_exit_error":natural.err(),"cleanup":cleanup})
+    }
+
+    fn cleanup(&mut self) -> Value {
+        self.reader.take();
+        let mut errors = Vec::new();
+        if let Some(child) = self.child.as_mut() {
+            if unsafe { WaitForSingleObject(HANDLE(child.as_raw_handle()), 0) } != WAIT_OBJECT_0 {
+                // 派生后尚未能复制/认领时，也只通过原 Child 句柄回收。
+                if let Err(error) = disk("stdio_keeper_terminate_original", child.kill()) {
+                    errors.push(error);
+                }
+            }
+            // 已有 Tree 原句柄时只沿同一五秒回收，不叠加第二个五秒等待。
+            if self.tree.first.is_none()
+                && unsafe { WaitForSingleObject(HANDLE(child.as_raw_handle()), 5000) }
+                    != WAIT_OBJECT_0
+            {
+                errors.push(failure("stdio_keeper_unclaimed_exit", "原句柄退出未确认"));
+            }
+        }
+        let result = self.tree.cleanup(false);
+        let child_exited = self.child.as_ref().is_none_or(|child| unsafe {
+            WaitForSingleObject(HANDLE(child.as_raw_handle()), 0) == WAIT_OBJECT_0
+        });
+        self.child.take();
+        json!({"confirmed":child_exited && errors.is_empty() && result["confirmed"] == true,
+            "original_child_signalled":child_exited,"errors":errors,"job_cleanup":result})
+    }
+}
+
+impl Drop for StdioKeeper {
+    fn drop(&mut self) {
+        if self.child.is_some() {
+            let cleanup = self.cleanup();
+            // setup 的早退也保存实际清理结果，不让 RAII 隐去失败阶段。
+            if let Ok(bytes) = serde_json::to_vec_pretty(&cleanup) {
+                let _ = save(
+                    &self.run.join("stdio-keeper-fallback-cleanup.safe.json"),
+                    &bytes,
+                );
+            }
+        }
+    }
+}
+
+fn pipe_context(pipe_value: usize) -> Value {
+    let mut report = json!({"attempted":true,"query_succeeded":false,"resources_released":false});
+    if let Err(error) = no_thread_token() {
+        report["precondition_error"] = error;
+        let reverted = api("stdio_precondition_revert", unsafe { RevertToSelf() });
+        report["revert_confirmed"] = json!(reverted.is_ok());
+        report["revert_error"] = reverted.err().unwrap_or(Value::Null);
+        return report;
+    }
+    let impersonated = api("stdio_impersonate", unsafe {
+        ImpersonateNamedPipeClient(HANDLE(pipe_value as *mut c_void))
+    });
+    report["impersonate_error"] = impersonated.as_ref().err().cloned().unwrap_or(Value::Null);
+    let mut token_closed = true;
+    if impersonated.is_ok() {
+        let query = (|| -> Result<Value> {
+            let mut token = HANDLE::default();
+            api("stdio_open_thread_token", unsafe {
+                OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, true, &mut token)
+            })?;
+            let token = owned(token);
+            let result = (|| -> Result<Value> {
+                let statistics: TOKEN_STATISTICS = token_field(raw(&token), TokenStatistics)?;
+                let level: SECURITY_IMPERSONATION_LEVEL =
+                    token_field(raw(&token), TokenImpersonationLevel)?;
+                Ok(json!({"auth_low":statistics.AuthenticationId.LowPart,
+                    "auth_high":statistics.AuthenticationId.HighPart as u32,"impersonation_level":level.0}))
+            })();
+            let close = api("stdio_close_context_token", unsafe {
+                CloseHandle(HANDLE(token.into_raw_handle()))
+            });
+            token_closed = close.is_ok();
+            report["token_close_error"] = close.err().unwrap_or(Value::Null);
+            result
+        })();
+        report["query_succeeded"] = json!(query.is_ok());
+        match query {
+            Ok(value) => report["token"] = value,
+            Err(error) => report["query_error"] = error,
+        }
+    }
+    // 即使模拟/查询失败也显式恢复；Revert 失败的线程立即结束，调用方 join 后拒绝该病例。
+    let reverted = api("stdio_revert", unsafe { RevertToSelf() });
+    report["revert_confirmed"] = json!(reverted.is_ok());
+    report["revert_error"] = reverted.err().unwrap_or(Value::Null);
+    report["token_closed"] = json!(token_closed);
+    report["resources_released"] = json!(token_closed && report["revert_confirmed"] == true);
+    report
+}
+
 fn logon_observation(process: &Process) -> Value {
     let luid = LUID {
         LowPart: process.auth_low,
@@ -964,7 +1344,11 @@ fn save(path: &Path, bytes: &[u8]) -> Result<()> {
     disk("sync_receipt", file.sync_all())
 }
 
-fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
+fn execute(
+    with_device_map: bool,
+    retain_empty_job: bool,
+    stdio_write: Option<bool>,
+) -> Result<Value> {
     let environment = |suffix: &str| {
         std::env::var_os(format!("{PREFIX}{suffix}")).ok_or_else(|| failure("environment", suffix))
     };
@@ -1029,6 +1413,7 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
     let mut second_identity = None;
     let mut candidate_station = None;
     let mut parent_objects = None;
+    let mut stdio_keeper = None;
     let scenario = (|| -> Result<()> {
         no_thread_token()?;
         let caller = process_snapshot(unsafe { GetCurrentProcess() })?;
@@ -1071,6 +1456,25 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
         ];
         if with_device_map {
             values.push((format!("{PREFIX}DEVICE_MAP"), "1".into()));
+        }
+        if let Some(write_marker) = stdio_write {
+            require(
+                !with_device_map && !retain_empty_job,
+                "stdio_separate_control",
+            )?;
+            // keeper 只用明确的私有环境；不读取或继承完整调用方环境。
+            stdio_keeper = Some(StdioKeeper::start(
+                &helper,
+                &run,
+                nonce.as_bytes(),
+                &values,
+                &caller,
+            )?);
+            values.push((
+                format!("{PREFIX}STDIO"),
+                if write_marker { "1" } else { "0" }.into(),
+            ));
+            report["stdio_control"] = json!({"write_marker":write_marker,"rust_stdio_piped":true});
         }
         values.sort_by_key(|(key, _)| key.to_ascii_uppercase());
         let mut block = Vec::new();
@@ -1147,6 +1551,15 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
             process_snapshot(first)? == first_snapshot,
             "first_before_resume",
         )?;
+        if let (Some(keeper), Some(write_marker)) = (&stdio_keeper, stdio_write) {
+            keeper.authorize(first, &first_snapshot, &run, write_marker)?;
+            // 移交句柄后再次核对原挂起进程与原 Job，之后才恢复。
+            require(
+                process_snapshot(first)? == first_snapshot,
+                "stdio_first_before_resume",
+            )?;
+            tree.member(first)?;
+        }
         resume(raw(tree.thread.as_ref().unwrap()), "resume_first")?;
         let suspended = wait_file(&run.join("suspended2.bin"), 152, first)?;
         check_header(&suspended, nonce.as_bytes(), 3, 152)?;
@@ -1244,6 +1657,14 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
             "candidate_independent_station",
         )?;
         revalidate(&held)?;
+        if let (Some(keeper), Some(write_marker)) = (&mut stdio_keeper, stdio_write) {
+            report["stdio_control"] =
+                keeper.observe(&run, nonce.as_bytes(), &first_snapshot, write_marker)?;
+            require(
+                !write_marker || report["stdio_control"]["context"]["resources_released"] == true,
+                "stdio_context_resources_released",
+            )?;
+        }
         Ok(())
     })();
     // 无论原生调用还是合同失败，先处理本次确切 Job 与原创建句柄，之后才允许断言。
@@ -1254,6 +1675,11 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
         Some(original) => json!(current_objects().is_ok_and(|actual| actual == original)),
         None => Value::Null,
     };
+    if let Some(keeper) = &stdio_keeper {
+        let live = keeper.live();
+        report["stdio_keeper_before_original_query"] =
+            json!({"confirmed":live.is_ok(),"error":live.err()});
+    }
     if let Some(identity) = &first_identity {
         let deadline = Instant::now() + Duration::from_secs(3);
         loop {
@@ -1283,6 +1709,25 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
             .map(|name| station_observation(name))
             .unwrap_or(Value::Null);
     }
+    if let Some(keeper) = &mut stdio_keeper {
+        let live = keeper.live();
+        report["stdio_keeper_after_original_query"] =
+            json!({"confirmed":live.is_ok(),"error":live.err()});
+        report["stdio_pipe_release"] = keeper.close_pipe(&run, nonce.as_bytes());
+        // 单次后观察只能说明资源释放之后的状态，绝不覆盖原三秒结果。
+        report["logon_after_pipe_close"] = first_identity
+            .as_ref()
+            .map(logon_observation)
+            .unwrap_or(Value::Null);
+        report["station_after_pipe_close"] = candidate_station
+            .as_ref()
+            .map(|name| station_observation(name))
+            .unwrap_or(Value::Null);
+        let live = keeper.live();
+        report["stdio_keeper_after_post_query"] =
+            json!({"confirmed":live.is_ok(),"error":live.err()});
+        report["stdio_keeper_finish"] = keeper.finish(&run, nonce.as_bytes());
+    }
     if let Some((target, identity)) = mapping {
         report["device_map_expected_nt_target"] = json!(String::from_utf16(&target).ok());
         report["device_map"] = match (
@@ -1297,7 +1742,7 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
             (Ok(_), _) => json!({"confirmed":false,"receipt_or_bound_process_missing":true}),
         };
     }
-    let receipts: Vec<_> = [
+    let mut receipt_names = vec![
         "stage1.bin",
         "suspended2.bin",
         "resume2.bin",
@@ -1305,16 +1750,47 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
         "stage1-complete.bin",
         "stage2-complete.bin",
         "device-map.bin",
-    ]
-    .into_iter()
-    .map(|name| match read_receipt(&run.join(name), 33980) {
-        Ok(Some(bytes)) => {
-            json!({"name":name,"bytes":bytes.len(),"sha256":hex(&Sha256::digest(bytes))})
-        }
-        Ok(None) => json!({"name":name,"present":false}),
-        Err(error) => json!({"name":name,"error":error}),
-    })
-    .collect();
+    ];
+    if stdio_write.is_some() {
+        receipt_names.extend([
+            "stdio-keeper-ready.bin",
+            "stdio-first-authorized.bin",
+            "stdio-first-complete.bin",
+            "stdio-keeper-close.bin",
+            "stdio-keeper-closed.bin",
+            "stdio-keeper-stop.bin",
+            "stdio-keeper-complete.bin",
+            "stdio-keeper-fallback-cleanup.safe.json",
+        ]);
+        report["stdio_native_completions"] = json!(
+            [
+                ("stdio-first-complete.bin", 10),
+                ("stdio-keeper-complete.bin", 14)
+            ]
+            .into_iter()
+            .map(|(name, kind)| match read_receipt(&run.join(name), 184) {
+                Ok(Some(bytes)) if check_header(&bytes, nonce.as_bytes(), kind, 184).is_ok() =>
+                    json!({
+                    "name":name,"stage":word(&bytes,172),"win32_error":word(&bytes,176),
+                    "hresult_from_win32":word(&bytes,180),"write_marker":word(&bytes,160),
+                    "written":word(&bytes,164),"pipe_closed":word(&bytes,168)}),
+                Ok(Some(_)) => json!({"name":name,"valid":false}),
+                Ok(None) => json!({"name":name,"present":false}),
+                Err(error) => json!({"name":name,"error":error}),
+            })
+            .collect::<Vec<_>>()
+        );
+    }
+    let receipts: Vec<_> = receipt_names
+        .into_iter()
+        .map(|name| match read_receipt(&run.join(name), 33980) {
+            Ok(Some(bytes)) => {
+                json!({"name":name,"bytes":bytes.len(),"sha256":hex(&Sha256::digest(bytes))})
+            }
+            Ok(None) => json!({"name":name,"present":false}),
+            Err(error) => json!({"name":name,"error":error}),
+        })
+        .collect();
     report["raw_receipts"] = json!(receipts);
     // 子阶段在写 suspended2 之前失败时，也必须提取它保存的原始错误，不能只剩等待错误。
     report["native_completions"] = json!([("stage1-complete.bin",5),("stage2-complete.bin",6)]
@@ -1333,6 +1809,13 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
         && report["cleanup"]["job_retained_for_logon_observation"] == retain_empty_job
         && report["retained_job_release"]["confirmed"] == true
         && (!with_device_map || report["device_map"]["confirmed"] == true)
+        && (stdio_write.is_none()
+            || (report["stdio_keeper_before_original_query"]["confirmed"] == true
+                && report["stdio_keeper_after_original_query"]["confirmed"] == true
+                && report["stdio_pipe_release"]["confirmed"] == true
+                && report["stdio_keeper_after_post_query"]["confirmed"] == true
+                && report["stdio_keeper_finish"]["natural_exit_confirmed"] == true
+                && report["stdio_keeper_finish"]["cleanup"]["confirmed"] == true))
         && report["caller_objects_unchanged"] == true
         && report["station_after_exit"]["gone"] == true
         && report["logon_after_exit"]["gone"] == true;
@@ -1347,11 +1830,21 @@ fn execute(with_device_map: bool, retain_empty_job: bool) -> Result<Value> {
 }
 
 pub(super) fn run(with_device_map: bool, retain_empty_job: bool) {
-    let report = execute(with_device_map, retain_empty_job)
+    let report = execute(with_device_map, retain_empty_job, None)
         .unwrap_or_else(|error| json!({"passed":false,"setup_error":error,"g09_closed":false}));
     eprintln!("windows_netcredentials_station_candidate={report}");
     assert_eq!(
         report["passed"], true,
         "非管理员服务身份的新原生路径未满足候选条件；保留本轮原件，不自动重跑"
+    );
+}
+
+pub(super) fn run_stdio(write_marker: bool) {
+    let report = execute(false, false, Some(write_marker))
+        .unwrap_or_else(|error| json!({"passed":false,"setup_error":error,"g09_closed":false}));
+    eprintln!("windows_netcredentials_stdio_candidate={report}");
+    assert_eq!(
+        report["passed"], true,
+        "管道生命周期对照的原三秒条件未满足；后置观察不能覆盖原失败"
     );
 }

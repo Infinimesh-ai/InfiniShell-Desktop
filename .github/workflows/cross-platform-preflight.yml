@@ -130,6 +130,7 @@ on:
           - nul_token
           - g09_tokens
           - g09_netcredentials
+          - g09_stdio_lifetime
           - codex_hooks
           - g09_image_contract
       windows_atomic_agent:
@@ -182,6 +183,12 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("windows_atomic_debug_scope") == "g09_stdio_lifetime":
+              required = {"run_windows", "run_atomic_windows_debug"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name, False) for name in required):
+                  sys.exit("标准流生命周期对照只允许单独 Windows 限定范围：" + ", ".join(sorted(conflicts)))
           if inputs.get("windows_atomic_debug_scope") == "g09_image_contract":
               required = {"run_windows"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -1182,12 +1189,54 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows_stdio_lifetime:
+    name: Windows Rust stdio logon lifetime
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'g09_stdio_lifetime' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: 'C:\infinishell-ci\cargo-target'
+      RUSTC_WRAPPER: 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+      SCCACHE_DIR: 'C:\infinishell-ci\sccache'
+      SCCACHE_CACHE_SIZE: 80G
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 该差分只涉及 command 与固定 C helper；最终 app 源码门禁仍走原双平台 job。
+      - name: Check Windows command tests
+        shell: pwsh
+        run: cargo check --locked -p command --tests
+
+      - name: Test Windows command process ownership
+        shell: pwsh
+        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::station_bootstrap::tests::) | test(windows::station_bootstrap::device_map::tests::) | test(windows::station_bootstrap::debugger::tests::) | test(windows::station_bootstrap::debugger::event::tests::)'
+
+      - name: Observe Rust stdio logon lifetime without and with a write
+        id: windows_netcredentials
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/verify_windows_netcredentials_station.ps1 -CaseSet Stdio
+
+      - name: Preserve Rust stdio logon lifetime evidence
+        if: ${{ always() && (steps.windows_netcredentials.outcome == 'success' || steps.windows_netcredentials.outcome == 'failure') && env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-netcredentials-station-${{ github.sha }}
+          path: ${{ env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR }}/**/*
+          if-no-files-found: error
+          retention-days: 14
+
   windows:
     name: Windows x64
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract')
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime')
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:

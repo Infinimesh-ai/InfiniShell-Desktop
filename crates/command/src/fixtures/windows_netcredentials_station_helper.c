@@ -36,6 +36,14 @@ typedef struct {
     PROCESS_SNAPSHOT process;
 } SUSPENDED;
 
+/* 只在 Stdio 对照中使用；句柄数值仅供原进程表之间传递，不作为身份授权。 */
+typedef struct {
+    HEADER header;
+    PROCESS_SNAPSHOT process;
+    DWORD handle_low, handle_high, write_marker, written, pipe_closed;
+    DWORD stage, win32_error, hresult_from_win32;
+} STDIO_RECORD;
+
 typedef struct {
     HEADER header;
     DWORD stage, win32_error, hresult_from_win32;
@@ -57,6 +65,7 @@ typedef char device_map_size[(sizeof(DEVICE_MAP) == 2612) ? 1 : -1];
 typedef char observation_size[(sizeof(OBSERVATION) == 33980) ? 1 : -1];
 typedef char suspended_size[(sizeof(SUSPENDED) == 152) ? 1 : -1];
 typedef char completion_size[(sizeof(COMPLETION) == 80) ? 1 : -1];
+typedef char stdio_record_size[(sizeof(STDIO_RECORD) == 184) ? 1 : -1];
 
 static WCHAR root[1024], path[1200], image[1024], command[1030];
 static WCHAR stage_text[8], nonce_text[40];
@@ -67,6 +76,8 @@ static ULONG_PTR token_buffer[128];
 static BYTE io_buffer[sizeof(SUSPENDED)];
 static DEVICE_MAP device_map;
 static WCHAR device_names[32768], device_query[1200], map_mode[4];
+static STDIO_RECORD stdio_record, stdio_request;
+static WCHAR stdio_mode[4];
 
 /* volatile 阻止编译器将无 CRT 的清零循环替换为 memset。 */
 static void clear_bytes(void *value, DWORD length) {
@@ -175,6 +186,130 @@ static BOOL snapshot(HANDLE process, PROCESS_SNAPSHOT *value) {
     return ok;
 }
 
+static BOOL read_stdio_record(const WCHAR *name, STDIO_RECORD *value, DWORD wait_ms) {
+    ULONGLONG deadline = GetTickCount64() + wait_ms;
+    if (!make_path(name)) return FALSE;
+    do {
+        HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+        if (file != INVALID_HANDLE_VALUE) {
+            LARGE_INTEGER size;
+            BY_HANDLE_FILE_INFORMATION information;
+            DWORD used = 0;
+            BOOL ok = GetFileInformationByHandle(file, &information);
+            if (ok && (information.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)) != 0) {
+                ok = FALSE; SetLastError(ERROR_INVALID_DATA);
+            }
+            if (ok) ok = GetFileSizeEx(file, &size);
+            if (ok && (size.QuadPart < 0 || (ULONGLONG)size.QuadPart != (ULONGLONG)sizeof(*value))) {
+                ok = FALSE; SetLastError(ERROR_INVALID_DATA);
+            }
+            if (ok) ok = ReadFile(file, value, sizeof(*value), &used, NULL);
+            if (ok && used != sizeof(*value)) { ok = FALSE; SetLastError(ERROR_INVALID_DATA); }
+            DWORD error = ok ? ERROR_SUCCESS : GetLastError();
+            if (!CloseHandle(file) && ok) { ok = FALSE; error = GetLastError(); }
+            SetLastError(error); return ok;
+        }
+        DWORD error = GetLastError();
+        if (error != ERROR_FILE_NOT_FOUND && error != ERROR_SHARING_VIOLATION) return FALSE;
+        Sleep(10);
+    } while (GetTickCount64() < deadline);
+    SetLastError(ERROR_TIMEOUT); return FALSE;
+}
+
+static BOOL stdio_first(void) {
+    SetLastError(ERROR_SUCCESS);
+    DWORD length = GetEnvironmentVariableW(L"INFINISHELL_WINDOWS_NETCREDENTIALS_STDIO", stdio_mode, 4);
+    DWORD error = GetLastError();
+    if (length == 0 && error == ERROR_ENVVAR_NOT_FOUND) return TRUE;
+    completion.stage = 80;
+    if (length != 1 || (stdio_mode[0] != L'0' && stdio_mode[0] != L'1')) {
+        SetLastError(ERROR_INVALID_DATA); return FALSE;
+    }
+    if (!read_stdio_record(L"stdio-first-authorized.bin", &stdio_record, WAIT_LIMIT)) return FALSE;
+    header(&stdio_request.header, 9);
+    if (!snapshot(GetCurrentProcess(), &stdio_request.process)) return FALSE;
+    if (!equal_bytes(&stdio_record.header, &stdio_request.header, sizeof(HEADER)) ||
+        !equal_bytes(&stdio_record.process, &stdio_request.process, sizeof(PROCESS_SNAPSHOT)) ||
+        stdio_record.write_marker != (DWORD)(stdio_mode[0] == L'1') ||
+        stdio_record.written != 0 || stdio_record.pipe_closed != 0 || stdio_record.stage != 0 ||
+        stdio_record.win32_error != 0 || stdio_record.hresult_from_win32 != 0) {
+        SetLastError(ERROR_INVALID_DATA); return FALSE;
+    }
+    HANDLE pipe = (HANDLE)(ULONG_PTR)(((ULONGLONG)stdio_record.handle_high << 32) | stdio_record.handle_low);
+    stdio_record.stage = 81;
+    BOOL ok = GetFileType(pipe) == FILE_TYPE_PIPE;
+    error = ok ? ERROR_SUCCESS : ERROR_INVALID_HANDLE;
+    if (ok && stdio_record.write_marker != 0) {
+        HEADER marker;
+        header(&marker, 15);
+        stdio_record.stage = 82;
+        ok = WriteFile(pipe, &marker, sizeof(marker), &stdio_record.written, NULL);
+        error = ok ? ERROR_SUCCESS : GetLastError();
+        if (ok && stdio_record.written != sizeof(marker)) { ok = FALSE; error = ERROR_WRITE_FAULT; }
+    }
+    /* 仅关闭经过原进程身份授权的副本；第二 helper 不继承这个对照句柄。 */
+    if (CloseHandle(pipe)) stdio_record.pipe_closed = 1;
+    else if (ok) { ok = FALSE; error = GetLastError(); }
+    header(&stdio_record.header, 10);
+    stdio_record.win32_error = error;
+    stdio_record.hresult_from_win32 = (DWORD)HRESULT_FROM_WIN32(error);
+    BOOL saved = save(L"stdio-first-complete.bin", &stdio_record, sizeof(stdio_record));
+    if (!saved && ok) { ok = FALSE; error = GetLastError(); }
+    SetLastError(error); return ok;
+}
+
+static BOOL keeper_request(const WCHAR *name, DWORD kind, DWORD wait_ms) {
+    if (!read_stdio_record(name, &stdio_request, wait_ms)) return FALSE;
+    STDIO_RECORD expected;
+    copy_bytes(&expected, &stdio_record, sizeof(expected));
+    header(&expected.header, kind);
+    if (!equal_bytes(&stdio_request, &expected, sizeof(expected))) {
+        SetLastError(ERROR_INVALID_DATA); return FALSE;
+    }
+    return TRUE;
+}
+
+static void stdio_keeper(void) {
+    header(&stdio_record.header, 8);
+    HANDLE pipe = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD stage = 90;
+    BOOL ok = snapshot(GetCurrentProcess(), &stdio_record.process);
+    if (ok && GetFileType(pipe) != FILE_TYPE_PIPE) { ok = FALSE; SetLastError(ERROR_INVALID_HANDLE); }
+    ULONGLONG value = (ULONGLONG)(ULONG_PTR)pipe;
+    stdio_record.handle_low = (DWORD)value;
+    stdio_record.handle_high = (DWORD)(value >> 32);
+    if (ok) {
+        stage = 91;
+        ok = save(L"stdio-keeper-ready.bin", &stdio_record, sizeof(stdio_record));
+    }
+    /* 宿主仍活着时独立关闭原写端；新登录会话的原三秒期限不变。 */
+    if (ok) {
+        stage = 92;
+        ok = keeper_request(L"stdio-keeper-close.bin", 11, WAIT_LIMIT * 4);
+    }
+    DWORD error = ok ? ERROR_SUCCESS : GetLastError();
+    BOOL closed = CloseHandle(pipe);
+    DWORD close_error = closed ? ERROR_SUCCESS : GetLastError();
+    if (!closed && ok) { ok = FALSE; error = close_error; stage = 93; }
+    if (ok) {
+        header(&stdio_record.header, 12);
+        stdio_record.pipe_closed = 1;
+        ok = save(L"stdio-keeper-closed.bin", &stdio_record, sizeof(stdio_record));
+        if (!ok) { error = GetLastError(); stage = 94; }
+    }
+    if (ok && !keeper_request(L"stdio-keeper-stop.bin", 13, WAIT_LIMIT)) {
+        ok = FALSE; error = GetLastError(); stage = 95;
+    }
+    header(&stdio_record.header, 14);
+    stdio_record.pipe_closed = closed ? 1u : 0u;
+    stdio_record.stage = ok ? 0u : stage;
+    stdio_record.win32_error = error;
+    stdio_record.hresult_from_win32 = (DWORD)HRESULT_FROM_WIN32(error);
+    BOOL saved = save(L"stdio-keeper-complete.bin", &stdio_record, sizeof(stdio_record));
+    ExitProcess(ok && saved ? 0 : 5);
+}
+
 static BOOL object_snapshot(HANDLE object, OBJECT_SNAPSHOT *value, DWORD stage) {
     USEROBJECTFLAGS flags;
     DWORD used = 0;
@@ -252,6 +387,7 @@ static BOOL wait_authorization(void) {
 }
 
 static BOOL stage_one(PROCESS_INFORMATION *child) {
+    if (!stdio_first()) return FALSE;
     completion.stage = 10;
     if (!observe(1) || !save(L"stage1.bin", &observation, sizeof(observation))) return FALSE;
     DWORD length = GetModuleFileNameW(NULL, image, 1024);
@@ -499,11 +635,12 @@ void WINAPI ProbeMain(void) {
     DWORD nonce_length = GetEnvironmentVariableW(L"INFINISHELL_WINDOWS_NETCREDENTIALS_NONCE", nonce_text, 40);
     DWORD stage_length = GetEnvironmentVariableW(L"INFINISHELL_WINDOWS_NETCREDENTIALS_STAGE", stage_text, 8);
     if (length == 0 || length >= 1024 || nonce_length != 32 || stage_length != 1 ||
-        (stage_text[0] != L'1' && stage_text[0] != L'2')) ExitProcess(2);
+        (stage_text[0] != L'0' && stage_text[0] != L'1' && stage_text[0] != L'2')) ExitProcess(2);
     for (DWORD i = 0; i < 32; ++i) {
         if (!((nonce_text[i] >= L'0' && nonce_text[i] <= L'9') ||
               (nonce_text[i] >= L'a' && nonce_text[i] <= L'f'))) ExitProcess(2);
     }
+    if (stage_text[0] == L'0') stdio_keeper();
     if (stage_text[0] == L'2') {
         BOOL ok = observe(2);
         if (ok) {

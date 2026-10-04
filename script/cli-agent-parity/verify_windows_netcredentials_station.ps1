@@ -1,9 +1,14 @@
+param(
+    [ValidateSet('MappingJob', 'Stdio')]
+    [string]$CaseSet = 'MappingJob'
+)
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 # 每个固定病例的非零退出单独记录；后续病例仍各执行一次，不重试失败病例。
 $PSNativeCommandUseErrorActionPreference = $false
 
-# 固定四例仅比较私有盘映射与已空 Job 生命周期；不执行 CLI、Node 或 AppContainer。
+# 两组独立诊断：原四例保持；Stdio 仅不写/写 marker 两例，不执行 CLI、Node 或 AppContainer。
 if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP) -or
     [string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
     throw '缺少 GitHub runner 的证据目录环境'
@@ -76,7 +81,8 @@ try {
         executable_sha256 = $helperHash
         executable_bytes = (Get-Item -LiteralPath $helper).Length
         commit = $env:GITHUB_SHA
-        scope = '仅新登录会话的 map × 已空 Job 四例对照；不代表普通交互用户、AppContainer、Node 或 npm 通过'
+        case_set = $CaseSet
+        scope = '仅新登录会话的指定生命周期对照；不代表普通交互用户、AppContainer、Node 或 npm 通过'
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceRoot 'build.safe.json') -Encoding utf8
 
     $env:INFINISHELL_WINDOWS_NETCREDENTIALS_HELPER = $helper
@@ -88,6 +94,12 @@ try {
         @{ name = 'retained-empty-job'; map = $false; retain_empty_job = $true; test = 'netcredentials_two_stage_retained_empty_job_records_identity_and_cleanup' }
         @{ name = 'device-map-retained-empty-job'; map = $true; retain_empty_job = $true; test = 'netcredentials_two_stage_private_device_map_retained_empty_job_records_identity_and_cleanup' }
     )
+    if ($CaseSet -eq 'Stdio') {
+        $cases = @(
+            @{ name = 'stdio-without-write'; map = $false; retain_empty_job = $false; write_marker = $false; test = 'netcredentials_stdio_without_write_records_original_and_released_lifetime' }
+            @{ name = 'stdio-with-write'; map = $false; retain_empty_job = $false; write_marker = $true; test = 'netcredentials_stdio_with_write_records_original_and_released_lifetime' }
+        )
+    }
     $results = @()
     $testExit = 0
     $stage = 'native_test'
@@ -108,6 +120,8 @@ try {
             evidence_directory = $caseRoot
             with_device_map = $case.map
             retain_empty_job = $case.retain_empty_job
+            case_set = $CaseSet
+            write_marker = $(if ($CaseSet -eq 'Stdio') { $case.write_marker } else { $null })
             test = $case.test
             exit_code = $caseExit
         }
@@ -128,7 +142,8 @@ try {
         test_exit_code = $testExit
         cases = $results
         g09_closed = $false
-        scope = '若通过，仅排除所测映射与空 Job 因素；不排除新 LUID AppContainer/console/debugger 组合'
+        case_set = $CaseSet
+        scope = '仅指定对照原期限结果；关闭管道后结果不覆盖原失败，不排除 AppContainer/console/debugger 组合'
         cleanup_ready = $false
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidenceRoot 'workflow.safe.json') -Encoding utf8
     exit $testExit

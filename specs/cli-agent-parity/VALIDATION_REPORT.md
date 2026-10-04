@@ -1,5 +1,14 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 标准流生命周期差分准备完成，原生结果待验
+
+`543cfe27e` 后的测试增量针对生产路径中仍保留的 Rust `Stdio::piped` 原读写端。沿固定 C helper 新增旧 LUID 宿主，两个新 LUID 病例分别不写／写 44 字节 nonce；新 LUID helper 已退出、原 Job 已空后，保留管道完成原三秒 LSA／窗口站查询，再只关闭管道并确认原宿主仍存活，独立保存单次后查。原失败绝不被后置消失覆盖。写例还读取 marker 并在独立线程查询管道缓存 AuthenticationId／模拟级别，显式关闭 token、恢复身份和 join 后才查 LSA，因此最多定位写／读后安全上下文路径，不能单独归因一次 WriteFile，也不能替代生产 AppContainer／console／debugger 与三标准流继承组合。
+
+本机 Windows `command --tests` 类型检查、Mac `cargo check -p warp`、i18n 11、PowerShell Parser、actionlint 及工作流范围门禁均通过；范围门禁接受唯一限定组合、拒绝 28 个冲突、保留 5 个旧范围。四个短根已按身份核实退出、归档并清理，索引 SHA `62ad3baa33c34b78b7d734bb952c9c4b2b543cb516fc91f94c1be1873aa0f11f`。四源独审未见阻断，审查收据 SHA `e790e0d9afa7626ed38a9cf9e6766c224b95d0183f8013f10e2cee7f54bb2f43`。Windows 实际 MSVC 编译和两例执行尚未发生。
+
+现有工作流的 `g09_stdio_lifetime` 仅接受 `run_windows`／`run_atomic_windows_debug` 为 true，其他布尔项为 false、其他枚举默认；独立小 job 只检查 command、运行原普通库回归与两例 Stdio，避免重编无变动 app。原 MappingJob 四例入口及最终同提交双平台源码门禁保留。仅测试与验证工作流变化，无需本地化变更。**新增关闭 0 项，仍为 10 关闭／G09 开放／3 移交，PR #22 保持草稿。**
+
+
 ## 2026-10-04：G09 四组生命周期对照完成，生产阻塞保留
 
 **2026-10-04 设备映射／空 Job 对照已核，仍开放**：`999ff00d6` 的[Windows 37168344636](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37168344636)正式成功，637 项普通 PASS（565 warp＋72 command）、i18n 11，以及四个 ignored 原生病例各一次通过。四例使用互异新 LUID／nonce，8 个 helper 自然退出 0；26 份原始二进制收据独立解码、身份和摘要吻合。四例原查询均为 LSA `0xc000005f`、站 `0x80070002`；保留空 Job 的两例在关闭 Job 前已经回收，两映射例精确创建／删除及 FileID 绑定通过。独审 SHA `cf99093f259d58dc413e19a0a2faf2e59cfc4897ae191c82ff96776bc7222307`，根复核 SHA `170b7778baf2378530493900e39934558b8162b937c268aabe520051308881f6`。只排除这些因素在本轮高 IL、Session 0 两段 helper 对照中足以重现留存，不外推生产 AppContainer／控制台／调试／标准流及多层 Job 组合。生产代码未改；4ff 的 LSA 残留、原五场景／三冷恢复和最终同提交源码门禁仍待解决。不再重复相近映射／一般空 Job 对照。**新增关闭 0 项**；无需本地化变更。
