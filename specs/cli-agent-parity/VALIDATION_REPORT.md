@@ -1,5 +1,22 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 候选输出生命周期修复已实现，完整原生矩阵待验
+
+固定 Windows npm `--version` 候选的 stdout／stderr 改由私有普通文件捕获；`create_new`、不共享、关闭即删除，祖先目录和文件身份被绑定。原候选进程退出且严格 Job 为空后，分块封存精确输出到候选从未继承的 worker 文件，并关闭候选输出句柄；原窗口站／LSA 清理完成后才重放宿主流。保留原 stdin、官方 CMD／PowerShell shim、ACL／零 capability、取消、stdout 1 MiB 上限和原清理期限，stderr 不新增长度上限。输出复制、关闭、重放或 flush 失败均不标成功；没有修改全局监督管道。
+
+源码独审 SHA `39e7576b1cf47feaadc20c6865bf42807370c89038c621ee733eb8c669064986`。本机 Mac `cargo check -p warp`、command Windows 目标 `--tests` 类型检查、i18n 11 项、Python 来源合同 21 项及工作流范围／actionlint／PowerShell 语法均通过；五个注册短根均归档清理。总门禁收据 SHA `9719596188e21d33bf4167bd9b658afcbb60dda1a0ca49986762f611f3e86c88`。改动源码格式通过；`sources.rs` 的五处既有格式偏差与 HEAD 一致，没有扩大改动。
+
+新增 8 项 output 文件行为回归已纳入 Windows 门禁，**尚未原生执行**。新生产／测试文件分别进入监督程序和验收来源闭包，生产源码嵌入 93 份。无需本地化变更：内部捕获与清理沿用既有英中错误映射，无文案或布局变化。真实 CMD／PowerShell、原五场景／三冷恢复和最终同提交双平台源码门禁仍待完成。**新增关闭 0 项，10 关闭／G09 开放／3 移交；PR 保持草稿。**
+
+## 2026-10-04：G09 写读后管道缓存身份复现登录会话留存
+
+修订 `3c470921a` 的 [Windows run 37173643101](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37173643101) 正式为 failure：MSVC helper 编译通过、普通 command 72 项 PASS；两原生病例各一次，**不写 PASS／写入并读取 FAIL**，无重试。两例新 LUID 的 helper 自然退出、Job 已空、窗口站消失。写例完整读出 44 字节 nonce，管道缓存 AuthenticationId 与新 LUID writer 相同、模拟级别 2；取证 token 关闭、Revert 和线程 join 均确认，原三秒 LSA 仍在。只关闭原管道、保持旧宿主原身份存活后，单次后查为 LSA 不存在；宿主之后自然退出。原 FAIL 和后查结果分别保留，不把整轮改写成成功。
+
+官方 ZIP `11292496945` 为 37223 字节，SHA `e20dacb62af0afe4934d8313c864c81d6e2d48de19d2b0e40f20fc63d5c0a17d`；35 个展开成员及 26 个实际二进制收据已按长度、SHA、ABI、nonce、进程出生身份和 LUID 绑定核验。正式终审索引 SHA `26f48e2dc49a8d9cd30c75c9e64b1a78e1bb899a90e46ddf97779146fcce9f5f`，原生核验 SHA `d7db1d764bf53c66d9f6ff58b371f9016dabe377186d20bc0ff9bd78af5d3eaa`，根独立 JSON／原件摘要核验 SHA `645ed813a7d07543cc23ee2c79b7e7fc3e991f0a755c1cd6e28132532a0d29b5`；35 成员／26 raw ABI 独审 SHA `b35ee5585e21c5239fc22493db294da09d8f184c465d863235be0dca4528597e`。唯一观察器 `r-zthflo64` 已退出、归档并清理；远端原件根保留，`cleanup_ready=false`。
+
+此对照证明写入／读取后的管道安全上下文可以持有新 LUID，不能单独归因一次 WriteFile，也未重跑生产 AppContainer／console／debugger 组合。实际生产 worker 与 supervisor 持有原标准输出管道；正在为固定 `--version` 候选隔离 stdout／stderr 生命周期，保留原输出、stdin、取消、严格 Job 及原清理期限。完整生产更新矩阵和最终同提交双平台源码门禁仍待完成。诊断无用户文案变化，生产修复另作英中审计。**新增关闭 0 项，仍为 10 关闭／G09 开放／3 移交，PR 保持草稿。**
+
+
 ## 2026-10-04：G09 标准流对照被 MSVC 初始化告警阻止
 
 `17c583371` 的 [Windows run 37173102898](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37173102898) 已正式失败；失败发生于固定 C helper 构建，`read_stdio_record` 的局部 `LARGE_INTEGER size` 被 `/W4 /WX` 报 C4701／C2220。两例原生诊断均未执行，无原期限或后置 LSA 结果。官方 ZIP `11292381264` 仅有编译脚本、编译日志和两份阶段收据，SHA `b1ed599418d0abf89399db41527f961b4f004fcfcc08519aacabcbf9ae9597bb`；根独审 SHA `66c7f0ee90e7e9a95005bd1f254b9f1696be0271a21f3845212fcea87ba87adc`。普通 command 72 项逐名 PASS，零 FAIL／LEAK／RETRY／FLAKY；唯一观察器 `r-4ctywwsm` 已退出并清理。完整终审索引 SHA `68a61af4df27e884832756967324415c8766f8bd8b22a1c7bb826a89ddf8188c`。之前 runner 离线和随后恢复在线的 API 原件分别保留。

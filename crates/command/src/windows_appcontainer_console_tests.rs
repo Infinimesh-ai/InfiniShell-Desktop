@@ -200,6 +200,7 @@ fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
             private_station: None,
             private_desktop: None,
             profile_directories: None,
+            captured_output: None,
         },
     )
 }

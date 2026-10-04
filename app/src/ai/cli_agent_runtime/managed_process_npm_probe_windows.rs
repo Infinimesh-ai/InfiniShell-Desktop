@@ -7,6 +7,7 @@ use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStringExt as _;
 use std::os::windows::fs::OpenOptionsExt as _;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -505,6 +506,7 @@ pub(super) fn execute(
         &format!("InfiniShell.Version.{}", manifest.generation),
         &readonly,
         &bootstrap,
+        record_directory,
         |operation, process| control.authorize_process(operation, process),
         |root| {
             let (arguments, environment) =
@@ -540,7 +542,21 @@ pub(super) fn execute(
     };
     drop(cwd);
     let cleanup = termination.and_then(|()| {
-        process.write_cleanup_receipt(&record_directory.join("appcontainer-cleanup-v1"))
+        process.write_cleanup_receipt_with_output(
+            &record_directory.join("appcontainer-cleanup-v1"),
+            &mut io::stdout(),
+            &mut io::stderr(),
+            || {
+                if control.token().load(Ordering::Acquire) {
+                    Err(io::Error::new(
+                        io::ErrorKind::Interrupted,
+                        "managed_process.atomic_windows_probe_cancelled",
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+        )
     });
     match &cleanup {
         Ok(()) => record_phase("cleanup_complete", started, None),

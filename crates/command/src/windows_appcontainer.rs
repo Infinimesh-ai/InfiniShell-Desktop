@@ -63,6 +63,10 @@ use super::station_bootstrap::{
 };
 use crate::managed::ProbeJobOperation;
 
+#[path = "windows_appcontainer_output.rs"]
+mod output;
+use output::CapturedOutput;
+
 fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
     let mut bytes: Vec<_> = value.encode_wide().collect();
     if bytes.contains(&0) {
@@ -481,13 +485,20 @@ struct InheritedStreams<'a> {
 }
 
 impl<'a> InheritedStreams<'a> {
-    fn new(parent: Option<BorrowedHandle<'a>>) -> io::Result<Self> {
+    fn new(
+        parent: Option<BorrowedHandle<'a>>,
+        output: Option<&CapturedOutput>,
+    ) -> io::Result<Self> {
         let mut result = Self {
             parent,
             handles: Vec::new(),
         };
         for stream in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
-            let original = unsafe { GetStdHandle(stream) }.map_err(io::Error::other)?;
+            let original = match (stream, output) {
+                (STD_OUTPUT_HANDLE, Some(output)) => output.stdout_handle(),
+                (STD_ERROR_HANDLE, Some(output)) => output.stderr_handle(),
+                _ => unsafe { GetStdHandle(stream) }.map_err(io::Error::other)?,
+            };
             let mut duplicate = HANDLE::default();
             unsafe {
                 DuplicateHandle(
@@ -577,6 +588,7 @@ pub struct AppContainerProbe {
     cleaned: bool,
     private_station: Option<PrivateStation>,
     profile_directories: Option<NativeProfileDirectories>,
+    captured_output: Option<CapturedOutput>,
     #[cfg(any(test, feature = "test-util"))]
     private_desktop: Option<desktop::ProbeDesktop>,
 }
@@ -586,6 +598,7 @@ enum ProbeDesktopMode<'a> {
     NewLogon(
         &'a StationBootstrapImage,
         &'a mut dyn FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
+        &'a Path,
     ),
     #[cfg(any(test, feature = "test-util"))]
     Private,
@@ -708,6 +721,7 @@ impl AppContainerProbe {
         name: &str,
         readonly: &[std::path::PathBuf],
         bootstrap: &StationBootstrapImage,
+        output_directory: &Path,
         mut authorize: impl FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
         prepare_command: impl FnOnce(&Path) -> io::Result<(OsString, Vec<(OsString, OsString)>)>,
     ) -> io::Result<Self> {
@@ -720,7 +734,7 @@ impl AppContainerProbe {
             name,
             Some(readonly),
             ProbeConsoleMode::NoWindow,
-            ProbeDesktopMode::NewLogon(bootstrap, &mut authorize),
+            ProbeDesktopMode::NewLogon(bootstrap, &mut authorize, output_directory),
         )
     }
 
@@ -876,6 +890,7 @@ impl AppContainerProbe {
             cleaned: false,
             private_station: None,
             profile_directories: None,
+            captured_output: None,
             #[cfg(any(test, feature = "test-util"))]
             private_desktop: None,
         };
@@ -884,7 +899,8 @@ impl AppContainerProbe {
         let mut authorize = None;
         match desktop_mode {
             ProbeDesktopMode::Inherited => {}
-            ProbeDesktopMode::NewLogon(image, bind_job) => {
+            ProbeDesktopMode::NewLogon(image, bind_job, output_directory) => {
+                result.captured_output = Some(CapturedOutput::create(output_directory)?);
                 result.private_station = Some(PrivateStation::create(
                     image, cwd, name, result.sid, bind_job,
                 )?);
@@ -984,7 +1000,7 @@ impl AppContainerProbe {
             .as_ref()
             .map(PrivateStation::parent_process)
             .transpose()?;
-        let mut streams = InheritedStreams::new(parent)?;
+        let mut streams = InheritedStreams::new(parent, result.captured_output.as_ref())?;
         let mut handles = streams.handles.clone();
         startup.StartupInfo.hStdInput = handles[0];
         startup.StartupInfo.hStdOutput = handles[1];
@@ -1313,6 +1329,8 @@ impl AppContainerProbe {
         // 新 LUID 的所有候选对象句柄先释放，之后才允许建站 helper 等待登录会话消失。
         self.thread = None;
         self.process = None;
+        // 异常收尾也只在原进程和 Job 已退出后释放候选的普通文件输出对象。
+        self.captured_output = None;
         if let Some(station) = &mut self.private_station {
             // CLI 与其严格 Job 已退出，才允许 helper 释放本轮站与新登录会话。
             station.close()?;
@@ -1336,7 +1354,35 @@ impl AppContainerProbe {
         Ok(())
     }
 
+    /// 固定版本候选的输出先转存为仅 worker 持有的文件，完成原生清理后才写回原流。
+    pub fn write_cleanup_receipt_with_output(
+        &mut self,
+        path: &Path,
+        stdout: &mut impl io::Write,
+        stderr: &mut impl io::Write,
+        mut check_cancelled: impl FnMut() -> io::Result<()>,
+    ) -> io::Result<()> {
+        self.wait_for_processes_terminated()?;
+        let output = self
+            .captured_output
+            .take()
+            .ok_or_else(|| io::Error::other("版本探针私有输出缺失"))
+            .and_then(|output| output.seal(&mut check_cancelled));
+        // 转存/取消失败不得跳过原生清理；对外写入即使阻塞也已不再持有新 LUID 的输出对象。
+        let cleanup = self.write_cleanup_receipt(path);
+        let replay = output.and_then(|output| output.replay(stdout, stderr, &mut check_cancelled));
+        cleanup.and(replay)
+    }
+
     pub fn write_cleanup_receipt(&mut self, path: &Path) -> io::Result<()> {
+        self.wait_for_processes_terminated()?;
+        self.cleanup()?;
+        let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+        file.write_all(b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n")?;
+        file.sync_all()
+    }
+
+    fn wait_for_processes_terminated(&self) -> io::Result<()> {
         // ContinueDebugEvent 返回后，内核退出信号可能稍后到达。只等待进程/Job 暂态；
         // ACL 外部修改、profile 删除和文件写入失败均保持原错误，不在这里重试。
         let deadline = Instant::now() + Duration::from_secs(3);
@@ -1349,10 +1395,7 @@ impl AppContainerProbe {
             }
             thread::sleep(Duration::from_millis(10));
         }
-        self.cleanup()?;
-        let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
-        file.write_all(b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n")?;
-        file.sync_all()
+        Ok(())
     }
 }
 
@@ -1373,6 +1416,7 @@ impl Drop for AppContainerProbe {
                 self.confirmed_exit_code = self.exit_code().ok();
                 self.thread = None;
                 self.process = None;
+                self.captured_output = None;
                 let station_reaped = match &mut self.private_station {
                     Some(station) => station.abort_and_reap().is_ok(),
                     None => true,

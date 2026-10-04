@@ -181,6 +181,7 @@ fn cleanup_receipt_rejects_external_acl_change_without_overwriting_it() {
         cleaned: false,
         private_station: None,
         profile_directories: None,
+        captured_output: None,
         private_desktop: None,
     };
     // profile 查询失败时 probe 已拥有 SID/Job；展开栈仍能走原 Drop 清理。

@@ -341,6 +341,10 @@ const SOURCES: &[(&str, &[u8])] = &[
         include_bytes!("../../../../crates/command/src/windows_appcontainer_console_tests.rs"),
     ),
     (
+        "crates/command/src/windows_appcontainer_output_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_output_tests.rs"),
+    ),
+    (
         "app/src/terminal/cli_agent_updates.rs",
         include_bytes!("../cli_agent_updates.rs"),
     ),
@@ -395,6 +399,10 @@ const SOURCES: &[(&str, &[u8])] = &[
     (
         "crates/command/src/windows_appcontainer_desktop.rs",
         include_bytes!("../../../../crates/command/src/windows_appcontainer_desktop.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_output.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_output.rs"),
     ),
     (
         "crates/command/src/windows_station_bootstrap.rs",

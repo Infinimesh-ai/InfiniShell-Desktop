@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G05按原关闭条件完成纯PNG、同轮图片加单技能、恢复/保稿和英中补验并独审，历史失败保留。G09的Windows新LSA登录会话回收仍待解决；原完整矩阵与最终同提交双平台源码门禁仍待完成。4ff原矩阵已确认窗口站消失、LSA仍存在且查询无错误；未定位剩余token引用，原生修复尚未证明。999ff的四组设备映射/空Job对照均在原查询内回收；此受限对照不能替代生产AppContainer/console/debugger组合或原更新矩阵。",
+  "status_zh": "本次Mac范围10项关闭，仅G09仍开放，V01/V02/V05移交不计通过，PR #22保持草稿。G09的3c470标准流对照已复现：写读后管道缓存新LUID身份，helper退出后LSA仍在；只关管道且旧宿主存活时LSA消失。该对照不能替代实际生产矩阵；候选专属输出生命周期修复已实现，完整生产验收待运行，原五场景/三次冷恢复及最终同提交双平台源码门禁仍待完成。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -9708,5 +9708,63 @@
       "final_index_sha256": "68a61af4df27e884832756967324415c8766f8bd8b22a1c7bb826a89ddf8188c",
       "observer_status": "r-4ctywwsm_exit0_cleaned"
     }
+  },
+  "g09_stdio_lifetime_result_20261004": {
+    "source_commit": "3c470921a32400ad36485c05403795e6c66c4030",
+    "run_id": 37173643101,
+    "windows_job_id": 111351633305,
+    "run_conclusion": "failure",
+    "ordinary_command_pass": 72,
+    "native_cases": {
+      "without_write": "PASS",
+      "with_write": "FAIL_original_lsa_still_present"
+    },
+    "retries": 0,
+    "original_logon_without_write_gone": true,
+    "original_logon_with_write_gone": false,
+    "cached_authentication_id_matches_writer": true,
+    "cached_impersonation_level": 2,
+    "context_token_close_revert_join_confirmed": true,
+    "logon_after_only_pipe_close_gone": true,
+    "keeper_same_identity_alive_through_post_close_query": true,
+    "keeper_natural_exit_confirmed": true,
+    "station_gone_both_cases": true,
+    "new_luid_helpers_natural_exit_and_empty_job_confirmed": true,
+    "native_raw_receipts": 26,
+    "artifact_id": 11292496945,
+    "artifact_sha256": "e20dacb62af0afe4934d8313c864c81d6e2d48de19d2b0e40f20fc63d5c0a17d",
+    "final_index_sha256": "26f48e2dc49a8d9cd30c75c9e64b1a78e1bb899a90e46ddf97779146fcce9f5f",
+    "observer_review_sha256": "d7db1d764bf53c66d9f6ff58b371f9016dabe377186d20bc0ff9bd78af5d3eaa",
+    "root_review_sha256": "645ed813a7d07543cc23ee2c79b7e7fc3e991f0a755c1cd6e28132532a0d29b5",
+    "conclusion": "写入/读取后原管道缓存的新LUID身份可跨所有helper退出保留登录会话；只关管道、保持旧宿主存活即消失，构成可复现的持有路径。实际生产组合仍需相应修复和完整更新矩阵。",
+    "production_repair": "固定版本候选stdout/stderr私有普通文件捕获已实现；真实退出及严格Job空后封存原字节、关闭候选句柄，原站/LSA清理后再重放。生产完整矩阵待验，不改原stdin/期限/隔离/官方shim。",
+    "native_failure_preserved": true,
+    "observer_status": "r-zthflo64_exit0_cleaned",
+    "remote_evidence_root_cleanup_ready": false,
+    "g09_closed": false,
+    "newly_closed_items": [],
+    "localization": "诊断增量无需本地化变更；生产修复待单独审计及源码门禁。",
+    "independent_review_sha256": "b35ee5585e21c5239fc22493db294da09d8f184c465d863235be0dca4528597e"
+  },
+  "g09_output_capture_implementation_20261004": {
+    "status": "implemented_local_gates_passed_native_matrix_pending",
+    "base_commit": "3c470921a32400ad36485c05403795e6c66c4030",
+    "implementation": "仅固定Windows npm版本候选的stdout/stderr使用专属普通文件；原进程退出与严格Job空后封存精确字节，关闭候选句柄，再完成原站/LSA清理，最后重放宿主流。stdin、官方shim、ACL/capability、取消与原清理期限保持。",
+    "output_contract": "stdout沿用1MiB上限，stderr不新增上限；分块复制、逐块取消，复制/关闭/重放/flush失败均不标成功。",
+    "local_gate_index_sha256": "9719596188e21d33bf4167bd9b658afcbb60dda1a0ca49986762f611f3e86c88",
+    "source_review_sha256": "39e7576b1cf47feaadc20c6865bf42807370c89038c621ee733eb8c669064986",
+    "mac_warp_check": "r-g0crk2mu_passed",
+    "windows_command_test_typecheck": "r-_kayg5d1_passed_not_native_execution",
+    "i18n": "r-sehdnmxz_11_passed",
+    "python_source_contract": "r-tvnu80jz_21_passed",
+    "workflow_gate": "r-rd3wx2g7_passed",
+    "new_output_tests": 8,
+    "new_output_tests_native_result": "pending",
+    "source_binding": "新增output生产模块和测试分别纳入supervisor/acceptance来源表；生产嵌入93份，既有Windows筛选包含全部output测试。",
+    "temporary_directories": "五个本机短根全部按记录归档清理",
+    "localization": "无需本地化变更：内部输出捕获和清理顺序沿用既有英中错误映射，无用户文案或布局变化；i18n11项通过。",
+    "boundary": "本机检查与静态独审不替代完整Windows五场景/三冷恢复；正式原生矩阵及最终同提交双平台源码门禁待验。",
+    "g09_closed": false,
+    "newly_closed_items": []
   }
 }
