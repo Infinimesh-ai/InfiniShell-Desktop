@@ -2,18 +2,23 @@
   "cli": "codex-cli 0.147.0",
   "plugin": "warp@codex-warp",
   "plugin_version": "0.4.0",
-  "patch_revision": 4,
-  "verified_platform": "windows",
-  "verified_architecture": "x86_64",
-  "passed": true,
-  "hooks_file_sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
-  "source_metadata_sha256": "dc5754dbf7cc3a69ab5261216073bfb711c923082bf8f2b6a6bd5b391c49fa96",
+  "patch_revision": 7,
+  "hooks_file_sha256": "9ba4d1a0556e8ac011643773eef4405ea3ca09a4ca77d39c4b27fa823b31c637",
   "model_request_attempted": false,
   "credentials_provided": false,
-  "native_config_restored": true,
-  "native_hook_lifecycle_verified": false,
-  "windows_product_enabled": false,
-  "native_artifact_sha256": "803db5ecf876ea79aae8fb4f1d27ae206fabba746c482ae3d64174a49943bb5e",
+  "native_config_unchanged": true,
+  "source_metadata_sha256": "046ba78bd7acb2889ebc4a9d94c6a2782a99072c18ca52adc3c3b190632e29fe",
+  "verified_platform": "windows",
+  "verified_architecture": "amd64",
+  "executable_sha256": "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d",
+  "passed": true,
+  "registration_shape_valid": true,
+  "product_contract_matches": true,
+  "registration_only": true,
+  "verification_run": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37287657975",
+  "verification_head_sha": "5682ee87e49fc69b9768a68ab0d8d109e63d20f0",
+  "raw_probe_sha256": "c4d31201a5bdcb7748190f605dbe0dfcc680274eca3e44e8d9824c598d94990d",
+  "native_registration_verified": true,
   "hooks": [
     {
       "key": "warp@codex-warp:hooks/hooks.json:permission_request:0:0",
@@ -23,9 +28,9 @@
       "enabled": true,
       "source": "plugin",
       "pluginId": "warp@codex-warp",
-      "currentHash": "sha256:44070d73fcbf068004c31131a2627104bf6c327a0a45cb2f3ea7a66c39eb1308",
+      "currentHash": "sha256:a91b553eaad07a767fe2ade4da7a82022960a308d9e90d56dc31c6767210ee31",
       "trustStatus": "untrusted",
-      "command_sha256": "5b9ac93652e1f28687d9e9dc48713718353441ad796f887396a5a4bf02be784a"
+      "command_sha256": "8c8e446c77437579dc2814e759b6c254437037cb9f41851616ab03b7ea6a4c22"
     },
     {
       "key": "warp@codex-warp:hooks/hooks.json:post_tool_use:0:0",
@@ -35,9 +40,9 @@
       "enabled": true,
       "source": "plugin",
       "pluginId": "warp@codex-warp",
-      "currentHash": "sha256:1b249d42206a018be2cab3f53d27b739b67c4997c8583c2ad883ff937f46509e",
+      "currentHash": "sha256:1144ab79c7069bbddd0c1cb6e46d936608092a5dc170064848c972d20db81a02",
       "trustStatus": "untrusted",
-      "command_sha256": "7098783fca8d010f0511323d5c050a5f2d4d235b3444c76d074a2acd4accd29c"
+      "command_sha256": "55cc3ba4f8039d1926846bf8bcb0e51f934b5a93399278d94ab7363358c43650"
     },
     {
       "key": "warp@codex-warp:hooks/hooks.json:session_start:0:0",
@@ -47,21 +52,9 @@
       "enabled": true,
       "source": "plugin",
       "pluginId": "warp@codex-warp",
-      "currentHash": "sha256:84c9084a052e6efc4f8104ff953afdf1f8bde6613e87638ce5cf1f3fc6ab230d",
+      "currentHash": "sha256:c9315b9e6402855ec12563c1de7c465a4bfd769209e5588fa9f5272809222862",
       "trustStatus": "untrusted",
-      "command_sha256": "bc3fa419f01a499cb29a4a1ad5a1e2b44bdd92a529139d7747559f6623150fb7"
-    },
-    {
-      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
-      "eventName": "userPromptSubmit",
-      "handlerType": "command",
-      "timeoutSec": 600,
-      "enabled": true,
-      "source": "plugin",
-      "pluginId": "warp@codex-warp",
-      "currentHash": "sha256:c5e2c592551335a5dc0de1aa80273f4d3e6195da3209b3f313c3b5b4425c1c20",
-      "trustStatus": "untrusted",
-      "command_sha256": "e74a5ad1f2a0cf664fd4389aa8f98249e676c205987905babb540cb2a34864b2"
+      "command_sha256": "71f4b9dcf214704744f82f937540d80b4b56521e786430edee38a7d59f9944ab"
     },
     {
       "key": "warp@codex-warp:hooks/hooks.json:stop:0:0",
@@ -71,9 +64,21 @@
       "enabled": true,
       "source": "plugin",
       "pluginId": "warp@codex-warp",
-      "currentHash": "sha256:7aca65d37ccae169a00489c40f6b130d5611c7774ca6fed130b3a5b6d19aa3cd",
+      "currentHash": "sha256:55c3903b07e1b3eba51f6bca1a8aaec0224fc5de91f4e8c7e7b2890e6f4c9987",
       "trustStatus": "untrusted",
-      "command_sha256": "f508f72c38e0b3e2c9367deb802778be20b88cdc3b4255e512faa8d87d77aee1"
+      "command_sha256": "fa57c76e829f19e66c2f4133d63e53408c48026070993a1ad14ad8bd8b378383"
+    },
+    {
+      "key": "warp@codex-warp:hooks/hooks.json:user_prompt_submit:0:0",
+      "eventName": "userPromptSubmit",
+      "handlerType": "command",
+      "timeoutSec": 600,
+      "enabled": true,
+      "source": "plugin",
+      "pluginId": "warp@codex-warp",
+      "currentHash": "sha256:85b3d96239e6855e1cc184eb4fbb08c351cce69af591d5e3dae5a38930b0af87",
+      "trustStatus": "untrusted",
+      "command_sha256": "70b4b8c7d523281231add71428fb8c8abf35b92ba9cee5fb6f33937a9b33d39a"
     }
   ]
 }

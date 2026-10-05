@@ -48,13 +48,29 @@ def source_bundle(bundle):
     root = bundle / 'codex'
     metadata_bytes = checked_file(root, 'SOURCE_METADATA.json').read_bytes()
     metadata = json.loads(metadata_bytes)
-    require(metadata['upstream_commit'] == COMMIT and metadata['cli_contract_version'] == '0.147.0',
-            '完整来源不符合固定受测契约')
+    require(metadata['upstream_commit'] == COMMIT and metadata['cli_contract_version'] == '0.147.0'
+            and metadata['plugin_version'] == '0.4.0' and metadata['patch_revision'] == 7
+            and metadata['directory'] == 'codex-warp-0.4.0-rev7',
+            '完整来源不符合固定 rev7 受测契约')
     expected = {name: entry['sha256'] for name, entry in metadata['files'].items()}
-    require(len(expected) == 36 and tree(root / 'source') == expected, '随附完整来源摘要不一致')
+    require(len(expected) == 38 and tree(root / 'source') == expected, '随附完整来源摘要不一致')
     verify_modes(root / 'source', metadata['files'])
     return metadata, metadata_bytes, expected
 
+
+def materialize_plugin_fixture(bundle, destination):
+    """仅为私有验收目录复制受控整树；不能覆盖现存目标或充当活动缓存更新器。"""
+    metadata, _, _ = source_bundle(bundle)
+    expected = {name.removeprefix('plugins/warp/'): entry
+                for name, entry in metadata['files'].items() if name.startswith('plugins/warp/')}
+    for path in (destination, *destination.parents):
+        require(not path.is_symlink(), '验收目标不能通过链接写入')
+    require(not destination.exists(), '验收目标已存在，拒绝覆盖')
+    shutil.copytree(bundle / 'codex/source/plugins/warp', destination)
+    require(tree(destination) == {name: entry['sha256'] for name, entry in expected.items()},
+            '验收插件副本与完整来源不一致')
+    verify_modes(destination, expected)
+    return destination
 
 def config(home):
     path = home / 'config.toml'
@@ -87,7 +103,7 @@ def verify_owned(home, bundle):
 
 
 def previous_revision(bundle, revision=3):
-    require(revision in (3, 4, 5), '未知的旧来源修补版本')
+    require(revision in (3, 4, 5, 6), '未知的旧来源修补版本')
     data = checked_file(bundle / f'codex/revisions/rev{revision}', 'SOURCE_METADATA.json').read_bytes()
     metadata = json.loads(data)
     require(metadata['upstream_commit'] == COMMIT and metadata['cli_contract_version'] == '0.147.0'
@@ -110,7 +126,7 @@ def verify_previous(home, bundle, revision=3):
 def verify_previous_cache(root, bundle):
     actual = tree(root)
     # 只能接受某个完整已部署版本，不能按文件拼凑不同修补版本。
-    for revision in (5, 4, 3):
+    for revision in (6, 5, 4, 3):
         metadata, _ = previous_revision(bundle, revision)
         files = {name.removeprefix('plugins/warp/'): entry for name, entry in metadata['files'].items()
                  if name.startswith('plugins/warp/')}
@@ -128,7 +144,7 @@ def validate_source(home, settings, bundle):
     if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, metadata)):
         verify_owned(home, bundle)
         return True
-    for revision in (5, 4, 3):
+    for revision in (6, 5, 4, 3):
         previous, _ = previous_revision(bundle, revision)
         if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, previous)):
             verify_previous(home, bundle, revision)
@@ -141,9 +157,11 @@ def validate_source(home, settings, bundle):
         '自定义或未知 marketplace 保持原样，不自动替换')
     snapshot = home / '.tmp/marketplaces/codex-warp'
     if snapshot.exists():
-        require(tree(snapshot, True) == {name: entry['upstream_sha256'] for name, entry in metadata['files'].items()},
+        original_files = {name: entry for name, entry in metadata['files'].items()
+                          if entry['upstream_sha256'] is not None}
+        require(tree(snapshot, True) == {name: entry['upstream_sha256'] for name, entry in original_files.items()},
                 '原始 marketplace 有用户修改或不是固定版本')
-        verify_modes(snapshot, metadata['files'])
+        verify_modes(snapshot, original_files)
     return False
 
 

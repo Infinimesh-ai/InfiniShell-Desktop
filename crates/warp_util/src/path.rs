@@ -118,6 +118,31 @@ pub fn user_friendly_path<'a>(path: &'a str, home_dir: Option<&str>) -> Cow<'a, 
         .unwrap_or(Cow::Borrowed(path))
 }
 
+/// 使用会话的主目录展开单独的 `~` 或以 `~` 和会话路径分隔符开头的路径。
+/// 未知主目录、`~user` 等其他路径保持原样，不读取宿主进程的主目录。
+pub fn expand_session_home(
+    path: &str,
+    home_dir: Option<&str>,
+    path_separators: &[char],
+) -> TypedPathBuf {
+    let Some(home_dir) = home_dir else {
+        return TypedPathBuf::from(path);
+    };
+    let Some(suffix) = path.strip_prefix('~') else {
+        return TypedPathBuf::from(path);
+    };
+    if suffix.is_empty()
+        || suffix
+            .chars()
+            .next()
+            .is_some_and(|separator| path_separators.contains(&separator))
+    {
+        TypedPathBuf::from(format!("{home_dir}{suffix}"))
+    } else {
+        TypedPathBuf::from(path)
+    }
+}
+
 /// Result after parsing a path string that mixes path and line and column numbers
 /// into each individual components.
 #[derive(Clone, Debug, PartialEq, Eq)]

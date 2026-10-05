@@ -2711,6 +2711,42 @@ impl Workspace {
     /// the settings pane so its nav-rail footer ("Open settings file" button
     /// or inline error alert) stays in sync with the workspace banner.
     fn sync_settings_error_state_into_settings_pane(&mut self, ctx: &mut ViewContext<Self>) {
+        if self.settings_pane.try_as_ref(ctx).is_none() {
+            let settings_pane = self.settings_pane.downgrade();
+            if settings_pane.window_id(ctx).is_none()
+                || !ctx.is_window_open(self.settings_pane.window_id(ctx))
+            {
+                return;
+            }
+            let workspace = ctx.handle();
+            let app = ctx.weak_app();
+            ctx.foreground_executor()
+                .spawn(async move {
+                    // 不递归排队；回到前台后读取最新状态，避免旧错误覆盖后来的清除事件。
+                    futures_lite::future::yield_now().await;
+                    let Some(mut app) = app.upgrade() else {
+                        return;
+                    };
+                    app.update(|ctx| {
+                        let (Some(workspace), Some(settings_pane)) =
+                            (workspace.upgrade(ctx), settings_pane.upgrade(ctx))
+                        else {
+                            return;
+                        };
+                        let (error, dismissed) = workspace.read(ctx, |workspace, _| {
+                            (
+                                workspace.settings_file_error.clone(),
+                                workspace.settings_error_banner_dismissed,
+                            )
+                        });
+                        settings_pane.update(ctx, |view, ctx| {
+                            view.set_settings_error_state(error, dismissed, ctx);
+                        });
+                    });
+                })
+                .detach();
+            return;
+        }
         let error = self.settings_file_error.clone();
         let dismissed = self.settings_error_banner_dismissed;
         self.settings_pane.update(ctx, |view, ctx| {

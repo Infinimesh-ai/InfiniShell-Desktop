@@ -20,6 +20,9 @@ mod single_instance_manager;
 pub enum StartupArgsForwardingError {
     #[error("should not forward arguments after an auto-update")]
     IgnoredAfterAutoUpdate,
+    /// 恢复监视进程不能向父进程转发新窗口请求，否则每次启动都会多开窗口。
+    #[error("should not forward arguments from the crash recovery process")]
+    IgnoredForCrashRecoveryProcess,
     #[error("there is no other instance of InfiniShell")]
     NoExistingInstance,
     #[error("failed to construct url")]
@@ -36,6 +39,9 @@ pub fn pass_startup_args_to_existing_instance(
 ) -> Result<(), StartupArgsForwardingError> {
     if args.finish_update {
         return Err(StartupArgsForwardingError::IgnoredAfterAutoUpdate);
+    }
+    if crate::crash_recovery::is_crash_recovery_process(args) {
+        return Err(StartupArgsForwardingError::IgnoredForCrashRecoveryProcess);
     }
     if SingleInstanceManager::is_sole_running_instance()? {
         return Err(StartupArgsForwardingError::NoExistingInstance);
@@ -81,3 +87,7 @@ pub(super) fn init(_ctx: &mut AppContext) {
         .spawn(register_uri_handler)
         .ok();
 }
+
+#[cfg(all(test, feature = "release_bundle"))]
+#[path = "../startup_tests.rs"]
+mod startup_tests;

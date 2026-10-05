@@ -61,6 +61,10 @@ def grok_frontend_sandbox(root, credential_directory, port, case):
 
 def plugin_copy(agent, root, claude_plugin=None):
     destination = root / "plugin"
+    if agent == "codex":
+        from codex_persistent_source import materialize_plugin_fixture
+        materialize_plugin_fixture(patch.default_bundle(), destination)
+        return destination
     assets = patch.default_bundle() / agent
     source = (assets / "source/plugins/warp" if agent == "codex" else
               claude_plugin if agent == "claude" else assets)

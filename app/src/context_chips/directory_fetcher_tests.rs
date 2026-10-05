@@ -1,4 +1,45 @@
+use std::sync::Arc;
+
+use typed_path::TypedPathBuf;
+use warp_completer::signatures::CommandRegistry;
+use warpui::App;
+
 use super::*;
+use crate::terminal::model::session::command_executor::testing::TestCommandExecutor;
+use crate::terminal::model::session::{Session, SessionInfo};
+
+#[test]
+fn directory_chip_lists_session_home_with_spaces() {
+    App::test((), |app| async move {
+        let directory = tempfile::tempdir().expect("session directory");
+        let home = directory.path().join("session home");
+        let project = home.join("project");
+        std::fs::create_dir_all(&project).expect("session project directory");
+        std::fs::write(project.join("file name.txt"), "").expect("session file");
+        let session = Session::new(
+            SessionInfo::new_for_test().with_home_dir(home.to_string_lossy().into_owned()),
+            Arc::new(TestCommandExecutor::default()),
+        );
+        let session_context = app.read(|ctx| {
+            SessionContext::new(
+                session,
+                Arc::new(CommandRegistry::empty()),
+                TypedPathBuf::from(directory.path().to_string_lossy().as_bytes()),
+                ctx,
+            )
+        });
+
+        let files = DirectoryFetcher::fetch_files_async(&session_context, "~/project").await;
+
+        assert_eq!(
+            files,
+            vec![create_directory_item(
+                "file name.txt",
+                DirectoryType::TextFile
+            )]
+        );
+    });
+}
 
 fn create_directory_item(name: &str, directory_type: DirectoryType) -> DirectoryItem {
     DirectoryItem {

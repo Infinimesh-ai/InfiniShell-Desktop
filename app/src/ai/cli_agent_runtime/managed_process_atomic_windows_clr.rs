@@ -1,13 +1,13 @@
-//! 仅授权的首个 PowerShell 候选读取原 CLR 异常停点；不参与候选成功判定。
+//! 仅授权的首个 PowerShell 候选读取分类返回同停点 CLR 栈；不参与候选成功判定。
 
 use std::io::Write as _;
 
-use command::windows::{ClrExceptionStop, ClrReader, ClrReaderImage, ClrRuntimeBinding};
+use command::windows::{ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding};
 
 use super::native_snapshot::{Identity, identity};
 use super::*;
 
-const CLR_EXCEPTION: u32 = 0xe0434352;
+const SINGLE_STEP: u32 = 0x80000004;
 const READ_BUDGET_BYTES: u32 = 24 * 1024 * 1024;
 
 #[derive(Debug)]
@@ -31,22 +31,41 @@ pub(super) struct NativeClr {
     reader_cleanup: Option<serde_json::Value>,
 }
 
-fn exception_hresult(event: &DEBUG_EVENT, root_pid: u32) -> io::Result<Option<u32>> {
+fn validate_return_binding(
+    event: &DEBUG_EVENT,
+    root_pid: u32,
+    sequence: u64,
+    classification: &serde_json::Value,
+) -> io::Result<()> {
     if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT || event.dwProcessId != root_pid {
-        return Ok(None);
+        return Err(error("native_clr.return_event"));
     }
     let information = unsafe { event.u.Exception };
-    let record = information.ExceptionRecord;
-    if information.dwFirstChance != 1 || record.ExceptionCode.0 as u32 != CLR_EXCEPTION {
-        return Ok(None);
-    }
-    if record.NumberParameters == 0
-        || record.NumberParameters as usize > record.ExceptionInformation.len()
+    let entry = classification["entry_sequence"].as_u64();
+    let node = classification["node_create_sequence"].as_u64();
+    if information.dwFirstChance != 1
+        || information.ExceptionRecord.ExceptionCode.0 as u32 != SINGLE_STEP
+        || classification["identity"]["process_id"] != root_pid
+        || classification["identity"]["thread_id"] != event.dwThreadId
+        || classification["return_sequence"] != sequence
+        || !node
+            .zip(entry)
+            .is_some_and(|(node, entry)| node != 0 && node < entry && entry < sequence)
+        || classification["node_process_id"]
+            .as_u64()
+            .is_none_or(|pid| pid == 0 || pid == u64::from(root_pid) || pid > u32::MAX as u64)
+        || classification["node_process_birth"]
+            .as_u64()
+            .is_none_or(|birth| birth == 0)
+        || classification["expected_node_matched"] != true
+        || classification["flags"] != 0x2000
+        || classification["registers_restored"] != true
+        || classification["execution_context_unchanged"] != true
+        || classification["post_start_clr_stack_required"] != true
     {
-        return Err(error("native_clr.exception_parameters"));
+        return Err(error("native_clr.return_classification_binding"));
     }
-    // EXCEPTION_INFORMATION 为指针宽度；HRESULT 合同只取低 32 位，允许 x64 符号扩展。
-    Ok(Some(record.ExceptionInformation[0] as u32))
+    Ok(())
 }
 
 fn write_receipt(path: &Path, receipt: &serde_json::Value) -> io::Result<()> {
@@ -172,22 +191,24 @@ impl NativeClr {
         Ok(())
     }
 
-    pub(super) fn observe(
+    pub(super) fn observe_native_return(
         &mut self,
         event: &DEBUG_EVENT,
         process: &OwnedHandle,
         process_created: u64,
         root_pid: u32,
         sequence: u64,
+        classification: &serde_json::Value,
         deadline: Instant,
         cancellation: Option<&AtomicBool>,
     ) -> io::Result<()> {
-        let Some(hresult) = exception_hresult(event, root_pid)? else {
-            return Ok(());
-        };
-        self.phase = "exception_identity";
+        validate_return_binding(event, root_pid, sequence, classification)?;
+        if classification["generation"] != serde_json::json!(self.generation.as_bytes()) {
+            return Err(error("native_clr.return_generation"));
+        }
+        self.phase = "native_return_identity";
         self.ensure_reaped()?;
-        if sequence <= self.last_sequence || Instant::now() >= deadline {
+        if self.completed != 0 || sequence <= self.last_sequence || Instant::now() >= deadline {
             return Err(error("native_clr.event_sequence_or_deadline"));
         }
         if cancellation.is_some_and(|value| value.load(Ordering::Acquire)) {
@@ -201,9 +222,10 @@ impl NativeClr {
         write_receipt(
             &self
                 .directory
-                .join(format!("native-clr-exception-{sequence}.pending.json")),
+                .join(format!("native-clr-classification-{sequence}.pending.json")),
             &serde_json::json!({"generation":self.generation,"process_id":root_pid,
-                "thread_id":event.dwThreadId,"event_sequence":sequence,"hresult":hresult,
+                "thread_id":event.dwThreadId,"event_sequence":sequence,"hresult":0,
+                "classification":classification,"operation":3,
                 "phase":"pending_not_read","candidate_success_inferred":false}),
         )?;
         let thread = self
@@ -219,7 +241,12 @@ impl NativeClr {
             self.identity_failure = Some(serde_json::json!(failure));
             error("native_clr.thread_identity")
         })?;
-        if current != thread.identity || current.process_id != root_pid {
+        let current_identity = serde_json::to_value(current)?;
+        if current != thread.identity
+            || current.process_id != root_pid
+            || classification["identity"]["process_birth"] != current_identity["process_created"]
+            || classification["identity"]["thread_birth"] != current_identity["thread_created"]
+        {
             return Err(error("native_clr.thread_identity_changed"));
         }
         let (_, runtime) = self
@@ -228,7 +255,7 @@ impl NativeClr {
             .ok_or_else(|| error("native_clr.runtime_missing"))?;
         self.phase = "reader_start";
         // start 成功即存入所有者；后续绑定、发送、取消和解析失败均不能提前丢失 reader。
-        self.active_reader = Some(ClrReader::start(
+        self.active_reader = Some(ClrReader::start_native_return(
             &mut self.image,
             &self.directory,
             sequence,
@@ -236,18 +263,18 @@ impl NativeClr {
         )?);
         let reader = self.active_reader.as_mut().unwrap();
         self.phase = "reader_bind_and_send";
-        reader.bind_and_send(
+        reader.bind_native_return_and_send(
             &mut self.image,
             runtime,
-            ClrExceptionStop {
+            ClrNativeReturnStop {
                 process: process.as_handle(),
                 thread: thread.handle.as_handle(),
                 process_id: root_pid,
                 thread_id: event.dwThreadId,
                 event_sequence: sequence,
-                exception_code: CLR_EXCEPTION,
+                exception_code: SINGLE_STEP,
                 first_chance: 1,
-                hresult,
+                hresult: 0,
                 read_budget_bytes: READ_BUDGET_BYTES,
             },
         )?;
@@ -265,15 +292,16 @@ impl NativeClr {
         let receipt = serde_json::json!({
             "schema":1,"generation":self.generation,"mode":"powershell",
             "event_sequence":sequence,"process_id":root_pid,"thread_id":event.dwThreadId,
-            "identity":current,"exception_code":CLR_EXCEPTION,"hresult":hresult,
+            "identity":current,"exception_code":SINGLE_STEP,"hresult":0,"operation":3,
+            "classification":classification,"live_threads_restored_before_reader":true,
             "binding":reader.binding(),"reader":self.image.receipt(),"runtime":runtime.receipt(),
-            "result":result,"reader_reaped":true,"candidate_success_inferred":false,
+            "result":result,"reader_reaped":true,"reader_job_empty":true,"candidate_success_inferred":false,
         });
         self.phase = "write_receipt";
         write_receipt(
             &self
                 .directory
-                .join(format!("native-clr-exception-{sequence}.json")),
+                .join(format!("native-clr-classification-{sequence}.json")),
             &receipt,
         )?;
         // 合法 observed/partial/unavailable 均已绑定且 reader 已退出；后两者不是读取通过。
@@ -285,6 +313,7 @@ impl NativeClr {
 
     pub(super) fn summary(&self) -> serde_json::Value {
         serde_json::json!({"recorded_events":self.completed,"last_sequence":self.last_sequence,
+            "operation":3,"scope":"post_start_classification_return_only",
             "phase":self.phase,"identity_failure":self.identity_failure,"reader_cleanup":self.reader_cleanup,
             "active_reader":self.active_reader.as_ref().map(|reader| serde_json::json!({
                 "reaped":reader.is_reaped(),"binding":reader.binding()}))})

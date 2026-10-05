@@ -1,6 +1,8 @@
 use std::sync::{Arc, OnceLock};
 
 use warp_core::channel::Channel;
+#[cfg(feature = "test-util")]
+use warp_core::features::mark_initialized;
 
 mod miss_cache;
 pub mod registry;
@@ -100,6 +102,8 @@ impl CommandRegistry {
 #[cfg(feature = "test-util")]
 impl Default for CommandRegistry {
     fn default() -> Self {
+        // 独立补全测试也会生成带特性门控的 CLI 签名，先标记测试默认状态已就绪。
+        mark_initialized();
         CommandRegistry::new_with_embedded_signatures()
     }
 }

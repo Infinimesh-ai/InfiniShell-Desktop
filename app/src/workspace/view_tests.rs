@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use ai::project_context::model::ProjectContextModel;
 use pane_group::{NotebookPane, PaneState, SplitPaneState, TerminalPaneId};
@@ -12,6 +13,7 @@ use tempfile::TempDir;
 use terminal::view::ActiveSessionState;
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;
+use warpui::r#async::FutureExt as _;
 use warpui::platform::WindowStyle;
 use warpui::{AddSingletonModel, App, ViewHandle};
 use watcher::HomeDirectoryWatcher;
@@ -221,6 +223,58 @@ pub(crate) fn initialize_app(app: &mut App) {
 
     // Make sure to initialize the keybindings so that they are available for subviews
     app.update(workspace::init);
+}
+
+#[test]
+fn settings_error_sync_updates_the_pane_after_its_borrow_ends() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+        let settings_pane = workspace.read(&app, |workspace, _| workspace.settings_pane.clone());
+        let error = crate::settings::SettingsFileError::InvalidSettings(vec!["font_size".into()]);
+
+        settings_pane.update(&mut app, |settings_view, ctx| {
+            workspace.update(ctx, |workspace, ctx| {
+                workspace.settings_file_error = Some(error.clone());
+                workspace.settings_error_banner_dismissed = true;
+                workspace.sync_settings_error_state_into_settings_pane(ctx);
+            });
+            assert_eq!(settings_view.settings_error_state_for_test(), (None, false));
+        });
+
+        async {
+            while settings_pane.read(&app, |view, _| view.settings_error_state_for_test())
+                != (Some(error.clone()), true)
+            {
+                futures_lite::future::yield_now().await;
+            }
+        }
+        .with_timeout(Duration::from_secs(5))
+        .await
+        .expect("借用结束后应同步错误和横幅关闭状态");
+
+        settings_pane.update(&mut app, |settings_view, ctx| {
+            workspace.update(ctx, |workspace, ctx| {
+                workspace.settings_file_error = None;
+                workspace.sync_settings_error_state_into_settings_pane(ctx);
+            });
+            assert_eq!(
+                settings_view.settings_error_state_for_test(),
+                (Some(error), true)
+            );
+        });
+
+        async {
+            while settings_pane.read(&app, |view, _| view.settings_error_state_for_test())
+                != (None, true)
+            {
+                futures_lite::future::yield_now().await;
+            }
+        }
+        .with_timeout(Duration::from_secs(5))
+        .await
+        .expect("借用结束后应清除面板中的旧错误");
+    });
 }
 
 pub(crate) fn mock_workspace(app: &mut App) -> ViewHandle<Workspace> {

@@ -14,6 +14,7 @@ from codex_windows_hook_inputs import require
 
 
 SOURCE = Path(__file__).with_suffix(".ps1")
+BUNDLE = Path(__file__).resolve().parents[2] / "app/assets/bundled/cli-agent-plugins/codex"
 SCRIPTS = ("on-session-start.sh", "on-prompt-submit.sh", "on-stop.sh",
            "on-permission-request.sh", "on-post-tool-use.sh")
 PREFIX = "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
@@ -37,6 +38,19 @@ def encode(script):
     return command
 
 
+def encode_legacy(script):
+    """历史候选只使用 rev6 冻结的 Bash 启动器，不借用当前原生 PS 入口。"""
+    require(script in SCRIPTS, "未知固定通知入口")
+    hooks = json.loads((BUNDLE / "revisions/rev6/hooks/hooks.json").read_bytes())["hooks"]
+    matches = [handler["commandWindows"] for groups in hooks.values() for group in groups
+               for handler in group["hooks"] if script in handler["command"]]
+    require(len(matches) == 1 and matches[0].startswith(PREFIX), "历史 Windows 命令不完整")
+    plain = base64.b64decode(matches[0][len(PREFIX):], validate=True).decode("utf-16le")
+    require(plain.startswith("$NotificationHook = '" + script + "'\n") and
+            "Get-Command bash.exe" in plain, "历史 Windows 命令不是已冻结的 Bash 配方")
+    return matches[0]
+
+
 def cmd_line(command, executable):
     # 与 Codex 0.147 的 /C + raw_arg 外层引号一致；变量路径只在可执行文件 argv 位置。
     require('"' not in str(executable) and '"' not in command, "固定命令含意外双引号")
@@ -56,7 +70,7 @@ def verify_encoding():
             "encoding_roundtrip": True}
 
 
-def windows_environment(bash, jq):
+def native_windows_environment():
     require(os.name == "nt", "原生检查必须在 Windows 执行，不允许跳过当作通过")
     import winreg
     # Codex 默认 cmd /C 会执行 AutoRun；受控 runner 存在该配置时拒绝执行，不改全局配置。
@@ -67,13 +81,20 @@ def windows_environment(bash, jq):
                 require(not value, "runner 的 cmd AutoRun 非空，不能证明隔离执行")
         except FileNotFoundError:
             pass
-    require(bash.name.lower() == "bash.exe" and (bash.parent / "msys-2.0.dll").is_file(),
-            "必须提供 Git usr/bin/bash.exe；不能使用 WSL shim")
-    require(jq.name.lower() == "jq.exe" and jq.is_file(), "必须提供实际 jq.exe")
     env = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP") if key in os.environ}
     system = Path(env["SYSTEMROOT"]) / "System32"
-    env["PATH"] = os.pathsep.join(map(str, (bash.parent, jq.parent, system, system / "WindowsPowerShell/v1.0")))
+    env["PATH"] = os.pathsep.join(map(str, (system, system / "WindowsPowerShell/v1.0")))
     env["COMSPEC"] = str(system / "cmd.exe")
+    return env
+
+
+def windows_environment(bash, jq):
+    # 旧候选和其他 CLI 的 shell 探针仍使用原依赖边界。
+    env = native_windows_environment()
+    require(bash is not None and bash.name.lower() == "bash.exe" and (bash.parent / "msys-2.0.dll").is_file(),
+            "必须提供 Git usr/bin/bash.exe；不能使用 WSL shim")
+    require(jq is not None and jq.name.lower() == "jq.exe" and jq.is_file(), "必须提供实际 jq.exe")
+    env["PATH"] = os.pathsep.join((str(bash.parent), str(jq.parent), env["PATH"]))
     for executable in (bash, jq):
         subprocess.run([str(executable), "--version"], env=env, capture_output=True, check=True, timeout=10)
     return env
@@ -102,6 +123,9 @@ if ($errors.Count -ne 0) { throw ($errors | Out-String) }
         run_powershell(parser, {**env, "PROBE_SOURCE": base64.b64encode(plain.encode("utf-8")).decode("ascii")})
     from codex_windows_notify import source_text as notification_source
     run_powershell(parser, {**env, "PROBE_SOURCE": base64.b64encode(notification_source().encode("utf-8")).decode("ascii")})
+    for name in ("on-notification.ps1", "warp-notify.ps1"):
+        plain = (BUNDLE / "scripts" / name).read_text(encoding="utf-8")
+        run_powershell(parser, {**env, "PROBE_SOURCE": base64.b64encode(plain.encode("utf-8")).decode("ascii")})
 
 
 def verify_windows_argv(env):
@@ -143,7 +167,7 @@ def require_original_bytes(completed, captured, payload, case):
     evidence = {"case": case, "expected_stdin_base64": encoded(payload),
                 "actual_stdin_base64": encoded(captured), "expected_stdout_base64": encoded(expected_stdout),
                 "actual_stdout_base64": encoded(completed.stdout), "stderr_base64": encoded(completed.stderr)}
-    raise ValueError("cmd/PowerShell/Bash 原始 stdin 或 stdout 字节发生改变: " + json.dumps(evidence, ensure_ascii=True))
+    raise ValueError("cmd/PowerShell 原始 stdin 或 stdout 字节发生改变: " + json.dumps(evidence, ensure_ascii=True))
 
 
 def verify_windows_bytes_and_boundary(env):
@@ -153,10 +177,12 @@ def verify_windows_bytes_and_boundary(env):
         root = Path(tmp) / "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"
         (root / "scripts").mkdir(parents=True)
         target = root / "input.bin"
-        for script in SCRIPTS:
-            (root / "scripts" / script).write_text(
-                '#!/bin/bash\nset -e\ncat > "$INFINISHELL_HOOK_BYTES"\nprintf "native-bytes-ok"\n',
-                encoding="utf-8", newline="\n")
+        (root / "scripts/on-notification.ps1").write_text(
+            'param([string] $NotificationHook)\n$ErrorActionPreference = "Stop"\n'
+            '$bytes = New-Object IO.MemoryStream\n[Console]::OpenStandardInput().CopyTo($bytes)\n'
+            '[IO.File]::WriteAllBytes($env:INFINISHELL_HOOK_BYTES, $bytes.ToArray())\n'
+            '$bytes.Dispose()\n[Console]::Out.Write("native-bytes-ok")\n',
+            encoding="utf-8", newline="\r\n")
         local_env = {**env, "PLUGIN_ROOT": str(root), "INFINISHELL_HOOK_BYTES": str(target)}
         maximum = max((encode(script) for script in SCRIPTS), key=len)
         # 真正执行 8191 单元的边界命令，而不只检查 Python 字符串长度。

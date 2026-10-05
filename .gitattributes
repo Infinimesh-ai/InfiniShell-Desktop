@@ -15,6 +15,11 @@ app/assets/bundled/bootstrap/*_subshell_bootstrap_block_output.txt -text
 # 统一差异补丁的空上下文行需要前导空格；固定上游原文须保持清单中的字节摘要。
 app/assets/bundled/cli-agent-plugins/*/upstream.patch whitespace=-blank-at-eol
 native/grok-build/terminal-bridge.patch whitespace=-blank-at-eol
+# 随附通知脚本按字节校验；各平台检出保持同一 LF 配方。
+app/assets/bundled/cli-agent-plugins/codex/scripts/*.ps1 text eol=lf
+app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/*.ps1 text eol=lf
+# G09 准备脚本纳入验收来源绑定，各平台检出须保持相同字节。
+script/ci/g09-clr-fixture/*.ps1 text eol=lf
 app/assets/bundled/cli-agent-plugins/codex/source/plugins/orchestration/skills/factory-files/references/scorers.md whitespace=-blank-at-eol
 
 # 原始验收输出保留终端空白与文件摘要，不对记录做格式整理。

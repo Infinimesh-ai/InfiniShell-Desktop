@@ -1,19 +1,23 @@
 # Codex 通知插件兼容修补
 
-这里随附 `warpdotdev/codex-warp` 固定提交的完整 marketplace，以及 `warp` 0.4.0 的五个通知替换件。插件 ID 仍为 `warp@codex-warp`；同来源的 orchestration 文件及索引保持原样。`source/` 包含全部 36 个跟踪文件，`SOURCE_METADATA.json` 记录原始与部署摘要、模式位和固定提交。通知差异另见 `PATCH_METADATA.json` 与 `upstream.patch`，上游 MIT 许可保存在 `LICENSE` 及 `source/LICENSE`。
+这里随附 `warpdotdev/codex-warp` 固定提交的完整 marketplace，以及 `warp` 0.4.0 的通知修补 rev7。插件 ID 仍为 `warp@codex-warp`；同来源的 orchestration 文件及索引保持原样。`source/` 包含 36 个固定上游文件及 2 个本地原生 PowerShell 脚本，`SOURCE_METADATA.json` 记录原始与部署摘要、模式位和固定提交。通知差异另见 `PATCH_METADATA.json` 与 `upstream.patch`，上游 MIT 许可保存在 `LICENSE` 及 `source/LICENSE`。
 
 Codex `rust-v0.147.0` 官方 hook schema 在 UserPromptSubmit、Stop、PermissionRequest 和 PostToolUse 中明确声明原生 `turn_id`，此修补只透传该字段，不制造 Claude `prompt_id`、事件 ID 或序号。缺少关联字段的终态降级为普通通知；`stop_hook_active=true` 不报告完成，缺少最终文本也不声称成功。
 
-本地安装器把完整来源发布到 CLI HOME 下的 `plugins/infinishell-sources/codex-warp-0.4.0-rev5/source`，在私有暂存 HOME 用真实 Codex 完成来源注册及安装，再验证缓存并迁入单一 marketplace 与目标插件启用字段。没有只修缓存的默认路径：Codex 的后台 Git marketplace 刷新会覆盖这种修补。原用户信任字段、无关配置、其他 marketplace、orchestration 的禁用及缓存均须保留。未知来源、完整源码或缓存的自定义修改、未经验证的版本、显式禁用会拒绝操作。
+本地安装器把完整来源发布到 CLI HOME 下的 `plugins/infinishell-sources/codex-warp-0.4.0-rev7/source`，在私有暂存 HOME 用真实 Codex 完成来源注册及安装，再验证缓存并迁入单一 marketplace 与目标插件启用字段。没有只修缓存的默认路径：Codex 的后台 Git marketplace 刷新会覆盖这种修补。原用户信任字段、无关配置、其他 marketplace、orchestration 的禁用及缓存均须保留。未知来源、完整源码或缓存的自定义修改、未经验证的版本、显式禁用会拒绝操作。
 
 配置提交使用限定字段重读比较和原子文件替换，并非跨进程原子 CAS。发现并发目标变化时停止；失败恢复仅覆盖仍匹配本操作写入值的状态。无法安全恢复的旧缓存及阶段记录保留在 `plugins/infinishell-transactions/`，错误日志给出路径。原始 Git snapshot 不会被删除；新版本应随应用交付新的完整受控来源，不能直接执行原生 Git upgrade 覆盖当前来源。详细实证、恢复边界及原生 `expectedVersion` 的限制见 `specs/cli-agent-parity/CODEX_PLUGIN_CACHE_REFRESH.md`。
 
-仍依赖上游 Bash、jq 和 `should-use-structured.sh`；TTY 传输使用随附的 `warp-notify.sh`。父应用必须保留并核对原生 `turn_id`，拒绝旧回合终态；本地安装器已接入受控修补；普通原生安装命令本身不会应用这些替换件。真实 hook 端到端、Windows/Git Bash 与 GUI 验收仍待完成；SSH/tmux 仅脚本传输已验证，见下方范围。
+Unix 仍依赖 Bash、jq 和 `should-use-structured.sh`；TTY 传输使用随附的 `warp-notify.sh`。Windows 正式 `commandWindows` 改用系统 PowerShell 5.1、`on-notification.ps1` 和 `warp-notify.ps1`，通知及安装预检不再依赖 Git Bash/jq。父应用必须保留并核对原生 `turn_id`，拒绝旧回合终态；本地安装器已接入受控修补；普通原生安装命令本身不会应用这些替换件。rev7 的五类脚本通知已通过真实 Windows ConPTY 回放，固定 CLI 0.147.0 / 0.156.1 已独立确认新命令的原生注册摘要；此记录不替代真实模型触发、完整 GUI 生命周期和生产自动安装验收。SSH/tmux 的历史验证范围见下文。
 
 
 安装器只支持受测 CLI 精确版本；Claude 最低插件版本为 2.2.0，Codex 为 0.4.0。缺失原生关联 ID 的 stop/stop_failure 会携带 `terminal_unverified=true`，不能算成功。详细失败恢复和缓存策略见 `specs/cli-agent-parity/PLUGIN_COMPATIBILITY.md`。
 
 SSH 或容器需用 `script/cli-agent-parity/apply_notification_patch.py --export <目录>` 导出后整体传输到目标机器。导出包包含完整来源与 `codex_persistent_source.py`；进入导出目录运行 `python3 apply_notification_patch.py --agent codex`，由目标 Python 3.11+、受测 CLI、Bash/jq 检查并安装或更新。只检查用 `--check`。不会把本机状态当成远端状态，失败不会降级为只修改缓存。Windows 自动运行仍未开放；显式 `--files-only` 的文件事务成功不能证明原生通知已运行。跨平台实际验证未通过前不得视为能力已完成。
+
+修补第 7 版保留插件语义版本 `0.4.0`，仅升级本地配方。Unix 祖先回退最多 32 层，只选择最近 Codex 祖先；Linux 首先通过 `/proc` 查询其终端文件描述符，没有 `ps` 也能覆盖该路径。有控制终端但标准流已捕获时保留可选 `ps` 回退。tmux、SSH、终端真实性检查与非零失败语义不变。Windows 原生入口按既有协议构造五类通知，直接写 `CONOUT$`，失败不向 stdout 写 OSC；旧 Git Bash 编码脚本保留为兼容路径。
+
+rev7 完整来源中的 PowerShell 脚本使用 UTF-8 BOM + LF，避免 PS5.1 按本地 ANSI 代码页误读中文注释；通知 JSON 本身仍为无 BOM 的 ASCII。完整来源按原始字节校验；新增文件的 `upstream_sha256=null`，不会虚构上游来源。精确 rev6 归档加入既有 rev3–5 迁移白名单，仍拒绝自定义文件、混合版本及被修改的旧来源。Windows 启动命令改变后须由真实 `hooks/list` 更新该平台信任合同；安装器不会替用户迁移或写入 `trusted_hash`，原生重新授权仍通过 `/hooks` 完成。本次状态与验证见 `docs/upstream-essence/2026-10-05.md`，以下为各历史修补的原始验收边界。
 
 修补第 2 版将 `hooks/hooks.json` 纳入同一固定摘要事务，保留原 matcher 和事件集合。Claude 使用原生 exec form（`command: bash` + 单元素 `args`），Codex 在 shell 命令中引用已导出的 `$PLUGIN_ROOT`，不把目录值拼入命令文本。含空格、中文和 shell 特殊字符的路径已通过 macOS Bash/jq 回放；Claude 2.1.273 的原生 `--init-only` 也通过独立路径探测。Codex Windows 的原生默认 hook shell 可能是 `cmd.exe`，本 POSIX 命令不据此获得 Windows 支持；Windows/Git Bash 与真实通知生命周期仍未验证。
 
@@ -25,7 +29,7 @@ rev3/rev4 迁移分别按 `revisions/rev3` 与 `revisions/rev4` 中的全部 36 
 
 修补第 5 版适配 Codex 0.155.1 将 hook 放入无控制终端新会话的行为。tmux 路径只接受当前 `TMUX_PANE` 查询到的 `pane_tty`，SSH 路径只接受经校验的 `SSH_TTY`；两者都拒绝链接、普通文件和非 TTY 字符设备。本地路径优先 `/dev/tty`，其不可用时只遍历有限父进程并接受名称为 Codex 的祖先 TTY。任何选择或写入失败都返回非零并输出错误，不再静默伪装通知成功。异机 Linux SSH 中的真实 Codex 0.155.1 已验证普通终端与 tmux `allow-passthrough=on/off` 正负路径；该记录不代表 GUI 完整生命周期或 Windows 新脚本字节已验收。
 
-rev4 的 macOS 无凭据原生 `hooks/list` 已采集为 `NATIVE_HOOK_TRUST.json`：仅五个正式 hook，无测试阻断 hook、无插桩 wrapper、无输入回合及模型调用。第十轮 b3d8 的 Windows x64 正式采集也已通过，独立摘要保存为 `NATIVE_HOOK_TRUST_WINDOWS.json`；应用据此只读判断 Required/Configured/Unknown，不把配置吻合显示为当前会话已生效。其他 Windows 架构及生产自动安装仍未开放。正式 ConPTY 证据只覆盖 SessionStart/UserPromptSubmit，剩余事件和完整生命周期仍待验；第九轮候选证据不替代正式记录。
+rev4 的 macOS 无凭据原生 `hooks/list` 已采集为 `NATIVE_HOOK_TRUST.json`：仅五个正式 hook，无测试阻断 hook、无插桩 wrapper、无输入回合及模型调用。第十轮 b3d8 的 Windows x64 正式采集也已通过，旧摘要现冻结于 `revisions/rev6/NATIVE_HOOK_TRUST_WINDOWS.json`，当前同名根文件记录 rev7；应用据此只读判断 Required/Configured/Unknown，不把配置吻合显示为当前会话已生效。其他 Windows 架构及生产自动安装仍未开放。历史正式 ConPTY 证据只覆盖 SessionStart/UserPromptSubmit，剩余原生事件触发和完整生命周期仍待验；第九轮候选证据不替代正式记录。
 
 固定 macOS Codex 0.147.0 还通过 Python 安装器的无凭据来源迁移：起点是精确 rev3 受控夹具，暂存调用真实原生插件命令，结果保留旧树、信任和编排禁用状态；见 `specs/cli-agent-parity/fixtures/codex-plugin-rev3-rev4-macos.json`。此记录明确不证明 Rust 安装器、GUI 或 Windows 已通过。候选运输脚本生成的末尾空行在正式资源中收敛为一个 LF；所有正式文件使用新摘要，后续实际通知验收必须以正式字节为准。
 

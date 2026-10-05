@@ -41,14 +41,14 @@ class FormalResourceTests(unittest.TestCase):
         repo = Path(__file__).resolve().parents[2]
         current, replacements, source_hash = probe_bundle(repo, 'formal')
         old, old_replacements, old_source_hash = probe_bundle(repo, 'candidate')
-        self.assertEqual((current['patch_revision'], old['patch_revision']), (6, 3))
+        self.assertEqual((current['patch_revision'], old['patch_revision']), (7, 3))
         self.assertEqual(len(source_hash), 64)
         self.assertIsNone(old_source_hash)
         self.assertNotIn('scripts/on-prompt-submit.sh', old_replacements)
         self.assertNotEqual(replacements['scripts/warp-notify.sh'], old_replacements['scripts/warp-notify.sh'])
         self.assertNotEqual(replacements['scripts/build-payload.sh'], old_replacements['scripts/build-payload.sh'])
         plugin = repo / 'app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp'
-        self.assertEqual(len(exact_plugin_tree(plugin, current)), 10)
+        self.assertEqual(len(exact_plugin_tree(plugin, current)), 12)
         with self.assertRaises(ValueError):
             exact_plugin_tree(plugin, old)
         with self.assertRaises(ValueError):
@@ -58,7 +58,7 @@ class FormalResourceTests(unittest.TestCase):
         repo = Path(__file__).resolve().parents[2]
         relative = Path('app/assets/bundled/cli-agent-plugins/codex')
         for name in ('PATCH_METADATA.json', 'SOURCE_METADATA.json'):
-            for revision in (5, 7):
+            for revision in (6, 8):
                 with self.subTest(name=name, revision=revision), tempfile.TemporaryDirectory() as temporary:
                     candidate = Path(temporary)
                     shutil.copytree(repo / relative, candidate / relative)
@@ -66,7 +66,7 @@ class FormalResourceTests(unittest.TestCase):
                     metadata = json.loads(path.read_bytes())
                     metadata['patch_revision'] = revision
                     path.write_text(json.dumps(metadata))
-                    with self.assertRaisesRegex(ValueError, 'rev6'):
+                    with self.assertRaisesRegex(ValueError, 'rev7'):
                         probe_bundle(candidate, 'formal')
 
     def test_historical_payload_archive_rejects_current_or_unknown_bytes(self):
@@ -117,7 +117,15 @@ class FormalResourceTests(unittest.TestCase):
         metadata, replacements, _ = probe_bundle(repo, 'candidate')
         with tempfile.TemporaryDirectory() as temporary:
             plugin = Path(temporary) / 'plugin'
-            shutil.copytree(bundle / 'source/plugins/warp', plugin)
+            # 历史快照还保存独立凭据；只按 rev6 完整来源清单装配插件，不将凭据混入插件树。
+            archive = bundle / 'revisions/rev6'
+            source = json.loads((archive / 'SOURCE_METADATA.json').read_bytes())
+            for name in source['files']:
+                if name.startswith('plugins/warp/'):
+                    relative = name.removeprefix('plugins/warp/')
+                    target = plugin / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(archive / relative, target)
             for name, contents in replacements.items():
                 (plugin / name).write_bytes(contents)
             (plugin / 'scripts/on-prompt-submit.sh').write_bytes(

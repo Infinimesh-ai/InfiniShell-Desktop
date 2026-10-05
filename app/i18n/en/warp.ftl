@@ -5571,6 +5571,9 @@ ai-suggested-prompt-a11y = Suggested prompt:
     { $prompt }
 ai-mcp-tool-title = MCP Tool: { $name }
 ai-mcp-tool-title-with-input = MCP Tool: { $name } ({ $input })
+ai-mcp-tool-timeout-before-dispatch = The MCP connection timed out after { $seconds } seconds. The tool was not dispatched.
+ai-mcp-tool-timeout-after-dispatch = The MCP tool call timed out after { $seconds } seconds. The tool may have executed; its outcome is unknown. Do not retry automatically.
+ai-mcp-tool-outcome-unknown = The MCP tool call failed without a confirmed result. The tool may have executed; its outcome is unknown. Do not retry automatically.
 ai-navigate-to-open-comments = Navigate to { $path } to open these comments
 ai-thought-for-duration = Thought for { $duration }
 ai-stopped-task = Stopped task: “{ $name }”

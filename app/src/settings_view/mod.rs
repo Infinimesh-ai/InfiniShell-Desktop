@@ -1333,6 +1333,14 @@ impl SettingsView {
         ctx.notify();
     }
 
+    #[cfg(test)]
+    pub(crate) fn settings_error_state_for_test(&self) -> (Option<SettingsFileError>, bool) {
+        (
+            self.settings_file_error.clone(),
+            self.settings_error_banner_dismissed,
+        )
+    }
+
     pub fn pane_configuration(&self) -> ModelHandle<PaneConfiguration> {
         self.pane_configuration.clone()
     }

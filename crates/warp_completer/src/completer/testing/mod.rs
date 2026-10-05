@@ -12,6 +12,7 @@ use smol_str::SmolStr;
 use typed_path::{TypedPath, TypedPathBuf};
 use warp_command_signatures::IconType;
 use warp_core::command::ExitCode;
+use warp_core::features::mark_initialized;
 use warp_util::path::{EscapeChar, ShellFamily, TEST_SESSION_HOME_DIR};
 
 use super::{CommandExitStatus, MatchedSuggestion, PathSeparators};
@@ -271,6 +272,8 @@ pub struct FakeCompletionContext {
 
 impl FakeCompletionContext {
     pub fn new(command_registry: CommandRegistry) -> Self {
+        // 自定义命令注册表也会执行带特性门控的生成器，先标记测试默认状态已就绪。
+        mark_initialized();
         Self {
             command_registry,
             supports_autocd: None,

@@ -142,6 +142,18 @@ impl PatchKind {
                         "../../../../assets/bundled/cli-agent-plugins/codex/scripts/warp-notify.sh"
                     ),
                 ),
+                (
+                    "scripts/on-notification.ps1",
+                    include_str!(
+                        "../../../../assets/bundled/cli-agent-plugins/codex/scripts/on-notification.ps1"
+                    ),
+                ),
+                (
+                    "scripts/warp-notify.ps1",
+                    include_str!(
+                        "../../../../assets/bundled/cli-agent-plugins/codex/scripts/warp-notify.ps1"
+                    ),
+                ),
             ],
         }
     }
@@ -162,7 +174,7 @@ struct CompatibleBase {
 
 #[derive(Deserialize)]
 struct FileHashes {
-    upstream_sha256: String,
+    upstream_sha256: Option<String>,
     replacement_sha256: String,
     #[serde(default)]
     previous_replacement_sha256: Vec<String>,
@@ -223,7 +235,7 @@ const WINDOWS_DEPENDENCY_PROBE: &str = include_str!(
 );
 #[cfg(any(test, all(windows, target_arch = "x86_64")))]
 fn windows_dependency_receipt_matches(stdout: &[u8], stderr: &[u8]) -> bool {
-    stdout == b"infinishell-codex-windows-dependencies-v1\r\n" && stderr.is_empty()
+    stdout == b"infinishell-codex-windows-native-notifications-v2\r\n" && stderr.is_empty()
 }
 
 #[cfg(any(test, all(windows, target_arch = "x86_64")))]
@@ -578,6 +590,12 @@ fn sha256(contents: &[u8]) -> String {
 }
 
 fn validate_tree(installation: &Installation, kind: PatchKind) -> io::Result<()> {
+    if kind == PatchKind::Codex {
+        if installation.version != kind.version() {
+            return Err(invalid_state());
+        }
+        return super::codex_source::verify_notification_cache(&installation.path);
+    }
     let metadata = kind.metadata();
     let base = metadata
         .compatible_bases
@@ -675,8 +693,8 @@ pub(super) fn verify_staged_claude_cache(path: &Path) -> io::Result<()> {
 
 pub(super) fn apply(home: &Path, kind: PatchKind, log: &str) -> Result<(), PluginInstallError> {
     invalidate(home, kind);
-    // Windows Codex 只经运行时预检后的完整来源事务，不开放仅修缓存的旁路。
-    if !auto_install_supported() {
+    // Codex 只经运行时预检后的完整来源事务，不开放仅修缓存或新增文件的旁路。
+    if kind == PatchKind::Codex || !auto_install_supported() {
         return Err(unsupported());
     }
     let installation = installed(home, kind)
@@ -749,7 +767,7 @@ fn apply_files(
         let original = fs::read(&path)?;
         let expected = hashes.get(*relative).ok_or_else(invalid_state)?;
         let digest = sha256(&original);
-        if (digest != expected.upstream_sha256
+        if (Some(&digest) != expected.upstream_sha256.as_ref()
             && digest != expected.replacement_sha256
             && !expected.previous_replacement_sha256.contains(&digest))
             || sha256(replacement.as_bytes()) != expected.replacement_sha256

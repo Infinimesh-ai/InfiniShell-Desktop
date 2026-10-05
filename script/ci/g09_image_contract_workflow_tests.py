@@ -12,12 +12,18 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/cross-platform-preflight.yml"
-# 沿用本机工作流审计的 Ruby 标准库 YAML，不要求为此安装 Python 依赖。
-DATA = json.loads(subprocess.check_output([
-    "ruby", "-r", "yaml", "-r", "json", "-e",
-    "puts JSON.generate(YAML.load_file(ARGV[0]))", str(WORKFLOW),
-], text=True))
-TRIGGER = DATA.get("on", DATA.get("true"))
+try:
+    import yaml
+except ModuleNotFoundError:
+    # 保留既有 Ruby 标准库入口，不要求已配 Ruby 的审计环境安装 Python 依赖。
+    DATA = json.loads(subprocess.check_output([
+        "ruby", "-r", "yaml", "-r", "json", "-e",
+        "puts JSON.generate(YAML.load_file(ARGV[0]))", str(WORKFLOW),
+    ], text=True))
+else:
+    # Windows 可复用隔离安装的 PyYAML；只解析数据，不构造任意对象。
+    DATA = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+TRIGGER = DATA.get("on", DATA.get(True, DATA.get("true")))
 INPUTS = TRIGGER["workflow_dispatch"]["inputs"]
 RUN = DATA["jobs"]["validate_scope"]["steps"][0]["run"]
 SCOPE = compile(RUN.split("python3 - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0], "workflow-scope", "exec")
@@ -50,6 +56,61 @@ def enabled(condition, values, event="workflow_dispatch"):
     return bool(eval(expression, {"__builtins__": {}}, {
         "github": SimpleNamespace(event_name=event), "inputs": SimpleNamespace(**values),
     }))
+
+
+class UpstreamEssenceScopeTests(unittest.TestCase):
+    def values(self):
+        return dict(defaults(), windows_atomic_debug_scope="upstream_essence")
+
+    def selected(self, values, event="workflow_dispatch"):
+        return [name for name, job in DATA["jobs"].items()
+                if name != "validate_scope" and enabled(job["if"], values, event)]
+
+    def test_existing_choice_preserves_input_limit_and_only_upstream_route(self):
+        self.assertEqual(len(INPUTS), 25)
+        self.assertNotIn("upstream_essence_only", INPUTS)
+        self.assertIn("upstream_essence", INPUTS["windows_atomic_debug_scope"]["options"])
+        self.assertEqual(DATA["jobs"]["upstream_essence"]["needs"], "validate_scope")
+        for linux, windows in ((True, True), (True, False), (False, True)):
+            with self.subTest(linux=linux, windows=windows):
+                values = dict(self.values(), run_linux=linux, run_windows=windows)
+                self.assertTrue(accepted(values))
+                self.assertEqual(self.selected(values), ["upstream_essence"])
+        self.assertFalse(accepted(dict(self.values(), run_linux=False, run_windows=False)))
+
+    def test_upstream_rejects_each_other_boolean_and_nondefault_choice(self):
+        values = self.values()
+        for name, spec in INPUTS.items():
+            if spec["type"] == "boolean" and name not in {"run_linux", "run_windows", "full_workspace_tests"}:
+                with self.subTest(forbidden=name):
+                    self.assertFalse(accepted(dict(values, **{name: True})))
+            elif spec["type"] == "choice" and name != "windows_atomic_debug_scope":
+                for value in spec["options"]:
+                    if value != spec["default"]:
+                        with self.subTest(forbidden=name, value=value):
+                            self.assertFalse(accepted(dict(values, **{name: value})))
+
+    def test_full_mode_takes_priority_and_default_push_source_routes_survive(self):
+        full = dict(self.values(), full_workspace_tests=True)
+        self.assertTrue(accepted(full))
+        self.assertEqual(self.selected(full), ["linux", "windows"])
+        for values in (defaults(), dict(defaults(), source_gate_only=True)):
+            with self.subTest(values=values):
+                self.assertTrue(accepted(values))
+                self.assertEqual(self.selected(values), ["linux", "windows"])
+        self.assertEqual(self.selected({}, "push"), ["linux", "windows"])
+
+    def test_full_mode_uses_the_default_windows_debug_scope(self):
+        step = next(step for step in DATA["jobs"]["windows"]["steps"]
+                    if step.get("id") == "atomic_windows_debug")
+        expression = step["env"]["ATOMIC_WINDOWS_DEBUG_SCOPE"].removeprefix("${{").removesuffix("}}").strip()
+        expression = expression.replace("&&", " and ").replace("||", " or ")
+        for scope in INPUTS["windows_atomic_debug_scope"]["options"]:
+            with self.subTest(scope=scope):
+                values = dict(defaults(), full_workspace_tests=True, run_atomic_windows_debug=True,
+                              windows_atomic_debug_scope=scope)
+                actual = eval(expression, {"__builtins__": {}}, {"inputs": SimpleNamespace(**values)})
+                self.assertEqual(actual, "all" if scope == "upstream_essence" else scope)
 
 
 class ImageContractScopeTests(unittest.TestCase):

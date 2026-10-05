@@ -120,12 +120,13 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 专项范围；g09_clr_fixture 验证固定 CLR 读取能力，g09_npm_powershell 选择首 PS 快照
+        description: 专项范围；upstream_essence 仅验上游精华，g09_clr_fixture 验固定 CLR，g09_npm_powershell 选择首 PS 快照
         required: true
         default: all
         type: choice
         options:
           - all
+          - upstream_essence
           - stdio
           - nul_token
           - g09_tokens
@@ -187,6 +188,14 @@ jobs:
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("windows_atomic_debug_scope") == "upstream_essence" and not inputs.get("full_workspace_tests", False):
+              allowed = {"run_linux", "run_windows", "windows_atomic_debug_scope"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in allowed and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts:
+                  sys.exit("上游精华验证不能与其他专项混用：" + ", ".join(sorted(conflicts)))
+              if not (inputs.get("run_linux", False) or inputs.get("run_windows", False)):
+                  sys.exit("上游精华验证至少选择 Linux 或 Windows 一个平台")
           if inputs.get("linux_atomic_agent") == "claude_musl":
               required = {"run_linux", "native_acceptance_only", "run_claude_npm_updates"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "all", "windows_atomic_agent": "all"}
@@ -239,12 +248,222 @@ jobs:
               sys.exit("源码门禁至少选择 Linux 或 Windows 一个平台")
           PY
 
+  upstream_essence:
+    name: 上游精华 / ${{ matrix.platform }} x64
+    needs: validate_scope
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.windows_atomic_debug_scope == 'upstream_essence' && !inputs.full_workspace_tests
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.run_linux && inputs.run_windows && '["linux","windows"]' || inputs.run_windows && '["windows"]' || '["linux"]') }}
+    runs-on: [self-hosted, '${{ matrix.platform }}', x64, infinishell-ci]
+    timeout-minutes: 180
+    env:
+      APP_FEATURES: release_bundle,warpui/test-util,rust-embed/debug-embed
+      APP_FILTER: >-
+        test(ai::mcp::) | test(call_mcp_tool::) |
+        test(history_up_does_not_reenter_inline_history_menu_update) |
+        test(editor_down_does_not_reenter_inline_history_menu_update) |
+        test(undo_close::stack::tests::) |
+        test(settings_error_sync_) |
+        test(notebooks::notebook::tests::test_command_block_dispatches_event) |
+        test(context_chips::directory_fetcher::tests::) |
+        test(terminal::input::slash_commands::tests::) |
+        test(aborting_remote_run_command_kills_process_and_clears_in_progress_request) |
+        test(terminal::cli_agent_sessions::plugin_manager::) |
+        test(i18n::tests) | test(app_services::linux::startup_tests::) |
+        test(app_services::windows::startup_tests::)
+    steps:
+      # 全量模式在 job 条件中优先；其余专项冲突直接失败，避免悄悄漏验。
+      - name: 校验精简模式输入
+        shell: bash
+        env:
+          RUN_LINUX: ${{ inputs.run_linux }}
+          RUN_WINDOWS: ${{ inputs.run_windows }}
+          OTHER_SPECIALIZED_MODE: ${{ inputs.run_macos_intel || inputs.native_acceptance_only || inputs.run_gui_clipboard || inputs.linux_gui_only || inputs.windows_grok_installer_only || inputs.run_cli_atomic_updates || inputs.run_claude_npm_updates || inputs.run_codex_npm_updates || inputs.run_windows_codex_npm_updates || inputs.run_grok_npm_updates || inputs.run_atomic_windows_debug }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUN_LINUX" != true && "$RUN_WINDOWS" != true ]]; then
+            echo '::error::精简模式至少选择 run_linux 或 run_windows。'
+            exit 1
+          fi
+          if [[ "$OTHER_SPECIALIZED_MODE" == true ]]; then
+            echo '::error::upstream_essence 不可与其他专项模式同时开启。'
+            exit 1
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 仅设置当前作业环境，复用已部署的 Perl、LLVM 与构建缓存。
+      - name: 配置 Windows 已部署工具链
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $strawberryPerl = 'C:\Strawberry\perl\bin\perl.exe'
+          $libclang = 'C:\Program Files\LLVM\bin'
+          $sccache = 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+          foreach ($required in @($strawberryPerl, (Join-Path $libclang 'libclang.dll'), $sccache)) {
+            if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+              throw "已部署工具链缺失：$required"
+            }
+          }
+          'C:\Strawberry\perl\bin', $libclang | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          @(
+            "OPENSSL_SRC_PERL=$strawberryPerl"
+            "LIBCLANG_PATH=$libclang"
+            'CARGO_TARGET_DIR=C:\infinishell-ci\cargo-target'
+            "RUSTC_WRAPPER=$sccache"
+            'SCCACHE_DIR=C:\infinishell-ci\sccache'
+            'SCCACHE_CACHE_SIZE=80G'
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: 核对测试提交与工具链
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_dir="$RUNNER_TEMP/upstream-essence"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            log_dir="$(cygpath -u "$RUNNER_TEMP")/upstream-essence"
+          fi
+          mkdir -p "$log_dir"
+          echo "UPSTREAM_ESSENCE_LOG_DIR=$log_dir" >> "$GITHUB_ENV"
+          {
+            actual_sha="$(git rev-parse HEAD)"
+            echo "expected_sha=$GITHUB_SHA"
+            echo "actual_sha=$actual_sha"
+            test "$actual_sha" = "$GITHUB_SHA"
+            git --version
+            rustc --version
+            cargo --version
+            cargo nextest --version
+            cmake --version
+            protoc --version
+          } 2>&1 | tee "$log_dir/toolchain.log"
+
+      - name: 检查主应用及启动条件编译
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "cargo check --locked -p warp --features $APP_FEATURES"
+            cargo check --locked -p warp --features "$APP_FEATURES"
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/cargo-check.log"
+
+      - name: 准备 Windows 作业内 Python
+        id: windows_notification_python
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
+
+      - name: 准备 Linux 固定 Python
+        id: linux_notification_python
+        if: ${{ matrix.platform == 'linux' }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        timeout-minutes: 10
+        with:
+          python-version: '3.13.15'
+          architecture: x64
+          check-latest: false
+          update-environment: true
+
+      - name: 验证 Codex 通知安装事务与真实终端传输
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          set -euo pipefail
+          python=python3
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            python=python
+          fi
+          modules=(notification_patch_tests codex_persistent_source_tests codex_windows_hook_tests codex_windows_notify_tests)
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            modules+=(codex_native_windows_notification_tests)
+          else
+            modules+=(codex_detached_notification_tests tmux_notification_tests)
+          fi
+          # 收齐独立用例的失败，不因首项失败掩盖其余平台证据。
+          "$python" -B -c 'import sys, unittest; sys.path.insert(0, "script/cli-agent-parity"); unittest.main(module=None)' \
+            "${modules[@]}" -v 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/codex-notifications.log"
+
+      - name: 采集 Unix 正式 Codex Hook 信任摘要
+        if: ${{ !cancelled() && matrix.platform == 'linux' && steps.linux_notification_python.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          codex_executable="$(python3 -B script/cli-agent-parity/prepare_codex_cli.py --version 0.156.1 --download-dir "$RUNNER_TEMP/codex-notification-inputs")"
+          python3 -B script/cli-agent-parity/probe_codex_hook_trust.py \
+            --codex-version 0.156.1 --codex-executable "$codex_executable" \
+            --output "$UPSTREAM_ESSENCE_LOG_DIR/codex-hook-trust-0.156.1.json"
+
+      - name: 采集 Windows 正式 Codex Hook 信任摘要
+        if: ${{ !cancelled() && matrix.platform == 'windows' && steps.windows_notification_python.outcome == 'success' }}
+        shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($version in @('0.147.0', '0.156.1')) {
+            $codexExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --version $version --download-dir "$env:RUNNER_TEMP\codex-notification-$version"
+            if ($LASTEXITCODE -ne 0) { throw '固定 Codex 准备失败' }
+            python -B script/cli-agent-parity/probe_codex_hook_trust.py --codex-version $version --codex-executable $codexExecutable --output "$env:RUNNER_TEMP\upstream-essence\codex-hook-trust-$version.json"
+            if ($LASTEXITCODE -ne 0) { throw '正式 Hook 信任摘要采集失败' }
+          }
+
+      - name: 测试 MCP、远程请求取消、路径工具与默认补全
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
+
+      - name: 测试 v2 补全路径边界
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp_completer --lib --features v2 -E test(completer::engine::path::tests::)'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp_completer --lib --features v2 -E 'test(completer::engine::path::tests::)'
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/completer-tests.log"
+
+      - name: 测试本轮应用回归与双语资源
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp --lib --features $APP_FEATURES -E '$APP_FILTER'"
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp --lib --features "$APP_FEATURES" -E "$APP_FILTER"
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/app-tests.log"
+
+      - name: 保存上游精华验证日志
+        if: ${{ always() && steps.toolchain.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: upstream-essence-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/upstream-essence/*.log
+            ${{ runner.temp }}/upstream-essence/*.json
+          if-no-files-found: error
+          retention-days: 14
+
   linux:
     name: Linux x64
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_linux)
+      (github.event_name == 'workflow_dispatch' && inputs.run_linux &&
+       (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, linux, x64, infinishell-ci]
     timeout-minutes: 180
     steps:
@@ -1045,7 +1264,7 @@ jobs:
   macos_intel_ssh_extension_build:
     name: macOS Intel SSH extension fallback cross-build
     needs: validate_scope
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel && (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests) }}
     runs-on: macos-26
     timeout-minutes: 360
     outputs:
@@ -1348,7 +1567,9 @@ jobs:
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime')
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows &&
+       inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime' &&
+       (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:
@@ -2071,7 +2292,7 @@ jobs:
         shell: pwsh
         timeout-minutes: 5
         env:
-          ATOMIC_WINDOWS_DEBUG_SCOPE: ${{ inputs.windows_atomic_debug_scope }}
+          ATOMIC_WINDOWS_DEBUG_SCOPE: ${{ inputs.windows_atomic_debug_scope == 'upstream_essence' && 'all' || inputs.windows_atomic_debug_scope }}
         run: |
           switch -CaseSensitive ($env:ATOMIC_WINDOWS_DEBUG_SCOPE) {
             'all' { $atomicDebugFilter = 'test(managed_process::atomic_windows::tests::debug_session_runs_system_only_process_to_native_exit) | test(managed_process::atomic_windows::tests::debug_session_rejects_non_system_dynamic_image_before_continue) | test(managed_process::atomic_windows::tests::package_probe_rejects_unbound_child_and_confirms_cleanup) | test(managed_process::atomic_windows::tests::package_probe_cleans_up_before_initial_debug_event) | test(managed_process::atomic_windows::tests::package_probe_continue_failure_preserves_pending_cleanup) | test(managed_process::atomic_windows::tests::console_binding::)' }

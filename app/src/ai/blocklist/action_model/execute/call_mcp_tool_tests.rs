@@ -1,6 +1,8 @@
 //! Unit tests for the `coerce_integer_args` helper.
 
 use serde_json::json;
+#[cfg(not(target_family = "wasm"))]
+use warpui::App;
 
 use super::*;
 
@@ -317,4 +319,109 @@ fn already_integer_value_is_unchanged() {
 
     assert_eq!(args["x"].as_i64(), Some(5));
     assert_eq!(serde_json::to_string(&args["x"]).unwrap(), "5");
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn transport_failure_after_dispatch_surfaces_localized_unknown_outcome() {
+    App::test((), |app| async move {
+        crate::i18n::init(None);
+        let expected = crate::t!("ai-mcp-tool-outcome-unknown");
+        assert_ne!(expected, "ai-mcp-tool-outcome-unknown");
+
+        let result = app.read(|ctx| {
+            handle_call_tool_result(
+                Err(ToolCallError::OutcomeUnknown(
+                    rmcp::ServiceError::TransportClosed,
+                )),
+                None,
+                "test".to_owned(),
+                ctx,
+            )
+        });
+
+        let AIAgentActionResultType::CallMCPTool(CallMCPToolResult::Error(message)) = result else {
+            panic!("传输失败应返回 MCP 工具错误");
+        };
+        assert_eq!(message, expected);
+        assert_ne!(message, "Transport closed");
+    });
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn protocol_error_preserves_the_confirmed_server_error() {
+    App::test((), |app| async move {
+        let error = rmcp::ServiceError::McpError(rmcp::model::ErrorData::invalid_params(
+            "test protocol error",
+            None,
+        ));
+        let expected = error.to_string();
+
+        let result = app.read(|ctx| {
+            handle_call_tool_result(
+                Err(ToolCallError::Service(error)),
+                None,
+                "test".to_owned(),
+                ctx,
+            )
+        });
+
+        let AIAgentActionResultType::CallMCPTool(CallMCPToolResult::Error(message)) = result else {
+            panic!("协议错误应返回 MCP 工具错误");
+        };
+        assert_eq!(message, expected);
+    });
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn deadline_before_dispatch_does_not_claim_the_tool_may_have_executed() {
+    App::test((), |app| async move {
+        crate::i18n::init(None);
+        let expected = crate::t!("ai-mcp-tool-timeout-before-dispatch", seconds = 1800);
+        assert_ne!(expected, "ai-mcp-tool-timeout-before-dispatch");
+
+        let result = app.read(|ctx| {
+            handle_call_tool_result(
+                Err(ToolCallError::DeadlineExceeded {
+                    may_have_executed: false,
+                }),
+                None,
+                "test".to_owned(),
+                ctx,
+            )
+        });
+
+        let AIAgentActionResultType::CallMCPTool(CallMCPToolResult::Error(message)) = result else {
+            panic!("连接超时应返回 MCP 工具错误");
+        };
+        assert_eq!(message, expected);
+    });
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn deadline_after_dispatch_surfaces_localized_unknown_outcome() {
+    App::test((), |app| async move {
+        crate::i18n::init(None);
+        let expected = crate::t!("ai-mcp-tool-timeout-after-dispatch", seconds = 1800);
+        assert_ne!(expected, "ai-mcp-tool-timeout-after-dispatch");
+
+        let result = app.read(|ctx| {
+            handle_call_tool_result(
+                Err(ToolCallError::DeadlineExceeded {
+                    may_have_executed: true,
+                }),
+                None,
+                "test".to_owned(),
+                ctx,
+            )
+        });
+
+        let AIAgentActionResultType::CallMCPTool(CallMCPToolResult::Error(message)) = result else {
+            panic!("派发后超时应返回 MCP 工具错误");
+        };
+        assert_eq!(message, expected);
+    });
 }

@@ -18,6 +18,7 @@ import tomllib
 
 sys.dont_write_bytecode = True
 from apply_notification_patch import apply_files, bundle_data, default_bundle
+from codex_persistent_source import source_bundle
 from codex_windows_hook_inputs import CODEX_VERSION, PLUGIN_COMMIT, plugin_base, require, verify_plugin
 from prepare_codex_cli import DEFAULT_VERSION, SUPPORTED_VERSIONS, release_contract, require_cli_version
 from probe_codex_plugin_lifecycle import tree_hashes
@@ -554,8 +555,12 @@ def run(executable, directory, report, codex_version):
     cache = Path(installed['installedPath'])
     require(cache.resolve().is_relative_to(home), '缓存越出私有 HOME')
     verify_plugin(cache, plugin_base(repo))
-    apply_files(cache, metadata, replacements)
-    require(tree_hashes(cache) == patched_tree, '缓存补丁初始校验失败')
+    # 缓存覆盖反例固定使用旧 rev6；新版本只允许完整来源迁移。
+    previous = default_bundle() / 'codex/revisions/rev6'
+    previous_metadata = json.loads((previous / 'PATCH_METADATA.json').read_bytes())
+    previous_replacements = {name: (previous / name).read_bytes() for name in previous_metadata['files']}
+    apply_files(cache, previous_metadata, previous_replacements)
+    require(tree_hashes(cache) == expected_patch_tree(previous_metadata), '旧缓存补丁初始校验失败')
     report['cache_only_before_restart'] = {'tree': tree_hashes(cache), 'config': configuration(home)}
     require(configuration(home)['marketplaces']['codex-warp'].get('last_revision') is None,
             '原生首次 add 的配置与已知触发前提不符')
@@ -578,14 +583,10 @@ def run(executable, directory, report, codex_version):
                    disable_id='orchestration@codex-warp')
 
     # 保留完整固定 marketplace 的全部插件；不能只留下 warp 而破坏同来源的 orchestration。
-    owned_source = directory / f'owned-source/codex-{codex_version}-rev3/codex-warp'
-    owned_source.mkdir(parents=True)
-    for name in complete_source:
-        target = owned_source / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(git_source / name, target)
-    require(tree_hashes(owned_source) == complete_source, '完整本地来源复制不一致')
-    apply_files(owned_source / 'plugins/warp', metadata, replacements)
+    owned_source = directory / f'owned-source/codex-{codex_version}-rev7/codex-warp'
+    _, _, expected_source = source_bundle(default_bundle())
+    shutil.copytree(default_bundle() / 'codex/source', owned_source)
+    require(tree_hashes(owned_source) == expected_source, '完整本地来源复制不一致')
     owned_tree = tree_hashes(owned_source)
     require({name: digest for name, digest in owned_tree.items() if not name.startswith('plugins/warp/')} ==
             {name: digest for name, digest in complete_source.items() if not name.startswith('plugins/warp/')},

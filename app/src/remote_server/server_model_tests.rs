@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use warp_util::standardized_path::StandardizedPath;
-use warpui::App;
+use warpui::{App, ModelHandle};
 
 use super::super::diff_state_tracker::RemoteDiffStateManager;
 use super::super::proto::{
@@ -24,7 +24,7 @@ use super::{ConnectionId, PendingFileOps, ServerModel};
 use crate::code_review::diff_state::DiffMode;
 use crate::remote_server::diff_state_tracker::DiffModelKey;
 
-fn test_model(app: &mut App) -> ServerModel {
+fn test_model_with_diff_states(diff_states: ModelHandle<RemoteDiffStateManager>) -> ServerModel {
     ServerModel {
         connection_senders: HashMap::new(),
         #[cfg(all(unix, feature = "local_fs"))]
@@ -84,13 +84,26 @@ fn test_model(app: &mut App) -> ServerModel {
         auth_token: None,
         #[cfg(feature = "local_fs")]
         buffers: ServerBufferTracker::new(),
-        diff_states: app.add_model(|_| RemoteDiffStateManager::new()),
+        diff_states,
         host_scoped_requests: HashMap::new(),
         git_status_models: HashMap::new(),
         github_repo_models: HashMap::new(),
         git_status_subscribers: HashMap::new(),
         git_status_repo_by_conn: HashMap::new(),
     }
+}
+
+fn test_model(app: &mut App) -> ServerModel {
+    let diff_states = app.add_model(|_| RemoteDiffStateManager::new());
+    test_model_with_diff_states(diff_states)
+}
+
+#[cfg(unix)]
+fn test_model_handle(app: &mut App) -> ModelHandle<ServerModel> {
+    app.add_model(|ctx| {
+        let diff_states = ctx.add_model(|_| RemoteDiffStateManager::new());
+        test_model_with_diff_states(diff_states)
+    })
 }
 
 /// Zap:`Initialize` 只用 `auth_token` 一个字段(没有账号体系,身份/崩溃
@@ -679,3 +692,7 @@ fn create_directory_creates_nested_directories() {
         assert!(nested.is_dir());
     });
 }
+
+#[cfg(unix)]
+#[path = "server_model_unix_tests.rs"]
+mod unix;

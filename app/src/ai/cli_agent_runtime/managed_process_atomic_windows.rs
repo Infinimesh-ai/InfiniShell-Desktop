@@ -940,6 +940,8 @@ impl WindowsImageDebugSession {
             }
         };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_received(&event);
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             let exit_code = (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
                 .then(|| unsafe { event.u.ExitProcess.dwExitCode });
@@ -997,10 +999,6 @@ impl WindowsImageDebugSession {
         }
         result.map(|_| ())?;
         self.pending_event = None;
-        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-        if code == EXIT_THREAD_DEBUG_EVENT {
-            self.native_clr_thread_exited(process_id, thread_id);
-        }
         // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
         if code == EXIT_PROCESS_DEBUG_EVENT {
             self.processes.remove(&process_id);
@@ -1056,6 +1054,8 @@ impl WindowsImageDebugSession {
                 }
             }
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_continued(process_id, thread_id, code)?;
         Ok(())
     }
 
@@ -1276,12 +1276,7 @@ impl WindowsImageDebugSession {
                     }
                 }
                 #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-                self.native_witness_module(
-                    event.dwProcessId,
-                    &file,
-                    information.lpBaseOfDll as u64,
-                    true,
-                )?;
+                self.native_witness_load(event, &file)?;
                 Ok(DBG_CONTINUE)
             }
             RIP_EVENT => Err(error("managed_process.atomic_windows_loader_rip_event")),

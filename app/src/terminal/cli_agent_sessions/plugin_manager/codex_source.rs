@@ -29,6 +29,9 @@ const REV4_METADATA: &str = include_str!(
 const REV5_METADATA: &str = include_str!(
     "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev5/SOURCE_METADATA.json"
 );
+const REV6_METADATA: &str = include_str!(
+    "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev6/SOURCE_METADATA.json"
+);
 
 #[derive(Deserialize)]
 struct SourceMetadata {
@@ -39,7 +42,7 @@ struct SourceMetadata {
 
 #[derive(Deserialize)]
 struct SourceFile {
-    upstream_sha256: String,
+    upstream_sha256: Option<String>,
     sha256: String,
     mode: u32,
 }
@@ -54,6 +57,9 @@ static REV4_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
 });
 static REV5_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
     serde_json::from_str(REV5_METADATA).expect("随附 Codex rev5 完整来源元数据必须有效")
+});
+static REV6_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
+    serde_json::from_str(REV6_METADATA).expect("随附 Codex rev6 完整来源元数据必须有效")
 });
 static CURRENT: LazyLock<Mutex<BTreeMap<PathBuf, (Instant, bool)>>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
@@ -129,9 +135,16 @@ fn tree(root: &Path, git_snapshot: bool) -> io::Result<BTreeMap<String, String>>
             let relative = path
                 .strip_prefix(root)
                 .map_err(|_| invalid())?
-                .to_str()
-                .ok_or_else(invalid)?
-                .replace('\\', "/");
+                .components()
+                .map(|component| match component {
+                    Component::Normal(name) => name.to_str().ok_or_else(invalid),
+                    Component::Prefix(_)
+                    | Component::RootDir
+                    | Component::CurDir
+                    | Component::ParentDir => Err(invalid()),
+                })
+                .collect::<io::Result<Vec<_>>>()?
+                .join("/");
             if entry.file_type()?.is_symlink() {
                 return Err(invalid());
             }
@@ -187,16 +200,13 @@ fn revision_tree(
         .files
         .iter()
         .filter_map(|(name, file)| {
-            name.strip_prefix(prefix).map(|name| {
-                (
-                    name.to_owned(),
-                    if upstream {
-                        file.upstream_sha256.clone()
-                    } else {
-                        file.sha256.clone()
-                    },
-                )
-            })
+            let relative = name.strip_prefix(prefix)?;
+            let hash = if upstream {
+                file.upstream_sha256.as_ref()?
+            } else {
+                &file.sha256
+            };
+            Some((relative.to_owned(), hash.clone()))
         })
         .collect()
 }
@@ -223,10 +233,22 @@ fn verify_modes(root: &Path, prefix: &str) -> io::Result<()> {
 }
 
 fn verify_revision_modes(root: &Path, prefix: &str, revision: &SourceMetadata) -> io::Result<()> {
+    verify_revision_modes_for(root, prefix, revision, false)
+}
+
+fn verify_revision_modes_for(
+    root: &Path,
+    prefix: &str,
+    revision: &SourceMetadata,
+    upstream: bool,
+) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
         for (name, expected) in &revision.files {
+            if upstream && expected.upstream_sha256.is_none() {
+                continue;
+            }
             if let Some(relative) = name.strip_prefix(prefix)
                 && fs::metadata(relative_file(root, relative)?)?
                     .permissions()
@@ -239,21 +261,38 @@ fn verify_revision_modes(root: &Path, prefix: &str, revision: &SourceMetadata) -
         }
     }
     #[cfg(not(unix))]
-    let _ = (root, prefix, revision);
+    let _ = (root, prefix, revision, upstream);
     Ok(())
 }
 
-/// 只接收 rev3/rev4/rev5 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
+/// 原始来源不包含本地新增文件；当前配方必须包含全部新增文件，拒绝混合树。
+pub(super) fn verify_notification_cache(root: &Path) -> io::Result<()> {
+    let actual = tree(root, false)?;
+    if actual == expected_tree("plugins/warp/", false) {
+        verify_modes(root, "plugins/warp/")
+    } else if actual == expected_tree("plugins/warp/", true) {
+        verify_revision_modes_for(root, "plugins/warp/", &BUNDLE, true)
+    } else {
+        Err(invalid())
+    }
+}
+
+/// 只接收 rev3–rev6 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
 pub(super) fn is_previous_notification_cache(root: &Path) -> bool {
     let Ok(actual) = tree(root, false) else {
         return false;
     };
-    [&*REV5_BUNDLE, &*REV4_BUNDLE, &*PREVIOUS_BUNDLE]
-        .into_iter()
-        .any(|revision| {
-            actual == revision_tree(revision, "plugins/warp/", false)
-                && verify_revision_modes(root, "plugins/warp/", revision).is_ok()
-        })
+    [
+        &*REV6_BUNDLE,
+        &*REV5_BUNDLE,
+        &*REV4_BUNDLE,
+        &*PREVIOUS_BUNDLE,
+    ]
+    .into_iter()
+    .any(|revision| {
+        actual == revision_tree(revision, "plugins/warp/", false)
+            && verify_revision_modes(root, "plugins/warp/", revision).is_ok()
+    })
 }
 
 fn validate_config_shape(document: &DocumentMut) -> io::Result<()> {
@@ -356,6 +395,9 @@ pub(super) fn has_custom_source(home: &Path) -> bool {
             }
             Some(_) if owned_revision_entry(&document, home, &REV5_BUNDLE) => {
                 verify_revision(home, &REV5_BUNDLE, REV5_METADATA).is_err()
+            }
+            Some(_) if owned_revision_entry(&document, home, &REV6_BUNDLE) => {
+                verify_revision(home, &REV6_BUNDLE, REV6_METADATA).is_err()
             }
             Some(_) => !owned_entry(&document, home) || !is_current(home),
         },
@@ -482,7 +524,7 @@ fn validate_existing(home: &Path, document: &DocumentMut) -> io::Result<()> {
                 if tree(&original, true)? != expected_tree("", true) {
                     return Err(invalid());
                 }
-                verify_modes(&original, "")?;
+                verify_revision_modes_for(&original, "", &BUNDLE, true)?;
             }
         }
         Some(_) if owned_entry(document, home) => verify_owned(home)?,
@@ -494,6 +536,9 @@ fn validate_existing(home: &Path, document: &DocumentMut) -> io::Result<()> {
         }
         Some(_) if owned_revision_entry(document, home, &REV5_BUNDLE) => {
             verify_revision(home, &REV5_BUNDLE, REV5_METADATA)?;
+        }
+        Some(_) if owned_revision_entry(document, home, &REV6_BUNDLE) => {
+            verify_revision(home, &REV6_BUNDLE, REV6_METADATA)?;
         }
         Some(_) => return Err(invalid()),
     }
@@ -974,14 +1019,71 @@ fn snapshot_if_present(path: &Path) -> io::Result<Option<BTreeMap<String, String
 }
 
 fn verify_installed_cache(root: &Path, name: &str) -> io::Result<()> {
-    let expected = expected_tree(&format!("plugins/{name}/"), false)
+    verify_installed_revision_cache(root, name, &BUNDLE)
+}
+
+fn verify_installed_revision_cache(
+    root: &Path,
+    name: &str,
+    revision: &SourceMetadata,
+) -> io::Result<()> {
+    let expected = revision_tree(revision, &format!("plugins/{name}/"), false)
         .into_iter()
         .map(|(path, sha)| (format!("0.4.0/{path}"), sha))
         .collect();
     if tree(root, false)? != expected {
         return Err(invalid());
     }
-    verify_modes(&root.join("0.4.0"), &format!("plugins/{name}/"))
+    verify_revision_modes(&root.join("0.4.0"), &format!("plugins/{name}/"), revision)
+}
+
+fn is_completed_manual_archive(state: &serde_json::Value) -> bool {
+    let keys = [
+        "plugin",
+        "phase",
+        "old_config_sha256",
+        "installed_config_sha256",
+        "original_cache",
+        "installed_cache",
+    ];
+    let valid_sha = |sha: &str| {
+        sha.len() == 64
+            && sha
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    let valid_cache = |cache: &serde_json::Value| {
+        cache.as_object().is_some_and(|files| {
+            !files.is_empty()
+                && files.len() <= 128
+                && files.iter().all(|(path, value)| {
+                    path.starts_with("0.4.0/")
+                        && path.split('/').all(|part| {
+                            !matches!(part, "" | "." | "..") && !part.contains(['\\', ':', '\0'])
+                        })
+                        && value.as_str().is_some_and(|fingerprint| {
+                            fingerprint.split_once(':').is_some_and(|(sha, mode)| {
+                                // Python 使用十进制 S_IMODE；不能按 Rust 快照的八进制解析。
+                                valid_sha(sha)
+                                    && mode.parse::<u32>().is_ok_and(|bits| {
+                                        bits <= 0o7777 && bits.to_string() == mode
+                                    })
+                            })
+                        })
+                })
+        })
+    };
+    state.as_object().is_some_and(|object| {
+        object.len() == keys.len() && keys.iter().all(|key| object.contains_key(*key))
+    }) && state["plugin"].as_str() == Some("warp@codex-warp")
+        && matches!(state["phase"].as_str(), Some("verified" | "rolled_back"))
+        && (state["old_config_sha256"].is_null()
+            || state["old_config_sha256"].as_str().is_some_and(valid_sha))
+        && state["installed_config_sha256"]
+            .as_str()
+            .is_some_and(valid_sha)
+        && (state["original_cache"].is_null() || valid_cache(&state["original_cache"]))
+        && valid_cache(&state["installed_cache"])
 }
 
 fn recover_transactions(home: &Path) -> io::Result<()> {
@@ -1005,6 +1107,10 @@ fn recover_transactions(home: &Path) -> io::Result<()> {
         let bytes = fs::read(relative_file(&transaction, "state.json")?)?;
         let state: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
         if state.get("version").is_none() {
+            if is_completed_manual_archive(&state) {
+                // 手动迁移的已完成归档只保留，不用配置摘要猜测恢复或覆盖用户后续修改。
+                continue;
+            }
             let keys = [
                 "phase",
                 "plugin",
@@ -1051,6 +1157,24 @@ fn recover_transaction(
     transaction: &Path,
     journal: &InstallJournal,
 ) -> io::Result<()> {
+    // 应用升级后仍按 journal 固定的旧配方恢复，绝不把 rev6 的半成品当 rev7。
+    let (revision, metadata) = [
+        (&*BUNDLE, METADATA),
+        (&*REV6_BUNDLE, REV6_METADATA),
+        (&*REV5_BUNDLE, REV5_METADATA),
+        (&*REV4_BUNDLE, REV4_METADATA),
+        (&*PREVIOUS_BUNDLE, PREVIOUS_METADATA),
+    ]
+    .into_iter()
+    .find(|(revision, metadata)| {
+        journal.source
+            == home
+                .join("plugins/infinishell-sources")
+                .join(&revision.directory)
+                .join("source")
+            && journal.source_metadata_sha256 == digest(metadata.as_bytes())
+    })
+    .ok_or_else(invalid)?;
     if journal.version != 1
         || !matches!(
             journal.plugin.as_str(),
@@ -1060,8 +1184,6 @@ fn recover_transaction(
             journal.phase.as_str(),
             "prepared" | "cache_written" | "configuration_written" | "needs_review"
         )
-        || journal.source != source_path(home)
-        || journal.source_metadata_sha256 != digest(METADATA.as_bytes())
         || journal.staged_cache.as_os_str().is_empty()
         || journal
             .staged_cache
@@ -1070,7 +1192,7 @@ fn recover_transaction(
     {
         return Err(invalid());
     }
-    verify_owned(home)?;
+    verify_revision(home, revision, metadata)?;
     let key = journal.plugin.clone();
     let name = key.strip_suffix("@codex-warp").ok_or_else(invalid)?;
     let original = journal_scope(&journal.original_scope, &key)?;
@@ -1079,7 +1201,7 @@ fn recover_transaction(
         .installed_scope
         .parse::<DocumentMut>()
         .map_err(|_| invalid())?;
-    if !owned_entry(&installed_document, home)
+    if !owned_revision_entry(&installed_document, home, revision)
         || installed.enabled.as_bool() != Some(true)
         || installed.marketplace.as_table_like().is_none_or(|entry| {
             entry
@@ -1110,7 +1232,7 @@ fn recover_transaction(
         if backup_tree != journal.original_cache {
             return Err(invalid());
         }
-        verify_installed_cache(&target, name)?;
+        verify_installed_revision_cache(&target, name, revision)?;
         return record_phase(transaction, "verified");
     }
     if !original.matches(&current) || current.enabled.as_bool() == Some(false) {
@@ -1133,7 +1255,7 @@ fn recover_transaction(
         if backup_tree != journal.original_cache {
             return Err(invalid());
         }
-        verify_installed_cache(&target, name)?;
+        verify_installed_revision_cache(&target, name, revision)?;
     } else {
         if staged_tree.as_ref() != Some(&journal.installed_cache)
             || (target_tree.is_some()
@@ -1142,7 +1264,7 @@ fn recover_transaction(
         {
             return Err(invalid());
         }
-        verify_installed_cache(&staged, name)?;
+        verify_installed_revision_cache(&staged, name, revision)?;
         let parent = target.parent().ok_or_else(invalid)?;
         fs::create_dir_all(parent)?;
         if target_tree.is_some() {
@@ -1391,6 +1513,18 @@ static FILES: &[(&str, &[u8])] = &[
         "plugins/warp/scripts/warp-notify.sh",
         include_bytes!(
             "../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/warp-notify.sh"
+        ),
+    ),
+    (
+        "plugins/warp/scripts/on-notification.ps1",
+        include_bytes!(
+            "../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-notification.ps1"
+        ),
+    ),
+    (
+        "plugins/warp/scripts/warp-notify.ps1",
+        include_bytes!(
+            "../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/warp-notify.ps1"
         ),
     ),
     (

@@ -24,7 +24,7 @@ MACOS_CLI_VERSIONS = {
 }
 FILES = {
     "claude": ("scripts/build-payload.sh", "scripts/on-session-start.sh", "scripts/on-stop.sh", "scripts/should-use-structured.sh", "hooks/hooks.json", "scripts/warp-notify.sh"),
-    "codex": ("scripts/build-payload.sh", "scripts/on-stop.sh", "hooks/hooks.json", "scripts/warp-notify.sh", "scripts/on-prompt-submit.sh"),
+    "codex": ("scripts/build-payload.sh", "scripts/on-stop.sh", "hooks/hooks.json", "scripts/warp-notify.sh", "scripts/on-prompt-submit.sh", "scripts/on-notification.ps1", "scripts/warp-notify.ps1"),
 }
 
 
@@ -109,6 +109,14 @@ def validate_tree(root, version, metadata):
     if base is None:
         raise ValueError("插件版本未经验证")
     expected = base["tree_sha256"]
+    if metadata.get("upstream_repository") == "https://github.com/warpdotdev/codex-warp":
+        # Codex 新增脚本只随完整来源发布，必须精确匹配原始树或当前整树。
+        from codex_persistent_source import tree
+        current = dict(expected)
+        current.update({name: entry["replacement_sha256"] for name, entry in metadata["files"].items()})
+        if tree(root) not in (expected, current):
+            raise ValueError("Codex 插件不是完整固定配方，拒绝缺失、新旧混合或自定义文件")
+        return
     observed = set()
     for directory, directories, files in os.walk(root, followlinks=False):
         for name in directories:
@@ -148,6 +156,9 @@ def atomic_write(path, contents, mode, *, staging_dir=None):
 
 
 def apply_files(root, metadata, replacements, *, staging_parent=None):
+    # 新增文件仅通过 Codex 整树来源事务安装；不能在活动缓存中逐文件拼接。
+    if any(entry["upstream_sha256"] is None for entry in metadata["files"].values()):
+        raise ValueError("包含新增文件的 Codex 配方必须使用完整来源事务")
     originals = []
     for name, contents in replacements.items():
         path = checked_file(root, name)

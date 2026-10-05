@@ -270,6 +270,13 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
             snapshot: None,
             root_thread: None,
             clr: None,
+            classification: None,
+            expected_node: None,
+            node_create: None,
+            classification_entry: None,
+            classification_return: None,
+            pending_event: None,
+            continuation_failed: false,
             expected_temp_environment: [vec![], vec![], vec![]],
             early_root_cpu: None,
             late_snapshot: None,
@@ -279,6 +286,87 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
         }),
         loader_trace: None,
     }
+}
+
+#[test]
+fn classification_requires_one_original_node_lease() {
+    assert!(classification_node_path(&[]).is_err());
+    let (_directory, file) = module_file(&module_bytes());
+    let mut lease =
+        lease_mapped_image(&file, &final_path_from_handle(&file).unwrap(), true, true).unwrap();
+    lease.npm_role = NpmProcessRole::Node;
+    let duplicate = lease.try_clone().unwrap();
+    assert!(classification_node_path(&[(false, lease), (false, duplicate)]).is_err());
+}
+
+#[test]
+fn classification_preserves_the_lease_path_utf16_spelling() {
+    let (directory, file) = module_file(&module_bytes());
+    let mut lease =
+        lease_mapped_image(&file, &final_path_from_handle(&file).unwrap(), true, true).unwrap();
+    lease.npm_role = NpmProcessRole::Node;
+    let expected: Vec<_> = directory
+        .path()
+        .join("module.dll")
+        .as_os_str()
+        .encode_wide()
+        .collect();
+    assert_eq!(
+        classification_node_path(&[(false, lease)]).unwrap(),
+        expected
+    );
+}
+
+#[test]
+fn witness_continuation_rejects_a_different_original_event() {
+    let (_directory, file) = module_file(&module_bytes());
+    let mut session = witness_session(&file, WitnessMode::PowerShell);
+    let event = DEBUG_EVENT {
+        dwDebugEventCode: EXIT_THREAD_DEBUG_EVENT,
+        dwProcessId: 1,
+        dwThreadId: 2,
+        ..Default::default()
+    };
+    session.native_witness_received(&event);
+    assert!(
+        session
+            .native_witness_continued(1, 3, EXIT_THREAD_DEBUG_EVENT)
+            .is_err()
+    );
+}
+
+#[test]
+fn witness_cleanup_drains_but_cannot_pass_after_invalid_continuation() {
+    let (_directory, file) = module_file(&module_bytes());
+    let mut session = witness_session(&file, WitnessMode::PowerShell);
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .begin_cleanup(false);
+    let event = DEBUG_EVENT {
+        dwDebugEventCode: EXIT_THREAD_DEBUG_EVENT,
+        dwProcessId: 1,
+        dwThreadId: 2,
+        ..Default::default()
+    };
+    session.native_witness_received(&event);
+    session
+        .native_witness_continued(1, 3, EXIT_THREAD_DEBUG_EVENT)
+        .unwrap();
+    session.root_exit_observed = true;
+    assert!(session.native_witness_confirm_exit().is_err());
+    assert!(!session.native_witness.as_ref().unwrap().exit_confirmed);
+}
+
+#[test]
+fn classification_error_evidence_does_not_include_arbitrary_error_text() {
+    let evidence = classification_failure(
+        "classification_thread",
+        &io::Error::other("C:\\private\\input-token"),
+    );
+    assert!(evidence["register_readback"].is_null());
+    assert!(!evidence.to_string().contains("input-token"));
 }
 
 #[test]

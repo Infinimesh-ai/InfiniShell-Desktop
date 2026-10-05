@@ -1,6 +1,58 @@
 use super::*;
 
 #[test]
+fn expands_unix_session_home_only_for_home_prefixes() {
+    assert_eq!(
+        expand_session_home("~", Some("/srv/remote user"), &['/']),
+        TypedPathBuf::from_unix("/srv/remote user")
+    );
+    assert_eq!(
+        expand_session_home("~/project/file name.txt", Some("/srv/remote user"), &['/']),
+        TypedPathBuf::from_unix("/srv/remote user/project/file name.txt")
+    );
+    assert_eq!(
+        expand_session_home("~other/project", Some("/srv/remote user"), &['/']),
+        TypedPathBuf::from_unix("~other/project")
+    );
+    assert_eq!(
+        expand_session_home(r"~\project", Some("/srv/remote user"), &['/']),
+        TypedPathBuf::from_unix(r"~\project")
+    );
+}
+
+#[test]
+fn leaves_paths_without_session_home_unchanged() {
+    assert_eq!(
+        expand_session_home("~", None, &['/']),
+        TypedPathBuf::from_unix("~")
+    );
+    assert_eq!(
+        expand_session_home("~/project", None, &['/']),
+        TypedPathBuf::from_unix("~/project")
+    );
+    assert_eq!(
+        expand_session_home("/tmp/project", Some("/home/me"), &['/']),
+        TypedPathBuf::from_unix("/tmp/project")
+    );
+}
+
+#[test]
+fn expands_windows_session_home_with_windows_separators() {
+    assert_eq!(
+        expand_session_home(
+            r"~\Desktop\file name.txt",
+            Some(r"C:\Users\user name"),
+            &['/', '\\']
+        ),
+        TypedPathBuf::from_windows(r"C:\Users\user name\Desktop\file name.txt")
+    );
+    assert_eq!(
+        expand_session_home("~/Desktop", Some(r"C:\Users\user name"), &['/', '\\']),
+        TypedPathBuf::from_windows(r"C:\Users\user name/Desktop")
+    );
+}
+
+#[test]
 fn test_user_friendly_path_with_home() {
     let home = "/Users/blue";
     assert_eq!(

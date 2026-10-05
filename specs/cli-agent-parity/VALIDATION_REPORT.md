@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-06：接入首 PS 分类停点并整合 main
+
+固定能力在本机及原runner均通过后，PS opt-in路径复用相同 `ShellClassificationWitness` 与 `ClrReader`，只接收唯一Node租约已核原CREATE之后的一次分类返回。Shell32绑定原LOAD文件句柄与授权拒写租约；generation、进程/线程birth及事件顺序贯通至operation3。在原停点恢复所有自有DR后读取CLR栈，reader与精确Job退出后才Continue；旧26异常采集不再调用。无命中保留unknown，不从静态代码或分类结果直接推断候选成功。
+
+独审发现并修复了Continue已成功后钩子失败跳过退出记账/排空的问题：先完成状态提交，线程暂未signaled时保留原句柄，清理期其他错误留存且继续排空，最终失败仍失败；原进程和所有原线程都需确认退出。五文件静态独审SHA `a141425c328f89f5d8de2ca50ef9bf0e7b5428bdf6de576640b722fadcba0e45`，不是实际PS运行证据。
+
+整合main `d155f1daf9a848f317d9a24a6b96641c995bd4e6`，保留Codex rev7与上游精华代码，以及分支完整性测试。冲突工作流保留G09前置隔离和上游精华job；受25输入上限约束，上游精华范围改用 `windows_atomic_debug_scope=upstream_essence`，全量仍优先。23范围合同、actionlint通过（按既有文档声明自托管标签；未执行未安装的shellcheck/pyflakes）。PowerShell固定来源统一LF检出，初次CRLF检出导致的Python来源失败日志保留，恢复索引原字节后15项通过、1项跳过。
+
+默认warp check、合并后的48项i18n/Codex来源回归、诊断feature含测试目标check及28离线来源项通过；feature定向31项全部通过。真实PS尚未执行，首因unknown，G09开放、PR草稿，新增关闭0项。无需本地化变更：本次接入仅内部诊断，没有GUI/TUI文案或布局变化。
+
 ## 2026-10-06：Windows 本机固定能力通过，真实 PS 首因仍开放
+
+后续原runner运行 [37344743491](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37344743491) 已按精确提交 `e4e690dd7e9e6986237d5f9c43d6107dc84f62f7` 通过55普通项及唯一native。独审SHA `5c4c331f2fd700d77d669c3dee60bb7d47e6de4c9ad845244b39ae1795e7fef5`：runner22 / WIN-E000APDGSNS，实际CLR/DAC与原失败字节完全一致，9个reader输入及5份准备来源与Git检出字节吻合。168事件全Continue；Node CREATE72、entry151、return153绑定同一worker，返回0x4550，caller IL160，首stub原E_FAIL/空IL及四异常链保留，DR、reader、root与全部后代回收完整。固定夹具本轮没有保存SMA身份，不能冒称已复核实际PowerShell模块；真实PS首因仍unknown，新增关闭0项。
 
 从 `28d0922519b02b0690626edc148638c0150cda1c` 继续，已核分支、HEAD、origin与草稿PR。原runner运行 [37340942346](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37340942346) 的45普通项通过，唯一native因DR写入读回失败，原件保留；没有真实分类或CLR读取。原PS失败工件及26组CLR/DAC身份重新核验，原CLR/DAC为4.8.9310.0，本机为4.8.9345.0，不能跨机器代证首因。
 
@@ -8,9 +20,9 @@
 
 a5读到真实返回0x4550、caller IL160，首帧nil MethodDef映射E_FAIL使结果partial。a7通过同一MethodInstance的完整名称确认Framework的DomainBound PInvoke桩，仍保留partial原件。新合同显式保留这个运行时首帧与原E_FAIL/空IL；未知、截断、非首帧、伪造IL以及其他metadata映射错误均拒绝，caller不能由stub或祖先替代。
 
-a8的55普通项（含原45项与10个反例）、唯一原生夹具、28离线来源测试及 `cargo check --locked -p warp` 通过。四异常链、真实返回、同停点完整栈、精确caller IL160、寄存器恢复和进程回收均通过。fixture安全收据SHA `e90222ed7d9627a788a2fafe711e76b8437978938b4dbead7deb518d23ca6797`，reader构建收据SHA `c03f17b72586526795990822bce7d6ec630226695af8ac2410440a097dcd7365`。a1–a8完整原件及源码保留于仓外 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`，未宣称证据目录可清理。
+a8的55普通项（含原45项与10项新增边界用例）、唯一原生夹具、28离线来源测试及 `cargo check --locked -p warp` 通过。四异常链、真实返回、同停点完整栈、精确caller IL160、寄存器恢复和进程回收均通过。fixture安全收据SHA `e90222ed7d9627a788a2fafe711e76b8437978938b4dbead7deb518d23ca6797`，reader构建收据SHA `c03f17b72586526795990822bce7d6ec630226695af8ac2410440a097dcd7365`。a1–a8完整原件及源码保留于仓外 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`，未宣称证据目录可清理。
 
-原runner的新固定能力复核、真实PS分类与同停点栈、正常witness=false五场景和三次独立冷恢复、最终同源Linux/Windows门禁仍待完成。新增关闭0项，G09开放，PR草稿。无需本地化变更：仅内部诊断和夹具，无GUI/TUI文案、语义或布局变化。
+原runner的新固定能力复核已通过；真实PS分类与同停点栈、正常witness=false五场景和三次独立冷恢复、最终同源Linux/Windows门禁仍待完成。新增关闭0项，G09开放，PR草稿。无需本地化变更：仅内部诊断和夹具，无GUI/TUI文案、语义或布局变化。
 
 ## 2026-10-06：区分调试后代与固定分类目标
 

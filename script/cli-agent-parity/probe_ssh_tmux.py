@@ -18,6 +18,7 @@ import tempfile
 import time
 
 from apply_notification_patch import apply_files, bundle_data, default_bundle, validate_tree
+from codex_persistent_source import materialize_plugin_fixture
 
 
 REMOTE = r'''
@@ -115,10 +116,13 @@ def execute(args, root, socket_directory):
     plugins = {}
     for agent, source, version in (("codex", args.codex_plugin, "0.4.0"), ("claude", args.claude_plugin, "2.2.0")):
         plugin = home / (agent + " 插件")
-        shutil.copytree(source, plugin)
-        metadata, replacements = bundle_data(default_bundle(), agent)
-        validate_tree(plugin, version, metadata)
-        apply_files(plugin, metadata, replacements)
+        if agent == "codex":
+            materialize_plugin_fixture(default_bundle(), plugin)
+        else:
+            shutil.copytree(source, plugin)
+            metadata, replacements = bundle_data(default_bundle(), agent)
+            validate_tree(plugin, version, metadata)
+            apply_files(plugin, metadata, replacements)
         plugins[agent] = str(plugin)
     grok = home / "grok 插件"
     shutil.copytree(default_bundle() / "grok", grok)
