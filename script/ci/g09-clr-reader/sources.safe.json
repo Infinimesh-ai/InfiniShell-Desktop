@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "upstream": "https://github.com/dotnet/runtime",
+  "tag": "v8.0.0",
+  "commit": "5535e31a712343a63f5d7d796cd874e563e5ac14",
+  "purpose": "仅使用官方生成的 COM ABI 头；运行时必须加载目标 Framework CLR 的实际配套 DAC，绝不加载 .NET 8 DAC 代替。",
+  "files": [
+    {
+      "path": "vendor/clrdata.h",
+      "upstream_path": "src/coreclr/pal/prebuilt/inc/clrdata.h",
+      "url": "https://raw.githubusercontent.com/dotnet/runtime/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/pal/prebuilt/inc/clrdata.h",
+      "bytes": 45641,
+      "sha256": "66ef8f73507485e20c299a4e2b4f553ed3e5a523a4949330b026ec90e3878f69"
+    },
+    {
+      "path": "vendor/xclrdata.h",
+      "upstream_path": "src/coreclr/pal/prebuilt/inc/xclrdata.h",
+      "url": "https://raw.githubusercontent.com/dotnet/runtime/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/pal/prebuilt/inc/xclrdata.h",
+      "bytes": 289218,
+      "sha256": "a3729f85c323adb1996c1cfbd6a32bb7c0d6429a50fe45c394ef0ece7d599984"
+    },
+    {
+      "path": "vendor/LICENSE.TXT",
+      "upstream_path": "LICENSE.TXT",
+      "url": "https://raw.githubusercontent.com/dotnet/runtime/5535e31a712343a63f5d7d796cd874e563e5ac14/LICENSE.TXT",
+      "bytes": 1116,
+      "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
+    }
+  ]
+}

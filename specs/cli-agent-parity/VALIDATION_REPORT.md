@@ -1,6 +1,22 @@
 # CLI 支持与能力对齐：验证结论
 
-## 2026-10-05：Mac 显式空 ACL 漏读修复，真实事务待验
+## 2026-10-05：Windows 固定 CLR 原生读取夹具准备，尚未执行
+
+以 `74ddcaa42` 为基线，仅新增内部固定 Framework 4.8 夹具、只读 DAC reader 和独立工作流范围。原调试停点的进程／线程句柄、出生身份、CLR/DAC 原文件及版本绑定后，读取当前异常链、Win32 原码和有界方法帧；固定 C# 工作线程的三层异常必须与实际 MVID／MethodDef／IL 逐项对账。reader 已退出且精确 Job 为空后才能继续原事件，失败保留首因和 pending；不改变真实候选的期限、命令或安装权限。
+
+本机 Windows 目标 `cargo check --locked -p command --tests --target x86_64-pc-windows-msvc` 通过（`r-38o8h37r`，日志SHA `61d36e0c85e23e92031f30e6d27398078c8f22cc3fe93871afd67b355cd0b431`）；`cargo check --locked -p warp` 通过（`r-8_40sk0o`，日志SHA `47ad3c6a8f0e8d02481e8743929dcde2730edac5e383dbb826aeab729d399574`）。工作流18项和actionlint通过，本机PS7仅解析两份PS脚本。新 `g09_clr_fixture` 保持25输入，仅选择独立Windows，先普通7项、再固定ignored夹具一次，无重试，并保留失败原件。尚无MSVC编译或真实CLR读取结果；夹具通过也不等于原PowerShell失败已修复。**无需本地化变更，新增关闭0项，G09及最终同源双平台门禁仍开放。**
+
+## 2026-10-05：Mac 显式空 ACL 真实更新与独立冷恢复通过，G09仍开放
+
+精确 `74ddcaa42ada3e3f7306adab1fd5b7b69df30d13` 的 `r-f6ta9tcm` 使用版本化 `readonly-inherited-empty-v1`，仅运行 `updated` 与 `swap_receipt_missing`。前者真实公开入口升级至2.1.280；后者保留交换意图后，由独立新libtest冷恢复2.1.278，完整after与before相同。两场景before／prepared／after的README均精确保留 `{"format":"MacV1","extended":{"flags":0,"entries":[]}}`，包根及两CLI文件仍是非空只读ACL；同路径uid／gid／mode／ACL逐项相等。没有新增相对路径，不将此结果计为新路径继承验收。
+
+独审逐一核对19份精确Git blob、四份官方tgz的SRI／完整成员尺寸／SHA／mode，以及完整归档的签名后worker和supervisor原件。两代原候选均输出22字节 `2.1.280 (Claude Code)\n`、退出0；manifest／launch／exit／coalition身份和清理绑定闭合。冷恢复278由同源真实公开入口检查、产品收据及官方完整树计证，没有单独归档其公开stdout，不冒充额外stdout原件。私有配置保持不变，未执行npm install或生命周期脚本，也未发送模型输入。
+
+归档位于 `g08-build-preparation/g09-claude-npm-empty-acl-macos-runs/r-f6ta9tcm`：独审 `independent-native-empty-acl-review.safe.json` SHA `7571567a5e135478b59ae0ce92f734603d0021c1b3edafa419f95d5a53e5a9d2`；driver收据 SHA `8121e01a34bd1f657492016c57968607a80f59a2a3951c4675a779797ac36ff6`、ACL收据 SHA `eb4d0afcff872713054700116e9e7ab3339103b6f6d79d2688e1160a47c782b7`、退出证明 SHA `e4e8024dcabc353c8a8068090489e052c66d8ecac78a99876fad61403c956829`。根任务另重核40份小原件及19份Git blob，`root-empty-acl-recheck.safe.json` SHA `ca3d7d4faa42cfad6f3588fae5c6568d64fe723b08d98314b5e7a794c73a7426`。登记执行exit0／cleaned：先归档，再确认原进程、相关launchd及FD释放，仅对两个精确0500私有快照目录补owner写位且原fd ACL保持，最后按身份清理原短根；未移除安装树README的空ACL来通过验收。
+
+本轮严格为两场景／一次独立冷恢复，未重跑原五场景／两冷恢复、GUI、模型或插件复检。普通显式空ACL不套用用户允许的三类特殊安装豁免；历史红灯及旧失败仍按原件保留。Linux后续 [37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 正在运行，不能提前覆盖b5通知发送超时的原失败。Windows固定CLR夹具尚未原生验证，a5原矩阵首updated失败及后四场景／三冷恢复未运行的事实保持，最终同冻结源码双平台门禁仍未完成。**新增关闭0项；10关闭／G09开放／V01、V02、V05移交，PR草稿。无需本地化变更。**
+
+## 2026-10-05：Mac 显式空 ACL 漏读修复准备（历史阶段，当时真实事务待验）
 
 同一个原fd的公开 `fgetattrlist` 返回56字节完整属性（44字节显式空ACL、0条ACE），旧 `acl_get_fd_np` 却返回缺失；真实红测 `r-7nu39tcd` 失败日志SHA `fc5f2240de83b3c1bcd21178cc7daedada4a2a4d792ff1a9ca165c69503cfb43` 已保留。先前“APFS将空ACL归一化为缺失”的解释被该原生证据推翻；旧失败不改为通过，普通文件空ACL也不套用特殊链接权限的范围豁免。
 

@@ -311,3 +311,7 @@ impl CommandExt for crate::r#async::Command {
 #[cfg(test)]
 #[path = "windows_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "windows_clr_fixture_tests.rs"]
+mod clr_fixture_tests;

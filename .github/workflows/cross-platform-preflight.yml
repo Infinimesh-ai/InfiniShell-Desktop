@@ -120,7 +120,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 专项范围；g09_image_contract/g09_powershell_contract 只读实现，g09_npm_powershell 选择首 PS 快照
+        description: Windows 专项范围；g09_clr_fixture 验证固定 CLR 读取能力，g09_npm_powershell 选择首 PS 快照
         required: true
         default: all
         type: choice
@@ -134,6 +134,7 @@ on:
           - codex_hooks
           - g09_image_contract
           - g09_powershell_contract
+          - g09_clr_fixture
           - g09_npm_powershell
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
@@ -200,12 +201,12 @@ jobs:
               conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if conflicts or not all(inputs.get(name, False) for name in required):
                   sys.exit("标准流生命周期对照只允许单独 Windows 限定范围：" + ", ".join(sorted(conflicts)))
-          if inputs.get("windows_atomic_debug_scope") in {"g09_image_contract", "g09_powershell_contract"}:
+          if inputs.get("windows_atomic_debug_scope") in {"g09_image_contract", "g09_powershell_contract", "g09_clr_fixture"}:
               required = {"run_windows"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
               conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if conflicts or inputs.get("run_windows") is not True:
-                  sys.exit("固定系统实现静态取证只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
+                  sys.exit("固定 Windows 实现验证只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
           if inputs.get("windows_atomic_debug_scope") == "codex_hooks":
               required = {"run_windows", "run_atomic_windows_debug"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -1194,6 +1195,57 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows_g09_clr_fixture:
+    name: Windows fixed Framework CLR reader fixture
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope == 'g09_clr_fixture' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: 'C:\infinishell-ci\cargo-target'
+      RUSTC_WRAPPER: 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+      SCCACHE_DIR: 'C:\infinishell-ci\sccache'
+      SCCACHE_CACHE_SIZE: 80G
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 先独立证明固定 CLR 的字段/栈读取和精确回收，不执行真实 PowerShell 候选。
+      - name: Check fixed CLR controller types
+        shell: pwsh
+        run: cargo check --locked -p command --tests
+
+      - name: Test fixed CLR receipt binding
+        shell: pwsh
+        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(windows::clr_fixture_tests::)'
+
+      - name: Build fixed CLR reader with existing MSVC
+        shell: powershell
+        run: ./script/ci/g09-clr-fixture/build-reader.ps1
+
+      - name: Prepare fixed Framework exception fixture
+        shell: powershell
+        run: ./script/ci/g09-clr-fixture/prepare.ps1 -Reader $env:INFINISHELL_CLR_READER
+
+      - name: Verify original CLR exception thread and bounded reader cleanup
+        shell: pwsh
+        timeout-minutes: 3
+        run: cargo nextest run --locked --no-fail-fast --retries 0 --run-ignored only -p command --lib -E 'test(windows::clr_fixture_tests::framework_exception_chain_uses_original_event_thread_and_reaps_reader)'
+
+      - name: Preserve fixed CLR reader and fixture evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-g09-clr-fixture-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/g09-clr-build-${{ github.run_id }}-${{ github.run_attempt }}/
+            ${{ runner.temp }}/g09-clr-fixture-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
   windows_codex_hooks:
     name: Windows fixed Codex 0.156.1 hooks
     needs: validate_scope
@@ -1296,7 +1348,7 @@ jobs:
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime')
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime')
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:

@@ -180,6 +180,56 @@ class PowerShellContractScopeTests(unittest.TestCase):
                          "${{ runner.temp }}/g09-powershell-contract-${{ github.run_id }}-${{ github.run_attempt }}/")
 
 
+class ClrFixtureScopeTests(unittest.TestCase):
+    def values(self):
+        return dict(static_inputs(), windows_atomic_debug_scope="g09_clr_fixture")
+
+    def test_only_standalone_fixed_fixture_job_is_selected(self):
+        values = self.values()
+        self.assertEqual(len(INPUTS), 25)
+        self.assertTrue(accepted(values))
+        self.assertFalse(accepted(dict(values, run_windows=False)))
+        self.assertEqual([name for name, job in DATA["jobs"].items()
+                          if name != "validate_scope" and enabled(job["if"], values)],
+                         ["windows_g09_clr_fixture"])
+        condition = DATA["jobs"]["windows_g09_clr_fixture"]["if"]
+        self.assertFalse(enabled(condition, {}, "push"))
+        self.assertFalse(enabled(condition, defaults()))
+
+    def test_fixture_rejects_every_other_mode(self):
+        values = self.values()
+        for name, spec in INPUTS.items():
+            if spec["type"] == "boolean" and name != "run_windows":
+                with self.subTest(forbidden=name):
+                    self.assertFalse(accepted(dict(values, **{name: True})))
+            elif spec["type"] == "choice" and name != "windows_atomic_debug_scope":
+                for value in spec["options"]:
+                    if value != spec["default"]:
+                        with self.subTest(forbidden=name, value=value):
+                            self.assertFalse(accepted(dict(values, **{name: value})))
+
+    def test_native_fixture_runs_once_after_local_checks_with_original_evidence(self):
+        job = DATA["jobs"]["windows_g09_clr_fixture"]
+        self.assertEqual(job["needs"], "validate_scope")
+        self.assertEqual(job["runs-on"], ["self-hosted", "windows", "x64", "infinishell-ci"])
+        self.assertEqual(job["steps"][0]["with"]["ref"], "${{ github.sha }}")
+        commands = [step for step in job["steps"] if "run" in step]
+        self.assertEqual(commands[0]["run"], "cargo check --locked -p command --tests")
+        self.assertIn("--retries 0", commands[1]["run"])
+        self.assertEqual(commands[2]["shell"], "powershell")
+        self.assertEqual(commands[2]["run"], "./script/ci/g09-clr-fixture/build-reader.ps1")
+        self.assertEqual(commands[3]["shell"], "powershell")
+        self.assertEqual(commands[3]["run"], "./script/ci/g09-clr-fixture/prepare.ps1 -Reader $env:INFINISHELL_CLR_READER")
+        self.assertEqual(commands[4]["timeout-minutes"], 3)
+        self.assertEqual(commands[4]["run"], "cargo nextest run --locked --no-fail-fast --retries 0 --run-ignored only -p command --lib -E 'test(windows::clr_fixture_tests::framework_exception_chain_uses_original_event_thread_and_reaps_reader)'")
+        artifact = job["steps"][-1]
+        self.assertEqual(artifact["if"], "${{ always() }}")
+        self.assertEqual(artifact["with"]["if-no-files-found"], "error")
+        for directory in ("g09-clr-build", "g09-clr-fixture"):
+            self.assertIn("${{ runner.temp }}/" + directory + "-${{ github.run_id }}-${{ github.run_attempt }}/", artifact["with"]["path"])
+        self.assertEqual(len(commands), 5)
+
+
 class ClaudeMuslScopeTests(unittest.TestCase):
     def values(self):
         values = defaults()

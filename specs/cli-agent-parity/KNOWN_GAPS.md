@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | b5d9 Mac只读ACL真实升级／一次独立冷恢复通过独审；Mac新增路径异gid父目录缺陷已修复。2026-10-05用户允许三类特殊权限安装提示原安装工具升级，普通安装及已支持只读ACL自动升级保持。b5 Linux通知发送超时、a5ecc Windows首updated失败（后4场景／3冷恢复未跑）及最终同源双平台门禁仍待完成 |
+| G09 | 开放 | 74dd/r-f6ta9tcm Mac显式空ACL两场景／一次独立冷恢复通过独审，未覆盖新增路径、GUI或完整5/2重跑。用户允许三类特殊权限安装提示原安装工具升级，普通安装及已支持只读ACL自动升级保持。b5 Linux通知超时原失败保留，后续37267752920运行中；a5ecc Windows首updated失败（后4场景／3冷恢复未跑），固定CLR夹具尚未原生验证，最终同源双平台门禁未完成 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”及“范围待用户决定”均为历史阶段判断；当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准，安全属性范围以 G09 下的2026-10-05用户决定为准。各轮源码、平台、失败和未验边界不变。
@@ -278,7 +278,11 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
-- **2026-10-05 Mac 显式空 ACL 修复**：真实原fd证据确认旧读取路径漏掉44字节空ACL，先前APFS归一化解释不成立。原语25项及包树／链接2项通过，版本化两场景／一次冷恢复夹具已接；Mac更新385项、i18n11项及warp／warp_tui check通过；真实事务仍待验，不以测试关闭G09。Linux专用feature通知阶段记录用于原失败进程定位，原期限保持。无需本地化变更。
+- **2026-10-05 Windows 固定 CLR 夹具准备**：原异常线程／当前异常对象／InnerException／Win32原码及方法帧读取、期限内reader回收均有明确夹具条件；本机Windows目标类型门禁、warp check及18项workflow校验通过，MSVC与真实Framework读取尚未执行。只验证诊断原生能力，不执行实际CLI候选，不计G09关闭；无需本地化变更。
+
+- **2026-10-05 Mac 显式空 ACL 真实事务通过，仍开放**：精确 `74ddcaa42ada3e3f7306adab1fd5b7b69df30d13/r-f6ta9tcm` 的 `updated` 公开入口升级至2.1.280，`swap_receipt_missing` 经独立libtest冷恢复2.1.278且完整after等于before。两场景before／prepared／after的README均精确保留显式空ACL，包根与两CLI文件保留非空只读ACL；四份官方归档、19份Git源码、签名后二进制及两代原生退出／清理绑定已独审，登记短根已清理。独审 `g09-claude-npm-empty-acl-macos-runs/r-f6ta9tcm/independent-native-empty-acl-review.safe.json` SHA `7571567a5e135478b59ae0ce92f734603d0021c1b3edafa419f95d5a53e5a9d2`。仅两场景／一次冷恢复，不计新增相对路径、GUI或原完整5/2重跑；Linux后续37267752920仍运行，Windows固定CLR夹具尚未原生验证，原失败和最终同源门禁保留。**新增关闭0项，G09开放；无需本地化变更。**
+
+- **2026-10-05 Mac 显式空 ACL 修复准备（历史阶段）**：真实原fd证据确认旧读取路径漏掉44字节空ACL，先前APFS归一化解释不成立。原语25项及包树／链接2项通过，版本化两场景／一次冷恢复夹具已接；Mac更新385项、i18n11项及warp／warp_tui check通过；当时真实事务仍待验，不以测试关闭G09。Linux专用feature通知阶段记录用于原失败进程定位，原期限保持。无需本地化变更。
 
 - **2026-10-05 PowerShell 实际实现只读取证**：`d0d61069c` 的 [37264336924](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37264336924) 已结束；69个托管方法IL已逐指令核验，2个原生PInvoke无IL使正式整轮为failure／partial。没有执行升级，也不回填a5实际失败分支。原始stderr无候选错误字节，已有首16次CLR异常又全部早于Node CREATE，仍缺失败窗口内的具体异常和方法位置。根复核SHA `41970d6b52c672b1ed5d1172594053990b4fdf07b0632443cb33b106c76dbce3`；**G09开放，新增关闭0项**。
 
