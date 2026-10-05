@@ -8,7 +8,7 @@
   "pr": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/pull/22",
   "worktree": "/home/chiiz/Documents/InfiniShell-Desktop/.worktrees/acceptance-linux",
   "evidence_root": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/evidence",
-  "recorded_at_utc": "2026-10-05T16:56:31.810403+00:00",
+  "recorded_at_utc": "2026-10-05T17:10:42.727977+00:00",
   "application_binary": {
     "commit": "28d0922519b02b0690626edc148638c0150cda1c",
     "clean_checkout": true,
@@ -72,7 +72,8 @@
     "三款官方完整版本与受审 SHA-256 匹配",
     "Grok Linux 文本定制桥 .6 工件 pin 匹配；单独标记非官方",
     "固定提交 cargo check、实际 GUI build 及 i18n 11/11",
-    "verify_v02_v05_gui --guide/--preflight/--init 执行；构建来源已绑定"
+    "verify_v02_v05_gui --guide/--preflight/--init 执行；构建来源已绑定",
+    "三款原生插件版本登记与受审来源核对；Codex 两缓存树/Grok 四文件树匹配，Claude 固定上游完整匹配。产品通知路径仍未验。"
   ],
   "setup_failure_preserved": {
     "stage": "未认证 Wayland 启动预检",
@@ -95,13 +96,23 @@
     "scope": "脚本只核结构/摘要，不证明真实输入法、模型审批或视觉通过"
   },
   "plugins": {
-    "status": "not_installed_or_verified",
+    "status": "native_preparation_partially_verified_product_paths_pending",
     "expected": {
       "codex": "codex-warp 0.4.0",
       "claude": "warp 2.2.0",
       "grok": "infinishell-grok 0.1.6"
     },
-    "codex_hooks_trust": "必须由用户在原生 /hooks 审核；未代写"
+    "codex_hooks_trust": "必须由用户在原生 /hooks 审核；未代写",
+    "native_preparation_record": "PLUGIN_PREPARATION.json",
+    "observed_native_versions": {
+      "codex_warp": "0.4.0",
+      "codex_orchestration": "0.4.0",
+      "claude_warp": "2.2.0",
+      "grok_infinishell_grok": "0.1.6"
+    },
+    "application_ready_verified": false,
+    "native_notifications_verified": false,
+    "remaining": "Codex /hooks 人工审核、Claude 产品通知补丁、Grok 1.0.41 启动桥和实际通知均待验；CLI 插件安装不能代替模型/GUI验收"
   },
   "models": {
     "codex_actual": null,
@@ -212,5 +223,6 @@
     "model_lifecycle_acceptance": false,
     "localization_change": "无需本地化变更；本轮未修改产品源码或界面文案",
     "bilingual_layout": "未验"
-  }
+  },
+  "goal_state_after_this_turn": "blocked_operator_action_required"
 }

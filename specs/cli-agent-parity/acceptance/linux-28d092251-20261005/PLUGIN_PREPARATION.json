@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+  "platform": "linux-x64",
+  "recorded_at_utc": "2026-10-05T17:10:42.727977+00:00",
+  "status": "native_preparation_only_not_acceptance",
+  "codex": {
+    "source_materialized": true,
+    "source_directory": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/profiles/home/.codex/plugins/infinishell-sources/codex-warp-0.4.0-rev6",
+    "plugin_version": "0.4.0",
+    "patch_revision": 6,
+    "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+    "files_verified": 36,
+    "native_hooks_trusted": false,
+    "source_matches_fixed_commit": true,
+    "native_plugin_add_completed": true,
+    "installed_cache_integrity": {
+      "warp": {
+        "version": "0.4.0",
+        "registered_and_enabled": true,
+        "expected_files": 10,
+        "mismatches": [],
+        "extra_files": [],
+        "fixed_source_hashes_match": true
+      },
+      "orchestration": {
+        "version": "0.4.0",
+        "registered_and_enabled": true,
+        "expected_files": 21,
+        "mismatches": [],
+        "extra_files": [],
+        "fixed_source_hashes_match": true
+      }
+    }
+  },
+  "grok": {
+    "source_materialized": true,
+    "source_directory": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/profiles/home/.local/share/InfiniShell/cli-agent-plugins/grok/0.1.6",
+    "plugin_version": "0.1.6",
+    "files_sha256": {
+      ".grok-plugin/plugin.json": "e09078a8266d29ecc4de9ccf08ab4a3e6ceb604b12364af2f5a92071f10ec9fd",
+      "hooks/hooks.json": "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe",
+      "hooks/notify.cjs": "027333b538a0b37dcd1f5e6d73f045e29e872f8fe7653719b4a560b6bb0c38b6",
+      "README.md": "866b9237e039f7ec6309e7bd8c22e87033221a11f19f7dd31a7ea475e1a20877"
+    },
+    "startup_bridge_installed": false,
+    "native_notifications_verified": false,
+    "native_validation_exit_code": 0,
+    "native_plugin_install_completed": true,
+    "installed_root": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/profiles/home/.grok/installed-plugins/0-1-6-25cbb0ad",
+    "installed_tree_matches_fixed_bundle": true,
+    "registered_version": "0.1.6",
+    "actual_bootstrap_cached_native_sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+    "actual_bootstrap_cached_native_matches_fixed": true
+  },
+  "claude": {
+    "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+    "native_commands": [
+      {
+        "command": [
+          "claude",
+          "plugin",
+          "marketplace",
+          "add",
+          "warpdotdev/claude-code-warp"
+        ],
+        "exit_code": 0,
+        "log": "logs/claude-plugin-marketplace.log"
+      },
+      {
+        "command": [
+          "claude",
+          "plugin",
+          "install",
+          "warp@claude-code-warp"
+        ],
+        "exit_code": 0,
+        "log": "logs/claude-plugin-install.log"
+      }
+    ],
+    "private_profile": true,
+    "model_inputs": 0,
+    "notification_patch_verified": false,
+    "actual_application_install_verified": false,
+    "recorded_at_utc": "2026-10-05T17:06:50.163615+00:00",
+    "registered_versions": [
+      "2.2.0"
+    ],
+    "expected_version": "2.2.0",
+    "version_match": true,
+    "marketplace_commit": "8c28e936ae51cbb23a1a5657fca2bfd30cf06f12",
+    "expected_upstream_commit": "8c28e936ae51cbb23a1a5657fca2bfd30cf06f12",
+    "marketplace_commit_matches_fixed": true,
+    "notification_files": {
+      "scripts/build-payload.sh": {
+        "sha256": "0ebf0734250d70d7c34a6948d550aeb140b785bcdeaa36e96f0fbac27850e881",
+        "matches_fixed_upstream": true,
+        "matches_product_replacement": false
+      },
+      "scripts/on-session-start.sh": {
+        "sha256": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+        "matches_fixed_upstream": true,
+        "matches_product_replacement": false
+      },
+      "scripts/on-stop.sh": {
+        "sha256": "249852062f8659a265e8b55b887fd5384bc0027ac31c296f3ac9fb13e4341d6c",
+        "matches_fixed_upstream": true,
+        "matches_product_replacement": false
+      },
+      "scripts/should-use-structured.sh": {
+        "sha256": "f34b95caf2959dcb321d00eb72dc736c85d8f96958b03472380725ea950588bb",
+        "matches_fixed_upstream": true,
+        "matches_product_replacement": false
+      },
+      "hooks/hooks.json": {
+        "sha256": "58df57ff9e94cc59a4e7f038b067614ed7a047fd71f352c84a34252d037f66ee",
+        "matches_fixed_upstream": true,
+        "matches_product_replacement": false
+      },
+      "scripts/warp-notify.sh": {
+        "sha256": "13c0200fb79b666eacfec87fd33fdd36ec29f0f8b836b2e26009b2848d7696fe",
+        "matches_fixed_upstream": true,
+        "matches_product_replacement": false
+      }
+    },
+    "fixed_upstream_files_match": true,
+    "next_step": "通过应用正式插件入口应用并验证受审通知补丁；不绕过 Linux 手动脚本的版本拒绝"
+  },
+  "actual_application_install_verified": false,
+  "native_hook_lifecycle_verified": false,
+  "model_inputs": 0,
+  "product_scenarios_passed": [],
+  "hooks_user_review": "Codex /hooks 必须由用户在原生界面审核；未代写信任摘要",
+  "pending": [
+    "Claude 通过应用正式插件入口应用/核验通知补丁",
+    "Grok 通过应用正式插件入口核验 1.0.41 启动桥",
+    "三款实际插件通知/模型/GUI仍待真实验收"
+  ],
+  "manual_patch_script_boundary": "Linux 上 apply_notification_patch.py 不接受这两款固定版本；未调用、未绕过版本拒绝",
+  "localization": "无需本地化变更；本轮只安装/核对私有原生插件，未修改产品源码或界面文案。"
+}

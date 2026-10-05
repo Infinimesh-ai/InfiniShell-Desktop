@@ -2,7 +2,7 @@
   "schema": 1,
   "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
   "evidence_root": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005",
-  "status": "pre_interaction_no_real_acceptance",
+  "status": "native_preparation_only_operator_required",
   "raw_videos": 0,
   "raw_screenshots": 0,
   "contains_credentials": false,
@@ -164,6 +164,72 @@
       "bytes": 236,
       "sha256": "3e77ddc29e16234c764ba945fb7320e1fe988416c5f98dfbc0696258a790d1b7",
       "scope": "启动预检原生日志；D-Bus 仅工具 stderr 摘录，未保存完整流"
+    },
+    {
+      "path": "evidence/plugin-source-preparation.json",
+      "bytes": 3748,
+      "sha256": "6b9e9c7e5e5610b7de2eec40126b0c48412eb9a4d7f00f3c8cc66c4ca7b8a5d9",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "evidence/claude-plugin-preparation.json",
+      "bytes": 2420,
+      "sha256": "13f542daf752d048100dc259bfbac246b68a89eed9188f983dc8aca2d0e97ead",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/codex-plugin-marketplace.log",
+      "bytes": 217,
+      "sha256": "e6af1fd14acf3b6be387ed65b28014668299582b82bec049a1141a6a259a2628",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/codex-plugin-warp.log",
+      "bytes": 129,
+      "sha256": "7545f7145a99bc0a4514adee217cb485369bd25cf4f246fc24f877cdf0c597bc",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/codex-plugin-orchestration.log",
+      "bytes": 147,
+      "sha256": "054a93268fd19feb6286282dc5918d1e3105b92ed6ae5a39668e9c29dfc95e5b",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/codex-plugin-list.log",
+      "bytes": 1230,
+      "sha256": "f1e81e190e80c0b027ac6275114b0a2e11e1204dd9b910780e55b29d90506585",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/grok-plugin-validate.log",
+      "bytes": 226,
+      "sha256": "57095921bd9b14b599101e9409fa085b1a5b6dba2489684abd39fed1d9e0519c",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/grok-plugin-install.log",
+      "bytes": 111,
+      "sha256": "332b9eaf51542c5736c9c501bf843aff2b1937d71904fb6cd13ff3fe453e3143",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/grok-plugin-list.log",
+      "bytes": 110,
+      "sha256": "cb65a9b34fbbb6381042058218cff24b13bf833b93ea08c99935c2493f3bbf07",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/claude-plugin-marketplace.log",
+      "bytes": 406,
+      "sha256": "1a9e774a5f722e51830d4502df75bb15d3e9ad937e4a3b74e61f3c8087f9913c",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
+    },
+    {
+      "path": "logs/claude-plugin-install.log",
+      "bytes": 115,
+      "sha256": "12d50f562a063c1c0f3e9158e535894fc103638f0d2bfa27ac78bec4065438a7",
+      "scope": "私有原生 CLI 插件准备；不包含模型输入或真实通知验收"
     }
   ],
   "excluded_private_trees": [
