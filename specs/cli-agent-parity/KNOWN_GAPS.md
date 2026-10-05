@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 四异常原生夹具仍失败**：精确`9578948db`的[37272950186](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37272950186)为11普通PASS／唯一原生FAIL。两个同HRESULT停点分别取得当前1234/5678，但字段预算、内链派生类型及IL映射未满足完整条件，4份读取均partial。原生53事件、退出和Job清理已独审，收据SHA `94acfa2d8c652a8137a7d7d5b7fd82890af8a863278a9dac7bafd74257022d32`。后续按真实MethodTable修字段，并修正原停点栈上下文及首帧顺序。DAC字段API会整块载入元数据，按已有System/mscorlib原件文件大小及原4MiB其它读取量、1MiB夹具上界，固定规划16MiB诊断读取额度；这不是当轮metadata大小实测，不保证通过。8192次、4层、32帧、所有期限及功能断言不变，原失败保留。**新增关闭0项。**
+
 - **2026-10-05 原生夹具与Linux门禁仍失败**：[Windows 37271419406](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37271419406) 已越过MSVC编译，真实CLR的CurrentExceptionState在first-chance停点给出空或前一次对象，三个读取均partial；目标绑定及退出清理不代替对象验收。正修复定位器，并加入相同HRESULT、不同原生码的四事件顺序断言，保留PARTIAL原状态、预算和期限。[Linux 37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 本轮外层Node8秒超时且preload/trace缺失；上次refreshed用例本轮ok不解释旧超时。两轮原件均已独审，不增加相近探针、不放宽期限。**新增关闭0项；无需本地化变更。**
 
 - **2026-10-05 固定 CLR 夹具编译失败，最窄修复待验**：精确 `bd6ecb498` 的 [37269594308](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37269594308) 正式失败；Windows类型检查和7普通项通过，MSVC在`GetFlags`实参报C2664，真实夹具未执行。现仅把`state_flags`从`ULONG`改为接口要求的`ULONG32`；不强转指针、不降低告警或验收条件。官方ZIP及完整日志已保留，旧PowerShell故障未解决；新增关闭0项。

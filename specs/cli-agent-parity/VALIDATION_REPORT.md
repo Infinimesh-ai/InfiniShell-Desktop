@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：四异常定位器取得部分字段，完整原生能力仍失败
+
+精确 `9578948db948248747f1c46b5290ce6fdf0c947b` 的 [37272950186](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37272950186) 为11普通PASS／唯一原生FAIL，4份reader均partial。原生43/44两个相同HRESULT停点取得1234/5678，仍在_HResult/inner遇到E_INVALIDARG及读取预算不足。45/46的根类型正确，内链却呈声明类型System.Exception，不能冒称实际派生类型；拆分结果确认context均S_OK、部分IL mapping为E_NOINTERFACE。原fixture自然退出0、53事件均Continue、所有reader及Job已回收，无pending；这些不代替完整字段/帧断言。14源码、7构建输入、34官方ZIP成员及原日志独审SHA `94acfa2d8c652a8137a7d7d5b7fd82890af8a863278a9dac7bafd74257022d32`，远端证据cleanup_ready=false保持。
+
+固定官方源码与本轮原件共同确认GetAssociatedValue保留声明类型。后续需从实际MethodTable核动态类型和限定字段，不读异常消息或正文。另修正两个明确栈调用问题：CreateStackWalk初始化可使用旧filter context，故以原hThread的CONTEXT_FULL重置读取器内的walker；Init/SetContext2已定位首帧，应先读再Next。SetContext2只修改本地walker状态，目标写接口继续拒绝；不加入IP减一回退，不以这两处静态问题冒称解释全部映射失败。[固定官方实现](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/stack.cpp)。
+
+固定官方 `GetFieldDescData` 经 `MetaSig`/`GetSig`/`GetMDImport` 整块载入模块metadata，失败会返回E_INVALIDARG；不通过猜测私有FieldDesc布局绕开。原4MiB只是新诊断读取器的工程参数，不是产品关闭条件。已有System.dll 3,541,424字节、mscorlib.dll 5,445,664字节与本轮所见MVID对应；两份完整IL文件大小加原4MiB其它读取量及1MiB夹具上界合计14,229,968字节，据此一次性选择16MiB固定诊断额度。未取得当轮metadataStart/Size，MVID也不代替当轮完整文件SHA，不声称16MiB已经实测通过；PowerShell的SMA不在本夹具容量规划内。8192次调用、4层异常、32帧、所有绝对期限、当前对象/完整链/同帧MethodDef与IL/回收断言保持。
+
+本机Windows目标command类型check（`r-lk84e_2p`）、warp check（`r-9nkols20`）、build-reader的PS7静态解析（`r-0o2v4agh`）、C++既定格式检查（`r-veyn5eow`）通过并完成短目录清理；不代替Windows MSVC编译和Framework原生行为。
+
+**新增关闭0项，G09开放；无需本地化变更。真实PS故障及最终同源门禁仍未完成。**
+
 ## 2026-10-05：真实CLR定位器反证与Linux外层超时
 
 Windows精确 `112adcc74998b43663aba8b6c0645eed9da23d39` 的 [37271419406](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37271419406) 仍正式失败：MSVC `/W4 /WX`、PS5.1准备和7普通项通过；原生单项失败，三次CurrentExceptionState读取为空／前一Win32／前一InvalidOperation。实际目标与原线程出生绑定、54次Continue、reader和fixture退出／Job空已核；这些不代替当前对象、内链和方法帧验证。官方32成员ZIP、源码及二进制绑定已独审，收据SHA `e44d71fb034c937b74366032f968b172a5bc63161ee1426fe77dc136129ff428`。

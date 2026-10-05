@@ -57,6 +57,7 @@ try {
     $official = @(
         @{ path = 'vendor/clrdata.h'; bytes = 45641; sha256 = '66ef8f73507485e20c299a4e2b4f553ed3e5a523a4949330b026ec90e3878f69' },
         @{ path = 'vendor/xclrdata.h'; bytes = 289218; sha256 = 'a3729f85c323adb1996c1cfbd6a32bb7c0d6429a50fe45c394ef0ece7d599984' },
+        @{ path = 'vendor/sospriv.h'; bytes = 101729; sha256 = '9c92d200b0986c0730e6188eecc8f6e34d9b356c2e97716ce47eeac314f7b7af' },
         @{ path = 'vendor/LICENSE.TXT'; bytes = 1116; sha256 = 'cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310' }
     )
     $provenancePath = Join-Path $sourceRoot 'sources.safe.json'
@@ -64,7 +65,7 @@ try {
     $provenance = [IO.File]::ReadAllText($provenancePath, [Text.Encoding]::UTF8) | ConvertFrom-Json
     if ($provenance.schema -ne 1 -or $provenance.upstream -ne 'https://github.com/dotnet/runtime' -or
         $provenance.commit -ne '5535e31a712343a63f5d7d796cd874e563e5ac14' -or
-        $provenance.tag -ne 'v8.0.0' -or @($provenance.files).Count -ne 3) {
+        $provenance.tag -ne 'v8.0.0' -or @($provenance.files).Count -ne 4) {
         throw '官方 ABI 来源记录不匹配'
     }
     foreach ($item in $official) {
@@ -76,8 +77,8 @@ try {
             throw '官方 vendor 原件字节或来源摘要不匹配'
         }
     }
-    foreach ($name in @('reader.cpp', 'wire.h', 'README.md', 'sources.safe.json',
-                         'vendor/clrdata.h', 'vendor/xclrdata.h', 'vendor/LICENSE.TXT')) {
+    foreach ($name in @('reader.cpp', 'wire.h', 'sos_layout.h', 'README.md', 'sources.safe.json',
+                         'vendor/clrdata.h', 'vendor/xclrdata.h', 'vendor/sospriv.h', 'vendor/LICENSE.TXT')) {
         $path = Join-Path $sourceRoot $name
         $copied = Join-Path $snapshot $name
         $hash = Get-RegularFileHash $path
@@ -154,7 +155,7 @@ try {
     }
     $receipt.inputs = $inputs
     $receipt.inputs_rechecked = $inputs.Count
-    $receipt.sources_unchanged = $inputs.Count -eq 7 -and -not $postFailure
+    $receipt.sources_unchanged = $inputs.Count -eq 9 -and -not $postFailure
     if ($postFailure) { $receipt.status = 'failed' }
     if ($receipt.status -eq 'compiled') { $receipt.stage = 'complete' }
     $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($receipt | ConvertTo-Json -Depth 8))

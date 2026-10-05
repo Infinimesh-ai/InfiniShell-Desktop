@@ -20,11 +20,26 @@
       "sha256": "a3729f85c323adb1996c1cfbd6a32bb7c0d6429a50fe45c394ef0ece7d599984"
     },
     {
+      "path": "vendor/sospriv.h",
+      "upstream_path": "src/coreclr/pal/prebuilt/inc/sospriv.h",
+      "url": "https://raw.githubusercontent.com/dotnet/runtime/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/pal/prebuilt/inc/sospriv.h",
+      "bytes": 101729,
+      "sha256": "9c92d200b0986c0730e6188eecc8f6e34d9b356c2e97716ce47eeac314f7b7af"
+    },
+    {
       "path": "vendor/LICENSE.TXT",
       "upstream_path": "LICENSE.TXT",
       "url": "https://raw.githubusercontent.com/dotnet/runtime/5535e31a712343a63f5d7d796cd874e563e5ac14/LICENSE.TXT",
       "bytes": 1116,
       "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
     }
-  ]
+  ],
+  "layout_source": {
+    "path": "sos_layout.h",
+    "upstream_path": "src/coreclr/inc/dacprivate.h",
+    "url": "https://raw.githubusercontent.com/dotnet/runtime/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/inc/dacprivate.h",
+    "upstream_bytes": 35776,
+    "upstream_sha256": "0230ca236edd88e7c303966ca0f6c236c9bd1ffc59ddeb8a490cb4cf213b70f2",
+    "scope": "仅五种公开 DAC 输出结构的声明，删除内联 Request 方法；不复制 CLR 私有 FieldDesc 内存布局。Windows x64 sizeof/offsetof 静态断言与真实夹具共同验证。"
+  }
 }

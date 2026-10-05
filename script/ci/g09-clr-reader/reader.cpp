@@ -24,13 +24,17 @@ using mdMethodDef = mdToken;
 using mdFieldDef = mdToken;
 using CorElementType = ULONG;
 #include "vendor/xclrdata.h"
+using T_CONTEXT = CONTEXT;
+#include "sos_layout.h"
+#include "vendor/sospriv.h"
 
 static_assert(sizeof(void *) == 8, "仅支持 x64");
 static_assert(sizeof(wchar_t) == 2, "仅支持 Windows UTF-16");
 
 namespace {
 constexpr std::uint8_t magic[8] = {'G', '0', '9', 'C', 'L', 'R', '1', 0};
-constexpr ULONG field_flags = CLRDATA_FIELD_ALL_KINDS | CLRDATA_FIELD_FROM_INSTANCE;
+constexpr CorElementType element_i4 = 0x08;
+constexpr CorElementType element_class = 0x12;
 
 struct Handle {
   HANDLE value = nullptr;
@@ -350,49 +354,119 @@ HRESULT bind_dac(const G09ClrRequest &r, const std::wstring &supplied, DacFile &
   return hr;
 }
 
-HRESULT field(IXCLRDataValue *object, IXCLRDataTypeInstance *declaring, const wchar_t *name,
-              Com<IXCLRDataValue> &output) {
-  CLRDATA_ENUM iterator = 0;
-  HRESULT hr =
-      object->StartEnumFieldsByName(name, CLRDATA_BYNAME_CASE_SENSITIVE, field_flags, declaring, &iterator);
-  if (hr != S_OK) return hr == S_FALSE ? E_NOINTERFACE : hr;
-  mdFieldDef token = 0;
-  hr = object->EnumFieldByName(&iterator, output.put(), &token);
-  if (hr == S_OK) {
-    Com<IXCLRDataValue> duplicate;
-    const HRESULT next = object->EnumFieldByName(&iterator, duplicate.put(), &token);
-    if (next != S_FALSE) hr = FAILED(next) ? next : E_UNEXPECTED;
-  }
-  const HRESULT ended = object->EndEnumFieldsByName(iterator);
-  if (SUCCEEDED(hr) && FAILED(ended)) hr = ended;
-  return hr == S_FALSE ? E_NOINTERFACE : hr;
+struct BoundType {
+  CLRDATA_ADDRESS method_table = 0;
+  DacpMethodTableData data{};
+  Com<IXCLRDataModule> module;
+  Com<IXCLRDataTypeDefinition> definition;
+  GUID mvid{};
+  wchar_t name[256]{};
+};
+
+HRESULT bind_type(ISOSDacInterface *sos, CLRDATA_ADDRESS method_table, BoundType &output) {
+  if (!method_table) return E_INVALIDARG;
+  output.method_table = method_table;
+  HRESULT hr = sos->GetMethodTableData(method_table, &output.data);
+  if (hr != S_OK) return hr;
+  const auto &data = output.data;
+  if (data.bIsFree || data.bIsDynamic || !data.Module || data.ComponentSize || data.BaseSize < 16 ||
+      (data.cl & 0xff000000) != 0x02000000 || (data.cl & 0x00ffffff) == 0)
+    return E_UNEXPECTED;
+  hr = sos->GetModule(data.Module, output.module.put());
+  if (hr != S_OK || !output.module.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  hr = output.module->GetTypeDefinitionByToken(data.cl, output.definition.put());
+  if (hr != S_OK || !output.definition.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  Com<IXCLRDataModule> scope;
+  mdTypeDef token = 0;
+  hr = output.definition->GetTokenAndScope(&token, scope.put());
+  if (hr != S_OK || !scope.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  if (token != data.cl) return E_UNEXPECTED;
+  hr = scope->IsSameObject(output.module.value);
+  if (hr != S_OK) return FAILED(hr) ? hr : E_UNEXPECTED;
+  hr = output.module->GetVersionId(&output.mvid);
+  if (hr != S_OK) return hr;
+  if (!nonzero(reinterpret_cast<const std::uint8_t *>(&output.mvid), sizeof(output.mvid)))
+    return E_UNEXPECTED;
+  ULONG32 needed = 0;
+  hr = output.definition->GetName(0, 256, &needed, output.name);
+  if (hr != S_OK || needed == 0 || needed > 256 || output.name[needed - 1] != 0)
+    return FAILED(hr) ? hr : E_UNEXPECTED;
+  return S_OK;
 }
-HRESULT declaring_type(IXCLRDataValue *object, const wchar_t *wanted, Com<IXCLRDataTypeInstance> &output) {
-  HRESULT hr = object->GetType(output.put());
-  for (unsigned i = 0; hr == S_OK && output.value && i < 16; ++i) {
+
+HRESULT declaring_type(ISOSDacInterface *sos, CLRDATA_ADDRESS method_table,
+                       const DacpUsefulGlobalsData &globals, const wchar_t *wanted,
+                       CLRDATA_ADDRESS required_table, Target &target, BoundType &output) {
+  std::array<CLRDATA_ADDRESS, 16> seen{};
+  for (unsigned i = 0; i < seen.size(); ++i) {
+    if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    for (unsigned j = 0; j < i; ++j)
+      if (seen[j] == method_table) return E_UNEXPECTED;
+    seen[i] = method_table;
+    HRESULT hr = bind_type(sos, method_table, output);
+    if (hr != S_OK) return hr;
+    if (std::wcscmp(output.name, wanted) == 0)
+      return !required_table || method_table == required_table ? S_OK : E_UNEXPECTED;
+    // 只在实际全局 Object MT 和元数据名称同时吻合时确认可选基类不存在。
+    if (method_table == globals.ObjectMethodTable)
+      return std::wcscmp(output.name, L"System.Object") == 0 ? E_NOINTERFACE : E_UNEXPECTED;
+    method_table = output.data.ParentMethodTable;
+  }
+  return E_UNEXPECTED;
+}
+
+HRESULT field(ISOSDacInterface *sos, BoundType &declaring, const wchar_t *wanted, Target &target,
+              DacpFieldDescData &output) {
+  DacpMethodTableFieldData fields{}, parent{};
+  HRESULT hr = sos->GetMethodTableFieldData(declaring.method_table, &fields);
+  if (hr != S_OK) return hr;
+  if (declaring.data.ParentMethodTable) {
+    hr = sos->GetMethodTableFieldData(declaring.data.ParentMethodTable, &parent);
+    if (hr != S_OK) return hr;
+  }
+  if (fields.wNumInstanceFields < parent.wNumInstanceFields) return E_UNEXPECTED;
+  // 实例计数包含继承字段；FirstField 仅指本类字段，不能把父类再枚举一次。
+  const unsigned count =
+      unsigned(fields.wNumInstanceFields) - parent.wNumInstanceFields + fields.wNumStaticFields;
+  CLRDATA_ADDRESS address = fields.FirstField;
+  bool found = false;
+  for (unsigned i = 0; i < count; ++i) {
+    if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    if (!address) return E_UNEXPECTED;
+    DacpFieldDescData value{};
+    hr = sos->GetFieldDescData(address, &value);
+    if (hr != S_OK) return hr;
+    if (value.MTOfEnclosingClass != declaring.method_table || value.ModuleOfType != declaring.data.Module ||
+        (value.mb & 0xff000000) != 0x04000000 || (value.mb & 0x00ffffff) == 0)
+      return E_UNEXPECTED;
     wchar_t name[256]{};
     ULONG32 needed = 0;
-    hr = output->GetName(0, 256, &needed, name);
+    // type/flags 留空：只核同模块 FieldDef 名称，不经 Value 的声明类型构造对象。
+    hr = declaring.definition->GetFieldByToken2(declaring.module.value, value.mb, 256, &needed, name, nullptr,
+                                                nullptr);
     if (hr != S_OK || needed == 0 || needed > 256 || name[needed - 1] != 0)
       return FAILED(hr) ? hr : E_UNEXPECTED;
-    if (std::wcscmp(name, wanted) == 0) return S_OK;
-    // 已确认到达根类型，才把不存在的可选声明类型与 API 失败区分。
-    if (std::wcscmp(name, L"System.Object") == 0) return E_NOINTERFACE;
-    Com<IXCLRDataTypeInstance> base;
-    hr = output->GetBase(base.put());
-    output.put();
-    output.value = base.value;
-    base.value = nullptr;
+    if (std::wcscmp(name, wanted) == 0) {
+      if (found || value.bIsStatic || value.bIsThreadLocal || value.bIsContextLocal) return E_UNEXPECTED;
+      output = value;
+      found = true;
+    }
+    if (i + 1 < count && value.NextField <= address) return E_UNEXPECTED;
+    address = value.NextField;
   }
-  return FAILED(hr) ? hr : E_NOINTERFACE;
+  return found ? S_OK : E_NOINTERFACE;
 }
-HRESULT scalar(IXCLRDataValue *value, std::int32_t &output) {
-  ULONG64 size = 0;
-  ULONG32 actual = 0;
-  HRESULT hr = value->GetSize(&size);
-  if (hr != S_OK || size != sizeof(output)) return FAILED(hr) ? hr : E_UNEXPECTED;
-  hr = value->GetBytes(sizeof(output), &actual, reinterpret_cast<BYTE *>(&output));
-  return hr == S_OK && actual == sizeof(output) ? S_OK : FAILED(hr) ? hr : E_UNEXPECTED;
+
+HRESULT read_field(Target &target, CLRDATA_ADDRESS object, const DacpObjectData &data,
+                   const DacpFieldDescData &field_data, CorElementType expected, void *output, ULONG32 size) {
+  if (field_data.Type != expected || field_data.sigType != expected) return E_UNEXPECTED;
+  // 普通对象地址指向 MT；FieldDesc offset 从其后开始，Size 还包含前置对象头。
+  const std::uint64_t offset = sizeof(void *) + std::uint64_t(field_data.dwOffset);
+  if (data.Size < 2 * sizeof(void *) || offset > data.Size - sizeof(void *) ||
+      size > data.Size - sizeof(void *) - offset ||
+      object > std::numeric_limits<std::uint64_t>::max() - offset)
+    return E_UNEXPECTED;
+  return target.read(object + offset, output, size);
 }
 const char *known_type(const wchar_t *name) {
   struct Known {
@@ -416,82 +490,82 @@ const char *known_type(const wchar_t *name) {
     if (std::wcscmp(name, value.wide) == 0) return value.narrow;
   return "unknown_type";
 }
-HRESULT collect_chain(IXCLRDataTask *task, Target &target, Result &result) {
+HRESULT collect_chain(IXCLRDataProcess *clr, IXCLRDataTask *task, Target &target, Result &result) {
+  Com<ISOSDacInterface> sos;
+  HRESULT hr = clr->QueryInterface(__uuidof(ISOSDacInterface), reinterpret_cast<void **>(sos.put()));
+  if (hr != S_OK || !sos.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  DacpUsefulGlobalsData globals{};
+  hr = sos->GetUsefulGlobals(&globals);
+  if (hr != S_OK) return hr;
+  if (!globals.ObjectMethodTable || !globals.ExceptionMethodTable ||
+      globals.ObjectMethodTable == globals.ExceptionMethodTable)
+    return E_UNEXPECTED;
   Com<IXCLRDataExceptionState> state;
   // first-chance 先于 CLR tracker 更新；保留 last-thrown 候选来源及原 PARTIAL 标志。
   result.exception_source = "last_thrown_object_candidate";
-  HRESULT hr = task->GetLastExceptionState(state.put());
+  hr = task->GetLastExceptionState(state.put());
   if (hr != S_OK || !state.value) return FAILED(hr) ? hr : E_NOINTERFACE;
   hr = state->GetFlags(&result.state_flags);
   if (hr != S_OK) return hr;
-  Com<IXCLRDataValue> current;
-  hr = state->GetManagedObject(current.put());
-  if (hr != S_OK || !current.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  Com<IXCLRDataValue> root;
+  hr = state->GetManagedObject(root.put());
+  if (hr != S_OK || !root.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  CLRDATA_ADDRESS address = 0;
+  hr = root->GetAddress(&address);
+  if (hr != S_OK) return hr;
   std::array<CLRDATA_ADDRESS, G09_CLR_MAX_CHAIN> seen{};
   for (unsigned depth = 0; depth < G09_CLR_MAX_CHAIN; ++depth) {
     if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
-    CLRDATA_ADDRESS address = 0;
-    hr = current->GetAddress(&address);
-    if (hr != S_OK) return hr;
+    if (!address) return E_UNEXPECTED;
     for (unsigned i = 0; i < depth; ++i)
       if (seen[i] == address) return E_UNEXPECTED;
     seen[depth] = address;
-    Com<IXCLRDataTypeInstance> type;
-    Com<IXCLRDataTypeDefinition> definition;
-    Com<IXCLRDataModule> module;
-    GUID mvid{};
-    mdTypeDef token = 0;
-    wchar_t name[256]{};
-    ULONG32 name_size = 0;
-    hr = current->GetType(type.put());
-    if (hr == S_OK) hr = type->GetName(0, 256, &name_size, name);
-    if (hr == S_OK && name_size > 0 && name_size <= 256 && name[name_size - 1] == 0)
-      hr = type->GetDefinition(definition.put());
-    else if (SUCCEEDED(hr)) hr = E_UNEXPECTED;
-    if (hr == S_OK) hr = definition->GetTokenAndScope(&token, module.put());
-    if (hr == S_OK) hr = module->GetVersionId(&mvid);
+    // 每一层重新由对象实际 MT 取类型；引用字段的声明类型不能代表 inner 的动态类型。
+    DacpObjectData object{};
+    hr = sos->GetObjectData(address, &object);
     if (hr != S_OK) return hr;
-    Com<IXCLRDataTypeInstance> exception_type;
-    Com<IXCLRDataValue> hresult_value, inner_value, native_value;
+    // 官方分类的 OBJ_OBJECT 仅指 System.Object；异常等普通派生类归为 OBJ_OTHER。
+    if (object.ObjectType != OBJ_OTHER || !object.MethodTable || object.Size < 16) return E_UNEXPECTED;
+    BoundType type, exception_type, win32_type;
+    hr = bind_type(sos.value, object.MethodTable, type);
+    if (hr != S_OK) return hr;
+    if (object.Size != type.data.BaseSize) return E_UNEXPECTED;
+    DacpFieldDescData hresult_field{}, inner_field{}, native_field{};
     std::int32_t hresult = 0, native_error = 0;
-    const HRESULT exception_type_hr = declaring_type(current.value, L"System.Exception", exception_type);
+    const HRESULT exception_type_hr =
+        declaring_type(sos.value, object.MethodTable, globals, L"System.Exception",
+                       globals.ExceptionMethodTable, target, exception_type);
     HRESULT hresult_hr = exception_type_hr;
+    if (hresult_hr == S_OK) hresult_hr = field(sos.value, exception_type, L"_HResult", target, hresult_field);
     if (hresult_hr == S_OK)
-      hresult_hr = field(current.value, exception_type.value, L"_HResult", hresult_value);
-    if (hresult_hr == S_OK) hresult_hr = scalar(hresult_value.value, hresult);
+      hresult_hr = read_field(target, address, object, hresult_field, element_i4, &hresult, sizeof(hresult));
     HRESULT inner_hr = exception_type_hr == S_OK
-                           ? field(current.value, exception_type.value, L"_innerException", inner_value)
+                           ? field(sos.value, exception_type, L"_innerException", target, inner_field)
                            : exception_type_hr;
-    Com<IXCLRDataTypeInstance> win32_type;
     const HRESULT win32_type_hr =
-        declaring_type(current.value, L"System.ComponentModel.Win32Exception", win32_type);
+        exception_type_hr == S_OK
+            ? declaring_type(sos.value, object.MethodTable, globals, L"System.ComponentModel.Win32Exception",
+                             0, target, win32_type)
+            : exception_type_hr;
     HRESULT native_hr = win32_type_hr;
+    if (native_hr == S_OK) native_hr = field(sos.value, win32_type, L"nativeErrorCode", target, native_field);
     if (native_hr == S_OK)
-      native_hr = field(current.value, win32_type.value, L"nativeErrorCode", native_value);
-    if (native_hr == S_OK) native_hr = scalar(native_value.value, native_error);
-    Com<IXCLRDataValue> next;
+      native_hr =
+          read_field(target, address, object, native_field, element_i4, &native_error, sizeof(native_error));
+    CLRDATA_ADDRESS reference = 0;
     const char *inner_status = "unavailable";
     if (inner_hr == S_OK) {
-      ULONG32 flags = 0, got = 0;
-      ULONG64 size = 0;
-      std::uint64_t reference = 0;
-      inner_hr = inner_value->GetFlags(&flags);
-      if (inner_hr == S_OK) inner_hr = inner_value->GetSize(&size);
-      if (inner_hr == S_OK && size == 8 && (flags & CLRDATA_VALUE_IS_REFERENCE))
-        inner_hr = inner_value->GetBytes(8, &got, reinterpret_cast<BYTE *>(&reference));
-      else if (SUCCEEDED(inner_hr)) inner_hr = E_UNEXPECTED;
-      if (inner_hr == S_OK && got == 8) {
+      inner_hr =
+          read_field(target, address, object, inner_field, element_class, &reference, sizeof(reference));
+      if (inner_hr == S_OK) {
         if (reference == 0) inner_status = "null";
         else if (depth + 1 == G09_CLR_MAX_CHAIN) inner_status = "truncated";
-        else {
-          inner_hr = inner_value->GetAssociatedValue(next.put());
-          if (inner_hr == S_OK && next.value) inner_status = "object";
-        }
-      } else if (SUCCEEDED(inner_hr)) inner_hr = E_UNEXPECTED;
+        else inner_status = "object";
+      }
     }
     std::ostringstream item;
-    item << "{\"type\":\"" << known_type(name) << "\",\"module_mvid\":\"" << guid(mvid)
-         << "\",\"type_token\":" << token << ",\"hresult\":";
+    item << "{\"type\":\"" << known_type(type.name) << "\",\"module_mvid\":\"" << guid(type.mvid)
+         << "\",\"type_token\":" << type.data.cl << ",\"hresult\":";
     if (hresult_hr == S_OK) item << static_cast<std::uint32_t>(hresult);
     else item << "null";
     item << ",\"hresult_read_hr\":" << static_cast<std::uint32_t>(hresult_hr) << ",\"native_error_code\":";
@@ -506,23 +580,37 @@ HRESULT collect_chain(IXCLRDataTask *task, Target &target, Result &result) {
     if (win32_type_hr == S_OK && native_hr != S_OK) return native_hr;
     if (std::strcmp(inner_status, "null") == 0) return S_OK;
     if (std::strcmp(inner_status, "object") != 0) return FAILED(inner_hr) ? inner_hr : S_FALSE;
-    current.put();
-    current.value = next.value;
-    next.value = nullptr;
+    address = reference;
   }
   return S_FALSE;
 }
-HRESULT collect_stack(IXCLRDataTask *task, Target &target, Result &result) {
+HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Result &result) {
   Com<IXCLRDataStackWalk> walk;
   HRESULT hr =
       task->CreateStackWalk(CLRDATA_SIMPFRAME_MANAGED_METHOD | CLRDATA_SIMPFRAME_RUNTIME_MANAGED_CODE |
                                 CLRDATA_SIMPFRAME_RUNTIME_UNMANAGED_CODE,
                             walk.put());
   if (hr != S_OK || !walk.value) return FAILED(hr) ? hr : E_NOINTERFACE;
+  // DAC 默认可能取旧 EH filter context；这里只更新读取器内的游标，不写目标线程。
+  alignas(16) CONTEXT stopped_context{};
+  hr = target.GetThreadContext(thread_id, CONTEXT_FULL, sizeof(stopped_context),
+                               reinterpret_cast<BYTE *>(&stopped_context));
+  if (hr != S_OK) return hr;
+  hr = walk->SetContext2(CLRDATA_STACK_SET_CURRENT_CONTEXT, sizeof(stopped_context),
+                         reinterpret_cast<BYTE *>(&stopped_context));
+  if (hr != S_OK) return hr;
   bool partial = false;
   for (unsigned n = 0; n < G09_CLR_MAX_FRAMES; ++n) {
     if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
-    hr = walk->Next();
+    // Init/SetContext2 已定位首帧；每次后续迭代才推进，非托管帧也只推进一次。
+    if (n != 0) {
+      hr = walk->Next();
+      if (hr == S_FALSE) return partial || result.frames.empty() ? S_FALSE : S_OK;
+      if (hr != S_OK) return hr;
+    }
+    CLRDataSimpleFrameType simple_type;
+    CLRDataDetailedFrameType detailed_type;
+    hr = walk->GetFrameType(&simple_type, &detailed_type);
     if (hr == S_FALSE) return partial || result.frames.empty() ? S_FALSE : S_OK;
     if (hr != S_OK) return hr;
     Com<IXCLRDataFrame> frame;
@@ -661,11 +749,11 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, Result &resul
   // 同一原停点读取完成前不 Continue；候选新鲜性由固定夹具逐事件核验，
   // 不凭 HRESULT 相同宣称当前对象，也不把 GetPrevious 当作 InnerException。
   result.stage = "observation";
-  result.exception_error = collect_chain(task.value, target, result);
+  result.exception_error = collect_chain(clr.value, task.value, target, result);
   result.object_chain_complete = result.exception_error == S_OK && !result.chain.empty();
   result.stack_error = target.expired()   ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
                        : result.exhausted ? HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_QUOTA)
-                                          : collect_stack(task.value, target, result);
+                                          : collect_stack(task.value, r.thread_id, target, result);
   result.status =
       result.object_chain_complete && result.stack_error == S_OK && !result.exhausted && !target.expired()
           ? "observed"

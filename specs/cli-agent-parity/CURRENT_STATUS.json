@@ -1,7 +1,23 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Linux74dd本轮外层Node8秒超时、无同进程阶段，旧b5发送超时仍未解释；Windows112adcc74已通过读取器编译，但真实CLR当前状态接口读到空或前一对象，夹具失败。正修复候选对象定位并加强同HRESULT旧对象拒绝；原Windows升级矩阵首updated失败及最终同源双平台门禁仍未解决，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Linux74dd本轮外层Node8秒超时、无同进程阶段，旧b5发送超时仍未解释；Windows9578948db的两个同HRESULT停点已取得不同当前原生码，但字段、内链实际类型和IL映射仍失败，正按真实MethodTable修复读取；原Windows升级矩阵首updated失败及最终同源双平台门禁仍未解决，新增关闭0项。",
+  "g09_clr_last_thrown_native_20261005": {
+    "status": "native_partial_sos_field_repair_pending",
+    "run": 37272950186,
+    "commit": "9578948db948248747f1c46b5290ce6fdf0c947b",
+    "formal_result": "failure",
+    "executed": "11普通PASS；唯一原生单项失败，4 reader均partial。",
+    "observed": "两个相同HRESULT停点实际读到1234/5678；后两根类型正确。但前两_HResult/inner E_INVALIDARG并耗预算，后两内链退化System.Exception；所有context S_OK，部分mapping E_NOINTERFACE。",
+    "boundary": "仅候选定位取得部分正例，内链实际类型、完整字段与方法映射未验收；不解释PS升级原故障。",
+    "cleanup": "53原事件全部Continue；fixture自然退出0，全部reader/fixture已回收且Job空，无pending。远端证据cleanup_ready=false不改写。",
+    "audit_sha256": "94acfa2d8c652a8137a7d7d5b7fd82890af8a863278a9dac7bafd74257022d32",
+    "next_fix": "按真实MethodTable与字段元数据读取限定字段；只设置本地stack walker为原线程CONTEXT，先读首帧再推进，不写目标或猜测IP修正。",
+    "diagnostic_capacity": "DAC字段API整块载入metadata；按已有System/mscorlib完整文件大小、原4MiB其它读取量及1MiB夹具上界共14229968字节，一次固定16MiB诊断额度。非当轮metadata大小实测，非实际通过保证；8192次、4层、32帧、所有期限与断言不变，不推广到SMA或真实PS成功。",
+    "repair_local_gates": "r-lk84e_2p Windows目标command类型check、r-9nkols20 warp check、r-0o2v4agh build-reader PS7静态解析、r-veyn5eow C++既定格式通过，均exit0并确认清理；Windows MSVC/Framework行为尚待新冻结源码运行。",
+    "newly_closed_gaps": [],
+    "localization": "无需本地化变更"
+  },
   "g09_clr_current_object_fix_20261005": {
     "status": "original_native_failure_preserved_locator_fix_pending",
     "windows": {

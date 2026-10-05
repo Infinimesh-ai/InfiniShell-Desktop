@@ -630,7 +630,7 @@ impl Fixture {
         put64(&mut bytes, 80, clr.base);
         put32(&mut bytes, 88, clr.size);
         put32(&mut bytes, 92, clr.timestamp);
-        put32(&mut bytes, 104, 4 * 1024 * 1024);
+        put32(&mut bytes, 104, 16 * 1024 * 1024);
         put32(&mut bytes, 108, 8192);
         put64(&mut bytes, 112, clr.dac.size);
         bytes[120..152].copy_from_slice(&clr.dac.sha);
