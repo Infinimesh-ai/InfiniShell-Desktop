@@ -126,7 +126,7 @@ fn witness_requires_exact_generation_and_authorized_mode() {
 }
 
 #[test]
-fn powershell_never_binds_creation_or_debug_registers() {
+fn powershell_does_not_bind_the_cmd_creation_witness() {
     let file = tempfile::tempfile().unwrap();
     let event = DEBUG_EVENT::default();
     let root = || VerifiedImage {
@@ -288,33 +288,120 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
     }
 }
 
-#[test]
-fn classification_requires_one_original_node_lease() {
-    assert!(classification_node_path(&[]).is_err());
-    let (_directory, file) = module_file(&module_bytes());
-    let mut lease =
-        lease_mapped_image(&file, &final_path_from_handle(&file).unwrap(), true, true).unwrap();
-    lease.npm_role = NpmProcessRole::Node;
-    let duplicate = lease.try_clone().unwrap();
-    assert!(classification_node_path(&[(false, lease), (false, duplicate)]).is_err());
+fn classification_package(
+    root: &Path,
+    relative: &Path,
+) -> (WindowsDirectoryLease, SystemHelperLease) {
+    let path = root.join(relative);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let mut bytes = module_bytes();
+    bytes[0x96..0x98].copy_from_slice(&0x0002u16.to_le_bytes());
+    std::fs::write(&path, bytes).unwrap();
+    (
+        prepare_directory(&AtomicDirectoryIdentity::capture(root).unwrap()).unwrap(),
+        prepare_package_image(&ExpectedFileIdentity::capture(&path).unwrap(), false).unwrap(),
+    )
 }
 
 #[test]
-fn classification_preserves_the_lease_path_utf16_spelling() {
-    let (directory, file) = module_file(&module_bytes());
-    let mut lease =
-        lease_mapped_image(&file, &final_path_from_handle(&file).unwrap(), true, true).unwrap();
-    lease.npm_role = NpmProcessRole::Node;
-    let expected: Vec<_> = directory
-        .path()
-        .join("module.dll")
-        .as_os_str()
-        .encode_wide()
-        .collect();
-    assert_eq!(
-        classification_node_path(&[(false, lease)]).unwrap(),
-        expected
+fn classification_requires_one_original_node_lease() {
+    let directory = tempfile::tempdir().unwrap();
+    let (root, mut node) = classification_package(directory.path(), Path::new(r"runtime\node.exe"));
+    let mapped = Path::new(r"Z:\");
+    assert!(classification_node_path(&[], &root, mapped).is_err());
+    let duplicate = node.try_clone().unwrap();
+    assert!(
+        classification_node_path(
+            &[(false, node.try_clone().unwrap()), (false, duplicate)],
+            &root,
+            mapped
+        )
+        .is_err()
     );
+    node.npm_role = NpmProcessRole::BoundOther;
+    assert!(classification_node_path(&[(false, node)], &root, mapped).is_err());
+}
+
+#[test]
+fn classification_maps_only_the_original_node_under_the_bound_package_root() {
+    for relative in [r"runtime\node.exe", r"install\node.exe"] {
+        let directory = tempfile::tempdir().unwrap();
+        let (root, node) = classification_package(directory.path(), Path::new(relative));
+        let original_identity = node.identity;
+        let images = [(false, node)];
+        for drive in [r"D:\", r"Z:\"] {
+            let expected: Vec<_> = format!("{drive}{relative}").encode_utf16().collect();
+            assert_eq!(
+                classification_node_path(&images, &root, Path::new(drive)).unwrap(),
+                expected
+            );
+            assert_eq!(
+                inspect_handle(&images[0].1.program).unwrap(),
+                original_identity
+            );
+        }
+    }
+}
+
+#[test]
+fn classification_rejects_non_root_or_alternate_mapped_root_spelling() {
+    let directory = tempfile::tempdir().unwrap();
+    let (root, node) = classification_package(directory.path(), Path::new(r"runtime\node.exe"));
+    let images = [(false, node)];
+    for mapped in [
+        r"C:\",
+        r"z:\",
+        r"Z:",
+        r"Z:\child",
+        r"\\?\Z:\",
+        r"\\server\share",
+        "Z:\\\0",
+    ] {
+        assert!(classification_node_path(&images, &root, Path::new(mapped)).is_err());
+    }
+}
+
+#[test]
+fn classification_rejects_same_name_nodes_outside_the_original_root_or_layout() {
+    let directory = tempfile::tempdir().unwrap();
+    let (root, _node) = classification_package(
+        &directory.path().join("package"),
+        Path::new(r"runtime\node.exe"),
+    );
+    let (_other_root, other_node) = classification_package(
+        &directory.path().join("package-neighbor"),
+        Path::new(r"runtime\node.exe"),
+    );
+    assert!(classification_node_path(&[(false, other_node)], &root, Path::new(r"Z:\")).is_err());
+    for relative in [
+        r"elsewhere\node.exe",
+        r"runtime\nested\node.exe",
+        r"runtime\Node.exe",
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let (root, node) = classification_package(directory.path(), Path::new(relative));
+        assert!(classification_node_path(&[(false, node)], &root, Path::new(r"Z:\")).is_err());
+    }
+}
+
+#[test]
+fn classification_rechecks_original_root_and_node_identity_before_mapping() {
+    let directory = tempfile::tempdir().unwrap();
+    let (mut root, mut node) =
+        classification_package(directory.path(), Path::new(r"runtime\node.exe"));
+    let original_root = root.identity;
+    root.identity.index ^= 1;
+    assert!(
+        classification_node_path(
+            &[(false, node.try_clone().unwrap())],
+            &root,
+            Path::new(r"Z:\")
+        )
+        .is_err()
+    );
+    root.identity = original_root;
+    node.sha256 = "0".repeat(64);
+    assert!(classification_node_path(&[(false, node)], &root, Path::new(r"Z:\")).is_err());
 }
 
 #[test]

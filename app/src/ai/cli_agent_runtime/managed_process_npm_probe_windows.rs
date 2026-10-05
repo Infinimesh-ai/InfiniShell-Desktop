@@ -524,6 +524,8 @@ pub(super) fn execute(
                 manifest.generation,
                 input.mode(),
                 &environment,
+                &cwd,
+                root,
                 record_directory,
                 reader.as_ref(),
             )?;

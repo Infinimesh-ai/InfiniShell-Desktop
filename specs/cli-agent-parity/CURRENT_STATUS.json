@@ -2,6 +2,21 @@
   "schema": 1,
   "status": "windows_g09_in_progress_pr_draft",
   "status_zh": "G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Windows本机及原runner固定能力55普通及唯一native通过；原runner绑定e4e690dd且CLR/DAC字节与原失败相同。真实PS分类接入进行中；原PS退出1/零输出而Node/Codex随后退出0的首因仍未证实，最终同源双平台门禁未完成。新增关闭0项。",
+  "g09_ps_mapped_path_binding_20261006": {
+    "base_commit": "b1150f4a4aeb9c2f5b4f847716d2470d67f3114f",
+    "cancelled_run": 37349685626,
+    "cancelled_before_candidate": true,
+    "cancelled_step": "Check InfiniShell-Desktop",
+    "reader_and_candidate_steps": "skipped",
+    "audit_sha256": "9c782642a6f0bc9039a3d34b8a81220312f2144b34eba6f4626e9b2e479210b7",
+    "gap": "旧诊断期望Node宿主物理DOS路径，但实际候选由本代私有DeviceMap根访问；旧静审未证明分类参数路径等价。此为诊断接线缺口，不是原PS首因。",
+    "repair": "已把传给spawn的原目录租约和同一闭包已验证的映射根绑定到唯一Node租约；前后核FileID/SHA、原Node祖先包含root身份、逐UTF16精确路径边界，仅允许install/runtime两种node.exe后缀，不在宿主重开私有盘符。",
+    "static_audit_sha256": "2f9df189671ae2ed93dc24c9c20cdb804a4f31e8fe0c5333a7dfdeb9bd0f8845",
+    "local_validation": {"warp_check": "passed", "warp_check_log_sha256": "816e66a8bd1fedfb4939df0adfe53d98bd75cd4a5aa9c146517967d78f3ef927", "feature_tests_pass": 34, "feature_tests_log_sha256": "d23d597a12e904684fde43a278d9644c7141305e53a160abdb4450298e5dd8cf", "format_and_diff_check": "passed"},
+    "native_cause_proven": false,
+    "newly_closed_gaps": [],
+    "localization": "无需本地化变更；仅内部诊断路径绑定，没有GUI/TUI文案或布局变化。"
+  },
   "g09_ps_classification_integration_20261006": {
     "base_commit": "e4e690dd7e9e6986237d5f9c43d6107dc84f62f7",
     "main_integrated": "d155f1daf9a848f317d9a24a6b96641c995bd4e6",

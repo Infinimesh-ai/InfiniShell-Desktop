@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-06：候选前取消，补齐本代私有映射路径绑定
+
+`b1150f4a4aeb9c2f5b4f847716d2470d67f3114f` 的 [37349685626](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37349685626) 已在源码检查阶段主动取消。原runner22的最终API确认reader与真实候选步骤全部跳过，不能记成候选失败。日志ZIP与现有环境工件完整保留，取消独审SHA `9c782642a6f0bc9039a3d34b8a81220312f2144b34eba6f4626e9b2e479210b7`。
+
+复核发现旧诊断从Node原租约取得宿主物理DOS路径，但候选通过本代私有DeviceMap根访问；旧五文件静审没有建立分类参数的路径等价。现将传给spawn的原目录租约及同一闭包已验证的映射根接入绑定，前后核唯一Node角色、原FileID/SHA及祖先root身份，按原句柄UTF16精确路径边界推导，仅接受install/runtime两种node.exe布局，不在宿主重开私有盘符。三文件静审SHA `2f9df189671ae2ed93dc24c9c20cdb804a4f31e8fe0c5333a7dfdeb9bd0f8845`；本机warp check和34项诊断特性测试通过，测试日志SHA `d23d597a12e904684fde43a278d9644c7141305e53a160abdb4450298e5dd8cf`。原静审和取消记录均保留；实际PS返回仍待完成，不把这个诊断接线缺口称作原PS首因。无需本地化变更，新增关闭0项，PR草稿。
+
 ## 2026-10-06：接入首 PS 分类停点并整合 main
 
 固定能力在本机及原runner均通过后，PS opt-in路径复用相同 `ShellClassificationWitness` 与 `ClrReader`，只接收唯一Node租约已核原CREATE之后的一次分类返回。Shell32绑定原LOAD文件句柄与授权拒写租约；generation、进程/线程birth及事件顺序贯通至operation3。在原停点恢复所有自有DR后读取CLR栈，reader与精确Job退出后才Continue；旧26异常采集不再调用。无命中保留unknown，不从静态代码或分类结果直接推断候选成功。

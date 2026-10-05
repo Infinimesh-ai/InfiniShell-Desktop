@@ -185,7 +185,19 @@ pub(super) struct NativeWitness {
     exit_confirmed: bool,
 }
 
-fn classification_node_path(images: &[(bool, SystemHelperLease)]) -> io::Result<Vec<u16>> {
+fn classification_node_path(
+    images: &[(bool, SystemHelperLease)],
+    package_root: &WindowsDirectoryLease,
+    mapped_root: &Path,
+) -> io::Result<Vec<u16>> {
+    let mapped: Vec<_> = mapped_root.as_os_str().encode_wide().collect();
+    if mapped.len() != 3
+        || !(b'D' as u16..=b'Z' as u16).contains(&mapped[0])
+        || mapped[1..] != [58, 92]
+    {
+        return Err(error("native_witness.mapped_root_invalid"));
+    }
+    package_root.verify_for_spawn()?;
     let mut nodes = images
         .iter()
         .filter(|(dll, lease)| !dll && lease.npm_role == NpmProcessRole::Node);
@@ -196,20 +208,37 @@ fn classification_node_path(images: &[(bool, SystemHelperLease)]) -> io::Result<
         return Err(error("native_witness.node_lease_ambiguous"));
     }
     node.verify_image(&node.program)?;
-    let path = final_path_from_handle(&node.program)?;
-    let units: Vec<_> = path.as_os_str().encode_wide().collect();
-    // 原租约的 DOS 路径只移除设备前缀；不改大小写、不借名称相似的路径替换。
-    let units = units.strip_prefix(&[92, 92, 63, 92]).unwrap_or(&units);
-    if units.len() < 3
-        || !((b'A' as u16..=b'Z' as u16).contains(&units[0])
-            || (b'a' as u16..=b'z' as u16).contains(&units[0]))
-        || units[1..3] != [58, 92]
-        || units.contains(&0)
+    if !node
+        .ancestors
+        .iter()
+        .any(|ancestor| ancestor.identity.id == package_root.identity)
     {
-        return Err(error("native_witness.node_lease_not_dos_path"));
+        return Err(error("native_witness.node_outside_package_root"));
     }
+    let original_root = package_root
+        .ancestors
+        .last()
+        .ok_or_else(|| error("native_witness.package_root_lease_missing"))?;
+    let root = final_path_from_handle(&original_root.file)?;
+    let node_path = final_path_from_handle(&node.program)?;
+    let root: Vec<_> = root.as_os_str().encode_wide().collect();
+    let node_path: Vec<_> = node_path.as_os_str().encode_wide().collect();
+    // 原 Node 拒写租约与目录租约先核共同身份，再逐 UTF-16 单元核对路径边界与固定布局。
+    // mapped_root 来自同一 cwd 的 station 验证回调；宿主绝不重开目标登录会话的局部盘。
+    let suffix = node_path
+        .strip_prefix(root.as_slice())
+        .and_then(|suffix| suffix.strip_prefix(&[92]))
+        .ok_or_else(|| error("native_witness.node_root_path_mismatch"))?;
+    if ![r"runtime\node.exe", r"install\node.exe"]
+        .iter()
+        .any(|relative| suffix.iter().copied().eq(relative.encode_utf16()))
+    {
+        return Err(error("native_witness.node_layout_mismatch"));
+    }
+    let expected = mapped.into_iter().chain(suffix.iter().copied()).collect();
     node.verify_image(&node.program)?;
-    Ok(units.to_vec())
+    package_root.verify_for_spawn()?;
+    Ok(expected)
 }
 
 fn enabled(
@@ -319,6 +348,8 @@ impl WindowsImageDebugSession {
         generation: Uuid,
         mode: &str,
         environment: &[(OsString, OsString)],
+        package_root: &WindowsDirectoryLease,
+        mapped_root: &Path,
         record_directory: &Path,
         reader: Option<&super::super::NativeWitnessReaderBinding>,
     ) -> io::Result<()> {
@@ -337,6 +368,8 @@ impl WindowsImageDebugSession {
             let expected_node = match mode {
                 WitnessMode::PowerShell => Some(classification_node_path(
                     self.package_images.as_deref().unwrap_or_default(),
+                    package_root,
+                    mapped_root,
                 )?),
                 WitnessMode::Cmd => None,
             };
