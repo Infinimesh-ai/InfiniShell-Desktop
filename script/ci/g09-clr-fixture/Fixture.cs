@@ -1,20 +1,52 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 
-// 固定异常只验证原调试停点的读取能力，不执行网络、文件或 CLI 操作。
+// 固定异常和本地映像分类只验证原调试停点，不执行网络或真实 CLI 操作。
 internal static class ClrFixture
 {
     private static int result = 1;
 
-    private static int Main()
+    private static int Main(string[] arguments)
     {
+        // 子模式在创建工作线程前返回，不能递归启动另一份夹具。
+        if (arguments.Length == 1 && arguments[0] == "--bound-node-child")
+            return Path.GetFileName(Assembly.GetExecutingAssembly().Location) == "fixture-node.exe" ? 0 : 3;
+        if (arguments.Length != 0) return 3;
         // 特意使用工作线程，防止读取器把创建时的主线程冒充当前异常线程。
         Thread worker = new Thread(Exercise);
         worker.Start();
         worker.Join();
         return result;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern UIntPtr SHGetFileInfoW(string path, uint attributes, IntPtr information,
+                                               uint informationSize, uint flags);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ClassifyBoundNode()
+    {
+        string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                                   "fixture-node.exe");
+        if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) path = path.Substring(4);
+        ProcessStartInfo start = new ProcessStartInfo(path, "--bound-node-child");
+        start.UseShellExecute = false;
+        start.CreateNoWindow = true;
+        using (Process child = Process.Start(start))
+        {
+            if (child == null || !child.WaitForExit(5000) || child.ExitCode != 0)
+                throw new InvalidOperationException("fixed child failed");
+        }
+        // 唯一固定本地路径；只记录 API 返回低 32 位，不输出路径或环境。
+        UIntPtr value = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
+        Console.WriteLine(unchecked((uint)value.ToUInt64()).ToString(CultureInfo.InvariantCulture));
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -56,6 +88,7 @@ internal static class ClrFixture
 
     private static void Exercise()
     {
+        ClassifyBoundNode();
         try { WrapOperation(); }
         catch (ApplicationException exception)
         {

@@ -868,15 +868,18 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, Result &resul
   // 同一原停点读取完成前不 Continue；候选新鲜性由固定夹具逐事件核验，
   // 不凭 HRESULT 相同宣称当前对象，也不把 GetPrevious 当作 InnerException。
   result.stage = "observation";
-  result.exception_error = collect_chain(clr.value, task.value, target, result);
-  result.object_chain_complete = result.exception_error == S_OK && !result.chain.empty();
+  if (r.operation == 1) {
+    result.exception_error = collect_chain(clr.value, task.value, target, result);
+    result.object_chain_complete = result.exception_error == S_OK && !result.chain.empty();
+  }
+  // operation 3 是调用方自有的原生返回单步，只读当前 CLR 栈，不查询异常对象。
   result.stack_error = target.expired()   ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
                        : result.exhausted ? HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_QUOTA)
                                           : collect_stack(task.value, r.thread_id, target, result);
-  result.status =
-      result.object_chain_complete && result.stack_error == S_OK && !result.exhausted && !target.expired()
-          ? "observed"
-          : "partial";
+  result.status = (r.operation == 3 ? !result.frames.empty() : result.object_chain_complete) &&
+                          result.stack_error == S_OK && !result.exhausted && !target.expired()
+                      ? "observed"
+                      : "partial";
   result.error = S_OK;
 }
 
@@ -893,8 +896,10 @@ bool valid_request(const G09ClrRequest &r) {
     allowed.deadline_tick_ms = r.deadline_tick_ms;
     return std::memcmp(&allowed, &r, sizeof(r)) == 0;
   }
-  return r.operation == 1 && r.event_sequence && r.process_id && r.thread_id && r.process_birth &&
-         r.thread_birth && r.process_handle && r.thread_handle && r.process_handle != r.thread_handle &&
+  const bool stop_kind = (r.operation == 1 && r.exception_code == 0xe0434352) ||
+                         (r.operation == 3 && r.exception_code == 0x80000004 && r.exception_hresult == 0);
+  return stop_kind && r.event_sequence && r.process_id && r.thread_id && r.process_birth && r.thread_birth &&
+         r.process_handle && r.thread_handle && r.process_handle != r.thread_handle &&
          r.process_handle < (std::uint64_t(1) << 63) && r.thread_handle < (std::uint64_t(1) << 63) &&
          r.clr_base && r.clr_image_size >= sizeof(IMAGE_NT_HEADERS64) &&
          r.clr_base <= std::numeric_limits<std::uint64_t>::max() - r.clr_image_size &&
@@ -902,7 +907,7 @@ bool valid_request(const G09ClrRequest &r) {
           r.read_budget_bytes == G09_CLR_POWERSHELL_READ_BYTES) &&
          r.read_budget_calls && r.read_budget_calls <= G09_CLR_MAX_READ_CALLS && r.dac_file_size &&
          r.dac_file_size <= 64 * 1024 * 1024 && nonzero(r.dac_sha256, 32) && r.dac_path_units &&
-         r.dac_path_units <= G09_CLR_MAX_PATH_UNITS && r.first_chance == 1 && r.exception_code == 0xe0434352;
+         r.dac_path_units <= G09_CLR_MAX_PATH_UNITS && r.first_chance == 1;
 }
 std::string output(const G09ClrRequest &r, const Result &result) {
   std::ostringstream text;

@@ -238,6 +238,7 @@ class ClrFixtureScopeTests(unittest.TestCase):
         self.assertEqual(commands[0]["run"], "cargo check --locked -p command --tests")
         self.assertIn("--retries 0", commands[1]["run"])
         self.assertIn("test(windows::clr_fixture_tests::) | test(windows::clr_reader::tests::)", commands[1]["run"])
+        self.assertIn("test(windows::shell_classification::tests::)", commands[1]["run"])
         self.assertEqual(commands[2]["shell"], "powershell")
         self.assertEqual(commands[2]["run"], "./script/ci/g09-clr-fixture/build-reader.ps1")
         self.assertEqual(commands[3]["shell"], "powershell")

@@ -316,8 +316,18 @@ mod tests;
 #[path = "windows_clr_reader.rs"]
 mod clr_reader;
 #[cfg(any(test, feature = "native-probe-witness"))]
-pub use clr_reader::{ClrExceptionStop, ClrReader, ClrReaderImage, ClrRuntimeBinding};
+pub use clr_reader::{
+    ClrExceptionStop, ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding,
+};
 
-#[cfg(test)]
+#[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
+#[path = "windows_shell_classification.rs"]
+mod shell_classification;
+#[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
+pub use shell_classification::{
+    Observation as ShellClassificationObservation, ShellClassificationWitness,
+};
+
+#[cfg(all(test, target_arch = "x86_64"))]
 #[path = "windows_clr_fixture_tests.rs"]
 mod clr_fixture_tests;

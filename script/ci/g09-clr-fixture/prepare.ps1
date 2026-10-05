@@ -33,10 +33,11 @@ $compiler = Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319\csc.
 $inputReader = (Resolve-Path -LiteralPath $Reader).Path
 $copiedReader = Join-Path $root 'reader.exe'
 $fixture = Join-Path $root 'fixture.exe'
+$fixtureNode = Join-Path $root 'fixture-node.exe'
 $receipt = [ordered]@{
     schema = 1; source_commit = $env:GITHUB_SHA; status = 'preparing'
     native_execution_started = $false; cleanup_ready = $false
-    scope = '固定 Framework 异常读取夹具；不代表 PowerShell 或 G09 通过'
+    scope = '固定 Framework 异常及本地映像分类读取夹具；不代表 PowerShell 或 G09 通过'
 }
 try {
     foreach ($path in @($source, $compiler, $inputReader)) {
@@ -58,11 +59,19 @@ try {
         throw '固定 Framework 夹具编译失败'
     }
     $receipt.fixture_sha256 = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash.ToLowerInvariant()
+    Copy-Item -LiteralPath $fixture -Destination $fixtureNode
+    $receipt.fixture_node_sha256 = (Get-FileHash -LiteralPath $fixtureNode -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($receipt.fixture_node_sha256 -ne $receipt.fixture_sha256) {
+        throw '固定无害子模式副本摘要不匹配'
+    }
     # 只读取刚编译原件的元数据；不调用 Main、类型初始化器或异常方法。
     $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($fixture)
     $receipt.fixture_mvid = $assembly.ManifestModule.ModuleVersionId.ToString('D')
     $type = $assembly.GetType('ClrFixture', $true)
     $flags = [Reflection.BindingFlags]'Static, NonPublic'
+    $shellMethod = $type.GetMethod('ClassifyBoundNode', $flags)
+    if ($null -eq $shellMethod) { throw '固定映像分类方法元数据缺失' }
+    $receipt.fixture_shell_method_token = $shellMethod.MetadataToken
     $receipt.fixture_method_tokens = @('ThrowNative', 'ThrowSecondNative', 'WrapNative', 'WrapOperation', 'Exercise') | ForEach-Object {
         $method = $type.GetMethod($_, $flags)
         if ($null -eq $method) { throw '固定夹具方法元数据缺失' }

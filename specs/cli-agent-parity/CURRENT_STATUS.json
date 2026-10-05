@@ -11031,5 +11031,20 @@
     "prior_final_index_sha256": "3e82fc75debafdbcc1e73ce8bc40224f1fe3dcc660ebcf4eed4ec1233fc01b4d",
     "prior_errors_sha256": "d110ff5dbde657eb6b9c352648a9d9df5a1d1545b0ed055a577084f802f2fcc7",
     "orphan_observer_cleanup_sha256": "c5da12cfbb0614e1b2f562bc5031987d0fde299af9461a5530f052441e42a336"
+  },
+  "g09_shell_classification_capability_20261005": {
+    "base_commit": "11a18a8d06a9c9af1dd3f8461d1c637f0620d0b4",
+    "status": "fixed_native_capability_pending",
+    "local_gate_summary_sha256": "794fea446eca094bad7d5ecd90f077be06a1c6f7522d9b20227b47cb3fde42fb",
+    "local_gates": "warp check/i18n11、Windows测试及诊断特性metadata、Python28/19、PowerShell AST、actionlint通过；8登记根均清理，不等于Windows原生通过",
+    "windows_ordinary_tests_pending": 38,
+    "windows_native_test_pending": 1,
+    "scope": "一次已绑定Node的SHGetFileInfoW返回与原停点CLR frames-only栈；尚未接入真实PowerShell候选",
+    "identity": "原CREATE/LOAD句柄、工作线程出生身份、入口栈/返回RSP、映射及有界代码字节；返回前自有DR恢复读回，退出回收分别记证",
+    "fixture": "唯一无害本地子CREATE、工作线程MEM_PRIVATE返回、原生低32返回与夹具自行输出一致、精确MVID/MethodDef及原四异常回归",
+    "limits": "不复跑26异常；未命中unknown，不推断UseShellExecute；普通命令、权限、期限及五场景/三冷恢复不变",
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "localization": "无需本地化变更；仅默认关闭诊断、固定夹具及源码绑定，无GUI/TUI文案、语义或布局变化。"
   }
 }

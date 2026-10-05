@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：一次原生分类返回与同停点CLR栈能力准备
+
+以`11a18a8d06a9c9af1dd3f8461d1c637f0620d0b4`为基础，新增只对本轮绑定Node、flags=0x2000的SHGetFileInfoW入口／返回观察。原CREATE/LOAD句柄及线程出生身份、原入口栈与返回RSP、私有或映像可执行映射及有界代码字节均需匹配；返回前恢复全部仍持有线程的自有DR并读回整数／控制上下文，首次返回后永久停止。退出回收与恢复读回分别记录，未取得返回保持unknown，不据此推断UseShellExecute或退出原因。
+
+共享CLR读取器新增独立operation 3，只在原自有返回单步事件读取托管栈；协议长度与版本、原operation 1/2、预算及Job回收保持。固定夹具在原工作线程启动唯一已绑定的无害本地子模式，核对真实CREATE、MEM_PRIVATE返回、夹具自行记录的返回低32位、精确MVID/MethodDef、reader回收和后续原四异常链。非自有异常继续交给原进程。该能力尚未接入真实PS候选，Windows原生结果待验；本轮不重复读取原26异常，也不执行正常更新矩阵。
+
+本机warp check、i18n 11项、Windows MSVC目标command测试及诊断特性metadata检查、Python来源合同28项、工作流合同19项、PowerShell AST及actionlint通过，8个登记根已清理。汇总SHA `794fea446eca094bad7d5ecd90f077be06a1c6f7522d9b20227b47cb3fde42fb`，只证明上述范围；Windows 38项普通测试及唯一原生用例尚待实际执行。独审发现的普通DLL误触发Shell32卸载和夹具线程副本缺SYNCHRONIZE均已修正；大JSON宏递归的本地编译失败原件保留，修复采用拆分固定值，未提高宏或运行期限。
+
+无需本地化变更：仅默认关闭的原生诊断能力、固定夹具和源码绑定变化，无GUI/TUI文案、语义或布局变化。新增关闭0项；10项关闭、G09开放、V01/V02/V05移交不计通过，最终同源双平台门禁待完成，PR保持草稿。
+
 ## 2026-10-05：原PS失败异常已保全，按实际帧补齐静态映射
 
 后续静态[b163运行37328199520](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37328199520)已终态failure：stage=completed、failure=null，110方法中108 decoded，仅原两个no_body导致partial；新增39方法和9类型均采齐，原71方法IL/EH未变。合同SHA `d6ae4082fe989adf7622b326bddab86a14deeefa17166578a03d0fd5bdc01baf`，独审SHA `64d7c0e1fb0c761109d08afef1dbb9894a5aeae92d78f641a090b595dfc2f525`。175/176/178/179为ItemNotFoundException及模块发现栈；187–203为ExitException/RethrowException解释器传播。37个不同常规IL位置皆落指令起点，40次特殊位置不作普通IL。所有26条仍为last_thrown_object_candidate、EH tracker不完整，178/179达到8192读取调用上限；IL映射不能反推对象Argument或运行时布尔。

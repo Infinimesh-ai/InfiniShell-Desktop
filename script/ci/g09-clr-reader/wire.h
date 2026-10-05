@@ -9,7 +9,7 @@
 struct G09ClrRequest {
   std::uint8_t magic[8];           // 0: G09CLR1\0
   std::uint32_t version;           // 8: 1
-  std::uint32_t operation;         // 12: 1 只读；2 无目标的阻塞清理夹具
+  std::uint32_t operation;         // 12: 1 CLR异常；2 无目标清理夹具；3 自有原生返回栈
   std::uint8_t nonce[16];          // 16: 本轮非零随机值
   std::uint64_t event_sequence;    // 32: 控制器精确 pending event 序号
   std::uint32_t process_id;        // 40
@@ -27,9 +27,9 @@ struct G09ClrRequest {
   std::uint64_t dac_file_size;     // 112: 非零且 <= 64 MiB
   std::uint8_t dac_sha256[32];     // 120: 原生 CLR 配套 DAC 的原文件摘要
   std::uint32_t dac_path_units;    // 152: 非零且 <= 1024
-  std::uint32_t exception_hresult; // 156: 原事件 ExceptionInformation[0] 低32位，仅作对照
+  std::uint32_t exception_hresult; // 156: op1原事件HRESULT，仅作对照；op3必须为0
   std::uint32_t first_chance;      // 160: 必须为1
-  std::uint32_t exception_code;    // 164: 必须为0xe0434352
+  std::uint32_t exception_code;    // 164: op1为0xe0434352；op3为0x80000004
 };
 #pragma pack(pop)
 static_assert(sizeof(G09ClrRequest) == 168);

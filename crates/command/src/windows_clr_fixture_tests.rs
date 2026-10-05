@@ -1,6 +1,6 @@
-//! 固定 Framework 异常夹具；只证明原调试停点读取及 reader 回收，不代表 G09 通过。
+//! 固定 Framework 异常与映像分类夹具；只证明原停点读取及 reader 回收，不代表 G09 通过。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write as _};
 use std::os::windows::io::{AsHandle as _, AsRawHandle as _, FromRawHandle as _, OwnedHandle};
@@ -19,16 +19,18 @@ use windows::Win32::System::Diagnostics::Debug::{
     OUTPUT_DEBUG_STRING_EVENT, RIP_EVENT, UNLOAD_DLL_DEBUG_EVENT, WaitForDebugEvent,
 };
 use windows::Win32::System::Threading::{
-    DEBUG_ONLY_THIS_PROCESS, GetCurrentProcess, GetProcessId, GetProcessIdOfThread, GetThreadId,
-    THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION, WaitForSingleObject,
+    DEBUG_PROCESS, GetCurrentProcess, GetProcessId, GetProcessIdOfThread, GetThreadId,
+    PROCESS_QUERY_INFORMATION, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE, THREAD_GET_CONTEXT,
+    THREAD_QUERY_INFORMATION, THREAD_SYNCHRONIZE, TerminateProcess, WaitForSingleObject,
 };
 use windows::core::HRESULT;
 
 use super::clr_reader::{
-    BoundFile, ClrExceptionStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, Job, birth,
-    duplicate, empty_environment, file_identity, hex, image_path, information, put64, raw,
-    remaining, request, require,
+    BoundFile, ClrExceptionStop, ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding,
+    Job, birth, duplicate, empty_environment, file_identity, hex, image_path, information, put64,
+    raw, remaining, request, require,
 };
+use super::{ShellClassificationObservation, ShellClassificationWitness};
 use crate::blocking::Command;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -57,17 +59,33 @@ struct Fixture {
     active_reader: Option<ClrReader>,
     pending: Option<(DEBUG_EVENT, NTSTATUS)>,
     termination_requested: bool,
+    node_image: BoundFile,
+    descendants: HashMap<u32, OwnedHandle>,
+    descendant_exits: HashMap<u32, u32>,
+    node_created: Option<Value>,
+    shell32: Option<BoundFile>,
+    shell: Option<ShellClassificationWitness>,
+    shell_entries: Vec<Value>,
+    shell_observation: Option<Value>,
+    initial_breakpoints: HashSet<u32>,
+    handling_stage: &'static str,
 }
 
 impl Fixture {
-    fn start(image: &mut BoundFile, root: &Path, cleanup_deadline: Instant) -> io::Result<Self> {
+    fn start(
+        image: &mut BoundFile,
+        mut node_image: BoundFile,
+        root: &Path,
+        cleanup_deadline: Instant,
+    ) -> io::Result<Self> {
         image.verify()?;
+        node_image.verify()?;
         let mut command = Command::new_with_managed_process_group(&image.path);
         empty_environment(&mut command, root)?;
         // CREATE 调试事件在任何用户态执行前发生；只在该停点入 Job 后 Continue。
         // 不叠加 CREATE_SUSPENDED，避免等待尚未获调度的主线程发出创建事件。
         command
-            .creation_flags(DEBUG_ONLY_THIS_PROCESS.0)
+            .creation_flags(DEBUG_PROCESS.0)
             .stdin(Stdio::null())
             .stdout(
                 OpenOptions::new()
@@ -99,6 +117,16 @@ impl Fixture {
             active_reader: None,
             pending: None,
             termination_requested: false,
+            node_image,
+            descendants: HashMap::new(),
+            descendant_exits: HashMap::new(),
+            node_created: None,
+            shell32: None,
+            shell: None,
+            shell_entries: vec![],
+            shell_observation: None,
+            initial_breakpoints: HashSet::new(),
+            handling_stage: "not_started",
         })
     }
 
@@ -112,7 +140,7 @@ impl Fixture {
         let handle = duplicate(
             thread,
             unsafe { GetCurrentProcess() },
-            (THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION).0,
+            (THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SYNCHRONIZE).0,
         )?;
         self.threads
             .insert(id, unsafe { OwnedHandle::from_raw_handle(handle.0) });
@@ -189,11 +217,172 @@ impl Fixture {
         Ok(())
     }
 
+    fn capture_native_return(
+        &mut self,
+        event: &DEBUG_EVENT,
+        receipt: Value,
+        image: &mut ClrReaderImage,
+        root: &Path,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        require(self.shell_observation.is_none(), "固定分类调用只能返回一次")?;
+        require(self.active_reader.is_none(), "上次 reader 尚未释放")?;
+        self.shell_observation =
+            Some(json!({"classification":receipt,"main_tid":self.main_thread}));
+        let shell = self
+            .shell
+            .as_ref()
+            .ok_or_else(|| io::Error::other("分类观察器缺失"))?;
+        require(
+            !shell.requires_restoration(),
+            "分类返回后仍有未恢复调试寄存器",
+        )?;
+        self.shell_observation
+            .as_mut()
+            .expect("刚记录的分类返回必须存在")["live_threads_restored_before_reader"] =
+            json!(true);
+        let clr = self
+            .clr
+            .as_mut()
+            .ok_or_else(|| io::Error::other("分类返回缺少原 CLR 映像"))?;
+        self.active_reader = Some(ClrReader::start_native_return(
+            image,
+            root,
+            self.sequence,
+            deadline,
+        )?);
+        let reader = self
+            .active_reader
+            .as_mut()
+            .expect("刚创建的 reader 必须存在");
+        let exception = unsafe { event.u.Exception };
+        reader.bind_native_return_and_send(
+            image,
+            clr,
+            ClrNativeReturnStop {
+                process: shell.process_handle(),
+                thread: shell.thread_handle(event.dwThreadId)?,
+                process_id: event.dwProcessId,
+                thread_id: event.dwThreadId,
+                event_sequence: self.sequence,
+                exception_code: exception.ExceptionRecord.ExceptionCode.0 as u32,
+                first_chance: exception.dwFirstChance,
+                hresult: 0,
+                read_budget_bytes: 16 * 1024 * 1024,
+            },
+        )?;
+        let result = loop {
+            if let Some(result) = reader.poll(|| false)? {
+                break result;
+            }
+        };
+        clr.verify()?;
+        let mut observation = reader
+            .binding()
+            .expect("成功读取必须保留原返回停点绑定")
+            .clone();
+        observation["main_tid"] = json!(self.main_thread);
+        observation["classification"] = receipt;
+        observation["live_threads_restored_before_reader"] = json!(true);
+        observation["reader"] = result;
+        observation["reader_reaped"] = json!(reader.is_reaped());
+        observation["reader_job_empty"] = json!(reader.job_empty_fixture()?);
+        self.shell_observation = Some(observation);
+        self.active_reader.take();
+        Ok(())
+    }
+
+    fn handle_descendant(
+        &mut self,
+        event: &DEBUG_EVENT,
+        file: Option<&mut File>,
+        cleanup: bool,
+    ) -> io::Result<()> {
+        self.handling_stage = "descendant_event";
+        match event.dwDebugEventCode {
+            CREATE_PROCESS_DEBUG_EVENT => {
+                self.handling_stage = "node_create_binding";
+                let info = unsafe { event.u.CreateProcessInfo };
+                require(
+                    !self.descendants.contains_key(&event.dwProcessId),
+                    "重复子进程 CREATE",
+                )?;
+                let handle = duplicate(
+                    info.hProcess,
+                    unsafe { GetCurrentProcess() },
+                    (PROCESS_QUERY_INFORMATION | PROCESS_SYNCHRONIZE | PROCESS_TERMINATE).0,
+                )?;
+                self.descendants.insert(event.dwProcessId, unsafe {
+                    OwnedHandle::from_raw_handle(handle.0)
+                });
+                if cleanup {
+                    // 精确 Job 可能已请求退出；继续原事件并在收尾核原句柄，不能卡住调试清理。
+                    let _ = unsafe { TerminateProcess(handle, 1) };
+                    return Ok(());
+                }
+                require(
+                    self.node_created.is_none() && self.descendants.len() == 1,
+                    "无害子模式必须只有一个真实 CREATE",
+                )?;
+                self.node_image.verify()?;
+                let file = file.ok_or_else(|| io::Error::other("子 CREATE 缺少原映像"))?;
+                let created = birth(info.hProcess, false)?;
+                require(
+                    unsafe { GetProcessId(info.hProcess) } == event.dwProcessId
+                        && unsafe { GetProcessIdOfThread(info.hThread) } == event.dwProcessId
+                        && unsafe { GetThreadId(info.hThread) } == event.dwThreadId
+                        && created != 0
+                        && file_identity(&information(file)?) == self.node_image.identity
+                        && image_path(file)? == self.node_image.path
+                        && BoundFile::digest(file)? == self.node_image.sha,
+                    "子 CREATE 未匹配唯一固定映像及出生身份",
+                )?;
+                self.shell
+                    .as_mut()
+                    .ok_or_else(|| io::Error::other("子 CREATE 先于原根绑定"))?
+                    .set_node_created(event, self.sequence, created)?;
+                self.node_created = Some(
+                    json!({"pid":event.dwProcessId,"birth":created,"sequence":self.sequence,
+                    "image":self.node_image.receipt(),"original_create_bound":true}),
+                );
+                Ok(())
+            }
+            EXIT_PROCESS_DEBUG_EVENT => {
+                require(
+                    self.descendants.contains_key(&event.dwProcessId),
+                    "子退出缺少原 CREATE",
+                )?;
+                require(
+                    self.descendant_exits
+                        .insert(event.dwProcessId, unsafe { event.u.ExitProcess.dwExitCode })
+                        .is_none(),
+                    "重复子退出",
+                )
+            }
+            CREATE_THREAD_DEBUG_EVENT
+            | EXIT_THREAD_DEBUG_EVENT
+            | LOAD_DLL_DEBUG_EVENT
+            | UNLOAD_DLL_DEBUG_EVENT
+            | EXCEPTION_DEBUG_EVENT
+            | OUTPUT_DEBUG_STRING_EVENT => require(
+                self.descendants.contains_key(&event.dwProcessId),
+                "子事件缺少原 CREATE",
+            ),
+            RIP_EVENT => Err(io::Error::other("子模式发生原生调试错误")),
+            _code => Err(io::Error::other("子模式出现未知调试事件")),
+        }
+    }
+
     fn terminate_original(&mut self) -> io::Result<()> {
         if self.termination_requested {
             return Ok(());
         }
         let _ = self.job.terminate();
+        for child in self.descendants.values() {
+            if unsafe { WaitForSingleObject(raw(child), 0) } != WAIT_OBJECT_0 {
+                let _ = unsafe { TerminateProcess(raw(child), 1) };
+            }
+        }
         if let Err(error) = self.child.kill() {
             if unsafe { WaitForSingleObject(HANDLE(self.child.as_raw_handle()), 0) }
                 != WAIT_OBJECT_0
@@ -210,12 +399,43 @@ impl Fixture {
             self.active_reader.is_none(),
             "reader 未确认退出，不能继续原停点",
         )?;
-        if let Some((event, status)) = self.pending.as_ref() {
-            unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, *status) }
+        if let Some((event, status)) = self.pending {
+            unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) }
                 .map_err(io::Error::from)?;
             self.pending.take();
             if let Some(last) = self.events.last_mut() {
                 last["continued"] = json!(true);
+                last["continue_status"] = json!(status.0 as u32);
+            }
+            if event.dwProcessId == self.child.id() {
+                if event.dwDebugEventCode == EXIT_THREAD_DEBUG_EVENT {
+                    if let Some(thread) = self.threads.get(&event.dwThreadId) {
+                        require(
+                            unsafe {
+                                WaitForSingleObject(raw(thread), remaining(self.cleanup_deadline)?)
+                            } == WAIT_OBJECT_0,
+                            "原线程 EXIT 继续后尚未退出",
+                        )?;
+                        if let Some(shell) = self.shell.as_mut() {
+                            shell.thread_exited(&event)?;
+                        }
+                    }
+                    self.threads.remove(&event.dwThreadId);
+                } else if event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT {
+                    require(
+                        unsafe {
+                            WaitForSingleObject(
+                                HANDLE(self.child.as_raw_handle()),
+                                remaining(self.cleanup_deadline)?,
+                            )
+                        } == WAIT_OBJECT_0,
+                        "原进程 EXIT 继续后尚未退出",
+                    )?;
+                    if let Some(shell) = self.shell.as_mut() {
+                        shell.confirm_process_exit()?;
+                    }
+                    self.threads.clear();
+                }
             }
         }
         Ok(())
@@ -229,29 +449,29 @@ impl Fixture {
         deadline: Instant,
         cleanup: bool,
     ) -> io::Result<()> {
+        self.handling_stage = "root_event";
         // 映像句柄由调试器关闭；进程/线程事件原句柄由 Windows 在 EXIT 继续后关闭。
         let file_handle = match event.dwDebugEventCode {
             CREATE_PROCESS_DEBUG_EVENT => Some(unsafe { event.u.CreateProcessInfo.hFile }),
             LOAD_DLL_DEBUG_EVENT => Some(unsafe { event.u.LoadDll.hFile }),
             _code => None,
         };
-        let file = file_handle
+        let mut file = file_handle
             .filter(|handle| !handle.is_invalid())
             .map(|handle| unsafe { File::from_raw_handle(handle.0) });
-        require(
-            event.dwProcessId == self.child.id(),
-            "夹具收到其他进程的调试事件",
-        )?;
+        if event.dwProcessId != self.child.id() {
+            return self.handle_descendant(event, file.as_mut(), cleanup);
+        }
         if cleanup {
             if event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT {
                 self.exit_code = Some(unsafe { event.u.ExitProcess.dwExitCode });
                 self.exited = true;
-                self.threads.clear();
             }
             return Ok(());
         }
         match event.dwDebugEventCode {
             CREATE_PROCESS_DEBUG_EVENT => {
+                self.handling_stage = "root_create_binding";
                 let info = unsafe { event.u.CreateProcessInfo };
                 require(
                     unsafe { GetProcessId(info.hProcess) } == self.child.id(),
@@ -272,15 +492,42 @@ impl Fixture {
                 self.job.assign(HANDLE(self.child.as_raw_handle()))?;
                 self.bind_thread(info.hThread, event.dwThreadId)?;
                 self.main_thread = Some(event.dwThreadId);
+                let expected = self
+                    .node_image
+                    .path
+                    .to_str()
+                    .ok_or_else(|| io::Error::other("固定子模式路径不是 Unicode"))?;
+                let expected = expected.strip_prefix("\\\\?\\").unwrap_or(expected);
+                require(
+                    expected
+                        .as_bytes()
+                        .first()
+                        .is_some_and(u8::is_ascii_alphabetic)
+                        && expected.as_bytes().get(1..3) == Some(b":\\"),
+                    "固定子模式必须使用已绑定的本地盘符路径",
+                )?;
+                self.shell = Some(ShellClassificationWitness::new(
+                    event,
+                    birth(info.hProcess, false)?,
+                    *uuid::Uuid::new_v4().as_bytes(),
+                    expected.encode_utf16().collect(),
+                )?);
                 Ok(())
             }
             CREATE_THREAD_DEBUG_EVENT => {
-                self.bind_thread(unsafe { event.u.CreateThread.hThread }, event.dwThreadId)
-            }
-            EXIT_THREAD_DEBUG_EVENT => {
-                self.threads.remove(&event.dwThreadId);
+                self.handling_stage = "thread_create_binding_and_arm";
+                self.bind_thread(unsafe { event.u.CreateThread.hThread }, event.dwThreadId)?;
+                let shell = self
+                    .shell
+                    .as_mut()
+                    .ok_or_else(|| io::Error::other("线程 CREATE 缺少原根"))?;
+                shell.retain_thread(event)?;
+                if self.shell32.is_some() && self.shell_observation.is_none() {
+                    shell.arm_all(event)?;
+                }
                 Ok(())
             }
+            EXIT_THREAD_DEBUG_EVENT => Ok(()),
             LOAD_DLL_DEBUG_EVENT => {
                 if let Some(file) = file {
                     let path = image_path(&file)?;
@@ -288,21 +535,76 @@ impl Fixture {
                         .file_name()
                         .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("clr.dll"))
                     {
+                        self.handling_stage = "clr_load_binding";
                         require(self.clr.is_none(), "重复 CLR 映像")?;
                         self.clr = Some(ClrRuntimeBinding::from_load(&file, unsafe {
                             event.u.LoadDll.lpBaseOfDll
                         }
                             as u64)?);
+                    } else if path.file_name().is_some_and(|name| {
+                        name.to_string_lossy().eq_ignore_ascii_case("shell32.dll")
+                    }) {
+                        self.handling_stage = "shell32_load_binding_and_arm";
+                        require(self.shell32.is_none(), "重复 Shell32 映像")?;
+                        let system = PathBuf::from(
+                            std::env::var_os("SystemRoot")
+                                .ok_or_else(|| io::Error::other("缺少系统根"))?,
+                        );
+                        let bound = BoundFile::open(&system.join("System32/shell32.dll"))?;
+                        require(
+                            path == bound.path
+                                && file_identity(&information(&file)?) == bound.identity,
+                            "Shell32 原 LOAD 与固定系统映像不符",
+                        )?;
+                        let shell = self
+                            .shell
+                            .as_mut()
+                            .ok_or_else(|| io::Error::other("Shell32 LOAD 缺少原根"))?;
+                        shell.bind_shell32(event, &file, bound.sha)?;
+                        self.shell32 = Some(bound);
+                        shell.arm_all(event)?;
                     }
                 }
                 Ok(())
             }
             EXCEPTION_DEBUG_EVENT => {
+                self.handling_stage = "shell_observe";
+                let observation = self
+                    .shell
+                    .as_mut()
+                    .ok_or_else(|| io::Error::other("异常停点缺少原根"))?
+                    .observe(event, self.sequence)?;
+                match observation {
+                    ShellClassificationObservation::NotOwned => (),
+                    ShellClassificationObservation::OwnedSkipped => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        return Ok(());
+                    }
+                    ShellClassificationObservation::OwnedEntry => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        self.shell_entries
+                            .push(json!({"sequence":self.sequence,"tid":event.dwThreadId}));
+                        require(self.shell_entries.len() == 1, "固定分类调用入口不唯一")?;
+                        return Ok(());
+                    }
+                    ShellClassificationObservation::OwnedReturn(receipt) => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        self.handling_stage = "native_return_reader";
+                        return self.capture_native_return(
+                            event,
+                            serde_json::to_value(receipt)?,
+                            image,
+                            root,
+                            deadline,
+                        );
+                    }
+                }
                 let info = unsafe { event.u.Exception };
                 if !cleanup
                     && info.dwFirstChance == 1
                     && info.ExceptionRecord.ExceptionCode.0 as u32 == CLR_EXCEPTION
                 {
+                    self.handling_stage = "exception_reader";
                     self.capture(event, image, root, deadline)?;
                 }
                 Ok(())
@@ -310,10 +612,17 @@ impl Fixture {
             EXIT_PROCESS_DEBUG_EVENT => {
                 self.exit_code = Some(unsafe { event.u.ExitProcess.dwExitCode });
                 self.exited = true;
-                self.threads.clear();
                 Ok(())
             }
-            UNLOAD_DLL_DEBUG_EVENT | OUTPUT_DEBUG_STRING_EVENT => Ok(()),
+            UNLOAD_DLL_DEBUG_EVENT => {
+                if let Some(shell) = self.shell.as_mut() {
+                    if shell.bound_base() == Some(unsafe { event.u.UnloadDll.lpBaseOfDll } as u64) {
+                        shell.unload(event)?;
+                    }
+                }
+                Ok(())
+            }
+            OUTPUT_DEBUG_STRING_EVENT => Ok(()),
             RIP_EVENT => Err(io::Error::other("CLR 夹具发生原生调试错误")),
             _code => Err(io::Error::other("CLR 夹具出现未知调试事件")),
         }
@@ -328,7 +637,7 @@ impl Fixture {
     ) -> io::Result<()> {
         self.release_reader()?;
         self.continue_pending()?;
-        while !self.exited {
+        while !self.exited || self.descendant_exits.len() != self.descendants.len() {
             require(self.sequence < 4096, "CLR 夹具调试事件超过上限")?;
             let mut event = DEBUG_EVENT::default();
             match unsafe { WaitForDebugEvent(&mut event, remaining(deadline)?.min(100)) } {
@@ -337,17 +646,30 @@ impl Fixture {
                 Err(error) => return Err(io::Error::from(error)),
             }
             self.sequence += 1;
-            let status: NTSTATUS = if event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT
-                && unsafe { event.u.Exception.ExceptionRecord.ExceptionCode }
-                    != EXCEPTION_BREAKPOINT
-            {
-                DBG_EXCEPTION_NOT_HANDLED
+            let exception = (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT)
+                .then(|| unsafe { event.u.Exception });
+            let status: NTSTATUS = if let Some(exception) = exception {
+                if exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT
+                    && exception.dwFirstChance == 1
+                    && (event.dwProcessId == self.child.id()
+                        || self.descendants.contains_key(&event.dwProcessId))
+                    && self.initial_breakpoints.insert(event.dwProcessId)
+                {
+                    DBG_CONTINUE
+                } else {
+                    DBG_EXCEPTION_NOT_HANDLED
+                }
             } else {
                 DBG_CONTINUE
             };
             self.pending = Some((event, status));
             let result = self.handle(&event, reader, root, deadline, cleanup);
-            self.events.push(json!({"sequence":self.sequence,"code":event.dwDebugEventCode.0,"pid":event.dwProcessId,"tid":event.dwThreadId,"handled":result.is_ok(),"continued":false}));
+            self.events.push(json!({"sequence":self.sequence,"code":event.dwDebugEventCode.0,"pid":event.dwProcessId,"tid":event.dwThreadId,
+                "exception_code":exception.map(|value| value.ExceptionRecord.ExceptionCode.0 as u32),
+                "first_chance":exception.map(|value| value.dwFirstChance),
+                "continue_status":self.pending.as_ref().map(|pending| pending.1.0 as u32),
+                "handling_stage":self.handling_stage,"shell_state":self.shell.as_ref().map(|shell| shell.summary()),
+                "handled":result.is_ok(),"continued":false}));
             if let Err(error) = &result {
                 if let Some(last) = self.events.last_mut() {
                     last["handling_error"] =
@@ -355,6 +677,20 @@ impl Fixture {
                 }
             }
             if result.is_err() {
+                if event.dwProcessId == self.child.id()
+                    && event.dwDebugEventCode != EXIT_PROCESS_DEBUG_EVENT
+                {
+                    if let Some(shell) = self
+                        .shell
+                        .as_mut()
+                        .filter(|shell| shell.requires_restoration())
+                    {
+                        let restored = shell.withdraw_all(&event);
+                        if let Some(last) = self.events.last_mut() {
+                            last["failure_register_restoration"] = json!(restored.is_ok());
+                        }
+                    }
+                }
                 // 首 CREATE 绑定失败也先终止原对象，不能让未获准的用户态执行。
                 self.terminate_original()?;
             }
@@ -369,7 +705,7 @@ impl Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        if !self.exited {
+        if !self.exited || self.descendant_exits.len() != self.descendants.len() {
             let _ = self.job.terminate();
             let _ = self.child.kill();
         }
@@ -471,14 +807,14 @@ fn validate_observations(observations: &[Value], prepared: &Value) -> io::Result
             frame["module_mvid"]
                 .as_str()
                 .is_some_and(|value| value.eq_ignore_ascii_case(mvid))
-                && tokens.contains(&frame["method_token"])
+                && tokens[..4].contains(&frame["method_token"])
                 && frame["il_offsets"].as_array().is_some_and(|offsets| {
                     offsets
                         .iter()
                         .any(|offset| offset.as_u64().is_some_and(|offset| offset < 0xfffffffd))
                 })
         });
-        // 启动异常不能冒充固定夹具；缺少真实目标帧最终仍因四项顺序不完整失败。
+        // 分类调用及其 Exercise 祖先不能冒充四个抛出方法；缺目标帧仍因四项不完整失败。
         if !fixture_frame {
             continue;
         }
@@ -556,21 +892,169 @@ fn validate_observations(observations: &[Value], prepared: &Value) -> io::Result
     require(count == 4, "四次固定异常没有按顺序各读取一次")
 }
 
+fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
+    let item = &report["shell_observation"];
+    let reader = &item["reader"];
+    let receipt = &item["classification"];
+    let node = &report["node_created"];
+    let summary = &report["shell_classification"];
+    let entries = report["shell_entries"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("分类入口记录缺失"))?;
+    validate_fixture_thread(item)?;
+    require(
+        item["reader_reaped"] == true && item["reader_job_empty"] == true,
+        "分类 reader 未确认回收",
+    )?;
+    require(
+        reader["schema"] == 1
+            && reader["operation"] == 3
+            && reader["status"] == "observed"
+            && reader["target_identity_verified"] == true
+            && reader["dac_sha256_verified"] == true
+            && reader["dac_loaded"] == true
+            && reader["stack_api_hresult"] == 0
+            && reader["budget_exhausted"] == false,
+        "分类 reader 未完整读取原目标与 DAC",
+    )?;
+    for field in [
+        "event_sequence",
+        "nonce",
+        "pid",
+        "tid",
+        "process_birth",
+        "thread_birth",
+    ] {
+        require(
+            !item[field].is_null() && item[field] == reader[field],
+            "分类 reader 原停点身份不匹配",
+        )?;
+    }
+    require(
+        item["event_hresult"] == 0
+            && reader["event_hresult"] == 0
+            && reader["exception_source"] == "none"
+            && reader["exception_api_hresult"] == 0x8000000a_u32
+            && reader["chain"] == json!([])
+            && reader["object_chain_complete"] == false
+            && reader["tracker_complete"] == false
+            && reader["exception_state_flags"] == 0,
+        "分类返回不能借用旧异常对象",
+    )?;
+    for (field, identity) in [
+        ("pid", "process_id"),
+        ("tid", "thread_id"),
+        ("process_birth", "process_birth"),
+        ("thread_birth", "thread_birth"),
+    ] {
+        require(
+            receipt["identity"][identity] == item[field],
+            "分类 entry/return 与 reader 身份不符",
+        )?;
+    }
+    let sequence = |value: &Value| {
+        value
+            .as_u64()
+            .filter(|value| *value != 0)
+            .ok_or_else(|| io::Error::other("分类事件序号缺失"))
+    };
+    require(
+        entries.len() == 1
+            && entries[0]["sequence"] == receipt["entry_sequence"]
+            && entries[0]["tid"] == item["tid"]
+            && receipt["return_sequence"] == item["event_sequence"]
+            && sequence(&node["sequence"])? < sequence(&receipt["entry_sequence"])?
+            && sequence(&receipt["entry_sequence"])? < sequence(&receipt["return_sequence"])?
+            && receipt["node_create_sequence"] == node["sequence"]
+            && receipt["node_process_id"] == node["pid"]
+            && receipt["node_process_birth"] == node["birth"]
+            && node["original_create_bound"] == true
+            && report["node_exit_confirmed"] == true,
+        "分类未绑定唯一原子 CREATE 与 entry/return",
+    )?;
+    require(
+        receipt["expected_node_matched"] == true
+            && receipt["flags"] == 0x2000
+            && receipt["return_region_kind"] == "private"
+            && receipt["registers_restored"] == true
+            && receipt["execution_context_unchanged"] == true
+            && item["live_threads_restored_before_reader"] == true
+            && receipt["post_start_clr_stack_required"] == true
+            && report["fixture_shell_return_low32"]
+                .as_u64()
+                .is_some_and(|value| value <= u32::MAX as u64)
+            && receipt["raw_return_low32"] == report["fixture_shell_return_low32"],
+        "原私有返回映射、寄存器恢复或夹具返回值不符",
+    )?;
+    let exited_before_restore = summary["threads_exited_before_restore"]
+        .as_u64()
+        .ok_or_else(|| io::Error::other("缺少原线程提前退出计数"))?;
+    let expected_restoration = if exited_before_restore == 0 {
+        "readback_verified"
+    } else {
+        "original_exit_confirmed"
+    };
+    require(
+        summary["selected_calls"] == 1
+            && summary["returned_calls"] == 1
+            && summary["root_process_id"] == item["pid"]
+            && summary["generation"] == receipt["generation"]
+            && summary["dirty_threads"] == 0
+            && summary["restoration"] == expected_restoration
+            && summary["restored_threads"]
+                .as_u64()
+                .is_some_and(|count| count > 0)
+            && summary["original_process_exit_confirmed"] == true
+            && summary["stopped"] == true,
+        "分类没有停止、恢复或确认原进程退出",
+    )?;
+    let mvid = prepared["fixture_mvid"]
+        .as_str()
+        .ok_or_else(|| io::Error::other("缺少夹具 MVID"))?;
+    let token = prepared["fixture_shell_method_token"]
+        .as_u64()
+        .ok_or_else(|| io::Error::other("缺少分类方法 MethodDef"))?;
+    let frames = reader["frames"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("分类 CLR 帧缺失"))?;
+    require(
+        frames.len() <= 32
+            && frames.iter().any(|frame| {
+                frame["module_mvid"]
+                    .as_str()
+                    .is_some_and(|value| value.eq_ignore_ascii_case(mvid))
+                    && frame["method_token"].as_u64() == Some(token)
+                    && frame["il_status"] == 0
+                    && frame["il_offsets"].as_array().is_some_and(|offsets| {
+                        offsets
+                            .iter()
+                            .any(|offset| offset.as_u64().is_some_and(|offset| offset < 0xfffffffd))
+                    })
+            }),
+        "原分类工作线程缺少精确夹具托管帧",
+    )
+}
+
 fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["stage"] = json!("input_binding");
     let prepared: Value = serde_json::from_slice(&fs::read(root.join("preparation.safe.json"))?)?;
     require(prepared["status"] == "prepared", "CLR 夹具未完成准备")?;
     let reader_file = BoundFile::open(&root.join("reader.exe"))?;
     let mut fixture_image = BoundFile::open(&root.join("fixture.exe"))?;
+    let node_image = BoundFile::open(&root.join("fixture-node.exe"))?;
     require(
         prepared["reader_sha256"] == hex(&reader_file.sha)
-            && prepared["fixture_sha256"] == hex(&fixture_image.sha),
+            && prepared["fixture_sha256"] == hex(&fixture_image.sha)
+            && prepared["fixture_node_sha256"] == hex(&node_image.sha)
+            && node_image.sha == fixture_image.sha
+            && node_image.identity != fixture_image.identity,
         "CLR 夹具与准备摘要不符",
     )?;
     let mut reader = ClrReaderImage::bind(&reader_file.path, reader_file.sha)?;
     drop(reader_file);
     report["reader_image"] = reader.receipt();
     report["fixture_image"] = fixture_image.receipt();
+    report["node_image"] = node_image.receipt();
     let deadline = Instant::now() + TIMEOUT;
     let active_deadline = deadline - CLEANUP_RESERVE;
 
@@ -630,14 +1114,17 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     drop(blocked);
 
     report["stage"] = json!("native_exception_capture");
-    let mut fixture = Fixture::start(&mut fixture_image, root, deadline)?;
+    let mut fixture = Fixture::start(&mut fixture_image, node_image, root, deadline)?;
     let result = fixture.pump(&mut reader, root, active_deadline, false);
     if let Err(error) = &result {
         report["native_result_error"] =
             json!({"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
     }
     if result.is_err()
-        && (!fixture.exited || fixture.pending.is_some() || fixture.active_reader.is_some())
+        && (!fixture.exited
+            || fixture.pending.is_some()
+            || fixture.active_reader.is_some()
+            || fixture.descendant_exits.len() != fixture.descendants.len())
     {
         let terminated = fixture.terminate_original();
         let drained = fixture.pump(&mut reader, root, deadline, true);
@@ -645,6 +1132,17 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     }
     report["events"] = json!(fixture.events);
     report["observations"] = json!(fixture.observations);
+    report["shell_entries"] = json!(fixture.shell_entries);
+    report["shell_observation"] = json!(fixture.shell_observation);
+    report["node_created"] = json!(fixture.node_created);
+    report["descendant_exits"] = json!(fixture.descendant_exits);
+    if let Some(shell) = fixture.shell.as_ref() {
+        report["shell_classification"] = serde_json::to_value(shell.summary())?;
+    }
+    if let Some(shell32) = fixture.shell32.as_mut() {
+        shell32.verify()?;
+        report["shell32_image"] = shell32.receipt();
+    }
     report["fixture_exit"] = json!(fixture.exit_code);
     report["pending_event"] = json!(fixture.pending.is_some());
     report["reader_unreleased"] = json!(fixture.active_reader.is_some());
@@ -668,6 +1166,15 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
                 .is_ok_and(|status| status.is_some())
     );
     report["fixture_job_empty"] = json!(fixture.job.empty().is_ok_and(|empty| empty));
+    report["node_exit_confirmed"] = json!(
+        fixture.descendants.len() == 1
+            && fixture
+                .descendants
+                .iter()
+                .all(|(pid, child)| fixture.descendant_exits.get(pid) == Some(&0)
+                    && unsafe { WaitForSingleObject(raw(child), 0) } == WAIT_OBJECT_0
+                    && birth(raw(child), false).ok() == report["node_created"]["birth"].as_u64())
+    );
     result?;
     report["stage"] = json!("receipt_validation");
     require(
@@ -679,8 +1186,22 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
         "CLR 夹具未自然退出并回收",
     )?;
     validate_observations(&fixture.observations, &prepared)?;
+    let output = fs::read(root.join("fixture.stdout"))?;
+    require(output.len() <= 12, "固定分类返回输出超过数值边界")?;
+    let returned = std::str::from_utf8(&output)
+        .ok()
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .ok_or_else(|| io::Error::other("固定分类返回不是低 32 位整数"))?;
+    require(
+        output == format!("{returned}\r\n").as_bytes()
+            || output == format!("{returned}\n").as_bytes(),
+        "固定分类返回存在额外输出",
+    )?;
+    report["fixture_shell_return_low32"] = json!(returned);
+    validate_native_return(report, &prepared)?;
     reader.verify()?;
     fixture_image.verify()?;
+    fixture.node_image.verify()?;
     report["accepted"] = json!(true);
     report["stage"] = json!("complete");
     Ok(())
@@ -825,4 +1346,110 @@ fn exception_receipts_do_not_substitute_an_ancestor_mapping_for_the_throw_frame(
     frames.push(json!({"module_mvid":"fixture-mvid","method_token":5,
         "il_status":0,"il_offsets":[2]}));
     assert!(validate_observations(&observations, &prepared).is_err());
+}
+
+#[test]
+fn classification_or_exercise_frames_cannot_replace_fixed_exception_methods() {
+    let (mut observations, prepared) = ordered_fixed_exception_receipts();
+    let mut classification = observations[0].clone();
+    classification["event_sequence"] = json!(9);
+    classification["reader"]["event_sequence"] = json!(9);
+    classification["reader"]["frames"] = json!([
+        {"module_mvid":"fixture-mvid","method_token":6,"il_status":0,"il_offsets":[2]},
+        {"module_mvid":"fixture-mvid","method_token":5,"il_status":0,"il_offsets":[2]}
+    ]);
+    observations.insert(0, classification);
+    assert!(validate_observations(&observations, &prepared).is_ok());
+    observations.remove(1);
+    assert!(validate_observations(&observations, &prepared).is_err());
+}
+
+fn fixed_native_return_receipt() -> (Value, Value) {
+    let generation = [1_u8; 16];
+    let reader = json!({"schema":1,"operation":3,"status":"observed","event_sequence":11,"nonce":"return-fixture",
+        "pid":41,"tid":42,"process_birth":100,"thread_birth":200,"event_hresult":0,
+        "target_identity_verified":true,"dac_sha256_verified":true,"dac_loaded":true,"stack_api_hresult":0,"budget_exhausted":false,
+        "exception_source":"none","exception_api_hresult":0x8000000a_u32,"chain":[],
+        "object_chain_complete":false,"tracker_complete":false,"exception_state_flags":0,
+        "frames":[{"module_mvid":"fixture-mvid","method_token":6,"il_status":0,"il_offsets":[2]}]});
+    let classification = json!({"generation":generation,"identity":{"process_id":41,"thread_id":42,"process_birth":100,"thread_birth":200},
+        "entry_sequence":10,"return_sequence":11,"node_create_sequence":8,"node_process_id":51,"node_process_birth":300,
+        "expected_node_matched":true,"flags":0x2000,"raw_return_low32":17744,"return_region_kind":"private",
+        "registers_restored":true,"execution_context_unchanged":true,"post_start_clr_stack_required":true});
+    let observation = json!({"event_sequence":11,"nonce":"return-fixture","pid":41,"tid":42,"main_tid":40,
+        "process_birth":100,"thread_birth":200,"event_hresult":0,"reader_reaped":true,"reader_job_empty":true,
+        "live_threads_restored_before_reader":true,"classification":classification,"reader":reader});
+    let report = json!({
+        "node_created":{"pid":51,"birth":300,"sequence":8,"original_create_bound":true},
+        "node_exit_confirmed":true,"fixture_shell_return_low32":17744,
+        "shell_entries":[{"sequence":10,"tid":42}],
+        "shell_classification":{"generation":generation,"root_process_id":41,"selected_calls":1,"returned_calls":1,
+            "dirty_threads":0,"threads_exited_before_restore":0,"restoration":"readback_verified",
+            "restored_threads":2,"original_process_exit_confirmed":true,"stopped":true},
+        "shell_observation":observation
+    });
+    (
+        report,
+        json!({"fixture_mvid":"fixture-mvid","fixture_shell_method_token":6}),
+    )
+}
+
+#[test]
+fn native_return_receipts_require_one_pair_after_original_child_create() {
+    let (report, prepared) = fixed_native_return_receipt();
+    assert!(validate_native_return(&report, &prepared).is_ok());
+    let mut missing = report.clone();
+    missing["shell_observation"] = Value::Null;
+    assert!(validate_native_return(&missing, &prepared).is_err());
+    let mut repeated = report.clone();
+    let entries = repeated["shell_entries"].as_array_mut().unwrap();
+    entries.push(entries[0].clone());
+    assert!(validate_native_return(&repeated, &prepared).is_err());
+    let mut late_create = report;
+    late_create["node_created"]["sequence"] = json!(12);
+    late_create["shell_observation"]["classification"]["node_create_sequence"] = json!(12);
+    assert!(validate_native_return(&late_create, &prepared).is_err());
+}
+
+#[test]
+fn native_return_receipts_require_private_mapping_fixture_value_and_restoration() {
+    let (report, prepared) = fixed_native_return_receipt();
+    for (field, value) in [
+        ("return_region_kind", json!("image")),
+        ("raw_return_low32", json!(0)),
+        ("registers_restored", json!(false)),
+        ("execution_context_unchanged", json!(false)),
+    ] {
+        let mut changed = report.clone();
+        changed["shell_observation"]["classification"][field] = value;
+        assert!(validate_native_return(&changed, &prepared).is_err());
+    }
+    let mut exited_armed = report.clone();
+    exited_armed["shell_classification"]["threads_exited_before_restore"] = json!(1);
+    assert!(validate_native_return(&exited_armed, &prepared).is_err());
+    exited_armed["shell_classification"]["restoration"] = json!("original_exit_confirmed");
+    assert!(validate_native_return(&exited_armed, &prepared).is_ok());
+    let mut unverified = report;
+    unverified["shell_classification"]["restoration"] = json!("unknown");
+    assert!(validate_native_return(&unverified, &prepared).is_err());
+}
+
+#[test]
+fn native_return_receipts_require_original_working_thread_stack_and_cleanup() {
+    let (report, prepared) = fixed_native_return_receipt();
+    let mut wrong_frame = report.clone();
+    wrong_frame["shell_observation"]["reader"]["frames"][0]["method_token"] = json!(5);
+    assert!(validate_native_return(&wrong_frame, &prepared).is_err());
+    for field in ["reader_reaped", "reader_job_empty"] {
+        let mut unreleased = report.clone();
+        unreleased["shell_observation"][field] = json!(false);
+        assert!(validate_native_return(&unreleased, &prepared).is_err());
+    }
+    let mut main_thread = report.clone();
+    main_thread["shell_observation"]["main_tid"] = json!(42);
+    assert!(validate_native_return(&main_thread, &prepared).is_err());
+    let mut old_object = report;
+    old_object["shell_observation"]["reader"]["exception_source"] =
+        json!("last_thrown_object_candidate");
+    assert!(validate_native_return(&old_object, &prepared).is_err());
 }

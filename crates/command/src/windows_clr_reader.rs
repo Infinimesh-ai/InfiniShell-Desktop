@@ -45,6 +45,7 @@ const MAX_POLL: Duration = Duration::from_millis(100);
 const FIXTURE_READ_BYTES: u32 = 16 * 1024 * 1024;
 const POWERSHELL_READ_BYTES: u32 = 24 * 1024 * 1024;
 const CLR_EXCEPTION: u32 = 0xe0434352;
+const NATIVE_RETURN_SINGLE_STEP: u32 = 0x80000004;
 
 pub(super) fn require(value: bool, message: &'static str) -> io::Result<()> {
     if value {
@@ -438,6 +439,64 @@ pub struct ClrExceptionStop<'a> {
     pub read_budget_bytes: u32,
 }
 
+/// 仅限调用方自有 SHGetFileInfoW 返回单步；必须仍持有原 root 的 pending 事件。
+#[derive(Debug)]
+pub struct ClrNativeReturnStop<'a> {
+    pub process: BorrowedHandle<'a>,
+    pub thread: BorrowedHandle<'a>,
+    pub process_id: u32,
+    pub thread_id: u32,
+    pub event_sequence: u64,
+    pub exception_code: u32,
+    pub first_chance: u32,
+    pub hresult: u32,
+    pub read_budget_bytes: u32,
+}
+
+struct ClrStop<'a> {
+    process: BorrowedHandle<'a>,
+    thread: BorrowedHandle<'a>,
+    process_id: u32,
+    thread_id: u32,
+    event_sequence: u64,
+    exception_code: u32,
+    first_chance: u32,
+    hresult: u32,
+    read_budget_bytes: u32,
+}
+
+impl<'a> From<ClrExceptionStop<'a>> for ClrStop<'a> {
+    fn from(stop: ClrExceptionStop<'a>) -> Self {
+        Self {
+            process: stop.process,
+            thread: stop.thread,
+            process_id: stop.process_id,
+            thread_id: stop.thread_id,
+            event_sequence: stop.event_sequence,
+            exception_code: stop.exception_code,
+            first_chance: stop.first_chance,
+            hresult: stop.hresult,
+            read_budget_bytes: stop.read_budget_bytes,
+        }
+    }
+}
+
+impl<'a> From<ClrNativeReturnStop<'a>> for ClrStop<'a> {
+    fn from(stop: ClrNativeReturnStop<'a>) -> Self {
+        Self {
+            process: stop.process,
+            thread: stop.thread,
+            process_id: stop.process_id,
+            thread_id: stop.thread_id,
+            event_sequence: stop.event_sequence,
+            exception_code: stop.exception_code,
+            first_chance: stop.first_chance,
+            hresult: stop.hresult,
+            read_budget_bytes: stop.read_budget_bytes,
+        }
+    }
+}
+
 fn poll_wait(left: Duration) -> Option<u32> {
     (!left.is_zero()).then(|| left.min(MAX_POLL).as_millis().max(1) as u32)
 }
@@ -446,14 +505,24 @@ fn valid_read_budget(bytes: u32) -> bool {
     matches!(bytes, FIXTURE_READ_BYTES | POWERSHELL_READ_BYTES)
 }
 
-fn validate_stop(stop: &ClrExceptionStop<'_>, sequence: u64) -> io::Result<()> {
+fn valid_stop_kind(operation: u32, code: u32, first_chance: u32, hresult: u32) -> bool {
+    first_chance == 1
+        && ((operation == 1 && code == CLR_EXCEPTION)
+            || (operation == 3 && code == NATIVE_RETURN_SINGLE_STEP && hresult == 0))
+}
+
+fn validate_stop(stop: &ClrStop<'_>, operation: u32, sequence: u64) -> io::Result<()> {
     require(
         stop.event_sequence == sequence
             && sequence != 0
             && stop.process_id != 0
             && stop.thread_id != 0
-            && stop.exception_code == CLR_EXCEPTION
-            && stop.first_chance == 1
+            && valid_stop_kind(
+                operation,
+                stop.exception_code,
+                stop.first_chance,
+                stop.hresult,
+            )
             && valid_read_budget(stop.read_budget_bytes),
         "CLR reader 停点或固定额度不符",
     )?;
@@ -468,7 +537,9 @@ fn validate_stop(stop: &ClrExceptionStop<'_>, sequence: u64) -> io::Result<()> {
 
 fn validate_reply(value: &Value, binding: &Value) -> io::Result<()> {
     require(
-        value["schema"] == 1 && value["operation"] == 1,
+        value["schema"] == 1
+            && matches!(binding["operation"].as_u64(), Some(1 | 3))
+            && value["operation"] == binding["operation"],
         "CLR reader 回复协议不符",
     )?;
     require(
@@ -478,6 +549,30 @@ fn validate_reply(value: &Value, binding: &Value) -> io::Result<()> {
         ),
         "CLR reader 回复状态无效",
     )?;
+    if binding["operation"] == 3 {
+        require(
+            value["event_hresult"] == 0
+                && value["exception_source"] == "none"
+                && value["exception_api_hresult"] == 0x8000000a_u32
+                && value["exception_state_flags"] == 0
+                && value["tracker_complete"] == false
+                && value["object_chain_complete"] == false
+                && value["chain"].as_array().is_some_and(Vec::is_empty)
+                && value["frames"]
+                    .as_array()
+                    .is_some_and(|frames| frames.len() <= 32),
+            "CLR 原生返回停点回复混入异常链",
+        )?;
+        require(
+            value["status"] != "observed"
+                || (value["stack_api_hresult"] == 0
+                    && value["budget_exhausted"] == false
+                    && value["frames"]
+                        .as_array()
+                        .is_some_and(|frames| !frames.is_empty())),
+            "CLR 原生返回停点未完整读取栈",
+        )?;
+    }
     let budget = binding["read_budget_bytes"]
         .as_u64()
         .filter(|bytes| {
@@ -523,6 +618,7 @@ pub struct ClrReader {
     output: File,
     image_guard: File,
     image_sha: [u8; 32],
+    operation: u32,
     sequence: u64,
     deadline: Instant,
     binding: Option<Value>,
@@ -545,6 +641,24 @@ impl ClrReader {
             image,
             private_root,
             &format!("reader-{sequence}"),
+            1,
+            sequence,
+            deadline,
+        )
+    }
+
+    pub fn start_native_return(
+        image: &mut ClrReaderImage,
+        private_root: &Path,
+        sequence: u64,
+        deadline: Instant,
+    ) -> io::Result<Self> {
+        require(sequence != 0, "CLR reader 事件序号无效")?;
+        Self::start_named(
+            image,
+            private_root,
+            &format!("native-return-reader-{sequence}"),
+            3,
             sequence,
             deadline,
         )
@@ -554,6 +668,7 @@ impl ClrReader {
         image: &mut ClrReaderImage,
         root: &Path,
         name: &str,
+        operation: u32,
         sequence: u64,
         deadline: Instant,
     ) -> io::Result<Self> {
@@ -585,6 +700,7 @@ impl ClrReader {
             output,
             image_guard,
             image_sha: image.0.sha,
+            operation,
             sequence,
             deadline,
             binding: None,
@@ -615,12 +731,32 @@ impl ClrReader {
         runtime: &mut ClrRuntimeBinding,
         stop: ClrExceptionStop<'_>,
     ) -> io::Result<()> {
+        require(self.operation == 1, "CLR reader 不是异常读取请求")?;
+        self.bind_stop_and_send(image, runtime, stop.into())
+    }
+
+    pub fn bind_native_return_and_send(
+        &mut self,
+        image: &mut ClrReaderImage,
+        runtime: &mut ClrRuntimeBinding,
+        stop: ClrNativeReturnStop<'_>,
+    ) -> io::Result<()> {
+        require(self.operation == 3, "CLR reader 不是原生返回读取请求")?;
+        self.bind_stop_and_send(image, runtime, stop.into())
+    }
+
+    fn bind_stop_and_send(
+        &mut self,
+        image: &mut ClrReaderImage,
+        runtime: &mut ClrRuntimeBinding,
+        stop: ClrStop<'_>,
+    ) -> io::Result<()> {
         require(
             self.binding.is_none() && !self.request_sent,
             "CLR reader 请求不能重放",
         )?;
         self.initialize(image)?;
-        validate_stop(&stop, self.sequence)?;
+        validate_stop(&stop, self.operation, self.sequence)?;
         runtime.verify()?;
         let process = HANDLE(stop.process.as_raw_handle());
         let thread = HANDLE(stop.thread.as_raw_handle());
@@ -628,7 +764,7 @@ impl ClrReader {
         let thread_birth = birth(thread, true)?;
         let nonce = *uuid::Uuid::new_v4().as_bytes();
         self.binding = Some(
-            json!({"event_sequence":stop.event_sequence,"pid":stop.process_id,"tid":stop.thread_id,
+            json!({"operation":self.operation,"event_sequence":stop.event_sequence,"pid":stop.process_id,"tid":stop.thread_id,
             "process_birth":process_birth,"thread_birth":thread_birth,"event_hresult":stop.hresult,"nonce":hex(&nonce),
             "read_budget_bytes":stop.read_budget_bytes}),
         );
@@ -643,7 +779,7 @@ impl ClrReader {
             HANDLE(self.child.as_raw_handle()),
             (THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION).0,
         )?;
-        let mut bytes = request(1, nonce, self.deadline)?;
+        let mut bytes = request(self.operation, nonce, self.deadline)?;
         put64(&mut bytes, 32, stop.event_sequence);
         put32(&mut bytes, 40, stop.process_id);
         put32(&mut bytes, 44, stop.thread_id);
@@ -802,7 +938,7 @@ impl ClrReader {
         name: &str,
         deadline: Instant,
     ) -> io::Result<Self> {
-        Self::start_named(image, root, name, 0, deadline)
+        Self::start_named(image, root, name, 2, 0, deadline)
     }
 
     pub(super) fn send_fixture(

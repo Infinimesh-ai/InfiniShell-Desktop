@@ -1220,7 +1220,7 @@ jobs:
 
       - name: Test fixed CLR receipt binding
         shell: pwsh
-        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(windows::clr_fixture_tests::) | test(windows::clr_reader::tests::)'
+        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(windows::clr_fixture_tests::) | test(windows::clr_reader::tests::) | test(windows::shell_classification::tests::)'
 
       - name: Build fixed CLR reader with existing MSVC
         shell: powershell

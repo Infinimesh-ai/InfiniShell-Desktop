@@ -38,6 +38,10 @@ PowerShell容量按已有同环境合同原件中的System.Management.Automation
 
 `operation=2` 仅为控制器回收夹具：除了 magic/version/op/nonce/deadline，所有字段必须为零，不能带路径/目标句柄。完整请求后阻塞，由控制器原期限终止并确认 Job 空。它不加载 DAC、不接触目标，不是实际异常读取的替代。
 
+`operation=3` 只在原 root 的自有 `SHGetFileInfoW` 返回单步停点读取 CLR 栈，要求 `exception_code=0x80000004`、`first_chance=1`、`exception_hresult=0`。它不是 CLR 异常：不调用异常对象或链读取，输出 `exception_source="none"`、空 `chain`、`object_chain_complete=false`、`tracker_complete=false`、`exception_state_flags=0`；`exception_api_hresult=E_PENDING` 表示没有调用异常接口。`status=observed` 仅表示栈完整且未耗尽额度或期限；部分帧、无帧和读取失败均保留其原状态。它不读取 Message、Data、StackTrace、locals 或参数值。
+
+Rust 调用方通过独立 `ClrNativeReturnStop`、`ClrReader::start_native_return` 和 `bind_native_return_and_send` 请求 operation 3，使用 `native-return-reader-{sequence}` 独占输出名；原 `start`/`bind_and_send` 仍固定 operation 1，不能交叉绑定。两种操作均沿用原句柄及创建时间、序号、nonce、CLR/DAC 文件、16/24 MiB 额度、Job 和退出回收校验，回复 operation 必须匹配原请求。168 字节布局与 version 1 不变；自有返回点的地址、线程、断点恢复和 pending 所有权仍由原调试控制器证明，reader 不凭单步异常代码推断这些授权。
+
 stdout 必须由控制器绑定为本轮全新普通文件；不能使用可能写满且无人消费的管道。reader 最多输出一条 32768 字节 JSON。stderr 不写路径、异常消息或内存内容。控制器保存原始文件，再有界解析；不得仅凭退出码计通过。
 
 ## 只读接口和输出解释

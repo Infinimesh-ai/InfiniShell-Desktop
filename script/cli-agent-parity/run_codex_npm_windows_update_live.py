@@ -43,6 +43,7 @@ SUPERVISOR_SOURCE_FILES = (
     "crates/command/src/windows_appcontainer_desktop.rs",
     "crates/command/src/windows_appcontainer_output.rs",
     "crates/command/src/windows_clr_reader.rs",
+    "crates/command/src/windows_shell_classification.rs",
     "crates/command/src/windows_station_bootstrap.rs",
     "crates/command/src/windows_station_device_map.rs",
     "crates/command/src/windows_station_debugger.rs",
@@ -74,6 +75,7 @@ ACCEPTANCE_SOURCE_FILES = (
     "crates/command/src/windows_appcontainer_console_tests.rs",
     "crates/command/src/windows_appcontainer_output_tests.rs",
     "crates/command/src/windows_clr_reader_tests.rs",
+    "crates/command/src/windows_shell_classification_tests.rs",
     *["script/ci/g09-clr-reader/" + name for name in (
         "reader.cpp", "wire.h", "sos_layout.h", "README.md", "sources.safe.json",
         "vendor/clrdata.h", "vendor/xclrdata.h", "vendor/sospriv.h", "vendor/LICENSE.TXT")],
