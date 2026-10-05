@@ -32,6 +32,87 @@ fn empty_registers() -> Registers {
 }
 
 #[test]
+fn initially_zero_debug_view_arms_the_architectural_inactive_status() {
+    let original = Registers {
+        address: [0; 4],
+        status: 0,
+        control: 0,
+    };
+    let armed = original.armed(0x12340, false);
+    assert_eq!(armed.status, 0xffff_0ff0);
+    assert_eq!(armed.control, 0x401);
+    let mut hit = CONTEXT {
+        Rip: 0x12340,
+        EFlags: 0x202,
+        ..CONTEXT::default()
+    };
+    armed.write(&mut hit);
+    hit.Dr6 = 0xffff_0ff1;
+    assert_eq!(owned_slot(armed, &hit, 0x12340), Some(0));
+    assert!(restorable(
+        Registers::read(&hit),
+        original,
+        Some(armed),
+        None
+    ));
+    original.write(&mut hit);
+    assert_eq!(Registers::read(&hit), original);
+}
+
+#[test]
+fn architectural_status_does_not_hide_another_debug_cause_or_configuration() {
+    let armed = empty_registers().armed(0x12340, false);
+    let mut hit = CONTEXT {
+        Rip: 0x12340,
+        EFlags: 0x202,
+        ..CONTEXT::default()
+    };
+    armed.write(&mut hit);
+    hit.Dr6 = 0xffff_2ff1;
+    assert_eq!(owned_slot(armed, &hit, 0x12340), None);
+    hit.Dr6 = 0xffff_07f1;
+    assert_eq!(owned_slot(armed, &hit, 0x12340), None);
+    hit.Dr6 = 0xfffe_0ff1;
+    assert_eq!(owned_slot(armed, &hit, 0x12340), None);
+    hit.Dr6 = 0xffff_0ff1;
+    hit.Dr7 |= 2;
+    assert_eq!(owned_slot(armed, &hit, 0x12340), None);
+}
+
+#[test]
+fn inactive_api_view_accepts_only_the_complete_known_encoding() {
+    let armed = empty_registers().armed(0x12340, false);
+    let api = Registers {
+        address: [0x12340, 0, 0, 0],
+        status: 0,
+        control: 1,
+    };
+    assert_eq!(armed.inactive_api_view(), api);
+    assert!(restorable(api, empty_registers(), Some(armed), None));
+    let active_bus_lock = Registers {
+        status: 0xffff_07f0,
+        ..empty_registers()
+    };
+    let active_transaction = Registers {
+        status: 0xfffe_0ff0,
+        ..empty_registers()
+    };
+    assert!(!active_bus_lock.vacant(0));
+    assert!(!active_transaction.vacant(0));
+    assert_eq!(active_bus_lock.inactive_api_view(), active_bus_lock);
+    assert_eq!(active_transaction.inactive_api_view(), active_transaction);
+    assert!(!restorable(
+        Registers {
+            control: 0x401,
+            ..api
+        },
+        empty_registers(),
+        Some(armed),
+        None
+    ));
+}
+
+#[test]
 fn exact_utf16_node_requires_case_units_and_single_terminator() {
     let expected: Vec<_> = "Q:\\runtime\\node.exe".encode_utf16().collect();
     let mut actual = expected.clone();

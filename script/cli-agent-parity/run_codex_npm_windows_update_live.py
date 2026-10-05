@@ -80,6 +80,7 @@ ACCEPTANCE_SOURCE_FILES = (
         "reader.cpp", "wire.h", "sos_layout.h", "README.md", "sources.safe.json",
         "vendor/clrdata.h", "vendor/xclrdata.h", "vendor/sospriv.h", "vendor/LICENSE.TXT")],
     "script/ci/g09-clr-fixture/build-reader.ps1",
+    "script/ci/g09-clr-fixture/preparation-context.ps1",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
 )

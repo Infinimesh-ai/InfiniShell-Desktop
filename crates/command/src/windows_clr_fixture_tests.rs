@@ -1210,6 +1210,50 @@ fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
     let frames = reader["frames"]
         .as_array()
         .ok_or_else(|| io::Error::other("分类 CLR 帧缺失"))?;
+    for (index, frame) in frames.iter().enumerate() {
+        let offsets = frame["il_offsets"]
+            .as_array()
+            .ok_or_else(|| io::Error::other("分类 CLR 帧的 IL 列表缺失"))?;
+        let metadata_frame = frame["frame_kind"] == "metadata_method"
+            && frame["method_token"]
+                .as_u64()
+                .is_some_and(|token| token > 0x06000000 && token <= 0x06ffffff)
+            && frame["context_hresult"] == 0
+            && frame["il_status"] == 0
+            && !offsets.is_empty()
+            && offsets.len() <= 8
+            && frame["il_offsets_needed"].as_u64() == Some(offsets.len() as u64)
+            && offsets.iter().all(|offset| {
+                offset
+                    .as_u64()
+                    .is_some_and(|offset| offset <= u32::MAX as u64)
+            });
+        // 只允许已由同一 MethodInstance 完整名称确认的首个 P/Invoke 帧无 metadata。
+        // 保留该帧的原始 E_FAIL；后方正确的 caller 不能掩盖未知帧或其它映射失败。
+        let runtime_frame = index == 0
+            && frame["frame_kind"] == "runtime_pinvoke_stub"
+            && matches!(
+                frame["runtime_name"].as_str(),
+                Some("domain_bound_pinvoke_stub" | "domain_neutral_pinvoke_stub")
+            )
+            && frame["method_token"] == 0x06000000_u32
+            && frame["simple_frame_type"] == 2
+            && frame["detailed_frame_type"] == 0
+            && frame["name_hresult"] == 0
+            && frame["name_complete"] == true
+            && frame["name_units_needed"]
+                .as_u64()
+                .is_some_and(|needed| (1..=512).contains(&needed))
+            && frame["context_hresult"] == 0
+            && frame["mapping_hresult"] == 0x80004005_u32
+            && frame["il_status"] == 0x80004005_u32
+            && offsets.is_empty()
+            && frame["il_offsets_needed"] == 0;
+        require(
+            metadata_frame || runtime_frame,
+            "分类 CLR 栈含未知帧、不完整映射或伪造的 runtime IL",
+        )?;
+    }
     require(
         frames.len() <= 32
             && frames.iter().any(|frame| {
@@ -1592,7 +1636,9 @@ fn fixed_native_return_receipt() -> (Value, Value) {
         "target_identity_verified":true,"dac_sha256_verified":true,"dac_loaded":true,"stack_api_hresult":0,"budget_exhausted":false,
         "exception_source":"none","exception_api_hresult":0x8000000a_u32,"chain":[],
         "object_chain_complete":false,"tracker_complete":false,"exception_state_flags":0,
-        "frames":[{"module_mvid":"fixture-mvid","method_token":6,"il_status":0,"il_offsets":[2]}]});
+        "frames":[{"module_mvid":"fixture-mvid","method_token":0x06000006_u32,
+            "frame_kind":"metadata_method","context_hresult":0,
+            "il_status":0,"il_offsets":[2],"il_offsets_needed":1}]});
     let classification = json!({"generation":generation,"identity":{"process_id":41,"thread_id":42,"process_birth":100,"thread_birth":200},
         "entry_sequence":10,"return_sequence":11,"node_create_sequence":8,"node_process_id":51,"node_process_birth":300,
         "expected_node_matched":true,"flags":0x2000,"raw_return_low32":17744,"return_region_kind":"private",
@@ -1612,8 +1658,98 @@ fn fixed_native_return_receipt() -> (Value, Value) {
     });
     (
         report,
-        json!({"fixture_mvid":"fixture-mvid","fixture_shell_method_token":6}),
+        json!({"fixture_mvid":"fixture-mvid","fixture_shell_method_token":0x06000006_u32}),
     )
+}
+
+fn fixed_native_return_with_stub_receipt() -> (Value, Value) {
+    let (mut report, prepared) = fixed_native_return_receipt();
+    report["shell_observation"]["reader"]["frames"]
+        .as_array_mut()
+        .unwrap()
+        .insert(
+            0,
+            json!({"module_mvid":"fixture-mvid","method_token":0x06000000_u32,
+                "frame_kind":"runtime_pinvoke_stub","runtime_name":"domain_bound_pinvoke_stub",
+                "simple_frame_type":2,"detailed_frame_type":0,"name_hresult":0,
+                "name_complete":true,"name_units_needed":86,"context_hresult":0,
+                "mapping_hresult":0x80004005_u32,"il_status":0x80004005_u32,
+                "il_offsets":[],"il_offsets_needed":0}),
+        );
+    (report, prepared)
+}
+
+#[test]
+fn native_return_accepts_identified_framework_pinvoke_frames() {
+    let (mut report, prepared) = fixed_native_return_with_stub_receipt();
+    assert!(validate_native_return(&report, &prepared).is_ok());
+    report["shell_observation"]["reader"]["frames"][0]["runtime_name"] =
+        json!("domain_neutral_pinvoke_stub");
+    assert!(validate_native_return(&report, &prepared).is_ok());
+}
+
+#[test]
+fn native_return_rejects_unknown_nil_frames_despite_a_complete_caller() {
+    let (mut report, prepared) = fixed_native_return_with_stub_receipt();
+    report["shell_observation"]["reader"]["frames"][0]["runtime_name"] = json!("unknown");
+    assert!(validate_native_return(&report, &prepared).is_err());
+}
+
+#[test]
+fn native_return_requires_complete_bounded_stub_names() {
+    let (report, prepared) = fixed_native_return_with_stub_receipt();
+    let mut truncated = report.clone();
+    truncated["shell_observation"]["reader"]["frames"][0]["name_complete"] = json!(false);
+    assert!(validate_native_return(&truncated, &prepared).is_err());
+    let mut empty = report.clone();
+    empty["shell_observation"]["reader"]["frames"][0]["name_units_needed"] = json!(0);
+    assert!(validate_native_return(&empty, &prepared).is_err());
+    let mut oversized = report;
+    oversized["shell_observation"]["reader"]["frames"][0]["name_units_needed"] = json!(513);
+    assert!(validate_native_return(&oversized, &prepared).is_err());
+}
+
+#[test]
+fn native_return_rejects_pinvoke_exemptions_after_the_first_frame() {
+    let (mut report, prepared) = fixed_native_return_with_stub_receipt();
+    report["shell_observation"]["reader"]["frames"]
+        .as_array_mut()
+        .unwrap()
+        .swap(0, 1);
+    assert!(validate_native_return(&report, &prepared).is_err());
+}
+
+#[test]
+fn native_return_does_not_replace_failed_metadata_with_an_ancestor() {
+    let (mut report, prepared) = fixed_native_return_with_stub_receipt();
+    let frames = report["shell_observation"]["reader"]["frames"]
+        .as_array_mut()
+        .unwrap();
+    frames.push(frames[1].clone());
+    frames[1]["il_status"] = json!(0x80004005_u32);
+    frames[1]["il_offsets"] = json!([]);
+    frames[1]["il_offsets_needed"] = json!(0);
+    assert!(validate_native_return(&report, &prepared).is_err());
+}
+
+#[test]
+fn native_return_rejects_fabricated_stub_il() {
+    let (mut report, prepared) = fixed_native_return_with_stub_receipt();
+    report["shell_observation"]["reader"]["frames"][0]["il_offsets"] = json!([160]);
+    report["shell_observation"]["reader"]["frames"][0]["il_offsets_needed"] = json!(1);
+    assert!(validate_native_return(&report, &prepared).is_err());
+    report["shell_observation"]["reader"]["frames"][0]["il_status"] = json!(0);
+    assert!(validate_native_return(&report, &prepared).is_err());
+}
+
+#[test]
+fn native_return_does_not_use_a_stub_as_the_required_caller() {
+    let (mut report, prepared) = fixed_native_return_with_stub_receipt();
+    report["shell_observation"]["reader"]["frames"]
+        .as_array_mut()
+        .unwrap()
+        .remove(1);
+    assert!(validate_native_return(&report, &prepared).is_err());
 }
 
 #[test]

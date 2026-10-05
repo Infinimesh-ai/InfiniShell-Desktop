@@ -290,6 +290,10 @@ const SOURCES: &[(&str, &[u8])] = &[
         include_bytes!("../../../../script/ci/g09-clr-fixture/build-reader.ps1"),
     ),
     (
+        "script/ci/g09-clr-fixture/preparation-context.ps1",
+        include_bytes!("../../../../script/ci/g09-clr-fixture/preparation-context.ps1"),
+    ),
+    (
         "crates/command/src/windows_station_debugger.rs",
         include_bytes!("../../../../crates/command/src/windows_station_debugger.rs"),
     ),

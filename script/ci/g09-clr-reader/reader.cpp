@@ -673,7 +673,7 @@ HRESULT terminal_il_mapping(IXCLRDataMethodInstance *method, CLRDATA_ADDRESS ip,
   return S_OK;
 }
 
-HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Result &result) {
+HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return, Target &target, Result &result) {
   Com<IXCLRDataStackWalk> walk;
   HRESULT hr =
       task->CreateStackWalk(CLRDATA_SIMPFRAME_MANAGED_METHOD | CLRDATA_SIMPFRAME_RUNTIME_MANAGED_CODE |
@@ -689,18 +689,19 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Re
                          reinterpret_cast<BYTE *>(&stopped_context));
   if (hr != S_OK) return hr;
   bool partial = false;
+  bool metadata_frame = false;
   for (unsigned n = 0; n < G09_CLR_MAX_FRAMES; ++n) {
     if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
     // Init/SetContext2 已定位首帧；每次后续迭代才推进，非托管帧也只推进一次。
     if (n != 0) {
       hr = walk->Next();
-      if (hr == S_FALSE) return partial || result.frames.empty() ? S_FALSE : S_OK;
+      if (hr == S_FALSE) return partial || !metadata_frame ? S_FALSE : S_OK;
       if (hr != S_OK) return hr;
     }
     CLRDataSimpleFrameType simple_type;
     CLRDataDetailedFrameType detailed_type;
     hr = walk->GetFrameType(&simple_type, &detailed_type);
-    if (hr == S_FALSE) return partial || result.frames.empty() ? S_FALSE : S_OK;
+    if (hr == S_FALSE) return partial || !metadata_frame ? S_FALSE : S_OK;
     if (hr != S_OK) return hr;
     Com<IXCLRDataFrame> frame;
     Com<IXCLRDataMethodInstance> method;
@@ -740,9 +741,45 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Re
       }
     } else if (SUCCEEDED(mapping)) mapping = E_UNEXPECTED;
     if (mapping == S_OK && (needed == 0 || needed > offsets.size())) mapping = S_FALSE;
-    if (mapping != S_OK) partial = true;
+    // 同一 MethodInstance 的完整名称区分 Framework 生成的互操作桩；不输出名称/签名。
+    HRESULT name_hr = E_PENDING;
+    ULONG32 name_needed = 0;
+    bool name_complete = false;
+    bool pinvoke_name = false;
+    const char *runtime_name = "not_requested";
+    if (token == 0x06000000) {
+      std::array<WCHAR, 512> name{};
+      name_hr = method->GetName(0, static_cast<ULONG32>(name.size()), &name_needed, name.data());
+      runtime_name = "unavailable";
+      if (name_hr == S_OK && name_needed > 0 && name_needed <= name.size() &&
+          name[name_needed - 1] == L'\0' && wcsnlen(name.data(), name.size()) + 1 == name_needed) {
+        name_complete = true;
+        const std::wstring value(name.data(), name_needed - 1);
+        runtime_name = value.rfind(L"DomainBoundILStubClass.IL_STUB_PInvoke(", 0) == 0
+                           ? "domain_bound_pinvoke_stub"
+                       : value.rfind(L"DomainNeutralILStubClass.IL_STUB_PInvoke(", 0) == 0
+                           ? "domain_neutral_pinvoke_stub"
+                           : "unknown";
+        pinvoke_name = std::strcmp(runtime_name, "unknown") != 0;
+      }
+    }
+    // 原生返回的首帧可为没有元数据 MethodDef 的已确认 P/Invoke 桩。
+    // 保留原 E_FAIL 和空 IL，不把该桩冒充托管调用者；其它映射失败仍是不完整栈。
+    const bool runtime_pinvoke = native_return && n == 0 && token == 0x06000000 &&
+                                 simple_type == CLRDATA_SIMPFRAME_MANAGED_METHOD && detailed_type == 0 &&
+                                 context_hr == S_OK && mapping == E_FAIL && mapping_hr == E_FAIL &&
+                                 needed == 0 && pinvoke_name;
+    const bool metadata_method = (token & 0xff000000) == 0x06000000 && (token & 0x00ffffff) != 0;
+    if (!runtime_pinvoke && (!metadata_method || mapping != S_OK)) partial = true;
+    if (metadata_method && mapping == S_OK) metadata_frame = true;
     std::ostringstream item;
     item << "{\"module_mvid\":\"" << guid(mvid) << "\",\"method_token\":" << token
+         << ",\"frame_kind\":\"" << (runtime_pinvoke ? "runtime_pinvoke_stub" : metadata_method ? "metadata_method" : "unknown_no_metadata") << "\""
+         << ",\"simple_frame_type\":" << static_cast<unsigned>(simple_type)
+         << ",\"detailed_frame_type\":" << static_cast<unsigned>(detailed_type)
+         << ",\"name_hresult\":" << static_cast<std::uint32_t>(name_hr)
+         << ",\"name_complete\":" << (name_complete ? "true" : "false")
+         << ",\"name_units_needed\":" << name_needed << ",\"runtime_name\":\"" << runtime_name << "\""
          << ",\"context_hresult\":" << static_cast<std::uint32_t>(context_hr)
          << ",\"mapping_hresult\":" << static_cast<std::uint32_t>(mapping_hr) << ",\"mapping_source\":\""
          << mapping_source << "\""
@@ -875,7 +912,7 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, Result &resul
   // operation 3 是调用方自有的原生返回单步，只读当前 CLR 栈，不查询异常对象。
   result.stack_error = target.expired()   ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
                        : result.exhausted ? HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_QUOTA)
-                                          : collect_stack(task.value, r.thread_id, target, result);
+                                          : collect_stack(task.value, r.thread_id, r.operation == 3, target, result);
   result.status = (r.operation == 3 ? !result.frames.empty() : result.object_chain_complete) &&
                           result.stack_error == S_OK && !result.exhausted && !target.expired()
                       ? "observed"

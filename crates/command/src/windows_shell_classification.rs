@@ -47,7 +47,9 @@ const MAX_PATH_UNITS: usize = 1024;
 const MAX_CALLS: u32 = 1;
 const MAX_USER: u64 = 0x0000_7fff_ffff_ffff;
 const OWN_STATUS: u64 = 15;
-const OTHER_STATUS: u64 = (1 << 13) | (1 << 14) | (1 << 15);
+// x64 DR6 非活动状态及 DR7 固定置一位；不把内核初始零视图作为硬件命中后的期望值。
+const DR6_INACTIVE: u64 = 0xffff_0ff0;
+const DR7_FIXED_ONE: u64 = 1 << 10;
 const RF: u32 = 1 << 16;
 const TF: u32 = 1 << 8;
 
@@ -221,11 +223,13 @@ pub struct Summary {
     pub skipped_entries: u64,
     pub dirty_threads: usize,
     pub restored_threads: u64,
+    pub inactive_api_readbacks: u64,
     pub threads_exited_before_restore: u64,
     pub original_process_exit_confirmed: bool,
     pub stopped: bool,
     pub restoration: &'static str,
     pub result: &'static str,
+    pub first_unowned_single_step: Option<serde_json::Value>,
 }
 
 #[derive(Debug)]
@@ -258,8 +262,21 @@ impl Registers {
     fn vacant(self, flags: u32) -> bool {
         self.address == [0; 4]
             && self.control & !(1 << 10) == 0
-            && self.status & (OWN_STATUS | OTHER_STATUS) == 0
+            && matches!(self.status, 0 | DR6_INACTIVE)
             && flags & TF == 0
+    }
+    fn inactive_api_view(self) -> Self {
+        // Windows 在 Set 后把完整非活动位组读回为零，硬件单步则读回架构值。
+        // 仅转换请求中的完整非活动位组；不掩掉实际 BLD/RTM 或其他调试原因。
+        if self.status & !OWN_STATUS == DR6_INACTIVE {
+            Self {
+                status: self.status & OWN_STATUS,
+                control: self.control & !DR7_FIXED_ONE,
+                ..self
+            }
+        } else {
+            self
+        }
     }
     fn same_configuration(self, other: Self) -> bool {
         self.address == other.address
@@ -270,8 +287,8 @@ impl Registers {
         let mut value = self;
         let slot = if returning { 3 } else { 0 };
         value.address[slot] = address;
-        value.control |= 1 << (slot * 2);
-        value.status &= !OWN_STATUS;
+        value.control |= DR7_FIXED_ONE | (1 << (slot * 2));
+        value.status = (value.status | DR6_INACTIVE) & !OWN_STATUS;
         value
     }
 }
@@ -298,6 +315,8 @@ fn restorable(
     current == original
         || expected.is_some_and(|value| current.same_configuration(value))
         || previous.is_some_and(|value| current.same_configuration(value))
+        || expected.is_some_and(|value| current.same_configuration(value.inactive_api_view()))
+        || previous.is_some_and(|value| current.same_configuration(value.inactive_api_view()))
 }
 fn execution_equal(left: &CONTEXT, right: &CONTEXT) -> bool {
     [
@@ -613,6 +632,7 @@ struct Thread {
     dirty: bool,
     resume_flag: Option<(u64, bool)>,
     pending: Option<Pending>,
+    inactive_api_readbacks: u64,
 }
 impl Thread {
     fn verify(&self, process: HANDLE) -> io::Result<()> {
@@ -625,19 +645,46 @@ impl Thread {
             "原线程身份改变",
         )
     }
-    fn change(&mut self, mut current: AlignedContext, registers: Registers) -> io::Result<()> {
+    fn change(
+        &mut self,
+        mut current: AlignedContext,
+        registers: Registers,
+        change_resume_flag: bool,
+    ) -> io::Result<()> {
         self.previous = self.expected;
         self.expected = Some(registers);
         self.dirty = true;
         registers.write(&mut current.0);
+        // 普通断点只写 DR；重写无关 CONTROL 会让内核规范化原 EFlags。
+        // 仅显式调整自有 RF 时才写 CONTROL，执行上下文仍须严格读回。
+        current.0.ContextFlags = if change_resume_flag {
+            CONTEXT_DEBUG_REGISTERS_AMD64 | CONTEXT_CONTROL_AMD64
+        } else {
+            CONTEXT_DEBUG_REGISTERS_AMD64
+        };
         if !unsafe { set_context_raw(raw(&self.handle), &current.0) }.as_bool() {
             return Err(io::Error::last_os_error());
         }
         let after = context(raw(&self.handle))?;
-        require(
-            Registers::read(&after.0) == registers && execution_equal(&current.0, &after.0),
-            "调试寄存器写入读回不符",
-        )
+        let actual = Registers::read(&after.0);
+        if (actual != registers && actual != registers.inactive_api_view())
+            || !execution_equal(&current.0, &after.0)
+        {
+            // 只保留控制位及逐项相等性，不输出目标地址或通用寄存器内容。
+            return Err(io::Error::other(format!(
+                "调试寄存器写入读回不符：addresses_equal={} dr6_expected={:#x} dr6_actual={:#x} dr7_expected={:#x} dr7_actual={:#x} execution_equal={} eflags_expected={:#x} eflags_actual={:#x}",
+                actual.address == registers.address,
+                registers.status,
+                actual.status,
+                registers.control,
+                actual.control,
+                execution_equal(&current.0, &after.0),
+                current.0.EFlags,
+                after.0.EFlags,
+            )));
+        }
+        self.inactive_api_readbacks += u64::from(actual != registers);
+        Ok(())
     }
     fn restore(&mut self) -> io::Result<bool> {
         if !self.dirty {
@@ -654,8 +701,10 @@ impl Thread {
             ),
             "拒绝覆盖外部调试配置",
         )?;
+        let original_flags = current.0.EFlags;
         restore_own_resume_flag(&mut current.0, self.resume_flag);
-        self.change(current, original)?;
+        let change_resume_flag = original_flags != current.0.EFlags;
+        self.change(current, original, change_resume_flag)?;
         self.dirty = false;
         self.pending = None;
         self.resume_flag = None;
@@ -683,6 +732,8 @@ pub struct ShellClassificationWitness {
     exited_dirty: u64,
     exited: bool,
     stopped: bool,
+    first_unowned_single_step: Option<serde_json::Value>,
+    completed_inactive_api_readbacks: u64,
 }
 impl std::fmt::Debug for ShellClassificationWitness {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -743,6 +794,8 @@ impl ShellClassificationWitness {
             exited_dirty: 0,
             exited: false,
             stopped: false,
+            first_unowned_single_step: None,
+            completed_inactive_api_readbacks: 0,
         };
         value.insert_thread(event.dwThreadId, created.hThread)?;
         Ok(value)
@@ -789,6 +842,7 @@ impl ShellClassificationWitness {
             dirty: false,
             resume_flag: None,
             pending: None,
+            inactive_api_readbacks: 0,
         };
         thread.verify(raw(&self.process))?;
         self.threads.insert(tid, thread);
@@ -839,7 +893,7 @@ impl ShellClassificationWitness {
                 "拒绝覆盖已有调试寄存器配置",
             )?;
             thread.original = Some(original);
-            thread.change(current, original.armed(image.entry, false))?;
+            thread.change(current, original.armed(image.entry, false), false)?;
         }
         Ok(())
     }
@@ -945,6 +999,21 @@ impl ShellClassificationWitness {
                 )
             })
         else {
+            if self.first_unowned_single_step.is_none() {
+                let actual = Registers::read(&current.0);
+                // 只记录首次未归属停点的控制位与相等性，原异常继续语义不变。
+                self.first_unowned_single_step = Some(serde_json::json!({
+                    "sequence": sequence, "identity": thread.identity, "dirty": thread.dirty,
+                    "addresses_equal": thread.expected.map(|value| value.address == actual.address),
+                    "dr6_expected": thread.expected.map(|value| value.status),
+                    "dr6_actual": actual.status,
+                    "dr7_expected": thread.expected.map(|value| value.control),
+                    "dr7_actual": actual.control,
+                    "eflags": current.0.EFlags,
+                    "ip_matches_exception": current.0.Rip == exception.ExceptionRecord.ExceptionAddress as u64,
+                    "ip_matches_slots": actual.address.map(|address| address == current.0.Rip),
+                }));
+            }
             return self.unowned_exception(event);
         };
         if slot == 0 {
@@ -965,11 +1034,12 @@ impl ShellClassificationWitness {
             require(thread.pending.is_none(), "分类调用意外重入")?;
             if !selected {
                 let mut resumed = current;
+                let change_resume_flag = resumed.0.EFlags & RF == 0;
                 thread.resume_flag = Some((resumed.0.Rip, resumed.0.EFlags & RF != 0));
                 resumed.0.EFlags |= RF;
                 let mut expected = thread.expected.unwrap();
                 expected.status &= !OWN_STATUS;
-                thread.change(resumed, expected)?;
+                thread.change(resumed, expected, change_resume_flag)?;
                 self.skipped += 1;
                 return Ok(Observation::OwnedSkipped);
             }
@@ -985,7 +1055,7 @@ impl ShellClassificationWitness {
             let original = thread.original.ok_or_else(|| invalid("原 DR 配置缺失"))?;
             thread.pending = Some(pending);
             self.selected += 1;
-            thread.change(current, original.armed(returned_to, true))?;
+            thread.change(current, original.armed(returned_to, true), false)?;
             return Ok(Observation::OwnedEntry);
         }
         require(slot == 3, "意外的自有调试槽")?;
@@ -1075,6 +1145,7 @@ impl ShellClassificationWitness {
             .ok_or_else(|| invalid("退出线程未绑定"))?;
         confirm_exit(raw(&thread.handle))?;
         self.exited_dirty += u64::from(thread.dirty);
+        self.completed_inactive_api_readbacks += thread.inactive_api_readbacks;
         self.threads.remove(&event.dwThreadId);
         Ok(())
     }
@@ -1115,9 +1186,16 @@ impl ShellClassificationWitness {
             skipped_entries: self.skipped,
             dirty_threads: self.threads.values().filter(|thread| thread.dirty).count(),
             restored_threads: self.restored,
+            inactive_api_readbacks: self.completed_inactive_api_readbacks
+                + self
+                    .threads
+                    .values()
+                    .map(|thread| thread.inactive_api_readbacks)
+                    .sum::<u64>(),
             threads_exited_before_restore: self.exited_dirty,
             original_process_exit_confirmed: self.exited,
             stopped: self.stopped,
+            first_unowned_single_step: self.first_unowned_single_step.clone(),
             restoration: if self.requires_restoration() {
                 "required"
             } else if self.exited_dirty > 0 {

@@ -1,7 +1,21 @@
 {
   "schema": 1,
-  "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a74首updated为ProbeFailed，PS退出1而Node/Codex随后退出0；原26异常及b163实际元数据已核，后段是ExitException/RethrowException传播，但缺实际NCP分支值，不能断言退出首因。Python夹具修复尚待Windows执行。b7eb Linux源码门禁完成独审，最终同源双平台门禁未完成。新增关闭0项。",
+  "status": "windows_g09_in_progress_pr_draft",
+  "status_zh": "G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Windows本机固定能力55普通及唯一native通过，读到4550返回、运行时PInvoke首帧和精确调用者IL；原runner复核及真实PS接入待执行。原PS退出1/零输出而Node/Codex随后退出0的首因仍未证实，最终同源双平台门禁未完成。新增关闭0项。",
+  "g09_windows_fixed_capability_20261006": {
+    "base_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+    "original_runner_recheck": {"run_id": 37340942346, "ordinary_pass": 45, "native": "failed_debug_register_readback", "artifact_sha256": "1bc13a709704a3df1f0ef66073e1a863da82bf7c05fa53e8e067dc667b837f14"},
+    "environment_boundary": "原runner CLR/DAC4.8.9310.0、SMA MVID0a210000-3870-4dec-b53e-175f62acb623；本机CLR/DAC4.8.9345.0、SMA MVIDef06f415-eee9-4b67-ab30-4d9485596832。版本不同，本机通过不解释原PS首因。",
+    "local_preparation": "显式-Local/-LocalRoot/-LocalRunId；不伪造GITHUB_ACTIONS；14边界项通过，helper与九个reader来源绑定并回读；默认CI限制保持。",
+    "local_fixed": {"ordinary_pass": 55, "native_pass": 1, "runner_offline_pass": 28, "warp_check": "passed", "fixture_sha256": "e90222ed7d9627a788a2fafe711e76b8437978938b4dbead7deb518d23ca6797", "build_sha256": "c03f17b72586526795990822bce7d6ec630226695af8ac2410440a097dcd7365", "ordinary_log_sha256": "97e41ebde8df1d33c32d6218ed38ed5c3146707675da28be6232d87212f24e09", "native_log_sha256": "8c810c26ea1b833a28d0eb75a7b80c0ef38e520c00c66c778e73e32d89d05ea2"},
+    "fix": "普通DR写入不重写CONTROL/INTEGER；仅完整DR非活动位组可接受Windows API零视图，硬件命中归属仍严格；operation3首帧由同一MethodInstance完整名称确认Framework PInvoke桩，原E_FAIL/空IL保留，所有metadata帧与精确caller仍严格校验。",
+    "failed_local_receipts": "a1–a7全部保留；a7确认DomainBoundPInvoke身份但仍partial，a8才通过新完整合同；不改旧失败结论。",
+    "evidence_root": "C:/Coding/InfiniShell-Evidence/g09-20261006-a",
+    "cleanup": "仓外唯一原件保留，cleanup_ready=false；不宣称证据目录已清理。",
+    "native_cause_proven": false,
+    "newly_closed_gaps": [],
+    "localization": "无需本地化变更；仅内部诊断与固定夹具，无GUI/TUI文案、语义或布局变化。"
+  },
   "g09_original_ps_exception_mapping_20261005": {
     "base_commit": "b7eb5447685dfab521c44c0531c28dff920f34db",
     "failed_run": 37299690314,

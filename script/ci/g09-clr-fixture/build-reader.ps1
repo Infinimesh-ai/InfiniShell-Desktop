@@ -1,12 +1,14 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([switch]$Local, [string]$LocalRoot, [string]$LocalRunId)
+
+$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-if ([IntPtr]::Size -ne 8 -or $env:OS -ne 'Windows_NT' -or
-    $PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5 -or
-    $PSVersionTable.PSVersion.Minor -ne 1 -or $env:GITHUB_ACTIONS -ne 'true' -or
-    $env:GITHUB_RUN_ID -notmatch '^\d+$' -or $env:GITHUB_RUN_ATTEMPT -notmatch '^\d+$' -or
-    [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP) -or [string]::IsNullOrEmpty($env:GITHUB_ENV)) {
-    throw 'reader 构建仅支持 Windows x64 CI 的 Windows PowerShell 5.1'
+$contextScript = Join-Path $PSScriptRoot 'preparation-context.ps1'
+$contextScriptHash = (Get-FileHash -LiteralPath $contextScript -Algorithm SHA256).Hash.ToLowerInvariant()
+. $contextScript
+if ((Get-FileHash -LiteralPath $contextScript -Algorithm SHA256).Hash.ToLowerInvariant() -cne $contextScriptHash) {
+    throw '受控准备入口在加载期间发生变化'
 }
+$context = New-G09PreparationContext -Local $Local -LocalRoot $LocalRoot -LocalRunId $LocalRunId -Kind 'build'
 
 function Get-RegularFileHash([string]$Path) {
     $item = Get-Item -LiteralPath $Path
@@ -17,14 +19,8 @@ function Get-RegularFileHash([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-$base = [IO.Path]::GetFullPath($env:RUNNER_TEMP)
-if ($base.StartsWith('\\') -or -not [IO.Directory]::Exists($base)) {
-    throw '构建根必须是既有本地 runner 临时目录'
-}
-$root = Join-Path $base ('g09-clr-build-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT)
-if (Test-Path -LiteralPath $root) { throw '本轮 reader 构建目录已存在' }
-$directory = New-Item -ItemType Directory -Path $root
-"INFINISHELL_CLR_BUILD_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+$root = $context.Root
+Write-G09PreparationOutput $context 'INFINISHELL_CLR_BUILD_ROOT' $root
 $sourceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\g09-clr-reader'))
 $snapshot = Join-Path $root 'source'
 $executable = Join-Path $root 'reader.exe'
@@ -32,23 +28,15 @@ $inputs = @()
 $failure = $null
 $postFailure = $false
 $receipt = [ordered]@{
-    schema = 1; status = 'started'; stage = 'private_directory'; source_commit = $env:GITHUB_SHA
-    run_id = $env:GITHUB_RUN_ID; run_attempt = $env:GITHUB_RUN_ATTEMPT
+    schema = 1; status = 'started'; stage = 'private_directory'; source_commit = $context.SourceIdentity.commit
+    preparation_mode = $context.Mode; source_identity = $context.SourceIdentity
+    context_script_sha256 = $contextScriptHash; context_script_unchanged = $false
+    run_id = $context.RunId; run_attempt = $context.RunAttempt
     native_execution_started = $false; dac_loaded = $false; cleanup_ready = $false
     inputs = @(); executable = $null
     scope = '仅编译固定只读 reader；不执行 reader、DAC、CLR 夹具或任何 CLI'
 }
 try {
-    # 仅给本轮新建目录设置私有 ACL，不修改安装树或既有 runner 目录。
-    $owner = [Security.Principal.WindowsIdentity]::GetCurrent().User
-    $acl = [Security.AccessControl.DirectorySecurity]::new()
-    $acl.SetOwner($owner)
-    $acl.SetAccessRuleProtection($true, $false)
-    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
-        $owner, [Security.AccessControl.FileSystemRights]::FullControl,
-        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-        [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Allow))
-    Set-Acl -LiteralPath $directory.FullName -AclObject $acl
     New-Item -ItemType Directory -Path $snapshot | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $snapshot 'vendor') | Out-Null
 
@@ -94,6 +82,11 @@ try {
     $scriptHash = Get-RegularFileHash $PSCommandPath
     Copy-Item -LiteralPath $PSCommandPath -Destination (Join-Path $root 'build-reader.ps1')
     $receipt.build_script_sha256 = $scriptHash
+    Copy-Item -LiteralPath $contextScript -Destination (Join-Path $root 'preparation-context.ps1')
+    if ((Get-RegularFileHash $contextScript) -cne $contextScriptHash -or
+        (Get-RegularFileHash (Join-Path $root 'preparation-context.ps1')) -cne $contextScriptHash) {
+        throw '受控准备入口的源码或归档摘要不匹配'
+    }
     $receipt.provenance_sha256 = $provenanceHash
 
     $receipt.stage = 'toolchain'
@@ -153,6 +146,18 @@ try {
             $item.recheck_error_hresult = $_.Exception.HResult
         }
     }
+    # 准备入口也是运行时依赖，独立复核，不改变九个固定 reader 输入的集合和顺序。
+    try {
+        $receipt.context_script_sha256_after = Get-RegularFileHash $contextScript
+        $receipt.archived_context_script_sha256 = Get-RegularFileHash (Join-Path $root 'preparation-context.ps1')
+        $receipt.context_script_unchanged = $receipt.context_script_sha256_after -ceq $contextScriptHash -and
+            $receipt.archived_context_script_sha256 -ceq $contextScriptHash
+        if (-not $receipt.context_script_unchanged) { $postFailure = $true }
+    } catch {
+        $postFailure = $true
+        $receipt.context_script_recheck_error_kind = $_.Exception.GetType().FullName
+        $receipt.context_script_recheck_error_hresult = $_.Exception.HResult
+    }
     $receipt.inputs = $inputs
     $receipt.inputs_rechecked = $inputs.Count
     $receipt.sources_unchanged = $inputs.Count -eq 9 -and -not $postFailure
@@ -164,4 +169,4 @@ try {
 }
 if ($null -ne $failure) { throw $failure }
 if ($postFailure) { throw '构建输入发生变化，拒绝发布 reader' }
-"INFINISHELL_CLR_READER=$executable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+Write-G09PreparationOutput $context 'INFINISHELL_CLR_READER' $executable

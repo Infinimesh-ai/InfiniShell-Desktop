@@ -70,6 +70,7 @@ class RunnerTests(unittest.TestCase):
         self.assertIsNotNone(table)
         inputs = re.findall(r"'([^']+)'", table.group(1))
         self.assertEqual(len(inputs), 9)
+        self.assertIn("script/ci/g09-clr-fixture/preparation-context.ps1", runner.ACCEPTANCE_SOURCE_FILES)
         self.assertLessEqual({"script/ci/g09-clr-reader/" + name for name in inputs},
                              set(runner.ACCEPTANCE_SOURCE_FILES))
         self.assertEqual(runner.SOURCE_FILES[-1], "script/cli-agent-parity/run_codex_npm_windows_update_live.py")

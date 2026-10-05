@@ -1,45 +1,34 @@
-﻿param([Parameter(Mandatory = $true)][string]$Reader)
+﻿param([Parameter(Mandatory = $true)][string]$Reader, [switch]$Local, [string]$LocalRoot, [string]$LocalRunId)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-if ([IntPtr]::Size -ne 8 -or $env:OS -ne 'Windows_NT' -or
-    $PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5 -or
-    $env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_RUN_ID -notmatch '^\d+$' -or
-    $env:GITHUB_RUN_ATTEMPT -notmatch '^\d+$' -or [string]::IsNullOrEmpty($env:GITHUB_ENV)) {
-    throw 'CLR 夹具只能由 Windows x64 runner 的 Windows PowerShell 5.1 准备'
+$contextScript = Join-Path $PSScriptRoot 'preparation-context.ps1'
+$contextScriptHash = (Get-FileHash -LiteralPath $contextScript -Algorithm SHA256).Hash.ToLowerInvariant()
+. $contextScript
+if ((Get-FileHash -LiteralPath $contextScript -Algorithm SHA256).Hash.ToLowerInvariant() -cne $contextScriptHash) {
+    throw '受控准备入口在加载期间发生变化'
 }
-$base = [IO.Path]::GetFullPath($env:RUNNER_TEMP)
-if (-not [IO.Directory]::Exists($base) -or $base.StartsWith('\\')) {
-    throw '缺少既有本地 runner 临时根'
-}
-$root = Join-Path $base ('g09-clr-fixture-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT)
-if (Test-Path -LiteralPath $root) { throw 'CLR 夹具证据目录已存在' }
-$directory = New-Item -ItemType Directory -Path $root
-$owner = [Security.Principal.WindowsIdentity]::GetCurrent().User
-$acl = [Security.AccessControl.DirectorySecurity]::new()
-$acl.SetOwner($owner)
-$acl.SetAccessRuleProtection($true, $false)
-$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
-    $owner, [Security.AccessControl.FileSystemRights]::FullControl,
-    [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-    [Security.AccessControl.PropagationFlags]::None,
-    [Security.AccessControl.AccessControlType]::Allow))
-Set-Acl -LiteralPath $directory.FullName -AclObject $acl
-"INFINISHELL_CLR_FIXTURE_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+$context = New-G09PreparationContext -Local $Local -LocalRoot $LocalRoot -LocalRunId $LocalRunId -Kind 'fixture'
+$root = $context.Root
+Write-G09PreparationOutput $context 'INFINISHELL_CLR_FIXTURE_ROOT' $root
 
 # 只编译固定 C#，不启动它，也不在准备阶段加载 DAC。
 $source = Join-Path $PSScriptRoot 'Fixture.cs'
 $compiler = Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$inputReader = (Resolve-Path -LiteralPath $Reader).Path
 $copiedReader = Join-Path $root 'reader.exe'
+$copiedSource = Join-Path $root 'Fixture.cs'
 $fixture = Join-Path $root 'fixture.exe'
 $fixtureNode = Join-Path $root 'fixture-node.exe'
 $receipt = [ordered]@{
-    schema = 1; source_commit = $env:GITHUB_SHA; status = 'preparing'
-    native_execution_started = $false; cleanup_ready = $false
+    schema = 1; source_commit = $context.SourceIdentity.commit; status = 'preparing'
+    preparation_mode = $context.Mode; source_identity = $context.SourceIdentity
+    context_script_sha256 = $contextScriptHash; context_script_unchanged = $false
+    run_id = $context.RunId; run_attempt = $context.RunAttempt
+    native_execution_started = $false; dac_loaded = $false; cleanup_ready = $false
     scope = '固定 Framework 异常及本地映像分类读取夹具；不代表 PowerShell 或 G09 通过'
 }
 try {
+    $inputReader = (Resolve-Path -LiteralPath $Reader).Path
     foreach ($path in @($source, $compiler, $inputReader)) {
         $item = Get-Item -LiteralPath $path
         if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
@@ -47,6 +36,41 @@ try {
         }
     }
     $readerHash = (Get-FileHash -LiteralPath $inputReader -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($Local) {
+        # 本地只接受本轮受控构建的 reader；不能借本地开关导入任意可执行文件。
+        $buildRoot = Join-Path $LocalRoot ('g09-clr-build-local-' + $LocalRunId)
+        $buildRoot = Assert-G09LocalDirectory $buildRoot
+        if (-not [string]::Equals($inputReader, (Join-Path $buildRoot 'reader.exe'), [StringComparison]::OrdinalIgnoreCase)) {
+            throw '本地 reader 必须来自同一轮受控构建目录'
+        }
+        $buildReceiptPath = Join-Path $buildRoot 'build.safe.json'
+        $buildReceiptFile = Get-Item -LiteralPath $buildReceiptPath
+        if ($buildReceiptFile.PSIsContainer -or ($buildReceiptFile.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            $buildReceiptFile.Length -le 0 -or $buildReceiptFile.Length -gt 1048576) {
+            throw 'reader 构建收据不是固定边界内的普通文件'
+        }
+        $buildReceipt = [IO.File]::ReadAllText($buildReceiptPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+        if ($buildReceipt.schema -ne 1 -or $buildReceipt.status -cne 'compiled' -or
+            $buildReceipt.preparation_mode -cne 'local' -or $buildReceipt.run_id -cne $LocalRunId -or
+            $buildReceipt.source_commit -cne $context.SourceIdentity.commit -or -not $buildReceipt.sources_unchanged -or
+            -not $buildReceipt.context_script_unchanged -or
+            $buildReceipt.native_execution_started -or $buildReceipt.dac_loaded -or $buildReceipt.cleanup_ready -or
+            $buildReceipt.executable.sha256 -cne $readerHash -or @($buildReceipt.inputs).Count -ne 9) {
+            throw 'reader 构建收据与本轮源码或可执行文件不匹配'
+        }
+        foreach ($name in @('reader.cpp', 'wire.h', 'sos_layout.h', 'README.md', 'sources.safe.json',
+                            'vendor/clrdata.h', 'vendor/xclrdata.h', 'vendor/sospriv.h', 'vendor/LICENSE.TXT')) {
+            $entries = @($buildReceipt.inputs | Where-Object { $_.path -ceq $name })
+            if ($entries.Count -ne 1 -or -not $entries[0].unchanged) {
+                throw 'reader 构建输入不属于固定来源'
+            }
+            $currentSource = Join-Path (Join-Path $PSScriptRoot '..\g09-clr-reader') $name
+            if ((Get-FileHash -LiteralPath $currentSource -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entries[0].sha256_before) {
+                throw 'reader 构建后源码已变化'
+            }
+        }
+        $receipt.reader_build_receipt_sha256 = (Get-FileHash -LiteralPath $buildReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
     Copy-Item -LiteralPath $inputReader -Destination $copiedReader
     if ((Get-FileHash -LiteralPath $copiedReader -Algorithm SHA256).Hash.ToLowerInvariant() -ne $readerHash) {
         throw 'reader 副本摘要不匹配'
@@ -54,7 +78,21 @@ try {
     $receipt.compiler_sha256 = (Get-FileHash -LiteralPath $compiler -Algorithm SHA256).Hash.ToLowerInvariant()
     $receipt.compiler_version = (Get-Item -LiteralPath $compiler).VersionInfo.FileVersion
     $receipt.source_sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
-    & $compiler /nologo /target:exe /platform:x64 /optimize- /debug- /warnaserror+ "/out:$fixture" $source *> (Join-Path $root 'compiler.log')
+    Copy-Item -LiteralPath $source -Destination $copiedSource
+    if ((Get-FileHash -LiteralPath $copiedSource -Algorithm SHA256).Hash.ToLowerInvariant() -cne $receipt.source_sha256) {
+        throw '固定夹具源码副本摘要不匹配'
+    }
+    $receipt.preparation_script_sha256 = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Copy-Item -LiteralPath $PSCommandPath -Destination (Join-Path $root 'prepare.ps1')
+    Copy-Item -LiteralPath $contextScript -Destination (Join-Path $root 'preparation-context.ps1')
+    if ((Get-FileHash -LiteralPath $contextScript -Algorithm SHA256).Hash.ToLowerInvariant() -cne $contextScriptHash -or
+        (Get-FileHash -LiteralPath (Join-Path $root 'preparation-context.ps1') -Algorithm SHA256).Hash.ToLowerInvariant() -cne $contextScriptHash) {
+        throw '受控准备入口的源码或归档摘要不匹配'
+    }
+    if ($Local -and $buildReceipt.context_script_sha256 -cne $receipt.context_script_sha256) {
+        throw 'reader 构建后受控准备入口已变化'
+    }
+    & $compiler /nologo /target:exe /platform:x64 /optimize- /debug- /warnaserror+ "/out:$fixture" $copiedSource *> (Join-Path $root 'compiler.log')
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fixture)) {
         throw '固定 Framework 夹具编译失败'
     }
@@ -78,6 +116,16 @@ try {
         $method.MetadataToken
     }
     $receipt.reader_sha256 = $readerHash
+    $receipt.context_script_sha256_after = (Get-FileHash -LiteralPath $contextScript -Algorithm SHA256).Hash.ToLowerInvariant()
+    $receipt.archived_context_script_sha256 = (Get-FileHash -LiteralPath (Join-Path $root 'preparation-context.ps1') -Algorithm SHA256).Hash.ToLowerInvariant()
+    $receipt.context_script_unchanged = $receipt.context_script_sha256_after -ceq $contextScriptHash -and
+        $receipt.archived_context_script_sha256 -ceq $contextScriptHash
+    $receipt.sources_unchanged = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $receipt.source_sha256 -and
+        (Get-FileHash -LiteralPath $copiedSource -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $receipt.source_sha256 -and
+        (Get-FileHash -LiteralPath $inputReader -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $readerHash -and
+        (Get-FileHash -LiteralPath $copiedReader -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $readerHash -and
+        $receipt.context_script_unchanged
+    if (-not $receipt.sources_unchanged) { throw '固定准备输入在编译期间发生变化' }
     $receipt.status = 'prepared'
 } catch {
     # 不保存异常消息，路径及环境内容不进入安全收据。

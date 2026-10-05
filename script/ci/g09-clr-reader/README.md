@@ -66,7 +66,18 @@ stdout 必须由控制器绑定为本轮全新普通文件；不能使用可能�
 
 没有用户可见文案变化，无需本地化变更。
 
+## 原生分类返回的运行时帧
+
+Windows x64 本地固定夹具在 `0x4550` 返回停点实际读到 Framework 的 `DomainBoundILStubClass.IL_STUB_PInvoke` 首帧，其 MethodDef 为 nil（`0x06000000`），原 IL 映射为 `E_FAIL`；下一个固定调用者具有实际 MethodDef 与 IL 160。旧失败原件保持 `partial`，不追改结论。
+
+仅 `operation=3` 的首帧允许识别为 `frame_kind="runtime_pinvoke_stub"`：同一 MethodInstance 的 `GetName(0)` 必须完整返回，固定 512 WCHAR 缓冲无截断或嵌入 NUL；名称必须精确匹配 Framework 的 `DomainBoundILStubClass.IL_STUB_PInvoke(` 或 `DomainNeutralILStubClass.IL_STUB_PInvoke(`。同时要求 nil MethodDef、managed simple type、未知 detailed type、完整原上下文、原 `E_FAIL` 和零 IL 条目。输出仅有固定名称类别、完整性和 HRESULT，不输出原名称或签名。
+
+这个帧保留在栈中，`mapping_hresult` 和 `il_status` 仍为原 `E_FAIL`，不赋予伪造 IL。其它帧仍须为有效 metadata MethodDef 且映射完整；至少一个真实元数据帧和正常解栈结束才允许完整状态。未知 nil 帧、其它 stub、非首帧、名称读取失败和任何其它映射错误均保持 `partial`。控制器另行核对实际调用者 MVID/MethodDef/有效 IL，因此运行时桩不能代替调用者。
+
 ## 官方合同
+
+- [Framework 同代 DAC 的桩类别与 CLR 到原生调用名称](https://github.com/dotnet/coreclr/blob/v2.0.0/src/vm/ilstubresolver.cpp#L42-L78)
+- [同一 MethodInstance 的名称读取](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/task.cpp#L3861-L3900)
 
 - [CLRDataCreateInstance](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/clrdatacreateinstance-function)
 - [ICLRDataTarget](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/iclrdatatarget-interface)
