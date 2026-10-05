@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 原运行页面确认离线夹具权限错误，真实候选继续**：`a74ba3c8f`的[37299690314步骤13](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314/job/111729240747#step:13:49)页面原日志为Python28项中27通过/1错误，唯一错误是测试创建符号链接时WinError1314；ctime三项均通过，完整终态日志尚待统一归档。现仅离线测试改为直接模拟文件/父目录reparse元数据并调用真实driver，断言在解析/打开前拒绝；Unix真实symlink仍保留，未提权或跳过整条测试。28项、Windows分支选择器模拟及warp check本机通过，不冒充Windows原生链接或升级验收。当前运行继续、验证引用不动；无需本地化变更。**新增关闭0项，G09仍开放，PR草稿。**
+
 - **2026-10-05 原PS组合取消前已有两项失败，修正后待新源码实跑**：[37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804)完整官方日志确认Python25项唯一失败为预期`clr_reader_binding`却提前得到`clr_reader_changed`；Windows普通libtest另有复合表达式cfg的E0658/移除表达式/E0061，不能记成仅人工取消。真实升级步骤未运行。时间字段路径已由`13d443281`修正，本次测试调用先绑定并共用原deadline，保留命令、权限、时限和断言。本机warp check与真实调用片段的Windows MSVC普通/诊断两配置检查通过，片段不替代完整应用门禁。Mac原条件只读复核未发现新增必要实机缺项；无需本地化变更。**新增关闭0项，G09和最终同源门禁仍开放，PR草稿。**
 
 - **2026-10-05 共享 CLR 能力通过，原PS组合仍待验**：精确 `e84e80047` 的 [37288696146](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37288696146) 已独审通过20普通项与唯一四异常原生夹具；原工作线程/出生身份、四条完整链、1234/5678及实际throw IL均核，53事件全部Continue，fixture自然退出0且所有Job为空。18来源/9编译输入/36工件成员已核，独审SHA `9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc`。同提交原PS组合 [37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804) 的Python驱动门禁已失败、整轮仍运行，完整首因待审。独立源码核实固定CPython3.13.15的路径ctime为创建时间、fstat ctime为变更时间，现只改为同API前后比较，保留跨API文件身份、mtime和SHA校验；本机28项及warp check通过，不据此提前认定本轮首因或升级通过。**新增关闭0项；无需本地化变更，PR草稿。**

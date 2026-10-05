@@ -1,7 +1,29 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Mac原件复核未见新增必要实机缺项。e84共享CLR原生能力通过；原PS组合取消前已有Python与Windows普通libtest独立失败，真实事务未执行，两项本地修复待Windows实跑。原升级故障、Linux失败及最终同源门禁仍开放，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。特殊权限范围按用户决定，普通及已支持只读ACL自动升级保留。a74原PS组合继续运行；已结束Python步骤的页面原日志为27通过/1错误，唯一错误是创建测试符号链接缺少特权1314，时间字段三项通过。仅离线测试已消除该特权依赖，完整Windows验证仍待；原升级故障、Linux失败及最终同源门禁开放，新增关闭0项。",
+  "g09_reader_offline_reparse_fixture_fix_20261005": {
+    "base_commit": "a74ba3c8f38c75e5f8991e4f9b02b1df9db4b3f5",
+    "original_run": 37299690314,
+    "status": "in_progress_step13_error_observed_in_github_ui",
+    "observed_failure": "Python28项，27通过/唯一ERROR；测试第218行link.symlink_to(reader)抛WinError1314；新增三项ctime测试均ok。",
+    "evidence_boundary": "已登录GitHub精确job/step可见DOM提前观察，完整终态日志仍由原观察器一次归档核对；不能视为整轮通过。",
+    "change": "仅离线测试：各平台模拟指定文件/父目录的重解析点元数据，真实driver拒绝且canonical/open均未发生；Unix原真实symlink测试保留。Windows不创建需要系统特权的夹具。",
+    "local_gates": {
+      "offline_tests": 28,
+      "offline_run": "r-qhxxmpco",
+      "offline_log_sha256": "c13e19b7e3d7e36ef1289f84700dca8ea93710f5977eed1582404cccdd0557ba",
+      "windows_selector_simulation": "r-64__l8o_：真实driver调用3次、symlink创建0次；仅测试模块os引用替换，非Windows原生实测。",
+      "selector_log_sha256": "d62a5577dcf36ad8e62af150bd091bee7fb83c862287217598efcf102b650cfb",
+      "warp_check": "r-by0_xfg2",
+      "warp_check_log_sha256": "6ff50f5177b672371db7f7966bdd4c8e8baedd5f300f682e6aa92964c974109c",
+      "cleanup": "三个登记根均exit0/cleaned"
+    },
+    "native_scope_unchanged": "driver、产品、工作流、原命令/期限及五场景/三冷恢复要求不变；当前a74运行和alias保留，不为此取消或重派。",
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "localization": "无需本地化变更；仅离线测试夹具，无用户界面变化。"
+  },
   "g09_clr_shared_native_and_reader_stat_fix_20261005": {
     "source_commit": "e84e8004759179ac3e812927747a8817fa59ddb9",
     "fixed_native_run": 37288696146,

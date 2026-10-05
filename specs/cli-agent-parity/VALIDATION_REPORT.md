@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：消除离线链接拒绝测试的系统特权依赖
+
+通过隐藏的已登录GitHub页面读取`a74ba3c8f` [37299690314已结束步骤13](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314/job/111729240747#step:13:49)：28项中27通过，唯一ERROR在测试第218行`link.symlink_to(reader)`，为WinError1314；三项新增ctime测试均ok。该提前页面观察归档于本轮`ui-step13-observation.safe.json`，不代替稍后完整终态日志和工件审计，当前原运行继续。
+
+仅修改离线测试：保持原字节变化拒绝，各平台对指定文件或父目录模拟`st_file_attributes=0x400`，调用真实`clr_reader_configuration`，断言拒绝发生在`canonical()`及`Path.open()`前；Unix仍执行原真实符号链接路径。Windows不再依赖创建链接的系统特权，不提高权限、不跳过整条测试、不改driver/产品/工作流及原生验收要求。
+
+原28项本机全过（r-qhxxmpco，SHA `c13e19b7e3d7e36ef1289f84700dca8ea93710f5977eed1582404cccdd0557ba`）；仅替换测试模块os引用的Windows选择器模拟通过，真实driver三调用、symlink零调用（r-64__l8o_，SHA `d62a5577dcf36ad8e62af150bd091bee7fb83c862287217598efcf102b650cfb`），不修改全局os.name或冒充Windows原生实测。`cargo check --locked -p warp`通过（r-by0_xfg2，SHA `6ff50f5177b672371db7f7966bdd4c8e8baedd5f300f682e6aa92964c974109c`）。三登记根均清理。无需本地化变更，新增关闭0项，PR仍草稿。
+
 ## 2026-10-05：原PS组合终态失败证据与测试配置修正
 
 `e84e80047` 的 [37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804) 已人工取消，完整官方日志保留取消前两项独立故障：Python25项中唯一失败期待`clr_reader_binding`却提前得到`clr_reader_changed`；Windows普通libtest在`managed_process_atomic_windows_tests.rs:1858`报E0658、不能移除表达式及E0061。`warp --lib --features cli-agent-native-witness`的check通过不覆盖普通libtest错误。真实事务步骤未运行，唯一工件为环境记录，不存在本轮候选、CLR结果或升级成功证据。

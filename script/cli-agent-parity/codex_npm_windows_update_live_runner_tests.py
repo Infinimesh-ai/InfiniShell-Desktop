@@ -214,14 +214,30 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "clr_reader_binding"):
             runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
         digest = runner.sha(reader)
-        link = self.root / "linked.exe"
-        link.symlink_to(reader)
-        with self.assertRaisesRegex(ValueError, "reparse_point"):
-            runner.clr_reader_configuration(True, "powershell", ["updated"], link, digest)
-        parent = self.root / "linked-parent"
-        parent.symlink_to(self.root, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, "reparse_point"):
-            runner.clr_reader_configuration(True, "powershell", ["updated"], parent / reader.name, digest)
+        original_lstat = Path.lstat
+        # 各平台模拟指定对象的重解析点元数据；不冒充 Windows 原生链接创建验收。
+        for target in (reader, reader.parent):
+            def reparse_stat(path):
+                info = original_lstat(path)
+                if path == target:
+                    return SimpleNamespace(st_mode=info.st_mode, st_file_attributes=0x400)
+                return info
+
+            with self.subTest(target=target), patch.object(Path, "lstat", reparse_stat), \
+                    patch.object(runner, "canonical") as canonical, patch.object(Path, "open") as opened:
+                with self.assertRaisesRegex(ValueError, "reparse_point"):
+                    runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+                canonical.assert_not_called()
+                opened.assert_not_called()
+        if os.name != "nt":
+            link = self.root / "linked.exe"
+            link.symlink_to(reader)
+            with self.assertRaisesRegex(ValueError, "reparse_point"):
+                runner.clr_reader_configuration(True, "powershell", ["updated"], link, digest)
+            parent = self.root / "linked-parent"
+            parent.symlink_to(self.root, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "reparse_point"):
+                runner.clr_reader_configuration(True, "powershell", ["updated"], parent / reader.name, digest)
 
     def test_clr_reader_rejects_hardlinks_empty_files_and_malformed_hashes(self):
         reader = Path(self.binaries["worker"]["path"])
