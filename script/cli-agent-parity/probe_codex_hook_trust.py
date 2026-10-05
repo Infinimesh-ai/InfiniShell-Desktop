@@ -53,11 +53,20 @@ def main():
             recorder.close()
         hooks = [item for group in listing.get("result", {}).get("data", []) for item in group.get("hooks", []) if item.get("pluginId") == "warp@codex-warp"]
         fields = ("key", "eventName", "handlerType", "command", "timeoutSec", "enabled", "source", "pluginId", "currentHash", "trustStatus")
-        hooks = [{key: item[key] for key in fields} for item in hooks]
-        assert len(hooks) == 5 and all(item["trustStatus"] == "untrusted" for item in hooks)
-        assert config.read_bytes() == before
-        report = {"cli": version, "plugin": "warp@codex-warp", "plugin_version": "0.4.0", "patch_revision": metadata["patch_revision"], "hooks_file_sha256": hashlib.sha256((plugin / "hooks/hooks.json").read_bytes()).hexdigest(), "model_request_attempted": False, "credentials_provided": False, "native_config_unchanged": True, "source_metadata_sha256": hashlib.sha256(source_bytes).hexdigest(), "verified_platform": {"darwin": "macos", "linux": "linux", "win32": "windows"}[sys.platform], "verified_architecture": platform.machine().lower(), "executable_sha256": executable_sha256, "hooks": hooks, "passed": True}
+        hooks = [{key: item.get(key) for key in fields} for item in hooks]
+        registration_shape_valid = len(hooks) == 5 and all(item["trustStatus"] == "untrusted" for item in hooks)
+        contract_name = "NATIVE_HOOK_TRUST_WINDOWS.json" if sys.platform == "win32" else "NATIVE_HOOK_TRUST.json"
+        contract = json.loads((default_bundle() / "codex" / contract_name).read_bytes())
+        contract_matches = {item["key"]: item["currentHash"] for item in hooks} == {
+            item["key"]: item["currentHash"] for item in contract["hooks"]
+        }
+        native_config_unchanged = config.read_bytes() == before
+        report = {"cli": version, "plugin": "warp@codex-warp", "plugin_version": "0.4.0", "patch_revision": metadata["patch_revision"], "hooks_file_sha256": hashlib.sha256((plugin / "hooks/hooks.json").read_bytes()).hexdigest(), "model_request_attempted": False, "credentials_provided": False, "native_config_unchanged": native_config_unchanged, "source_metadata_sha256": hashlib.sha256(source_bytes).hexdigest(), "verified_platform": {"darwin": "macos", "linux": "linux", "win32": "windows"}[sys.platform], "verified_architecture": platform.machine().lower(), "executable_sha256": executable_sha256, "hooks": hooks, "passed": True}
+    passed = registration_shape_valid and contract_matches and native_config_unchanged
+    report.update(registration_shape_valid=registration_shape_valid, product_contract_matches=contract_matches, passed=passed)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if not passed:
+        raise SystemExit("原生 Hook 注册、摘要或配置保持检查失败；实际收据已保留")
     print(json.dumps({"passed": True, "hooks": len(hooks)}))
 
 

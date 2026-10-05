@@ -25,6 +25,7 @@ function ConvertTo-NativeArgument([string] $Value) {
 }
 
 # BEGIN_NOTIFICATION_LAUNCH
+$ProgressPreference = 'SilentlyContinue'
 try {
     if ($NotificationHook -notin @(
         'on-session-start.sh', 'on-prompt-submit.sh', 'on-stop.sh',

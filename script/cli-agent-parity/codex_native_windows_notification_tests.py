@@ -63,6 +63,31 @@ def native_environment(plugin):
     return environment
 
 
+def verify_bundle_file_syntax(environment):
+    # 必须让 PS 5.1 自己读取实际文件；先在 Python 中按 UTF-8 解码会掩盖 -File 的 ANSI 问题。
+    source = r'''
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+    throw 'Windows PowerShell 5.1 is required'
+}
+foreach ($name in @('on-notification.ps1', 'warp-notify.ps1')) {
+    $path = [IO.Path]::Combine($env:INFINISHELL_SCRIPT_ROOT, $name)
+    $tokens = $null
+    $errors = $null
+    $null = [Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw ($errors | Out-String) }
+}
+[Console]::Out.Write('bundle-files-parsed-ps51')
+'''
+    command = ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+               base64.b64encode(source.encode('utf-16le')).decode('ascii')]
+    environment = {**environment, 'INFINISHELL_SCRIPT_ROOT': str(BUNDLE / 'scripts')}
+    result = private_run(command, environment, BUNDLE)
+    if result.returncode != 0 or result.stdout != b'bundle-files-parsed-ps51' or result.stderr:
+        raise AssertionError(('PS 5.1 ParseFile 未通过', result.returncode, result.stdout, result.stderr))
+
+
 class StaticNativeNotificationTests(unittest.TestCase):
     def test_native_launcher_has_no_shell_dependency_and_keeps_fixed_encoded_arguments(self):
         source = source_text()
@@ -71,6 +96,7 @@ class StaticNativeNotificationTests(unittest.TestCase):
         self.assertIn("Join-Path $PSHOME 'powershell.exe'", source)
         self.assertIn("'scripts/on-notification.ps1'", source)
         self.assertIn('ReparsePoint', source)
+        self.assertIn("$ProgressPreference = 'SilentlyContinue'", source)
         for script in SCRIPTS:
             command = encode(script)
             self.assertLessEqual(len(command), 8000)
@@ -96,7 +122,9 @@ class StaticNativeNotificationTests(unittest.TestCase):
         self.assertNotIn('[Console]::Out', writer)
         for name in FILES:
             contents = (BUNDLE / 'scripts' / name).read_bytes()
-            self.assertFalse(contents.startswith(b'\xef\xbb\xbf'))
+            # 脚本 BOM 用于 PS 5.1 文件解码；通知载荷仍须通过下面的无 BOM 字节断言。
+            self.assertTrue(contents.startswith(b'\xef\xbb\xbf'))
+            self.assertNotIn('\ufeff', contents.decode('utf-8-sig'))
             self.assertNotIn(b'\r\n', contents)
 
 
@@ -104,7 +132,9 @@ class StaticNativeNotificationTests(unittest.TestCase):
 class NativePowerShellNotificationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        verify_windows_syntax(native_windows_environment())
+        environment = native_windows_environment()
+        verify_bundle_file_syntax(environment)
+        verify_windows_syntax(environment)
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='codex-native-')

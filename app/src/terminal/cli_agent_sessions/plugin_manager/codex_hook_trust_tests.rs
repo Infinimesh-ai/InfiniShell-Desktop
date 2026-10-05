@@ -474,6 +474,108 @@ fn historical_windows_contract_uses_only_the_formal_five_hooks_and_exact_resourc
 }
 
 #[test]
+fn native_windows_rev7_contract_matches_recorded_hash_algorithm_and_current_commands() {
+    use sha2::{Digest as _, Sha256};
+    let bundled: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST_WINDOWS.json"
+    ))
+    .unwrap();
+    let hooks_bytes =
+        include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/hooks/hooks.json");
+    let manifest: serde_json::Value = serde_json::from_slice(hooks_bytes).unwrap();
+    let previous: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev6/NATIVE_HOOK_TRUST_WINDOWS.json"
+    ))
+    .unwrap();
+    for (version, receipt) in [
+        (
+            "0.147.0",
+            include_str!(
+                "../../../../../specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust-rev7-windows.json"
+            ),
+        ),
+        (
+            "0.156.1",
+            include_str!(
+                "../../../../../specs/cli-agent-parity/fixtures/codex-0.156.1-native-hook-trust-rev7-windows.json"
+            ),
+        ),
+    ] {
+        let source: serde_json::Value = serde_json::from_str(receipt).unwrap();
+        assert_eq!(source["cli"], format!("codex-cli {version}"));
+        assert_eq!(source["patch_revision"], 7);
+        assert_eq!(source["plugin_version"], "0.4.0");
+        assert_eq!(source["verified_platform"], "windows");
+        assert_eq!(source["verified_architecture"], "amd64");
+        assert_eq!(source["registration_only"], true);
+        assert_eq!(source["native_config_unchanged"], true);
+        assert_eq!(source["credentials_provided"], false);
+        assert_eq!(source["model_request_attempted"], false);
+        assert_eq!(source["passed"], true);
+        // 官方两版均将默认值规范化后按键排序为紧凑 JSON；用真实注册收据校验算法。
+        assert_eq!(source["hooks"].as_array().unwrap().len(), 5);
+        for hook in source["hooks"].as_array().unwrap() {
+            assert_eq!(
+                hook["currentHash"],
+                windows_hook_hash(hook, hook["command"].as_str().unwrap())
+            );
+        }
+    }
+    assert_eq!(
+        bundled["hooks_file_sha256"],
+        format!("{:x}", Sha256::digest(hooks_bytes))
+    );
+    let recorded = bundled["hooks"].as_array().unwrap();
+    assert_eq!(recorded.len(), 5);
+    for hook in recorded {
+        let (_, entries) = manifest["hooks"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(event, _)| event.eq_ignore_ascii_case(hook["eventName"].as_str().unwrap()))
+            .unwrap();
+        let command = entries[0]["hooks"][0]["commandWindows"].as_str().unwrap();
+        assert_eq!(hook["currentHash"], windows_hook_hash(hook, command));
+        assert_eq!(
+            hook["command_sha256"],
+            format!("{:x}", Sha256::digest(command.as_bytes()))
+        );
+        assert_eq!(hook["trustStatus"], "untrusted");
+        assert_eq!(hook["enabled"], true);
+        assert_eq!(hook["pluginId"], "warp@codex-warp");
+        let old = previous["hooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|old| old["key"] == hook["key"])
+            .unwrap();
+        assert_ne!(old["currentHash"], hook["currentHash"]);
+        if cfg!(windows) {
+            let mut value = config();
+            value["hooks"]["state"][hook["key"].as_str().unwrap()]["trusted_hash"] =
+                toml_edit::value(old["currentHash"].as_str().unwrap());
+            assert_eq!(
+                configured_status(&value),
+                NativeAuthorizationStatus::Required
+            );
+        }
+    }
+}
+
+fn windows_hook_hash(hook: &serde_json::Value, command: &str) -> String {
+    use sha2::{Digest as _, Sha256};
+    // 键按字典序书写，None 字段省略；实际命令仍由 Windows 原生采集器逐项复核。
+    let identity = serde_json::json!({
+        "event_name": hook["key"].as_str().unwrap().split(':').nth(2).unwrap(),
+        "hooks": [{"async": false, "command": command, "timeout": 600, "type": "command"}],
+    });
+    format!(
+        "sha256:{:x}",
+        Sha256::digest(serde_json::to_vec(&identity).unwrap())
+    )
+}
+
+#[test]
 fn selected_contract_matches_the_current_platform() {
     let contract: serde_json::Value = serde_json::from_str(CONTRACT).unwrap();
     assert_eq!(

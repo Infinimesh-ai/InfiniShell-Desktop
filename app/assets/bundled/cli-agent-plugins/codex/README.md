@@ -17,7 +17,7 @@ SSH 或容器需用 `script/cli-agent-parity/apply_notification_patch.py --expor
 
 修补第 7 版保留插件语义版本 `0.4.0`，仅升级本地配方。Unix 祖先回退最多 32 层，只选择最近 Codex 祖先；Linux 首先通过 `/proc` 查询其终端文件描述符，没有 `ps` 也能覆盖该路径。有控制终端但标准流已捕获时保留可选 `ps` 回退。tmux、SSH、终端真实性检查与非零失败语义不变。Windows 原生入口按既有协议构造五类通知，直接写 `CONOUT$`，失败不向 stdout 写 OSC；旧 Git Bash 编码脚本保留为兼容路径。
 
-rev7 完整来源包含新增脚本并按 LF 字节校验；新增文件的 `upstream_sha256=null`，不会虚构上游来源。精确 rev6 归档加入既有 rev3–5 迁移白名单，仍拒绝自定义文件、混合版本及被修改的旧来源。Windows 启动命令改变后须由真实 `hooks/list` 更新该平台信任合同；安装器不会替用户迁移或写入 `trusted_hash`，原生重新授权仍通过 `/hooks` 完成。本次状态与验证见 `docs/upstream-essence/2026-10-05.md`，以下为各历史修补的原始验收边界。
+rev7 完整来源中的 PowerShell 脚本使用 UTF-8 BOM + LF，避免 PS5.1 按本地 ANSI 代码页误读中文注释；通知 JSON 本身仍为无 BOM 的 ASCII。完整来源按原始字节校验；新增文件的 `upstream_sha256=null`，不会虚构上游来源。精确 rev6 归档加入既有 rev3–5 迁移白名单，仍拒绝自定义文件、混合版本及被修改的旧来源。Windows 启动命令改变后须由真实 `hooks/list` 更新该平台信任合同；安装器不会替用户迁移或写入 `trusted_hash`，原生重新授权仍通过 `/hooks` 完成。本次状态与验证见 `docs/upstream-essence/2026-10-05.md`，以下为各历史修补的原始验收边界。
 
 修补第 2 版将 `hooks/hooks.json` 纳入同一固定摘要事务，保留原 matcher 和事件集合。Claude 使用原生 exec form（`command: bash` + 单元素 `args`），Codex 在 shell 命令中引用已导出的 `$PLUGIN_ROOT`，不把目录值拼入命令文本。含空格、中文和 shell 特殊字符的路径已通过 macOS Bash/jq 回放；Claude 2.1.273 的原生 `--init-only` 也通过独立路径探测。Codex Windows 的原生默认 hook shell 可能是 `cmd.exe`，本 POSIX 命令不据此获得 Windows 支持；Windows/Git Bash 与真实通知生命周期仍未验证。
 

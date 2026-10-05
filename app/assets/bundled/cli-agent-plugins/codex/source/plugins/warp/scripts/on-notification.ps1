@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('on-session-start.sh', 'on-prompt-submit.sh', 'on-stop.sh',
                  'on-permission-request.sh', 'on-post-tool-use.sh')]
@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 Set-StrictMode -Version 2
 
 function Get-NotificationField($Object, [string] $Name, $Fallback) {

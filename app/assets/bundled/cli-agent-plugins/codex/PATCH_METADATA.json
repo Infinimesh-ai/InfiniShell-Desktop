@@ -38,7 +38,7 @@
     },
     "hooks/hooks.json": {
       "upstream_sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
-      "replacement_sha256": "9636c14558a69feaf9c6cdbbf3ec785ff705cfd76eac181fab1d1060dbdec271",
+      "replacement_sha256": "9ba4d1a0556e8ac011643773eef4405ea3ca09a4ca77d39c4b27fa823b31c637",
       "mode": "0644"
     },
     "scripts/warp-notify.sh": {
@@ -53,12 +53,12 @@
     },
     "scripts/on-notification.ps1": {
       "upstream_sha256": null,
-      "replacement_sha256": "b56151ad21d91a62545c17ad1afa80a43a6f0b8a3c459c91f90b0213e2fd66a2",
+      "replacement_sha256": "898154a17e7c83a19c2a441eb2fb699b7331417aca9f0d59f1e395b391f85c7a",
       "mode": "0644"
     },
     "scripts/warp-notify.ps1": {
       "upstream_sha256": null,
-      "replacement_sha256": "f0beca15b5349e8783a6db1fcc07bdd578926beea3b1d519eb722d2bb07b525b",
+      "replacement_sha256": "b8862dabfe914faa03c7e150d854e5fb4025d8337ec7336c2fba24a0c51f8196",
       "mode": "0644"
     }
   },

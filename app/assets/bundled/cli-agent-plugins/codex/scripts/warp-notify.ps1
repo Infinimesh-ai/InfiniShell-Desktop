@@ -1,4 +1,4 @@
-# 移植已验证的 codex_windows_notify.ps1 控制台写入，不触碰标准输出或控制台模式。
+﻿# 移植已验证的 codex_windows_notify.ps1 控制台写入，不触碰标准输出或控制台模式。
 function Write-InfiniShellNotification([string] $Message) {
     $utf8 = New-Object Text.UTF8Encoding($false, $true)
     if ($Message.Length -eq 0 -or $utf8.GetByteCount($Message) -gt 1048576) {
