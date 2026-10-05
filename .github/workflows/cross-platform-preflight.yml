@@ -26,6 +26,11 @@ on:
         required: true
         default: false
         type: boolean
+      upstream_essence_only:
+        description: 仅运行上游精华修复定向验证；全量模式优先，不可叠加其他专项
+        required: false
+        default: false
+        type: boolean
       native_acceptance_only:
         description: 仅补验原生 CLI 安装升级和 GUI；全量模式优先
         required: true
@@ -117,11 +122,155 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  upstream_essence:
+    name: 上游精华 / ${{ matrix.platform }} x64
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.upstream_essence_only && !inputs.full_workspace_tests
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.run_linux && inputs.run_windows && '["linux","windows"]' || inputs.run_windows && '["windows"]' || '["linux"]') }}
+    runs-on: [self-hosted, '${{ matrix.platform }}', x64, infinishell-ci]
+    timeout-minutes: 180
+    env:
+      APP_FEATURES: release_bundle,warpui/test-util,rust-embed/debug-embed
+      APP_FILTER: >-
+        test(ai::mcp::) | test(call_mcp_tool::) |
+        test(history_up_does_not_reenter_inline_history_menu_update) |
+        test(editor_down_does_not_reenter_inline_history_menu_update) |
+        test(undo_close::stack::tests::) |
+        test(settings_error_sync_) |
+        test(notebooks::notebook::tests::test_command_block_dispatches_event) |
+        test(context_chips::directory_fetcher::tests::) |
+        test(terminal::input::slash_commands::tests::) |
+        test(aborting_remote_run_command_kills_process_and_clears_in_progress_request) |
+        test(i18n::tests) | test(app_services::linux::startup_tests::) |
+        test(app_services::windows::startup_tests::)
+    steps:
+      # 全量模式在 job 条件中优先；其余专项冲突直接失败，避免悄悄漏验。
+      - name: 校验精简模式输入
+        shell: bash
+        env:
+          RUN_LINUX: ${{ inputs.run_linux }}
+          RUN_WINDOWS: ${{ inputs.run_windows }}
+          OTHER_SPECIALIZED_MODE: ${{ inputs.run_macos_intel || inputs.native_acceptance_only || inputs.run_gui_clipboard || inputs.linux_gui_only || inputs.windows_grok_installer_only || inputs.run_cli_atomic_updates || inputs.run_claude_npm_updates || inputs.run_codex_npm_updates || inputs.run_windows_codex_npm_updates || inputs.run_grok_npm_updates || inputs.run_atomic_windows_debug }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUN_LINUX" != true && "$RUN_WINDOWS" != true ]]; then
+            echo '::error::精简模式至少选择 run_linux 或 run_windows。'
+            exit 1
+          fi
+          if [[ "$OTHER_SPECIALIZED_MODE" == true ]]; then
+            echo '::error::upstream_essence_only 不可与其他专项模式同时开启。'
+            exit 1
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 仅设置当前作业环境，复用已部署的 Perl、LLVM 与构建缓存。
+      - name: 配置 Windows 已部署工具链
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $strawberryPerl = 'C:\Strawberry\perl\bin\perl.exe'
+          $libclang = 'C:\Program Files\LLVM\bin'
+          $sccache = 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+          foreach ($required in @($strawberryPerl, (Join-Path $libclang 'libclang.dll'), $sccache)) {
+            if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+              throw "已部署工具链缺失：$required"
+            }
+          }
+          'C:\Strawberry\perl\bin', $libclang | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          @(
+            "OPENSSL_SRC_PERL=$strawberryPerl"
+            "LIBCLANG_PATH=$libclang"
+            'CARGO_TARGET_DIR=C:\infinishell-ci\cargo-target'
+            "RUSTC_WRAPPER=$sccache"
+            'SCCACHE_DIR=C:\infinishell-ci\sccache'
+            'SCCACHE_CACHE_SIZE=80G'
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: 核对测试提交与工具链
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_dir="$RUNNER_TEMP/upstream-essence"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            log_dir="$(cygpath -u "$RUNNER_TEMP")/upstream-essence"
+          fi
+          mkdir -p "$log_dir"
+          echo "UPSTREAM_ESSENCE_LOG_DIR=$log_dir" >> "$GITHUB_ENV"
+          {
+            actual_sha="$(git rev-parse HEAD)"
+            echo "expected_sha=$GITHUB_SHA"
+            echo "actual_sha=$actual_sha"
+            test "$actual_sha" = "$GITHUB_SHA"
+            git --version
+            rustc --version
+            cargo --version
+            cargo nextest --version
+            cmake --version
+            protoc --version
+          } 2>&1 | tee "$log_dir/toolchain.log"
+
+      - name: 检查主应用及启动条件编译
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "cargo check --locked -p warp --features $APP_FEATURES"
+            cargo check --locked -p warp --features "$APP_FEATURES"
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/cargo-check.log"
+
+      - name: 测试 MCP、远程请求取消、路径工具与默认补全
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
+
+      - name: 测试 v2 补全路径边界
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp_completer --lib --features v2 -E test(completer::engine::path::tests::)'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp_completer --lib --features v2 -E 'test(completer::engine::path::tests::)'
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/completer-tests.log"
+
+      - name: 测试本轮应用回归与双语资源
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp --lib --features $APP_FEATURES -E '$APP_FILTER'"
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp --lib --features "$APP_FEATURES" -E "$APP_FILTER"
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/app-tests.log"
+
+      - name: 保存上游精华验证日志
+        if: ${{ always() && steps.toolchain.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: upstream-essence-${{ matrix.platform }}-${{ github.sha }}
+          path: ${{ runner.temp }}/upstream-essence/*.log
+          if-no-files-found: error
+          retention-days: 14
+
   linux:
     name: Linux x64
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_linux)
+      (github.event_name == 'workflow_dispatch' && inputs.run_linux &&
+       (!inputs.upstream_essence_only || inputs.full_workspace_tests))
     runs-on: [self-hosted, linux, x64, infinishell-ci]
     timeout-minutes: 180
     steps:
@@ -779,7 +928,7 @@ jobs:
 
   macos_intel_ssh_extension_build:
     name: macOS Intel SSH extension fallback cross-build
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel && (!inputs.upstream_essence_only || inputs.full_workspace_tests) }}
     runs-on: macos-26
     timeout-minutes: 360
     outputs:
@@ -877,7 +1026,8 @@ jobs:
     name: Windows x64
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows)
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows &&
+       (!inputs.upstream_essence_only || inputs.full_workspace_tests))
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:
