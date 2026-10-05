@@ -1,0 +1,655 @@
+{
+  "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+  "platform": "linux-x64",
+  "original_closure_source": {
+    "V01": "KNOWN_GAPS.md:552",
+    "V02": "KNOWN_GAPS.md:560",
+    "V05": "KNOWN_GAPS.md:597"
+  },
+  "other_platforms_closed": false,
+  "items": [
+    {
+      "id": "V01.codex.new_session",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.at_least_two_turns",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.real_approval_allow",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.real_approval_deny",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.native_append",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.cancel",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.continue",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.application_restart",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.same_native_session_restore",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.complete_result_collection",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.codex.owned_process_cleanup",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.new_session",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.at_least_two_turns",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.real_approval_allow",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.real_approval_deny",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.native_append",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.cancel",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.continue",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.application_restart",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.same_native_session_restore",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.complete_result_collection",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.claude.owned_process_cleanup",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.new_session",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.at_least_two_turns",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.real_approval_allow",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.real_approval_deny",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.native_append",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.cancel",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.continue",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.application_restart",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.same_native_session_restore",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.complete_result_collection",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V01.grok.owned_process_cleanup",
+      "status": "not_run",
+      "native_session_id": null,
+      "model": null,
+      "message_state": null,
+      "file_effect": null,
+      "evidence": []
+    },
+    {
+      "id": "V02.rich_terminal.preedit",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.rich_terminal.number_candidate",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.rich_terminal.space_candidate",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.rich_terminal.mixed_chinese_ascii",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.rich_terminal.multiline",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.rich_terminal.enter_during_composition",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.managed_composer.preedit",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.managed_composer.number_candidate",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.managed_composer.space_candidate",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.managed_composer.mixed_chinese_ascii",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.managed_composer.multiline",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V02.managed_composer.enter_during_composition",
+      "status": "not_run",
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.inherit",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.fixed_read",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.fixed_files",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.skills_disabled",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.approval_pending",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.approval_allowed",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.approval_denied",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.scroll_top",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.scroll_middle",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.compact.scroll_bottom",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.inherit",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.fixed_read",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.fixed_files",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.skills_disabled",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.approval_pending",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.approval_allowed",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.approval_denied",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.scroll_top",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.scroll_middle",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.en.normal.scroll_bottom",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.inherit",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.fixed_read",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.fixed_files",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.skills_disabled",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.approval_pending",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.approval_allowed",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.approval_denied",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.scroll_top",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.scroll_middle",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.compact.scroll_bottom",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.inherit",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.fixed_read",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.fixed_files",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.skills_disabled",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.approval_pending",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.approval_allowed",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.approval_denied",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.scroll_top",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.scroll_middle",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    },
+    {
+      "id": "V05.zh-CN.normal.scroll_bottom",
+      "status": "not_run",
+      "native_approval": null,
+      "visual_review": null,
+      "evidence": []
+    }
+  ],
+  "blocking_conditions": [
+    "Wayland 会话不满足 X11 前提",
+    "私有 CLI 尚未登录",
+    "物理输入需要用户操作"
+  ],
+  "scripts_do_not_prove_real_acceptance": true
+}

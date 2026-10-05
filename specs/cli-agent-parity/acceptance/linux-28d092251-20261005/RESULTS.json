@@ -1,0 +1,211 @@
+{
+  "schema": 1,
+  "platform": "linux-x64",
+  "status": "incomplete_operator_required",
+  "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+  "record_commit": "本记录所在提交；与受测提交分开",
+  "acceptance_branch": "codex/acceptance-linux-v01-v02-v05",
+  "pr": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/pull/22",
+  "worktree": "/home/chiiz/Documents/InfiniShell-Desktop/.worktrees/acceptance-linux",
+  "evidence_root": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/evidence",
+  "recorded_at_utc": "2026-10-05T16:56:31.810403+00:00",
+  "application_binary": {
+    "commit": "28d0922519b02b0690626edc148638c0150cda1c",
+    "clean_checkout": true,
+    "branch": "codex/acceptance-linux-v01-v02-v05",
+    "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+    "cargo": "cargo 1.92.0 (344c4567c 2025-10-21)",
+    "cargo_target_dir": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/build/target",
+    "tmpdir": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/tmp",
+    "features": "gui,rust-embed/debug-embed",
+    "profile": "dev",
+    "check_command": "cargo check --locked -p warp --features gui,rust-embed/debug-embed",
+    "check_exit_code": 0,
+    "build_command": "cargo build --locked -p warp --bin infinishell --features gui,rust-embed/debug-embed",
+    "build_status": "passed",
+    "binary_sha256": "f385edca8bcba11360e35ffd87520431e5d623f81ce3cee1772d42b17b6758c7",
+    "record_commit": null,
+    "recorded_at": "2026-10-05T16:45:50.788059+00:00",
+    "build_exit_code": 0,
+    "binary": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/build/target/debug/infinishell",
+    "binary_bytes": 1137061272,
+    "build_completed_at": "2026-10-05T16:47:10.152369+00:00"
+  },
+  "linux": {
+    "V01": {
+      "status": "not_run",
+      "passed": [],
+      "failed_product_scenarios": [],
+      "unverified": "三款固定 CLI 的新建、至少两轮、真实允许/拒绝、原生追加、取消、继续、应用重启、同会话恢复、完整结果回收和进程清理全部未验",
+      "blockers": [
+        "专用 CLI 配置尚未登录",
+        "未取得本轮实际模型与原生会话记录"
+      ],
+      "closure": false
+    },
+    "V02": {
+      "status": "blocked_environment",
+      "passed": [],
+      "failed_product_scenarios": [],
+      "unverified": "普通终端富输入和托管输入的物理 preedit、数字/空格选词、混排、多行、组合 Enter 防误提交全部未验",
+      "blockers": [
+        "当前已登录会话为 Wayland，脚本 ready_for_operator_check=false",
+        "需要用户切到已安装 Xfce/X11 会话并亲自输入"
+      ],
+      "closure": false
+    },
+    "V05": {
+      "status": "not_run",
+      "passed": [],
+      "failed_product_scenarios": [],
+      "unverified": "英文/简体中文 × 800×600/1280×800 的继承、固定读取、固定文件、技能禁用、真实审批待决/允许/拒绝、完整滚动与视觉焦点全部未验",
+      "blockers": [
+        "Grok 私有配置尚未登录，未取得真实模型审批",
+        "尚未进行 X11 实窗与目视检查"
+      ],
+      "closure": false
+    }
+  },
+  "preparation_passed": [
+    "验收仓库/远端/固定提交/干净 checkout 核对",
+    "独立 worktree、构建输出、官方 CLI 安装与私有配置建立",
+    "三款官方完整版本与受审 SHA-256 匹配",
+    "Grok Linux 文本定制桥 .6 工件 pin 匹配；单独标记非官方",
+    "固定提交 cargo check、实际 GUI build 及 i18n 11/11",
+    "verify_v02_v05_gui --guide/--preflight/--init 执行；构建来源已绑定"
+  ],
+  "setup_failure_preserved": {
+    "stage": "未认证 Wayland 启动预检",
+    "description": "初次把 D-Bus 放在挂载空间外，secrets 服务激活超时 120 秒；应用后续形成数据库/绘制帧，已用精确 PID SIGTERM 退出 -15，并确认所记自有进程原身份退出",
+    "correction": "后续脚本将 D-Bus daemon/服务激活放进持久挂载空间、独立 XDG_RUNTIME_DIR，真实 IME 地址显式传入",
+    "boundary": "修正后的私有总线 Python 探针通过；实际应用、物理 IME 和活跃宿主重关联仍待验。未改产品源码，不计 V01 失败或通过"
+  },
+  "structure_verification": {
+    "status": "incomplete_expected",
+    "binary_source_binding": true,
+    "operator_visual_review": false,
+    "native_ime_or_approval_verified": false,
+    "raw_videos": 0,
+    "raw_stage_screenshots": 0,
+    "scope": "脚本只核结构/摘要，不证明真实输入法、模型审批或视觉通过"
+  },
+  "plugins": {
+    "status": "not_installed_or_verified",
+    "expected": {
+      "codex": "codex-warp 0.4.0",
+      "claude": "warp 2.2.0",
+      "grok": "infinishell-grok 0.1.6"
+    },
+    "codex_hooks_trust": "必须由用户在原生 /hooks 审核；未代写"
+  },
+  "models": {
+    "codex_actual": null,
+    "claude_actual": null,
+    "grok_actual": null,
+    "grok_requested_private_default": "grok-4.7",
+    "configured_model_is_not_observed_model": true
+  },
+  "isolation": {
+    "HOME_changed": false,
+    "CODEX_HOME_changed": false,
+    "method": "bwrap 将私有 home 挂到原 /home/chiiz；源码/CLI 只读，私有证据与 scratch 可写；应用 profile 隔离",
+    "app_profile": "acceptance-linux-v01-v02-v05",
+    "dbus": "后续持久挂载空间内部的独立 session bus",
+    "tmpdir_inside_namespace": "/tmp",
+    "tmpdir_host": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/tmp",
+    "lifecycle": "同一持久 namespace 与总线跨 GUI 退出/重启保留，最后再核宿主退出",
+    "physical_desktop_verified_after_correction": false
+  },
+  "localization": "无需本地化变更；未修改产品源码或界面文案。英中 i18n 11 项通过，实际双语布局未验。",
+  "scope_unchanged": true,
+  "other_platforms_closed": false,
+  "goal_complete": false,
+  "pr_merged": false,
+  "g09_branch_written": false,
+  "operator_next_steps": [
+    "保存其他工作，从 Ubuntu 菜单注销",
+    "GDM 选择 chiiz 后点击齿轮，选 Xfce Session/Xfce 会话，再登录",
+    "重新打开 Codex 本聊天并告知切换完成；不要先录屏或提交凭据",
+    "主代理恢复固定受测提交、重新核对 loginctl/X11/D-Bus/Rime 和 namespace",
+    "主代理提供私有 CLI 登录命令；用户只在本地认证终端完成，不把令牌/登录链接发入聊天",
+    "认证完成后启动录屏、执行 V01/V02/V05；V02 由用户使用物理键盘",
+    "固定源码干净时执行最终 evidence_dir --repo --binary 校验，另做原生记录与视觉审查",
+    "结束验收后再更新记录分支，不覆盖本轮未验/预检失败原件"
+  ],
+  "fixed_cli_installation": {
+    "codex": {
+      "url": "https://github.com/openai/codex/releases/download/rust-v0.156.1/codex-package-x86_64-unknown-linux-musl.tar.gz",
+      "archive_sha256": "8b711520beddf385467b8da4d2c93736637c6ba1e46811cf0d8606b7c490b6f6",
+      "binary": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/cli/codex-0.156.1/bin/codex",
+      "binary_sha256": "0b2e9301d6100dddda3b9d5c80ebaeaa3a2f1962388f2f36f6b96a9f08b1f33f",
+      "version_stdout": "codex-cli 0.156.1\n",
+      "exit_code": 0,
+      "classification": "official",
+      "checked_at": "2026-10-05T16:40:25.019787+00:00"
+    },
+    "claude": {
+      "url": "https://downloads.claude.ai/claude-code-releases/2.1.280/linux-x64/claude",
+      "binary": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/cli/claude-2.1.280/claude",
+      "binary_sha256": "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b",
+      "bytes": 233709640,
+      "version_stdout": "2.1.280 (Claude Code)\n",
+      "exit_code": 0,
+      "classification": "official",
+      "checked_at": "2026-10-05T16:41:48.748543+00:00"
+    },
+    "grok": {
+      "entrypoint": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/cli/grok-1.0.41/bin/grok",
+      "native_binary": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/cli/grok-1.0.41/lib/node_modules/@xai-official/grok/node_modules/@xai-official/grok-linux-x64/bin/grok",
+      "binary_sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+      "bytes": 165967424,
+      "version_stdout": "grok 1.0.41 (4220f3b224a6)\n",
+      "exit_code": 0,
+      "package_manifest_files_verified": true,
+      "dependency": "@iarna/toml@3.0.0",
+      "dependency_registered": true,
+      "classification": "official",
+      "checked_at": "2026-10-05T16:43:31.512740+00:00"
+    }
+  },
+  "custom_cli_installation": {
+    "classification": "custom_terminal_bridge_not_official",
+    "expected_version": "1.0.41+infinishell.terminal-bridge.6",
+    "version_stdout": "grok 1.0.41+infinishell.terminal-bridge.6 (07e35a3dfeed)\n",
+    "exit_code": 0,
+    "binary": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005/cli/grok-terminal-bridge-artifact/grok-terminal-bridge-source/artifacts/xai-grok-pager",
+    "binary_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
+    "artifact_id": 11115938907,
+    "run_id": 36752136629,
+    "native_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+    "runtime_pin_matched": true
+  },
+  "local_gates": {
+    "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+    "cargo_check": {
+      "exit_code": 0,
+      "log": "logs/cargo-check.initial.log",
+      "log_sha256": "3d1bed3edac072453008ca3eda06ee0fa85361ba50d30cdf47af3c8114d69a27"
+    },
+    "gui_build": {
+      "exit_code": 0,
+      "log": "logs/cargo-build.initial.log",
+      "log_sha256": "b7e3e1f072aeb8980892c58922bdac27074d5337df4f0c15a42fdd4e341c65b9"
+    },
+    "i18n_tests": {
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "log": "logs/i18n-tests.initial.log",
+      "log_sha256": "de3fac21a26debdb081cb02fd507ae8678e8a955e8cc46f68f284a6efc3f35f8"
+    },
+    "gui_structure_verification": {
+      "exit_code": 1,
+      "complete": false,
+      "log": "evidence/gui-verification.bound-source.txt"
+    },
+    "visual_acceptance": false,
+    "model_lifecycle_acceptance": false,
+    "localization_change": "无需本地化变更；本轮未修改产品源码或界面文案",
+    "bilingual_layout": "未验"
+  }
+}

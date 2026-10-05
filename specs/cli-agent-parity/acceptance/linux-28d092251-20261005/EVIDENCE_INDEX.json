@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "source_commit": "28d0922519b02b0690626edc148638c0150cda1c",
+  "evidence_root": "/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005",
+  "status": "pre_interaction_no_real_acceptance",
+  "raw_videos": 0,
+  "raw_screenshots": 0,
+  "contains_credentials": false,
+  "large_originals_committed": false,
+  "items": [
+    {
+      "path": "evidence/source-documents.json",
+      "bytes": 906,
+      "sha256": "b4ac16883e6c510ea0a715a81adc411d104f44a01eea553680d434797d1f3f4c"
+    },
+    {
+      "path": "evidence/build-source.json",
+      "bytes": 1148,
+      "sha256": "88f39d82e9e6f00b8969dc543f7aa440e0b8128f93b1fd97280fe34e713b616e"
+    },
+    {
+      "path": "evidence/codex-install.json",
+      "bytes": 562,
+      "sha256": "8988f9c75c3ff8110faacdd65ac85ba62f1eec32b0e7f98c86e5ac6810e51181"
+    },
+    {
+      "path": "evidence/claude-install.json",
+      "bytes": 461,
+      "sha256": "540bab230fd5ec24c6373615e4211ae630603c51ad35ec6bffedfd44342a79f9"
+    },
+    {
+      "path": "evidence/grok-install.json",
+      "bytes": 694,
+      "sha256": "cc2247bc67ebca101b0eee833e72694936c92d0f1dde7ffc66d20ae7e6d14e1d"
+    },
+    {
+      "path": "evidence/grok-bridge-install.json",
+      "bytes": 635,
+      "sha256": "51001324c95427fb883143e3e34b66dbd73ba84c6f67ca0e7d56c4656d849cdb"
+    },
+    {
+      "path": "evidence/codex-auth-state.json",
+      "bytes": 179,
+      "sha256": "15b8d5758286fb0cadb97dcb3403bd0f367eda9bdcbf58be0db542176c30faf4"
+    },
+    {
+      "path": "evidence/claude-auth-state.json",
+      "bytes": 180,
+      "sha256": "27a62cb75f5425decb010fd783b973721cfff5d792848b2d697ef500359868c3"
+    },
+    {
+      "path": "evidence/guide.txt",
+      "bytes": 1653,
+      "sha256": "b985b9d250db9624edb4da5789f64a4b3916093b6bcfa40b33cb5aa4f235f400"
+    },
+    {
+      "path": "evidence/preflight.initial.txt",
+      "bytes": 292,
+      "sha256": "93c7206096c5fac5273ce4aa385416766fc3d128bea4e44d373dfc4f7513890a"
+    },
+    {
+      "path": "evidence/gui/manifest.json",
+      "bytes": 5948,
+      "sha256": "e9565753ad5c395632c2d83b8b1f4f30a5c333c99d34d550dc67719243ebcb3e"
+    },
+    {
+      "path": "evidence/gui-verification.initial.txt",
+      "bytes": 55,
+      "sha256": "dcb1bcf5e6f381c9364ead0b57ee107c195be1c1fbbf46d01e4a93bd7ca5b40c"
+    },
+    {
+      "path": "evidence/gui-verification.bound-source.txt",
+      "bytes": 58,
+      "sha256": "89bab752e4b60432a8f901753860e50ea324e1619a19bbf30380ce339793801a"
+    },
+    {
+      "path": "evidence/local-gates.json",
+      "bytes": 947,
+      "sha256": "9177d7c30c063ccc60bf0123e6f7d13e0e59339f7f34c3afbfa6356f190dfdcc"
+    },
+    {
+      "path": "evidence/initial-smoke-stop.json",
+      "bytes": 946,
+      "sha256": "50197a7eeae308922d317c7441c635e816e1eeaebab9b7136501d35c780d602e"
+    },
+    {
+      "path": "evidence/app-launches.jsonl",
+      "bytes": 122,
+      "sha256": "e3bda1fa42e8b55f617b746cd4013d30e0bd779486a99d43b410bb4704f3c003"
+    },
+    {
+      "path": "evidence/acceptance-checklist.json",
+      "bytes": 15487,
+      "sha256": "99a7df6e8cf7d99915278f5c008affd9c80a8e3a12758b7868db8d840de86463"
+    },
+    {
+      "path": "evidence/result.pre-interaction.json",
+      "bytes": 6815,
+      "sha256": "c70df68bde2848d8f64f64c089b094a17849662c5d1e4c75746cbed5eaa004b9"
+    },
+    {
+      "path": "logs/cargo-check.initial.log",
+      "bytes": 49279,
+      "sha256": "3d1bed3edac072453008ca3eda06ee0fa85361ba50d30cdf47af3c8114d69a27"
+    },
+    {
+      "path": "logs/cargo-build.initial.log",
+      "bytes": 48324,
+      "sha256": "b7e3e1f072aeb8980892c58922bdac27074d5337df4f0c15a42fdd4e341c65b9"
+    },
+    {
+      "path": "logs/i18n-tests.initial.log",
+      "bytes": 15193,
+      "sha256": "de3fac21a26debdb081cb02fd507ae8678e8a955e8cc46f68f284a6efc3f35f8"
+    },
+    {
+      "path": "logs/desktop-tools-install.log",
+      "bytes": 34393,
+      "sha256": "d2ae520acc549493f7b7780169aee13cef2485a302af62443828cbf79abd0925"
+    },
+    {
+      "path": "logs/grok-install.log",
+      "bytes": 232,
+      "sha256": "7c5e8bf474134b6034b4730f36838a036ef18df7a0766edfb34fc80d7532504c"
+    },
+    {
+      "path": "logs/grok-bridge-download.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/gui-init.log",
+      "bytes": 100,
+      "sha256": "79f788d55da6844b5b86d8e612263a8686a4d7c48100b03b7187091f69d1e831"
+    },
+    {
+      "path": "tools/private-exec.py",
+      "bytes": 2337,
+      "sha256": "54ba5801443e33f5c53a8e214190f22a64b793fe21aff57118d5ce42eca46ed2"
+    },
+    {
+      "path": "tools/private-dbus-daemon.sh",
+      "bytes": 197,
+      "sha256": "4f04b40f795331bf08cf75035d5e99b1606fea4b8dcf01effe8d295716921a28"
+    },
+    {
+      "path": "tools/session-driver.py",
+      "bytes": 1460,
+      "sha256": "7b2c0a234e86b5c29330136ad467e416487ccf183268979a5fb50044ae51b2e4"
+    },
+    {
+      "path": "tools/CONTINUE.txt",
+      "bytes": 972,
+      "sha256": "2fceefc3a2e26a4164656e1e53ce1f05dbf2934c20d26eea0bd45dc89f11c160"
+    }
+  ],
+  "excluded_private_trees": [
+    "profiles/",
+    "cli/",
+    "build/target/",
+    "tmp/",
+    "scratch/"
+  ],
+  "description": "Git 仅包含安全结果/清单/摘要索引；认证资料、数据库、安装树、大工件和原始日志留私有目录，不公开原样内容。"
+}
