@@ -136,6 +136,50 @@ class ImageContractScopeTests(unittest.TestCase):
         self.assertFalse(enabled(condition, defaults()))
 
 
+class PowerShellContractScopeTests(unittest.TestCase):
+    def values(self):
+        return dict(static_inputs(), windows_atomic_debug_scope="g09_powershell_contract")
+
+    def test_only_standalone_windows_collection_is_selected(self):
+        values = self.values()
+        self.assertEqual(len(INPUTS), 25)
+        self.assertTrue(accepted(values))
+        self.assertFalse(accepted(dict(values, run_windows=False)))
+        self.assertEqual([name for name, job in DATA["jobs"].items()
+                          if name != "validate_scope" and enabled(job["if"], values)],
+                         ["windows_g09_powershell_contract"])
+        condition = DATA["jobs"]["windows_g09_powershell_contract"]["if"]
+        self.assertFalse(enabled(condition, {}, "push"))
+        self.assertFalse(enabled(condition, defaults()))
+
+    def test_collection_rejects_every_other_boolean_and_nondefault_choice(self):
+        values = self.values()
+        for name, spec in INPUTS.items():
+            if spec["type"] == "boolean" and name != "run_windows":
+                with self.subTest(forbidden=name):
+                    self.assertFalse(accepted(dict(values, **{name: True})))
+            elif spec["type"] == "choice" and name != "windows_atomic_debug_scope":
+                for value in spec["options"]:
+                    if value != spec["default"]:
+                        with self.subTest(forbidden=name, value=value):
+                            self.assertFalse(accepted(dict(values, **{name: value})))
+
+    def test_actual_windows_powershell_host_and_always_preserved_evidence(self):
+        job = DATA["jobs"]["windows_g09_powershell_contract"]
+        self.assertEqual(job["needs"], "validate_scope")
+        self.assertEqual(job["runs-on"], ["self-hosted", "windows", "x64", "infinishell-ci"])
+        self.assertEqual(len(job["steps"]), 3)
+        self.assertTrue(job["steps"][0]["uses"].startswith("actions/checkout@"))
+        self.assertEqual(job["steps"][1]["shell"], "powershell")
+        self.assertEqual(job["steps"][1]["run"], "./script/ci/collect_g09_powershell_contract.ps1")
+        artifact = job["steps"][2]
+        self.assertEqual(artifact["if"], "${{ always() }}")
+        self.assertTrue(artifact["uses"].startswith("actions/upload-artifact@"))
+        self.assertEqual(artifact["with"]["if-no-files-found"], "error")
+        self.assertEqual(artifact["with"]["path"],
+                         "${{ runner.temp }}/g09-powershell-contract-${{ github.run_id }}-${{ github.run_attempt }}/")
+
+
 class ClaudeMuslScopeTests(unittest.TestCase):
     def values(self):
         values = defaults()

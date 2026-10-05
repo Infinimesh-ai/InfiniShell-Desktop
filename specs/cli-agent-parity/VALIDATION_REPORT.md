@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：用户确认特殊权限安装可使用原安装工具升级
+
+用户明确允许：带额外共享写权限、文件保护标志或特殊链接权限的安装，可提示使用原安装工具升级；普通安装和已支持只读ACL安装继续保留自动升级要求。该决定不取消来源、身份、权限、恢复或清理核验，也不把安全拒绝记为自动升级成功。以下逐轮“范围待用户决定”保留为当时的历史记录，当前安全属性范围以本节为准，不改写既有源码与验收事实。
+
+**新增关闭0项；仍为10项本次Mac范围关闭、G09开放、V01／V02／V05移交不计通过，PR草稿。** Windows `37209945616` 首updated失败及未运行的后四场景／三冷恢复、Linux `37215103046` 真实通知send超时和最终同冻结源码Linux／Windows门禁仍须解决或完成。已复核 `settings-cli-updates-unsupported-source`：英文 `app/i18n/en/warp.ftl:6082` 与简体中文 `app/i18n/zh-CN/warp.ftl:5894` 均明确提示原安装工具，**无需本地化变更**；本次只更新范围文档，未新增测试或验收结果。
+
 ## 2026-10-05：Linux ACL 源码门禁通过相关回归，真实通知超时使整轮失败
 
 [37215103046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37215103046) 已结束，精确源码为 `b5d9d9fb689d470c40c2abb50bfc0c11bcb63767`，仅 Linux／source_gate_only。新增ACL18、树5、npm事务3、Grok回滚3和Brew绑定3共32项逐名各一次PASS，含Linux原生fd ACL往返；普通nextest共5514 PASS，i18n11项在两配置各一次PASS，无nextest FAIL／LEAK／RETRY／FLAKY／TIMEOUT。以上不包含后续Mac父gid修复，也不是最终双平台门禁。

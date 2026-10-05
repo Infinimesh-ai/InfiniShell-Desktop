@@ -120,7 +120,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 专项范围；g09_image_contract 只读固定映像，g09_npm_powershell 选择首 PS 快照
+        description: Windows 专项范围；g09_image_contract/g09_powershell_contract 只读实现，g09_npm_powershell 选择首 PS 快照
         required: true
         default: all
         type: choice
@@ -133,6 +133,7 @@ on:
           - g09_stdio_lifetime
           - codex_hooks
           - g09_image_contract
+          - g09_powershell_contract
           - g09_npm_powershell
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
@@ -199,12 +200,12 @@ jobs:
               conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if conflicts or not all(inputs.get(name, False) for name in required):
                   sys.exit("标准流生命周期对照只允许单独 Windows 限定范围：" + ", ".join(sorted(conflicts)))
-          if inputs.get("windows_atomic_debug_scope") == "g09_image_contract":
+          if inputs.get("windows_atomic_debug_scope") in {"g09_image_contract", "g09_powershell_contract"}:
               required = {"run_windows"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
               conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if conflicts or inputs.get("run_windows") is not True:
-                  sys.exit("固定系统映像静态取证只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
+                  sys.exit("固定系统实现静态取证只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
           if inputs.get("windows_atomic_debug_scope") == "codex_hooks":
               required = {"run_windows", "run_atomic_windows_debug"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -1152,6 +1153,34 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows_g09_powershell_contract:
+    name: Windows PowerShell 5.1 implementation contract
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope == 'g09_powershell_contract' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 使用系统 Windows PowerShell 5.1 读取实际加载的实现，不实例化命令处理器或执行升级候选。
+      - name: Read loaded PowerShell and Framework method bodies
+        shell: powershell
+        timeout-minutes: 3
+        run: ./script/ci/collect_g09_powershell_contract.ps1
+
+      - name: Preserve bounded PowerShell implementation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: g09-powershell-contract-${{ github.sha }}
+          path: ${{ runner.temp }}/g09-powershell-contract-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
   windows_codex_hooks:
     name: Windows fixed Codex 0.156.1 hooks
     needs: validate_scope
@@ -1254,7 +1283,7 @@ jobs:
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime')
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime')
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:
