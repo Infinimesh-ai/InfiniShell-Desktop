@@ -140,6 +140,40 @@ impl ClosedItem {
             return;
         }
 
+        if pane_group.try_as_ref(ctx).is_none() {
+            if pane_group.downgrade().window_id(ctx).is_none() {
+                return;
+            }
+            let pane_group = pane_group.clone();
+            let app = ctx.weak_app();
+            ctx.foreground_executor()
+                .spawn(async move {
+                    // 保留最后一个 pane 句柄直到这一次清理结束；不持有 App，也不递归排队。
+                    futures_lite::future::yield_now().await;
+                    let Some(mut app) = app.upgrade() else {
+                        return;
+                    };
+                    app.update(|ctx| {
+                        if ctx.is_window_open(pane_group.window_id(ctx))
+                            && pane_group.try_as_ref(ctx).is_some()
+                        {
+                            // 借用期间跳过的归档也要补做，避免清理 live 会话后丢失历史入口。
+                            let history_model = BlocklistAIHistoryModel::handle(ctx);
+                            Self::mark_conversations_historical_for_pane_group(
+                                &pane_group,
+                                &history_model,
+                                ctx,
+                            );
+                            pane_group.update(ctx, |pane_group, ctx| {
+                                pane_group.clean_up_panes(ctx);
+                            });
+                        }
+                    });
+                })
+                .detach();
+            return;
+        }
+
         pane_group.update(ctx, |pane_group, ctx| {
             pane_group.clean_up_panes(ctx);
         });
@@ -396,3 +430,7 @@ impl Entity for UndoCloseStack {
 }
 
 impl SingletonEntity for UndoCloseStack {}
+
+#[cfg(test)]
+#[path = "stack_tests.rs"]
+mod tests;
