@@ -214,6 +214,8 @@ struct Manifest {
     station_bootstrap: Binary,
     node: Binary,
     npm_cli: Binary,
+    #[serde(default)]
+    clr_reader: Option<Binary>,
     old_public_sha256: String,
     npm_install_sha256: String,
     npm_tree: BTreeMap<String, Member>,
@@ -223,6 +225,62 @@ struct Manifest {
 
 // 与运行器的完整来源集合一致；验收文件无需嵌入生产监督程序。
 const SOURCES: &[(&str, &[u8])] = &[
+    (
+        "crates/command/src/windows_clr_reader.rs",
+        include_bytes!("../../../../crates/command/src/windows_clr_reader.rs"),
+    ),
+    (
+        "crates/command/src/windows_clr_reader_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_clr_reader_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_clr.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_clr.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_clr_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_clr_tests.rs"),
+    ),
+    (
+        "script/ci/g09-clr-reader/reader.cpp",
+        include_bytes!("../../../../script/ci/g09-clr-reader/reader.cpp"),
+    ),
+    (
+        "script/ci/g09-clr-reader/wire.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/wire.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/sos_layout.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/sos_layout.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/README.md",
+        include_bytes!("../../../../script/ci/g09-clr-reader/README.md"),
+    ),
+    (
+        "script/ci/g09-clr-reader/sources.safe.json",
+        include_bytes!("../../../../script/ci/g09-clr-reader/sources.safe.json"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/clrdata.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/clrdata.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/xclrdata.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/xclrdata.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/sospriv.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/sospriv.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/LICENSE.TXT",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/LICENSE.TXT"),
+    ),
+    (
+        "script/ci/g09-clr-fixture/build-reader.ps1",
+        include_bytes!("../../../../script/ci/g09-clr-fixture/build-reader.ps1"),
+    ),
     (
         "crates/command/src/windows_station_debugger.rs",
         include_bytes!("../../../../crates/command/src/windows_station_debugger.rs"),
@@ -545,6 +603,46 @@ fn validate_inherited_environment(
     Ok(())
 }
 
+fn validate_clr_reader_scope(
+    present: bool,
+    case: &str,
+    step: &str,
+    permit: Option<&str>,
+) -> Result<(), String> {
+    let powershell = permit == Some("codex-npm-first-powershell-v1");
+    check(
+        present == powershell
+            && (!present
+                || cfg!(feature = "cli-agent-native-witness")
+                    && case == "updated"
+                    && step == "execute"),
+        "clr_reader_scope",
+    )
+}
+
+fn validate_clr_reader(reader: &Binary) -> Result<(), String> {
+    let identity = tree::path_identity(&reader.path).map_err(mapped)?;
+    check(
+        reader.path.canonicalize().ok().as_ref() == Some(&reader.path)
+            && !identity.directory
+            && identity.length > 0
+            && identity.length <= 64 * 1024 * 1024
+            && reader.sha256.len() == 64
+            && reader
+                .sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            && identity
+                .digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+                == reader.sha256
+            && tree::path_identity(&reader.path).map_err(mapped)? == identity,
+        "clr_reader_binding",
+    )
+}
+
 fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
     let root = &manifest.root;
     check(
@@ -585,6 +683,17 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
         )?;
     }
     validate_inherited_environment(&manifest.case, &step(), std::env::vars_os())?;
+    validate_clr_reader_scope(
+        manifest.clr_reader.is_some(),
+        &manifest.case,
+        &step(),
+        std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW")
+            .ok()
+            .as_deref(),
+    )?;
+    if let Some(reader) = &manifest.clr_reader {
+        validate_clr_reader(reader)?;
+    }
     check(
         std::env::var("INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW").as_deref() == Ok(SCOPE)
             && std::env::current_dir()
@@ -979,6 +1088,15 @@ async fn real_codex_windows_npm_update_without_model() {
             if step() == "recover" {
                 cold_recover(&manifest).await
             } else {
+                #[cfg(feature = "cli-agent-native-witness")]
+                if let Some(reader) = &manifest.clr_reader {
+                    // 完整清单与来源已核；注册不进入候选环境，仅供首个获准 PS 代次。
+                    managed_process::register_native_witness_reader(
+                        reader.path.clone(),
+                        reader.sha256.clone(),
+                    )
+                    .map_err(|_| "clr_reader_registration")?;
+                }
                 exercise(&manifest).await
             }
         })
@@ -997,6 +1115,72 @@ async fn real_codex_windows_npm_update_without_model() {
     assert!(
         result.is_ok(),
         "Windows npm 产品验收失败，原始现场保留：{result:?}"
+    );
+}
+
+#[test]
+fn windows_npm_witness_reader_rejects_changed_bytes_and_hardlinks() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("reader.exe");
+    fs::write(&path, b"fixed reader bytes; never execute").unwrap();
+    let reader = Binary {
+        path: path.canonicalize().unwrap(),
+        sha256: digest(&path).unwrap(),
+    };
+    assert_eq!(validate_clr_reader(&reader), Ok(()));
+    fs::write(&path, b"changed reader bytes; never execute").unwrap();
+    assert_eq!(
+        validate_clr_reader(&reader),
+        Err("clr_reader_binding".into())
+    );
+    let reader = Binary {
+        sha256: digest(&path).unwrap(),
+        ..reader
+    };
+    fs::hard_link(&path, directory.path().join("reader-alias.exe")).unwrap();
+    assert!(validate_clr_reader(&reader).is_err());
+}
+
+#[test]
+fn windows_npm_witness_reader_requires_exact_powershell_execute_scope() {
+    let permit = Some("codex-npm-first-powershell-v1");
+    let result = validate_clr_reader_scope(true, "updated", "execute", permit);
+    assert_eq!(result.is_ok(), cfg!(feature = "cli-agent-native-witness"));
+    assert_eq!(
+        validate_clr_reader_scope(false, "updated", "execute", permit),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "updated", "recover", permit),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "old_moved", "execute", permit),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "updated", "execute", Some("codex-npm-first-cmd-v1")),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "updated", "execute", None),
+        Err("clr_reader_scope".into())
+    );
+}
+
+#[test]
+fn windows_npm_witness_reader_keeps_regular_and_cmd_manifests_optional() {
+    assert_eq!(
+        validate_clr_reader_scope(false, "updated", "execute", None),
+        Ok(())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(false, "old_moved", "recover", None),
+        Ok(())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(false, "updated", "execute", Some("codex-npm-first-cmd-v1")),
+        Ok(())
     );
 }
 

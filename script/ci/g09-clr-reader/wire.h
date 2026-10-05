@@ -22,7 +22,7 @@ struct G09ClrRequest {
   std::uint32_t clr_image_size;    // 88: PE SizeOfImage
   std::uint32_t clr_timestamp;     // 92: PE TimeDateStamp
   std::uint64_t deadline_tick_ms;  // 96: 同机 GetTickCount64 绝对期限
-  std::uint32_t read_budget_bytes; // 104: 非零且 <= 16 MiB，失败读也扣预算
+  std::uint32_t read_budget_bytes; // 104: 夹具 16 MiB 或 PS 24 MiB，失败读也扣预算
   std::uint32_t read_budget_calls; // 108: 非零且 <= 8192
   std::uint64_t dac_file_size;     // 112: 非零且 <= 64 MiB
   std::uint8_t dac_sha256[32];     // 120: 原生 CLR 配套 DAC 的原文件摘要
@@ -36,7 +36,8 @@ static_assert(sizeof(G09ClrRequest) == 168);
 static_assert(offsetof(G09ClrRequest, process_handle) == 64);
 static_assert(offsetof(G09ClrRequest, dac_path_units) == 152);
 
-constexpr std::uint32_t G09_CLR_MAX_READ_BYTES = 16 * 1024 * 1024;
+constexpr std::uint32_t G09_CLR_FIXTURE_READ_BYTES = 16 * 1024 * 1024;
+constexpr std::uint32_t G09_CLR_POWERSHELL_READ_BYTES = 24 * 1024 * 1024;
 constexpr std::uint32_t G09_CLR_MAX_READ_CALLS = 8192;
 constexpr std::uint32_t G09_CLR_MAX_PATH_UNITS = 1024;
 constexpr std::uint32_t G09_CLR_MAX_OUTPUT_BYTES = 32768;

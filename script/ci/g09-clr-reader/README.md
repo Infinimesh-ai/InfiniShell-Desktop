@@ -1,6 +1,6 @@
 # 固定 Framework CLR 只读异常 reader
 
-这是 G09 的独立诊断程序，不是产品调试后端，也不证明 PowerShell 或更新事务通过。仅支持 Windows x64 的 Framework 4.x 现场。必须先由固定 Framework 夹具验证本机 DAC 的实际接口行为，再考虑接入原失败停点。
+这是 G09 的独立诊断程序，不是产品调试后端，也不证明 PowerShell 或更新事务通过。仅支持 Windows x64 的 Framework 4.x 现场。固定 Framework 四异常夹具已在 `1d85bdb36` 验证本机 DAC 的实际接口行为；接入原失败停点仍须保留相同绑定、期限与回收合同。
 
 ## 构建与来源
 
@@ -18,6 +18,8 @@ cl /nologo /std:c++17 /utf-8 /W4 /WX /O2 /MT /EHsc reader.cpp /Fo:<私有构建�
 
 `a8766acff` 已完整读到前两条 Win32 字段和不同原码，约 4.924 MB 读取未耗预算，但固定 Throw 方法的 IL 映射仍返回 E_NOINTERFACE，且第二个 reader 退出后的即时 Job 空检查失败，中断后两条包装异常。因此没有完整夹具通过结论；现有原件未记录原 RIP 与映射范围，不能断言失败已由方法端点解释。
 
+`1d85bdb36` 的 Windows 运行 `37277365566` 已通过全部四异常、同原工作线程及完整 inner 链核验。实际 throw 帧 IL 为16/16/36/24，第三项 direct，其余从严格校验的末项开放结束标记获得，保留原 E_NOINTERFACE。55原事件已 Continue，fixture自然退出0，所有reader收割且精确Job空；前轮失败保持。共享Rust控制器必须由固定夹具与首PS候选复用，不能用两套实现互相代验。
+
 ## 单次控制协议
 
 `wire.h` 定义 168 字节、小端、无填充的请求。尾部仅为指定长度、无 NUL 的 UTF-16LE DAC 路径，再以 stdin EOF 结束。没有命令行参数。读完整请求、尾部和 EOF 并再次核期限前，不查询目标或加载 DAC。
@@ -26,9 +28,13 @@ cl /nologo /std:c++17 /utf-8 /W4 /WX /O2 /MT /EHsc reader.cpp /Fo:<私有构建�
 
 原调试器必须在 reader 已退出并确认其精确 Job 为空后才 Continue，超时也必须先终止/等待本轮 reader，再继续原事件。任何 reader 超时、绑定失败、部分结果或无输出，都不能作为候选成功。同步 DAC/磁盘读取没有用户态硬抢占保证，唯一硬边界是控制器已有绝对期限及独立子进程的精确回收；不延长候选期限。
 
-`operation=1` 读取一个 CLR first-chance 停点。上限为 16 MiB 目标虚拟内存、8192 次目标内存读取、4 层异常、32 次解栈推进，每帧最多 8 个 IL 偏移。失败的内存读取也扣预算。每次目标内存/线程上下文读取及主要循环检查同机 `GetTickCount64` 绝对期限。没有预算不足后自动重试或增额。
+`operation=1` 读取一个 CLR first-chance 停点。目标虚拟内存额度只接受夹具固定16 MiB或PowerShell固定24 MiB；8192次目标内存读取、4层异常、32次解栈推进，每帧最多8个IL偏移不变。失败的内存读取也扣预算。每次目标内存/线程上下文读取及主要循环检查同机 `GetTickCount64` 绝对期限。没有预算不足后自动重试或增额。
 
 该诊断容量由元数据接口合同确定，不改变产品或候选期限。官方 `GetFieldDescData` 的 MetaSig 和字段名称查询均可能经 `GetMDImport` 整块读取模块元数据；不是读取三个字段就只需三个标量。既存系统模块记录中 System.dll 为 3,541,424 字节，mscorlib.dll 为 5,445,664 字节，两 MVID 与 `9578948db` 观测一致。以两完整文件容量加原 4 MiB 其它读取空间和夹具 1 MiB 文件上界规划，合计 14,229,968 字节，采用固定 16 MiB；这不是实测 metadata 大小或下一轮必过证明，也不替代当轮模块身份核验。原 4 MiB 的失败原件保留，PowerShell 的额外模块未在本夹具中验收。
+
+PowerShell容量按已有同环境合同原件中的System.Management.Automation.dll 6,642,688字节及powershell.exe 454,656字节，在上述16 MiB上加两份完整文件上界，共23,874,560字节，固定为24 MiB。来源合同SHA `7c534817905aa10d038d2fa03a9cf04e22a5d71abd93fa099c9a254cc0661e54`；这是接入前容量规划，不是实际metadata大小、所有模块足够或PS成功的证据。夹具仍请求16 MiB，实际PS耗量与任何partial必须原样保存。
+
+首PS授权只来自已验证私有验收清单，读取器路径和SHA写入原generation的独占sidecar，并绑定原启动清单摘要；候选环境不携带这些配置。控制器保存原CREATE_THREAD句柄，EXIT_THREAD成功Continue后才释放；停止、超时或reader错误时保留活动reader所有权，先终止原候选，再在既有清理期限内回收精确reader Job。等待切片不超过100ms，不能重建候选期限或把Drop视为回收成功。
 
 `operation=2` 仅为控制器回收夹具：除了 magic/version/op/nonce/deadline，所有字段必须为零，不能带路径/目标句柄。完整请求后阻塞，由控制器原期限终止并确认 Job 空。它不加载 DAC、不接触目标，不是实际异常读取的替代。
 

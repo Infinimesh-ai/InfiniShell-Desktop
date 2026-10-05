@@ -1,5 +1,23 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：共享 CLR 控制器与原PS停点接线，本机门禁通过
+
+以已验`1d85bdb36`为基础，将固定夹具的读取器生命周期抽为双方实际共用实现。spawn成功即保留reader所有权，后续Job分配、原句柄复制、请求发送、取消或解析失败均显式回收；100ms轮询切片与原硬期限分开，不重放请求。原fixture的四异常顺序、动态inner链、原线程/MVID/实际throw帧IL及两Job清理断言保持。新增9条共享普通规则，总计20条普通和唯一原生用例将由新冻结提交验证，尚未执行。
+
+PS接线只在既有首代授权下读取私有reader配置，以sidecar绑定原generation与manifest摘要；不改变CLI环境、升级命令或候选期限。原CREATE线程副本在EXIT成功Continue后释放，CLR/DAC绑定独立于解栈模块计数；每个原first-chance先写pending数值收据，reader结果另存且不覆盖，合法observed/partial/unavailable均保留原状态。停止时原候选先终止，在同一已有清理期限内回收精确reader再Continue。PS24MiB按原16MiB加SMA与宿主完整文件上界23,874,560字节预先规划，夹具16MiB、8192次、4层、32帧不变；不声称新额度或接线已经解决实际PS失败。
+
+本机`cargo check --locked -p warp`（r-w0o0kcp4，日志SHA `72050569ed002eab87e5d60b9a203229a21be694f545f46dbc155dbe01511d78`）、最终Windows command目标check（r-bn9_150e，SHA `730318792a75ea53920f8426d3876c6826516938cd661f2bbaa1449b81fe2753`）、原代次记录测试1项（r-c0lhzs1v）、i18n11项（r-6hqwak_c，SHA `d663168a2ecc37643f89c28965338d730ae430c4f98f5882b11ba94c58dab956`）均通过；Python25/workflow19、actionlint、PS静态解析及自有C++格式也通过。新增及变动均为内部授权诊断，无GUI/TUI文案或布局变化，无需本地化变更。登记根均已确认清理；r-5j6iapc8的并行写入缺文件编译、首轮局部格式/仓外脚本错误保持。A/B/C静态互审无确定阻断，未代替真实Windows组合行为。
+
+本轮新增关闭0项；下一步先验证共享后的固定四异常，再将同一实现用于原PS失败现场。PR仍草稿，a5ecc真实事务及Linux两轮失败不重标。
+
+## 2026-10-05：固定 CLR 四异常能力通过独审，G09仍开放
+
+精确 `1d85bdb36913f9f1bbe5a1dbecaa3018b118d2f2` 的[37277365566](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37277365566)正式成功：MSVC `/W4 /WX`、PS5.1准备、11普通项及唯一原生夹具均通过。四个原停点分别为Win32(1234)、Win32(5678)、InvalidOperation→Win32(5678)、Application→InvalidOperation→Win32(5678)，均完整读到真实null尾端。原工作线程及创建FILETIME一致，实际抛出帧由同一MVID/MethodDef绑定，IL分别16、16、36、24；第三项direct成功，其余保留原E_NOINTERFACE并以唯一extent及完整末项map证明。没有修改原IP、丢弃PARTIAL或把祖先帧当抛出帧。
+
+55原事件均Continue，fixture自然退出0，全部reader已收割且精确Job空，无pending或遗留reader。官方ZIP `11331041005` 为496611字节、SHA `992d75f751f64dfb7fef216567e45fd5c7710a8639e086b60e2c7dcf5561a1c7`，36成员CRC、16来源和9编译输入一致。完整Windows日志SHA `39ff626f5ccebde3db6c81236b77287e24e304ef39b9e9cda8e7c024e9b8fa4d`；独审SHA `2871934437a1a19181b9c1925c704bb7e8c712473ea8428ae8e2c9b605ad992e`，最终索引SHA `b59cea182370abba1c76b73470213678295195fbbae4fe9aa79c060757c232e6`。原Actions警告、两次本地审计脚本误断言及所有旧原生失败保持；未重跑原生来覆盖这些记录。本机observer及审计目录均按登记确认清理。
+
+该证据仅证明固定Framework四异常读取能力，不是实际PowerShell升级通过。原a5ecc首updated失败、Linux两轮超时及最终同源门禁仍开放；现将同一读取控制器接入原首PS候选，不能用诊断读取成功替代真实事务。无需本地化变更，新增关闭0项。
+
 ## 2026-10-05：实际MT读取到完整Win32字段，Job回收与throw映射仍失败
 
 精确 `a8766acff7457b42a724e97d94c5f93a8e0a2cee` 的 [37275551089](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37275551089)正式失败：MSVC `/W4 /WX`、PS5.1准备及11普通项通过；唯一原生项在seq44报“reader 退出后 Job 仍有进程”。reader43/44的原stdout均已完整读取Win32异常HResult、1234/5678原码及真实null尾端，约4.924MB且未耗额度；context全部S_OK，但实际throw帧仍E_NOINTERFACE。reader44未进入聚合observations，后两包装异常未执行，不能证明完整动态inner链。

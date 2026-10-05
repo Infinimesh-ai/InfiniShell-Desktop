@@ -65,6 +65,14 @@ class RunnerTests(unittest.TestCase):
         self.assertFalse(set(runner.SUPERVISOR_SOURCE_FILES) & set(runner.ACCEPTANCE_SOURCE_FILES))
         self.assertLessEqual(set(runner.SUPERVISOR_SOURCE_FILES), embedded_names)
         self.assertFalse(set(runner.ACCEPTANCE_SOURCE_FILES) & embedded_names)
+        builder = (repo / "script/ci/g09-clr-fixture/build-reader.ps1").read_text(encoding="utf-8-sig")
+        table = re.search(r"foreach \(\$name in @\((.*?)\)\)", builder, re.S)
+        self.assertIsNotNone(table)
+        inputs = re.findall(r"'([^']+)'", table.group(1))
+        self.assertEqual(len(inputs), 9)
+        self.assertLessEqual({"script/ci/g09-clr-reader/" + name for name in inputs},
+                             set(runner.ACCEPTANCE_SOURCE_FILES))
+        self.assertEqual(runner.SOURCE_FILES[-1], "script/cli-agent-parity/run_codex_npm_windows_update_live.py")
 
     def test_supervisor_requires_production_bytes_without_acceptance_files(self):
         repo, payloads = self.source_fixture()
@@ -145,7 +153,8 @@ class RunnerTests(unittest.TestCase):
                                     "NPM_CONFIG_PREFIX":"user-prefix","PSExecutionPolicyPreference":"Bypass",
                                     "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW":"codex-npm-first-cmd-v1",
                                     "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION":"stale",
-                                    "INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE":"powershell"}):
+                                    "INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE":"powershell",
+                                    "INFINISHELL_CLR_READER":"must-not-propagate-reader.exe"}):
             result = runner.environment(self.root,self.binaries,self.root / "Windows","execute")
         self.assertNotIn("OPENAI_API_KEY",result)
         self.assertNotIn("NODE_OPTIONS",result)
@@ -154,6 +163,7 @@ class RunnerTests(unittest.TestCase):
         self.assertNotIn("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW",result)
         self.assertNotIn("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",result)
         self.assertNotIn("INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE",result)
+        self.assertNotIn("INFINISHELL_CLR_READER",result)
         self.assertEqual(Path(result["NPM_CONFIG_USERCONFIG"]),self.root / "npm/user.npmrc")
         self.assertEqual(Path(result["CODEX_HOME"]),self.root / "home/.codex")
         self.assertEqual(result["INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW"],runner.SCOPE)
@@ -178,6 +188,54 @@ class RunnerTests(unittest.TestCase):
             runner.native_witness_permit(True, "pwsh", ["updated"])
         with self.assertRaisesRegex(ValueError, "witness_requires_one_updated_case"):
             runner.native_witness_permit(True, "powershell", ["updated", "updated"])
+
+    def test_clr_reader_requires_exact_powershell_updated_scope_and_both_arguments(self):
+        reader = Path(self.binaries["worker"]["path"])
+        digest = runner.sha(reader)
+        result = runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+        self.assertEqual(result, {"path":str(runner.canonical(reader)), "sha256":digest})
+        for requested, mode, cases in ((False, "cmd", None), (True, "cmd", ["updated"]),
+                                       (True, "powershell", ["old_moved"]),
+                                       (True, "powershell", ["updated", "updated"])):
+            with self.subTest(requested=requested, mode=mode, cases=cases):
+                with self.assertRaisesRegex(ValueError, "clr_reader_scope"):
+                    runner.clr_reader_configuration(requested, mode, cases, reader, digest)
+        for path, expected in ((None, None), (reader, None), (None, digest)):
+            with self.subTest(path=path, expected=expected):
+                with self.assertRaisesRegex(ValueError, "clr_reader_scope"):
+                    runner.clr_reader_configuration(True, "powershell", ["updated"], path, expected)
+        self.assertIsNone(runner.clr_reader_configuration(False, "cmd", None, None, None))
+        self.assertIsNone(runner.clr_reader_configuration(True, "cmd", ["updated"], None, None))
+
+    def test_clr_reader_rejects_changed_bytes_and_file_or_parent_links(self):
+        reader = Path(self.binaries["worker"]["path"])
+        digest = runner.sha(reader)
+        reader.write_bytes(b"different same role")
+        with self.assertRaisesRegex(ValueError, "clr_reader_binding"):
+            runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+        digest = runner.sha(reader)
+        link = self.root / "linked.exe"
+        link.symlink_to(reader)
+        with self.assertRaisesRegex(ValueError, "reparse_point"):
+            runner.clr_reader_configuration(True, "powershell", ["updated"], link, digest)
+        parent = self.root / "linked-parent"
+        parent.symlink_to(self.root, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "reparse_point"):
+            runner.clr_reader_configuration(True, "powershell", ["updated"], parent / reader.name, digest)
+
+    def test_clr_reader_rejects_hardlinks_empty_files_and_malformed_hashes(self):
+        reader = Path(self.binaries["worker"]["path"])
+        digest = runner.sha(reader)
+        linked = self.root / "hardlink.exe"
+        os.link(reader, linked)
+        with self.assertRaisesRegex(ValueError, "clr_reader_file"):
+            runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+        linked.unlink()
+        reader.write_bytes(b"")
+        with self.assertRaisesRegex(ValueError, "clr_reader_file"):
+            runner.clr_reader_configuration(True, "powershell", ["updated"], reader, runner.sha(reader))
+        with self.assertRaisesRegex(ValueError, "clr_reader_sha256"):
+            runner.clr_reader_configuration(True, "powershell", ["updated"], reader, "../not-a-hash")
 
     def test_actual_npm_cli_arguments_only_target_private_prefix(self):
         archive = self.root / "official-inputs/fixed.tgz"

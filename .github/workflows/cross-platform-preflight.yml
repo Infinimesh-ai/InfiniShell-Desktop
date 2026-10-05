@@ -1220,7 +1220,7 @@ jobs:
 
       - name: Test fixed CLR receipt binding
         shell: pwsh
-        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(windows::clr_fixture_tests::)'
+        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(windows::clr_fixture_tests::) | test(windows::clr_reader::tests::)'
 
       - name: Build fixed CLR reader with existing MSVC
         shell: powershell
@@ -2172,10 +2172,26 @@ jobs:
           if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'warp/cli-agent-native-witness,command/native-probe-witness') }
           cargo @arguments
 
+      # 固定夹具与真实 PS 分开调度；此处只构建同提交 reader，不自动执行夹具。
+      - name: Build reader for the authorized PowerShell npm observation
+        id: ps_clr_reader
+        if: ${{ !cancelled() && inputs.windows_atomic_debug_scope == 'g09_npm_powershell' && inputs.run_windows_npm_native_witness && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: powershell
+        run: ./script/ci/g09-clr-fixture/build-reader.ps1
+
+      - name: Preserve PowerShell npm reader build evidence
+        if: ${{ always() && inputs.windows_atomic_debug_scope == 'g09_npm_powershell' && (steps.ps_clr_reader.outcome == 'success' || steps.ps_clr_reader.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-g09-npm-clr-reader-${{ github.sha }}
+          path: ${{ runner.temp }}/g09-clr-build-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
       # 真实 npm 生成私有安装登记和入口；不改写用户前缀、凭据或执行策略。
       - name: Verify fixed Windows Codex npm update transactions without credentials
         id: codex_npm_updates
-        if: ${{ !cancelled() && inputs.run_windows_codex_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_windows_codex_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' && (inputs.windows_atomic_debug_scope != 'g09_npm_powershell' || steps.ps_clr_reader.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 45
         env:
@@ -2192,7 +2208,7 @@ jobs:
             $unitBinary = $executables[0]
             $listedTests = @(& $unitBinary --list)
             if ($LASTEXITCODE -ne 0) { throw 'Witness unit test discovery failed' }
-            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::native_snapshot::temp_path::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'managed_process::tests::native_witness_', 'sources::claude_downgrade::tests::', 'sources::npm_windows::live_tests::windows_npm_witness_environment_')) {
+            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::native_snapshot::temp_path::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'atomic_windows::native_clr::tests::', 'managed_process::tests::native_witness_', 'sources::claude_downgrade::tests::', 'sources::npm_windows::live_tests::windows_npm_witness_')) {
               if (@($listedTests | Where-Object { $_.Contains($filter) -and $_.EndsWith(': test') }).Count -eq 0) { throw "Missing witness unit group: $filter" }
               & $unitBinary $filter --test-threads=1
               if ($LASTEXITCODE -ne 0) { throw "Witness unit group failed: $filter" }
@@ -2227,6 +2243,10 @@ jobs:
             $witnessMode = 'cmd'
             if ('${{ inputs.windows_atomic_debug_scope }}' -eq 'g09_npm_powershell') { $witnessMode = 'powershell' }
             $witnessArguments = @('--native-witness', '--native-witness-mode', $witnessMode, '--case', 'updated')
+            if ($witnessMode -eq 'powershell') {
+              if ([string]::IsNullOrWhiteSpace($env:INFINISHELL_CLR_READER)) { throw 'Same-commit CLR reader is missing' }
+              $witnessArguments += @('--clr-reader', $env:INFINISHELL_CLR_READER, '--clr-reader-sha256', (Get-ParityDigest $env:INFINISHELL_CLR_READER))
+            }
           }
           python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --station-bootstrap $stationBootstrap --station-bootstrap-sha256 (Get-ParityDigest $stationBootstrap) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath) @witnessArguments
           if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm transaction failed; original receipts are preserved' }

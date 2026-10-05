@@ -1569,6 +1569,53 @@ fn authoritative_child_image_is_bound_to_transaction_and_rejects_invalid_identit
     }
 }
 
+#[test]
+fn native_witness_reader_record_rejects_replay_and_changed_launch() {
+    let root = tempfile::tempdir().unwrap();
+    let (_, mut manifest, _, _) = attempted_fixture(root.path(), Uuid::new_v4());
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1);
+    manifest.arguments = vec!["powershell".into()];
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let record = NativeWitnessReaderRecord {
+        version: 1,
+        generation: manifest.generation,
+        manifest_sha256: sha256(&bytes),
+        reader: NativeWitnessReaderBinding {
+            path: root.path().join("reader.exe"),
+            sha256: "a".repeat(64),
+        },
+    };
+    let original = serde_json::to_value(&record).unwrap();
+    validate_native_witness_reader_record(&record, &manifest, &bytes).unwrap();
+    // 旧代次、另一启动清单和未绑定程序均不得借用首个 PS 的授权。
+    for (key, value) in [
+        ("version", serde_json::json!(2)),
+        ("generation", serde_json::json!(Uuid::new_v4())),
+        ("manifest_sha256", serde_json::json!("b".repeat(64))),
+        (
+            "reader",
+            serde_json::json!({"path":"reader.exe", "sha256":"a".repeat(64)}),
+        ),
+        (
+            "reader",
+            serde_json::json!({"path":root.path().join("reader.exe"), "sha256":"A".repeat(64)}),
+        ),
+    ] {
+        let mut changed = original.clone();
+        changed[key] = value;
+        let changed = serde_json::from_value(changed).unwrap();
+        assert!(validate_native_witness_reader_record(&changed, &manifest, &bytes).is_err());
+    }
+    manifest.arguments[0] = "cmd".into();
+    assert!(validate_native_witness_reader_record(&record, &manifest, &bytes).is_err());
+    manifest.arguments[0] = "powershell".into();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::NativeFile);
+    assert!(validate_native_witness_reader_record(&record, &manifest, &bytes).is_err());
+    let mut extra = original;
+    extra["reader"]["arguments"] = serde_json::json!(["unbound"]);
+    assert!(serde_json::from_value::<NativeWitnessReaderRecord>(extra).is_err());
+}
+
 #[cfg(all(windows, feature = "cli-agent-native-witness"))]
 #[test]
 fn native_witness_claims_only_the_first_selected_powershell_generation() {

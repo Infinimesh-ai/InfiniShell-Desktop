@@ -109,6 +109,27 @@ class ImageContractScopeTests(unittest.TestCase):
         self.assertFalse(accepted(dict(base, windows_atomic_debug_scope="codex_hooks")))
         self.assertFalse(accepted(dict(base, windows_atomic_debug_scope="unknown")))
 
+    def test_powershell_reader_build_is_required_but_does_not_run_the_fixed_fixture(self):
+        steps = DATA["jobs"]["windows"]["steps"]
+        build = next(step for step in steps if step.get("id") == "ps_clr_reader")
+        native = next(step for step in steps if step.get("id") == "codex_npm_updates")
+        preserve = next(step for step in steps if step.get("name") == "Preserve PowerShell npm reader build evidence")
+        self.assertIn("inputs.windows_atomic_debug_scope == 'g09_npm_powershell'", build["if"])
+        self.assertIn("inputs.run_windows_npm_native_witness", build["if"])
+        self.assertEqual(build["shell"], "powershell")
+        self.assertEqual(build["run"], "./script/ci/g09-clr-fixture/build-reader.ps1")
+        self.assertIn("steps.ps_clr_reader.outcome == 'success'", native["if"])
+        self.assertIn("inputs.windows_atomic_debug_scope != 'g09_npm_powershell'", native["if"])
+        self.assertIn("if ($witnessMode -eq 'powershell')", native["run"])
+        self.assertIn("'--clr-reader', $env:INFINISHELL_CLR_READER, '--clr-reader-sha256'", native["run"])
+        self.assertIn("sources::npm_windows::live_tests::windows_npm_witness_", native["run"])
+        self.assertIn("atomic_windows::native_clr::tests::", native["run"])
+        self.assertIn("always()", preserve["if"])
+        self.assertIn("steps.ps_clr_reader.outcome == 'success' || steps.ps_clr_reader.outcome == 'failure'", preserve["if"])
+        self.assertIn("g09-clr-build-${{ github.run_id }}-${{ github.run_attempt }}/", preserve["with"]["path"])
+        self.assertEqual(preserve["with"]["if-no-files-found"], "error")
+        self.assertFalse(any("framework_exception_chain_uses_original_event_thread_and_reaps_reader" in step.get("run", "") for step in steps))
+
     def test_independent_job_has_only_checkout_collection_and_preservation(self):
         job = DATA["jobs"]["windows_g09_image_contract"]
         self.assertEqual(job["needs"], "validate_scope")
@@ -216,6 +237,7 @@ class ClrFixtureScopeTests(unittest.TestCase):
         commands = [step for step in job["steps"] if "run" in step]
         self.assertEqual(commands[0]["run"], "cargo check --locked -p command --tests")
         self.assertIn("--retries 0", commands[1]["run"])
+        self.assertIn("test(windows::clr_fixture_tests::) | test(windows::clr_reader::tests::)", commands[1]["run"])
         self.assertEqual(commands[2]["shell"], "powershell")
         self.assertEqual(commands[2]["run"], "./script/ci/g09-clr-fixture/build-reader.ps1")
         self.assertEqual(commands[3]["shell"], "powershell")

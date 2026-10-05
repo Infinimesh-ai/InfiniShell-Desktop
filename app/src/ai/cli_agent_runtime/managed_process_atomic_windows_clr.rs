@@ -1,0 +1,296 @@
+//! 仅授权的首个 PowerShell 候选读取原 CLR 异常停点；不参与候选成功判定。
+
+use std::io::Write as _;
+
+use command::windows::{ClrExceptionStop, ClrReader, ClrReaderImage, ClrRuntimeBinding};
+
+use super::native_snapshot::{Identity, identity};
+use super::*;
+
+const CLR_EXCEPTION: u32 = 0xe0434352;
+const READ_BUDGET_BYTES: u32 = 24 * 1024 * 1024;
+
+#[derive(Debug)]
+struct ThreadBinding {
+    handle: OwnedHandle,
+    identity: Identity,
+}
+
+#[derive(Debug)]
+pub(super) struct NativeClr {
+    generation: Uuid,
+    directory: PathBuf,
+    image: ClrReaderImage,
+    runtime: Option<(u64, ClrRuntimeBinding)>,
+    threads: HashMap<u32, ThreadBinding>,
+    active_reader: Option<ClrReader>,
+    last_sequence: u64,
+    completed: u64,
+    phase: &'static str,
+    identity_failure: Option<serde_json::Value>,
+    reader_cleanup: Option<serde_json::Value>,
+}
+
+fn exception_hresult(event: &DEBUG_EVENT, root_pid: u32) -> io::Result<Option<u32>> {
+    if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT || event.dwProcessId != root_pid {
+        return Ok(None);
+    }
+    let information = unsafe { event.u.Exception };
+    let record = information.ExceptionRecord;
+    if information.dwFirstChance != 1 || record.ExceptionCode.0 as u32 != CLR_EXCEPTION {
+        return Ok(None);
+    }
+    if record.NumberParameters == 0
+        || record.NumberParameters as usize > record.ExceptionInformation.len()
+    {
+        return Err(error("native_clr.exception_parameters"));
+    }
+    // EXCEPTION_INFORMATION 为指针宽度；HRESULT 合同只取低 32 位，允许 x64 符号扩展。
+    Ok(Some(record.ExceptionInformation[0] as u32))
+}
+
+fn write_receipt(path: &Path, receipt: &serde_json::Value) -> io::Result<()> {
+    let mut output = OpenOptions::new().write(true).create_new(true).open(path)?;
+    serde_json::to_writer(&mut output, receipt)?;
+    output.write_all(b"\n")?;
+    output.sync_all()
+}
+
+impl NativeClr {
+    pub(super) fn bind(
+        generation: Uuid,
+        directory: &Path,
+        binding: &super::super::NativeWitnessReaderBinding,
+    ) -> io::Result<Self> {
+        let hash = hex::decode(&binding.sha256)
+            .ok()
+            .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
+            .ok_or_else(|| error("native_clr.reader_digest"))?;
+        Ok(Self {
+            generation,
+            directory: directory.to_path_buf(),
+            image: ClrReaderImage::bind(&binding.path, hash)?,
+            runtime: None,
+            threads: HashMap::new(),
+            active_reader: None,
+            last_sequence: 0,
+            completed: 0,
+            phase: "bound",
+            identity_failure: None,
+            reader_cleanup: None,
+        })
+    }
+
+    pub(super) fn retain_thread(
+        &mut self,
+        process: &OwnedHandle,
+        process_created: u64,
+        process_id: u32,
+        thread_id: u32,
+        original: HANDLE,
+    ) -> io::Result<()> {
+        if self.threads.contains_key(&thread_id) {
+            return Err(error("native_clr.duplicate_thread"));
+        }
+        // 只复制原 CREATE 句柄，不以可重用的 TID 重开线程。
+        self.phase = "retain_thread";
+        let handle = duplicate_process_handle(original)?;
+        let (identity, _) = identity(
+            HANDLE(process.as_raw_handle()),
+            HANDLE(handle.as_raw_handle()),
+            process_created,
+        )
+        .map_err(|failure| {
+            self.identity_failure = Some(serde_json::json!(failure));
+            error("native_clr.thread_identity")
+        })?;
+        if identity.process_id != process_id || identity.thread_id != thread_id {
+            return Err(error("native_clr.thread_event_mismatch"));
+        }
+        self.threads
+            .insert(thread_id, ThreadBinding { handle, identity });
+        Ok(())
+    }
+
+    pub(super) fn bind_runtime(&mut self, file: &File, base: u64) -> io::Result<()> {
+        let path = final_path_from_handle(file)?;
+        if !path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("clr.dll"))
+        {
+            return Ok(());
+        }
+        if self.runtime.is_some() {
+            return Err(error("native_clr.duplicate_runtime"));
+        }
+        // A 层核固定 Framework64 来源、原 LOAD 文件身份和配对 DAC；不借 unwind 租约放行。
+        self.phase = "bind_runtime";
+        self.runtime = Some((base, ClrRuntimeBinding::from_load(file, base)?));
+        Ok(())
+    }
+
+    pub(super) fn unload(&mut self, base: u64) -> io::Result<()> {
+        self.ensure_reaped()?;
+        if self.runtime.as_ref().is_some_and(|(held, _)| *held == base) {
+            self.runtime = None;
+        }
+        Ok(())
+    }
+
+    pub(super) fn thread_exited(&mut self, tid: u32) {
+        // 调用点仅位于原 EXIT_THREAD 成功 Continue 之后。
+        self.threads.remove(&tid);
+    }
+
+    pub(super) fn process_exited(&mut self) {
+        self.threads.clear();
+        self.runtime = None;
+    }
+
+    pub(super) fn ensure_reaped(&self) -> io::Result<()> {
+        if self
+            .active_reader
+            .as_ref()
+            .is_some_and(|reader| !reader.is_reaped())
+        {
+            return Err(error("native_clr.reader_not_reaped"));
+        }
+        Ok(())
+    }
+
+    pub(super) fn abort_after_target_termination(&mut self, deadline: Instant) -> io::Result<()> {
+        if let Some(reader) = &mut self.active_reader {
+            reader.abort_and_reap(deadline)?;
+            self.reader_cleanup = Some(serde_json::json!({
+                "event_sequence":self.last_sequence,"binding":reader.binding(),
+                "reader_reaped":reader.is_reaped(),"target_termination_requested_first":true,
+            }));
+        }
+        self.ensure_reaped()?;
+        self.active_reader = None;
+        Ok(())
+    }
+
+    pub(super) fn observe(
+        &mut self,
+        event: &DEBUG_EVENT,
+        process: &OwnedHandle,
+        process_created: u64,
+        root_pid: u32,
+        sequence: u64,
+        deadline: Instant,
+        cancellation: Option<&AtomicBool>,
+    ) -> io::Result<()> {
+        let Some(hresult) = exception_hresult(event, root_pid)? else {
+            return Ok(());
+        };
+        self.phase = "exception_identity";
+        self.ensure_reaped()?;
+        if sequence <= self.last_sequence || Instant::now() >= deadline {
+            return Err(error("native_clr.event_sequence_or_deadline"));
+        }
+        if cancellation.is_some_and(|value| value.load(Ordering::Acquire)) {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "native_clr.cancelled",
+            ));
+        }
+        self.last_sequence = sequence;
+        // 先保全原停点；后续身份、运行时或 reader 失败不能抹去本次事件。
+        write_receipt(
+            &self
+                .directory
+                .join(format!("native-clr-exception-{sequence}.pending.json")),
+            &serde_json::json!({"generation":self.generation,"process_id":root_pid,
+                "thread_id":event.dwThreadId,"event_sequence":sequence,"hresult":hresult,
+                "phase":"pending_not_read","candidate_success_inferred":false}),
+        )?;
+        let thread = self
+            .threads
+            .get(&event.dwThreadId)
+            .ok_or_else(|| error("native_clr.original_thread_missing"))?;
+        let (current, _) = identity(
+            HANDLE(process.as_raw_handle()),
+            HANDLE(thread.handle.as_raw_handle()),
+            process_created,
+        )
+        .map_err(|failure| {
+            self.identity_failure = Some(serde_json::json!(failure));
+            error("native_clr.thread_identity")
+        })?;
+        if current != thread.identity || current.process_id != root_pid {
+            return Err(error("native_clr.thread_identity_changed"));
+        }
+        let (_, runtime) = self
+            .runtime
+            .as_mut()
+            .ok_or_else(|| error("native_clr.runtime_missing"))?;
+        self.phase = "reader_start";
+        // start 成功即存入所有者；后续绑定、发送、取消和解析失败均不能提前丢失 reader。
+        self.active_reader = Some(ClrReader::start(
+            &mut self.image,
+            &self.directory,
+            sequence,
+            deadline,
+        )?);
+        let reader = self.active_reader.as_mut().unwrap();
+        self.phase = "reader_bind_and_send";
+        reader.bind_and_send(
+            &mut self.image,
+            runtime,
+            ClrExceptionStop {
+                process: process.as_handle(),
+                thread: thread.handle.as_handle(),
+                process_id: root_pid,
+                thread_id: event.dwThreadId,
+                event_sequence: sequence,
+                exception_code: CLR_EXCEPTION,
+                first_chance: 1,
+                hresult,
+                read_budget_bytes: READ_BUDGET_BYTES,
+            },
+        )?;
+        self.phase = "reader_poll";
+        let result = loop {
+            if let Some(result) =
+                reader.poll(|| cancellation.is_some_and(|value| value.load(Ordering::Acquire)))?
+            {
+                break result;
+            }
+        };
+        if !reader.is_reaped() {
+            return Err(error("native_clr.reader_not_reaped"));
+        }
+        let receipt = serde_json::json!({
+            "schema":1,"generation":self.generation,"mode":"powershell",
+            "event_sequence":sequence,"process_id":root_pid,"thread_id":event.dwThreadId,
+            "identity":current,"exception_code":CLR_EXCEPTION,"hresult":hresult,
+            "binding":reader.binding(),"reader":self.image.receipt(),"runtime":runtime.receipt(),
+            "result":result,"reader_reaped":true,"candidate_success_inferred":false,
+        });
+        self.phase = "write_receipt";
+        write_receipt(
+            &self
+                .directory
+                .join(format!("native-clr-exception-{sequence}.json")),
+            &receipt,
+        )?;
+        // 合法 observed/partial/unavailable 均已绑定且 reader 已退出；后两者不是读取通过。
+        self.active_reader = None;
+        self.completed += 1;
+        self.phase = "event_recorded";
+        Ok(())
+    }
+
+    pub(super) fn summary(&self) -> serde_json::Value {
+        serde_json::json!({"recorded_events":self.completed,"last_sequence":self.last_sequence,
+            "phase":self.phase,"identity_failure":self.identity_failure,"reader_cleanup":self.reader_cleanup,
+            "active_reader":self.active_reader.as_ref().map(|reader| serde_json::json!({
+                "reaped":reader.is_reaped(),"binding":reader.binding()}))})
+    }
+}
+
+#[cfg(test)]
+#[path = "managed_process_atomic_windows_clr_tests.rs"]
+mod tests;

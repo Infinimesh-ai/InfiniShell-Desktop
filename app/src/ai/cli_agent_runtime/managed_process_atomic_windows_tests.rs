@@ -1791,10 +1791,12 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
             let identity = inspect_handle(&file).unwrap().id;
             identity
         });
-        match fixture
-            .debugger
-            .validate_event_in_container(&event, Some(&fixture.process))
-        {
+        match fixture.debugger.validate_event_in_container(
+            &event,
+            Some(&fixture.process),
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            deadline,
+        ) {
             Ok(status) => fixture.debugger.continue_pending(status, deadline).unwrap(),
             Err(failure) => break (failure, image),
         }
@@ -1850,7 +1852,13 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
         .unwrap();
     fixture
         .debugger
-        .validate_event_in_container(&event, Some(&fixture.process))
+        .validate_event_in_container(
+            &event,
+            Some(&fixture.process),
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            Instant::now()
+                + DEBUG_DRIVER_TIMEOUT,
+        )
         .unwrap();
     let pending = fixture.debugger.pending_event.unwrap();
     fixture.debugger.pending_event = Some((pending.0, 0, pending.2));

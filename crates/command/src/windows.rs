@@ -312,6 +312,12 @@ impl CommandExt for crate::r#async::Command {
 #[path = "windows_tests.rs"]
 mod tests;
 
+#[cfg(any(test, feature = "native-probe-witness"))]
+#[path = "windows_clr_reader.rs"]
+mod clr_reader;
+#[cfg(any(test, feature = "native-probe-witness"))]
+pub use clr_reader::{ClrExceptionStop, ClrReader, ClrReaderImage, ClrRuntimeBinding};
+
 #[cfg(test)]
 #[path = "windows_clr_fixture_tests.rs"]
 mod clr_fixture_tests;

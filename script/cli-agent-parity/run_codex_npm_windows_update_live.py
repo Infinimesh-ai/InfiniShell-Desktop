@@ -34,13 +34,15 @@ SUPERVISOR_SOURCE_FILES = (
         "managed_process.rs", "managed_process_probe_control.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
         "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_snapshot.rs",
         "managed_process_atomic_windows_snapshot_temp.rs",
-        "managed_process_atomic_windows_witness.rs", "managed_process_npm_probe_windows.rs")],
+        "managed_process_atomic_windows_witness.rs", "managed_process_atomic_windows_clr.rs",
+        "managed_process_npm_probe_windows.rs")],
     "crates/command/src/windows.rs",
     "crates/command/src/managed.rs",
     "crates/command/src/windows_appcontainer.rs",
     "crates/command/src/windows_appcontainer_witness.rs",
     "crates/command/src/windows_appcontainer_desktop.rs",
     "crates/command/src/windows_appcontainer_output.rs",
+    "crates/command/src/windows_clr_reader.rs",
     "crates/command/src/windows_station_bootstrap.rs",
     "crates/command/src/windows_station_device_map.rs",
     "crates/command/src/windows_station_debugger.rs",
@@ -60,6 +62,7 @@ ACCEPTANCE_SOURCE_FILES = (
         "managed_process_atomic_windows_snapshot_tests.rs",
         "managed_process_atomic_windows_snapshot_temp_tests.rs",
         "managed_process_atomic_windows_witness_tests.rs",
+        "managed_process_atomic_windows_clr_tests.rs",
         "managed_process_probe_control_tests.rs",
         "managed_process_npm_probe_windows_tests.rs")],
     "crates/command/src/managed_tests.rs",
@@ -70,6 +73,11 @@ ACCEPTANCE_SOURCE_FILES = (
     "crates/command/src/windows_appcontainer_tests.rs",
     "crates/command/src/windows_appcontainer_console_tests.rs",
     "crates/command/src/windows_appcontainer_output_tests.rs",
+    "crates/command/src/windows_clr_reader_tests.rs",
+    *["script/ci/g09-clr-reader/" + name for name in (
+        "reader.cpp", "wire.h", "sos_layout.h", "README.md", "sources.safe.json",
+        "vendor/clrdata.h", "vendor/xclrdata.h", "vendor/sospriv.h", "vendor/LICENSE.TXT")],
+    "script/ci/g09-clr-fixture/build-reader.ps1",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
 )
@@ -292,6 +300,8 @@ def fixture(args, case, binaries, sources, old, manager_tree, system_root):
     manifest = dict(schema=1,scope=SCOPE,case=case,root=str(root),source_sha256=sources,
         old_public_sha256=sha(root / "prefix/node_modules/@openai/codex/bin/codex.js"),
         npm_install_sha256=sha(root / "npm-install.safe.json"),npm_tree=manager_tree,shims=shims,**binaries)
+    if args.clr_reader is not None:
+        manifest["clr_reader"] = args.clr_reader
     write(root / "npm-registered-tree.safe.json", actual)
     write(root / "manifest.private.json", manifest)
     return root, manifest
@@ -348,6 +358,8 @@ def parser():
                         help="仅首个 updated 选定模式候选的一次原生取证；不视为完整验收")
     result.add_argument("--native-witness-mode", choices=("cmd", "powershell"), default="cmd",
                         help="默认保留 CMD 因果取证；PowerShell 仅采原主线程快照")
+    result.add_argument("--clr-reader", type=Path)
+    result.add_argument("--clr-reader-sha256")
     return result
 
 
@@ -358,9 +370,42 @@ def native_witness_permit(requested, mode, cases):
     return "codex-npm-first-" + mode + "-v1" if requested else None
 
 
+def clr_reader_configuration(requested, mode, cases, path, expected):
+    permitted = requested and mode == "powershell" and cases == ["updated"]
+    require((path is not None and expected is not None) if permitted
+            else path is None and expected is None, "clr_reader_scope")
+    if not permitted:
+        return None
+    require(re.fullmatch(r"[0-9a-f]{64}", expected) is not None, "clr_reader_sha256")
+    # 解析前拒绝原路径及祖先的链接；摘要必须来自同一个普通文件句柄。
+    original = Path(path).absolute()
+    for parent in original.parents:
+        require(stat.S_ISDIR(plain(parent).st_mode), "clr_reader_parent")
+    before = plain(original)
+    require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
+            and 0 < before.st_size <= 64 * 1024 * 1024, "clr_reader_file")
+    bound = canonical(original)
+    identity = lambda info: (info.st_dev, info.st_ino, info.st_nlink, info.st_size,
+                             info.st_mtime_ns, info.st_ctime_ns)
+    with bound.open("rb") as stream:
+        require(identity(os.fstat(stream.fileno())) == identity(before), "clr_reader_changed")
+        digest = hashlib.sha256()
+        length = 0
+        for block in iter(lambda: stream.read(65536), b""):
+            length += len(block)
+            require(length <= before.st_size, "clr_reader_changed")
+            digest.update(block)
+        require(length == before.st_size and identity(os.fstat(stream.fileno())) == identity(before), "clr_reader_changed")
+    require(identity(plain(original)) == identity(before) and canonical(original) == bound
+            and digest.hexdigest() == expected, "clr_reader_binding")
+    return {"path":str(bound), "sha256":expected}
+
+
 def main():
     args = parser().parse_args()
     witness_permit = native_witness_permit(args.native_witness, args.native_witness_mode, args.case)
+    args.clr_reader = clr_reader_configuration(args.native_witness, args.native_witness_mode,
+        args.case, args.clr_reader, args.clr_reader_sha256)
     require(platform.system() == "Windows" and platform.machine().lower() in ("amd64", "x86_64"), "windows_x64_only")
     args.repo = canonical(args.repo)
     args.official_inputs = canonical(args.official_inputs) if args.official_inputs else None
@@ -399,6 +444,7 @@ def main():
     require(re.fullmatch(r"[0-9a-f]{40}", revision), "source_commit_invalid")
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=args.repo, text=True, encoding="utf-8")
     write(args.output / "source.safe.json", {"commit":revision,"source_sha256":sources,"binaries":binaries,
+        "clr_reader":args.clr_reader,
         "working_tree_dirty":bool(status.strip()),"npm_version":manager_manifest.get("version"),"cmd_shim_registrations":shim_sources,
         "source_roles":{"supervisor_embedded":SUPERVISOR_SOURCE_FILES,"acceptance_only":ACCEPTANCE_SOURCE_FILES},
         "platform":"windows-x64","consumer_channel_discovery_covered":False,
@@ -428,6 +474,8 @@ def main():
                 "both_public_entries_required")
         verify_product(root, case, old, target)
         require(all(sha(value["path"]) == value["sha256"] for value in binaries.values())
+                and (args.clr_reader is None or clr_reader_configuration(True, "powershell", ["updated"],
+                    Path(args.clr_reader["path"]), args.clr_reader["sha256"]) == args.clr_reader)
                 and all(sha(args.repo / name) == digest for name,digest in sources.items())
                 and inventory(manager_root) == manager_tree, "source_or_manager_changed_during_run")
         cases.append({"case":case,"root":str(root),"result":result})

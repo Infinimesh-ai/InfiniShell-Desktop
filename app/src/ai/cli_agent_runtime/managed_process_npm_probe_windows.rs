@@ -504,6 +504,8 @@ pub(super) fn execute(
     let mut debugger = executable.prepare_image_debug_session()?;
     debugger.bind_cancellation(control.token());
     debugger.bind_package_diagnostics(manifest.generation);
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    let reader = super::read_native_witness_reader(record_directory, manifest)?;
     let spawn_started = Instant::now();
     let spawned = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
         executable.execution_path(),
@@ -518,7 +520,13 @@ pub(super) fn execute(
             let (arguments, environment) =
                 mapped_command(input.mode(), root, node_directory == install)?;
             #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-            debugger.bind_native_witness(manifest.generation, input.mode(), &environment)?;
+            debugger.bind_native_witness(
+                manifest.generation,
+                input.mode(),
+                &environment,
+                record_directory,
+                reader.as_ref(),
+            )?;
             Ok((arguments, environment))
         },
     );

@@ -9,6 +9,7 @@ use windows::core::PWSTR;
 use super::creation_witness::{
     CreationWitness, Disposition, Failure as CreationFailure, Summary, VerifiedImage,
 };
+use super::native_clr::NativeClr;
 use super::native_snapshot::{
     CpuSample, Identity, PreparedModules, VerifiedModule, capture, identity, prepare_modules,
     prepare_partial_modules,
@@ -153,6 +154,7 @@ pub(super) struct NativeWitness {
     creation_unavailable: Option<serde_json::Value>,
     snapshot: Option<serde_json::Value>,
     root_thread: Option<RootThread>,
+    clr: Option<NativeClr>,
     expected_temp_environment: [Vec<u16>; 3],
     early_root_cpu: Option<CpuSample>,
     late_snapshot: Option<serde_json::Value>,
@@ -258,6 +260,8 @@ impl WindowsImageDebugSession {
         generation: Uuid,
         mode: &str,
         environment: &[(OsString, OsString)],
+        record_directory: &Path,
+        reader: Option<&super::super::NativeWitnessReaderBinding>,
     ) -> io::Result<()> {
         let value = std::env::var(GENERATION_ENV).ok();
         let authorized_mode = std::env::var(MODE_ENV).ok();
@@ -271,6 +275,15 @@ impl WindowsImageDebugSession {
         {
             let expected_temp_environment = expected_temp_environment(environment)
                 .ok_or_else(|| error("native_witness.temp_environment_invalid"))?;
+            let clr = match (mode, reader) {
+                (WitnessMode::PowerShell, Some(reader)) => {
+                    Some(NativeClr::bind(generation, record_directory, reader)?)
+                }
+                (WitnessMode::Cmd, None) => None,
+                (WitnessMode::PowerShell, None) | (WitnessMode::Cmd, Some(_)) => {
+                    return Err(error("native_witness.reader_mode_mismatch"));
+                }
+            };
             self.native_witness = Some(NativeWitness {
                 generation,
                 mode,
@@ -284,6 +297,7 @@ impl WindowsImageDebugSession {
                 creation_unavailable: None,
                 snapshot: None,
                 root_thread: None,
+                clr,
                 expected_temp_environment,
                 early_root_cpu: None,
                 late_snapshot: None,
@@ -291,6 +305,8 @@ impl WindowsImageDebugSession {
                 cancelled: false,
                 exit_confirmed: false,
             });
+        } else if reader.is_some() {
+            return Err(error("native_witness.reader_not_authorized"));
         }
         Ok(())
     }
@@ -329,6 +345,16 @@ impl WindowsImageDebugSession {
             })
         {
             return Ok(());
+        }
+        // CLR/DAC 独立绑定原已授权 LOAD hFile，不能被 64 项解栈容量截断。
+        if dll
+            && pid == self.root_process_id
+            && let Some(clr) = self
+                .native_witness
+                .as_mut()
+                .and_then(|witness| witness.clr.as_mut())
+        {
+            clr.bind_runtime(file, base)?;
         }
         // 调用方已完成独立 CREATE/LOAD 映像授权；容量只限制额外诊断租约。
         let witness = self.native_witness.as_mut().unwrap();
@@ -488,6 +514,15 @@ impl WindowsImageDebugSession {
             if bound.process_id != event.dwProcessId || bound.thread_id != event.dwThreadId {
                 return Err(error("native_witness.root_event_identity_changed"));
             }
+            if let Some(clr) = &mut witness.clr {
+                clr.retain_thread(
+                    &process,
+                    birth,
+                    event.dwProcessId,
+                    event.dwThreadId,
+                    info.hThread,
+                )?;
+            }
             witness.root_thread = Some(RootThread {
                 process,
                 thread,
@@ -518,6 +553,11 @@ impl WindowsImageDebugSession {
         let Some(witness) = &mut self.native_witness else {
             return Ok(());
         };
+        if event.dwProcessId == self.root_process_id
+            && let Some(clr) = &mut witness.clr
+        {
+            clr.unload(unsafe { event.u.UnloadDll.lpBaseOfDll } as u64)?;
+        }
         // 根 DLL 卸载后不能让旧地址的断点认领重用映像；在原停点先撤回，不再重新布点。
         if event.dwProcessId == self.root_process_id
             && let Some(creation) = &mut witness.creation
@@ -543,6 +583,9 @@ impl WindowsImageDebugSession {
                 .is_some_and(|root| root.identity.process_id == pid)
             {
                 // 仅在原 EXIT 已 Continue 后释放，不让诊断复制句柄跨过 Job 清理。
+                if let Some(clr) = &mut witness.clr {
+                    clr.process_exited();
+                }
                 witness.root_thread.take();
             }
         }
@@ -551,7 +594,9 @@ impl WindowsImageDebugSession {
     pub(super) fn native_witness_exception(
         &mut self,
         event: &DEBUG_EVENT,
+        deadline: Instant,
     ) -> io::Result<Option<windows::Win32::Foundation::NTSTATUS>> {
+        self.native_clr_exception(event, deadline)?;
         let at_ms = self
             .npm_diagnostics
             .as_ref()
@@ -604,6 +649,99 @@ impl WindowsImageDebugSession {
             Ok(Disposition::OwnedEntry | Disposition::OwnedReturn) => Ok(Some(DBG_CONTINUE)),
             Err(failure) => Err(self.native_failure("creation_exception", failure)),
         }
+    }
+
+    pub(super) fn native_clr_create_thread(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        if event.dwProcessId != self.root_process_id {
+            return Ok(());
+        }
+        let Some(witness) = &mut self.native_witness else {
+            return Ok(());
+        };
+        let Some(clr) = &mut witness.clr else {
+            return Ok(());
+        };
+        let root = witness
+            .root_thread
+            .as_ref()
+            .ok_or_else(|| error("native_clr.root_missing"))?;
+        clr.retain_thread(
+            &root.process,
+            root.process_created,
+            event.dwProcessId,
+            event.dwThreadId,
+            unsafe { event.u.CreateThread.hThread },
+        )
+    }
+
+    pub(super) fn native_clr_thread_exited(&mut self, pid: u32, tid: u32) {
+        if pid == self.root_process_id
+            && let Some(clr) = self
+                .native_witness
+                .as_mut()
+                .and_then(|witness| witness.clr.as_mut())
+        {
+            clr.thread_exited(tid);
+        }
+    }
+
+    pub(super) fn native_clr_can_continue(&self) -> io::Result<()> {
+        if let Some(clr) = self
+            .native_witness
+            .as_ref()
+            .and_then(|witness| witness.clr.as_ref())
+        {
+            clr.ensure_reaped()?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn native_clr_abort_after_target_termination(
+        &mut self,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        if let Some(clr) = self
+            .native_witness
+            .as_mut()
+            .and_then(|witness| witness.clr.as_mut())
+        {
+            clr.abort_after_target_termination(deadline)?;
+        }
+        Ok(())
+    }
+
+    fn native_clr_exception(&mut self, event: &DEBUG_EVENT, deadline: Instant) -> io::Result<()> {
+        if event.dwProcessId != self.root_process_id {
+            return Ok(());
+        }
+        let Some(witness) = &mut self.native_witness else {
+            return Ok(());
+        };
+        let Some(clr) = &mut witness.clr else {
+            return Ok(());
+        };
+        let root = witness
+            .root_thread
+            .as_ref()
+            .ok_or_else(|| error("native_clr.root_missing"))?;
+        let sequence = self
+            .npm_diagnostics
+            .as_ref()
+            .and_then(|diagnostics| diagnostics.trace.as_ref())
+            .map(|trace| trace.received)
+            .ok_or_else(|| error("native_clr.event_sequence_missing"))?;
+        clr.observe(
+            event,
+            &root.process,
+            root.process_created,
+            self.root_process_id,
+            sequence,
+            deadline,
+            self.cancellation.as_deref(),
+        )
+        .map_err(|failure| {
+            self.native_failure("clr_exception", safe_failure("clr_exception", &failure))
+        })
     }
 
     // PID 仅是已持句柄查询的字段；授权仍是同 Job/token 与原映像租约。
@@ -1100,6 +1238,12 @@ impl WindowsImageDebugSession {
     pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
             let summary = serde_json::json!({"generation":witness.generation,"mode":witness.mode,"creation_enabled":witness.mode == WitnessMode::Cmd,"module_coverage_partial":witness.module_coverage_partial,"skipped_module_events":witness.skipped_module_events,"unsupported_module_events":witness.unsupported_module_events,"unsupported_module_reason":(witness.unsupported_module_events > 0).then_some("non_x64_native_unwind"),"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
+            let mut summary = summary;
+            summary["clr"] = witness
+                .clr
+                .as_ref()
+                .map(NativeClr::summary)
+                .unwrap_or(serde_json::Value::Null);
             // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

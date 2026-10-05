@@ -8,6 +8,8 @@ use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 #[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
+use std::sync::OnceLock;
+#[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
@@ -40,6 +42,119 @@ const SPAWN_ATTEMPT_RECORD: &str = "spawn-attempt.json";
 const SPAWN_REJECTED_RECORD: &str = "spawn-rejected.json";
 const LAUNCH_BINDING_RECORD: &str = "launch-binding.json";
 const EXIT_BINDING_RECORD: &str = "exit-binding.json";
+
+#[cfg(all(windows, feature = "cli-agent-native-witness"))]
+const NATIVE_WITNESS_READER_RECORD: &str = "native-clr-reader-v1.json";
+
+#[cfg(any(test, all(windows, feature = "cli-agent-native-witness")))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct NativeWitnessReaderBinding {
+    pub(super) path: PathBuf,
+    pub(super) sha256: String,
+}
+
+#[cfg(any(test, all(windows, feature = "cli-agent-native-witness")))]
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeWitnessReaderRecord {
+    version: u32,
+    generation: Uuid,
+    manifest_sha256: String,
+    reader: NativeWitnessReaderBinding,
+}
+
+#[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
+static NATIVE_WITNESS_READER: OnceLock<NativeWitnessReaderBinding> = OnceLock::new();
+
+#[cfg(all(test, windows, feature = "cli-agent-native-witness"))]
+pub(crate) fn register_native_witness_reader(path: PathBuf, sha256: String) -> io::Result<()> {
+    if std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW").as_deref()
+        != Ok("codex-npm-first-powershell-v1")
+        || std::env::var("INFINISHELL_CLI_CODEX_WINDOWS_NPM_STEP").as_deref() != Ok("execute")
+        || path.canonicalize()? != path
+        || ExpectedFileIdentity::capture(&path)?.sha256 != sha256
+    {
+        return Err(io::Error::other(
+            "managed_process.native_reader_binding_invalid",
+        ));
+    }
+    NATIVE_WITNESS_READER
+        .set(NativeWitnessReaderBinding { path, sha256 })
+        .map_err(|_| io::Error::other("managed_process.native_reader_already_registered"))
+}
+
+#[cfg(any(test, all(windows, feature = "cli-agent-native-witness")))]
+fn validate_native_witness_reader_record(
+    record: &NativeWitnessReaderRecord,
+    manifest: &Manifest,
+    manifest_bytes: &[u8],
+) -> io::Result<()> {
+    if record.version != 1
+        || record.generation != manifest.generation
+        || record.manifest_sha256 != sha256(manifest_bytes)
+        || manifest.atomic_launch_kind != Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1)
+        || manifest.arguments.first().and_then(|value| value.to_str()) != Some("powershell")
+        || !record.reader.path.is_absolute()
+        || record.reader.sha256.len() != 64
+        || !record
+            .reader
+            .sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(io::Error::other(
+            "managed_process.native_reader_binding_invalid",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(all(windows, feature = "cli-agent-native-witness"))]
+pub(super) fn read_native_witness_reader(
+    directory: &Path,
+    manifest: &Manifest,
+) -> io::Result<Option<NativeWitnessReaderBinding>> {
+    use std::os::windows::fs::OpenOptionsExt as _;
+    use windows::Win32::Storage::FileSystem::{FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ};
+
+    let path = directory.join(NATIVE_WITNESS_READER_RECORD);
+    let authorized = std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION").as_deref()
+        == Ok(manifest.generation.to_string().as_str())
+        && std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE").as_deref() == Ok("powershell");
+    if !authorized {
+        return match fs::symlink_metadata(path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error),
+            Ok(_) => Err(io::Error::other(
+                "managed_process.native_reader_not_authorized",
+            )),
+        };
+    }
+    // 保持私有记录拒写租约，并从同一句柄核普通文件与容量；读取器路径不进入 CLI 环境。
+    let mut file = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(path)?;
+    let identity = opened_file_metadata(&file)?;
+    if identity.size == 0 || identity.size > MAX_RECORD_BYTES {
+        return Err(io::Error::other(
+            "managed_process.native_reader_record_size_invalid",
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    if opened_file_metadata(&file)? != identity || bytes.len() as u64 != identity.size {
+        return Err(io::Error::other(
+            "managed_process.native_reader_record_changed",
+        ));
+    }
+    let record = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+    let manifest_bytes = serde_json::to_vec(manifest).map_err(io::Error::other)?;
+    validate_native_witness_reader_record(&record, manifest, &manifest_bytes)?;
+    Ok(Some(record.reader))
+}
 
 fn copy_output_with_flush(
     reader: &mut impl io::Read,
@@ -1760,6 +1875,22 @@ async fn spawn_configured_inner(
                 .as_deref(),
             &CLAIMED,
         ) {
+            if mode == "powershell" {
+                let reader = NATIVE_WITNESS_READER.get().ok_or_else(|| {
+                    io::Error::other("managed_process.native_reader_not_registered")
+                })?;
+                let record = NativeWitnessReaderRecord {
+                    version: 1,
+                    generation,
+                    manifest_sha256: sha256(&manifest_bytes),
+                    reader: reader.clone(),
+                };
+                validate_native_witness_reader_record(&record, &manifest, &manifest_bytes)?;
+                write_new_record(
+                    &directory.join(NATIVE_WITNESS_READER_RECORD),
+                    &serde_json::to_vec(&record).map_err(io::Error::other)?,
+                )?;
+            }
             command
                 .env(
                     "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",

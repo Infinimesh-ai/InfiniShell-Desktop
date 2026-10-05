@@ -60,6 +60,9 @@ use super::{
 #[path = "managed_process_atomic_windows_creation_witness.rs"]
 mod creation_witness;
 #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_clr.rs"]
+mod native_clr;
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
 #[path = "managed_process_atomic_windows_snapshot.rs"]
 mod native_snapshot;
 #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
@@ -967,6 +970,8 @@ impl WindowsImageDebugSession {
         let (process_id, thread_id, code) = self
             .pending_event
             .ok_or_else(|| error("managed_process.atomic_windows_debug_event_missing"))?;
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_clr_can_continue()?;
         let started = Instant::now();
         let call_thread_id = unsafe { GetCurrentThreadId() };
         // helper 后端在原创建线程继续其精确待事件；失败时双方均保留事件所有权。
@@ -992,6 +997,10 @@ impl WindowsImageDebugSession {
         }
         result.map(|_| ())?;
         self.pending_event = None;
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        if code == EXIT_THREAD_DEBUG_EVENT {
+            self.native_clr_thread_exited(process_id, thread_id);
+        }
         // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
         if code == EXIT_PROCESS_DEBUG_EVENT {
             self.processes.remove(&process_id);
@@ -1162,7 +1171,12 @@ impl WindowsImageDebugSession {
                 #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
                 container,
             )?;
-            let continue_status = match self.validate_event_in_container(&event, container) {
+            let continue_status = match self.validate_event_in_container(
+                &event,
+                container,
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                deadline,
+            ) {
                 Ok(status) => status,
                 Err(failure) => {
                     if reject_on_error {
@@ -1187,6 +1201,7 @@ impl WindowsImageDebugSession {
         &mut self,
         event: &DEBUG_EVENT,
         container: Option<&AppContainerProbe>,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))] deadline: Instant,
     ) -> io::Result<windows::Win32::Foundation::NTSTATUS> {
         let started = Instant::now();
         let result = (|| match event.dwDebugEventCode {
@@ -1199,10 +1214,14 @@ impl WindowsImageDebugSession {
                 Ok(DBG_CONTINUE)
             }
             // 原始线程句柄由 ContinueDebugEvent 在 EXIT_* 时关闭，不能提前释放。
-            CREATE_THREAD_DEBUG_EVENT => Ok(DBG_CONTINUE),
+            CREATE_THREAD_DEBUG_EVENT => {
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                self.native_clr_create_thread(event)?;
+                Ok(DBG_CONTINUE)
+            }
             EXCEPTION_DEBUG_EVENT => {
                 #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-                if let Some(status) = self.native_witness_exception(event)? {
+                if let Some(status) = self.native_witness_exception(event, deadline)? {
                     return Ok(status);
                 }
                 let information = unsafe { event.u.Exception };
@@ -1515,6 +1534,8 @@ impl WindowsImageDebugSession {
             );
         }
         self.cancellation = None;
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_clr_abort_after_target_termination(deadline)?;
         if let Some(container) = container {
             for process in self.processes.values() {
                 request_debugged_process_termination(container, process)?;

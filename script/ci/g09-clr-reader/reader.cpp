@@ -897,9 +897,10 @@ bool valid_request(const G09ClrRequest &r) {
          r.thread_birth && r.process_handle && r.thread_handle && r.process_handle != r.thread_handle &&
          r.process_handle < (std::uint64_t(1) << 63) && r.thread_handle < (std::uint64_t(1) << 63) &&
          r.clr_base && r.clr_image_size >= sizeof(IMAGE_NT_HEADERS64) &&
-         r.clr_base <= std::numeric_limits<std::uint64_t>::max() - r.clr_image_size && r.read_budget_bytes &&
-         r.read_budget_bytes <= G09_CLR_MAX_READ_BYTES && r.read_budget_calls &&
-         r.read_budget_calls <= G09_CLR_MAX_READ_CALLS && r.dac_file_size &&
+         r.clr_base <= std::numeric_limits<std::uint64_t>::max() - r.clr_image_size &&
+         (r.read_budget_bytes == G09_CLR_FIXTURE_READ_BYTES ||
+          r.read_budget_bytes == G09_CLR_POWERSHELL_READ_BYTES) &&
+         r.read_budget_calls && r.read_budget_calls <= G09_CLR_MAX_READ_CALLS && r.dac_file_size &&
          r.dac_file_size <= 64 * 1024 * 1024 && nonzero(r.dac_sha256, 32) && r.dac_path_units &&
          r.dac_path_units <= G09_CLR_MAX_PATH_UNITS && r.first_chance == 1 && r.exception_code == 0xe0434352;
 }

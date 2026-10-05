@@ -1,79 +1,39 @@
 //! 固定 Framework 异常夹具；只证明原调试停点读取及 reader 回收，不代表 G09 通过。
 
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read as _, Seek as _, SeekFrom, Write as _};
-use std::mem::size_of;
-use std::os::windows::ffi::{OsStrExt as _, OsStringExt as _};
-use std::os::windows::fs::OpenOptionsExt as _;
-use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
+use std::io::{self, Write as _};
+use std::os::windows::io::{AsHandle as _, AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
-use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
-use sha2::{Digest as _, Sha256};
 use windows::Win32::Foundation::{
-    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_HANDLE_OPTIONS, DuplicateHandle,
-    ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, FILETIME, HANDLE, NTSTATUS, WAIT_OBJECT_0,
-    WAIT_TIMEOUT,
-};
-use windows::Win32::Storage::FileSystem::{
-    BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT,
-    FILE_NAME_NORMALIZED, FILE_SHARE_READ, GetFileInformationByHandle, GetFileVersionInfoSizeW,
-    GetFileVersionInfoW, GetFinalPathNameByHandleW, VS_FIXEDFILEINFO, VerQueryValueW,
+    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, HANDLE,
+    NTSTATUS, WAIT_OBJECT_0,
 };
 use windows::Win32::System::Diagnostics::Debug::{
     CREATE_PROCESS_DEBUG_EVENT, CREATE_THREAD_DEBUG_EVENT, ContinueDebugEvent, DEBUG_EVENT,
     EXCEPTION_DEBUG_EVENT, EXIT_PROCESS_DEBUG_EVENT, EXIT_THREAD_DEBUG_EVENT, LOAD_DLL_DEBUG_EVENT,
     OUTPUT_DEBUG_STRING_EVENT, RIP_EVENT, UNLOAD_DLL_DEBUG_EVENT, WaitForDebugEvent,
 };
-use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-    JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
-    QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
-};
-use windows::Win32::System::SystemInformation::GetTickCount64;
 use windows::Win32::System::Threading::{
-    DEBUG_ONLY_THIS_PROCESS, GetCurrentProcess, GetProcessId, GetProcessIdOfThread,
-    GetProcessTimes, GetThreadId, GetThreadTimes, PROCESS_QUERY_INFORMATION, PROCESS_SYNCHRONIZE,
-    PROCESS_VM_READ, THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION, WaitForSingleObject,
+    DEBUG_ONLY_THIS_PROCESS, GetCurrentProcess, GetProcessId, GetProcessIdOfThread, GetThreadId,
+    THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION, WaitForSingleObject,
 };
-use windows::core::{BOOL, HRESULT, PCWSTR, w};
+use windows::core::HRESULT;
 
+use super::clr_reader::{
+    BoundFile, ClrExceptionStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, Job, birth,
+    duplicate, empty_environment, file_identity, hex, image_path, information, put64, raw,
+    remaining, request, require,
+};
 use crate::blocking::Command;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 const CLEANUP_RESERVE: Duration = Duration::from_secs(5);
-const MAX_FILE: u64 = 64 * 1024 * 1024;
-const MAX_OUTPUT: u64 = 32768;
 const CLR_EXCEPTION: u32 = 0xe0434352;
-const REQUEST_SIZE: usize = 168;
-
-fn require(value: bool, message: &'static str) -> io::Result<()> {
-    if value {
-        Ok(())
-    } else {
-        Err(io::Error::other(message))
-    }
-}
-
-fn raw(handle: &OwnedHandle) -> HANDLE {
-    HANDLE(handle.as_raw_handle())
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-fn remaining(deadline: Instant) -> io::Result<u32> {
-    let value = deadline.saturating_duration_since(Instant::now());
-    require(!value.is_zero(), "CLR 夹具原期限耗尽")?;
-    Ok(value.as_millis().min(u32::MAX as u128).max(1) as u32)
-}
 
 fn save(path: &Path, value: &Value) -> io::Result<()> {
     let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
@@ -81,437 +41,12 @@ fn save(path: &Path, value: &Value) -> io::Result<()> {
     file.sync_all()
 }
 
-fn information(file: &File) -> io::Result<BY_HANDLE_FILE_INFORMATION> {
-    let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    unsafe { GetFileInformationByHandle(HANDLE(file.as_raw_handle()), &mut info) }
-        .map_err(io::Error::from)?;
-    require(
-        info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0,
-        "夹具文件不能是重解析点",
-    )?;
-    Ok(info)
-}
-
-fn file_identity(info: &BY_HANDLE_FILE_INFORMATION) -> (u32, u32, u32, u32, u32) {
-    (
-        info.dwVolumeSerialNumber,
-        info.nFileIndexHigh,
-        info.nFileIndexLow,
-        info.nFileSizeHigh,
-        info.nFileSizeLow,
-    )
-}
-
-struct BoundFile {
-    file: File,
-    path: PathBuf,
-    identity: (u32, u32, u32, u32, u32),
-    sha: [u8; 32],
-    size: u64,
-}
-
-impl BoundFile {
-    fn open(path: &Path) -> io::Result<Self> {
-        require(path.is_absolute(), "夹具文件必须为绝对路径")?;
-        let path = path.canonicalize()?;
-        let mut file = OpenOptions::new()
-            .read(true)
-            .share_mode(FILE_SHARE_READ.0)
-            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
-            .open(&path)?;
-        let identity = file_identity(&information(&file)?);
-        let size = file.metadata()?.len();
-        require(size > 0 && size <= MAX_FILE, "夹具文件大小超过固定边界")?;
-        let sha = Self::digest(&mut file)?;
-        Ok(Self {
-            file,
-            path,
-            identity,
-            sha,
-            size,
-        })
-    }
-
-    fn digest(file: &mut File) -> io::Result<[u8; 32]> {
-        file.seek(SeekFrom::Start(0))?;
-        let mut hash = Sha256::new();
-        let mut bytes = [0; 65536];
-        loop {
-            let count = file.read(&mut bytes)?;
-            if count == 0 {
-                break;
-            }
-            hash.update(&bytes[..count]);
-        }
-        Ok(hash.finalize().into())
-    }
-
-    fn verify(&mut self) -> io::Result<()> {
-        require(
-            file_identity(&information(&self.file)?) == self.identity,
-            "夹具原文件身份改变",
-        )?;
-        require(
-            Self::digest(&mut self.file)? == self.sha,
-            "夹具原文件摘要改变",
-        )?;
-        let file = File::open(&self.path)?;
-        require(
-            file_identity(&information(&file)?) == self.identity,
-            "夹具路径已指向另一文件",
-        )
-    }
-
-    fn receipt(&self) -> Value {
-        json!({"sha256":hex(&self.sha),"bytes":self.size,"file_identity":self.identity})
-    }
-
-    fn version(&mut self) -> io::Result<(u32, u32)> {
-        self.verify()?;
-        let path: Vec<u16> = self.path.as_os_str().encode_wide().chain(Some(0)).collect();
-        let size = unsafe { GetFileVersionInfoSizeW(PCWSTR(path.as_ptr()), None) };
-        require(
-            size > 0 && size <= 1024 * 1024,
-            "系统映像版本资源超过固定边界",
-        )?;
-        let mut bytes = vec![0_u8; size as usize];
-        unsafe {
-            GetFileVersionInfoW(PCWSTR(path.as_ptr()), None, size, bytes.as_mut_ptr().cast())
-        }
-        .map_err(io::Error::from)?;
-        let mut pointer = std::ptr::null_mut();
-        let mut length = 0;
-        require(
-            unsafe { VerQueryValueW(bytes.as_ptr().cast(), w!("\\"), &mut pointer, &mut length) }
-                .as_bool()
-                && !pointer.is_null()
-                && length as usize >= size_of::<VS_FIXEDFILEINFO>(),
-            "系统映像缺少固定版本资源",
-        )?;
-        let start = bytes.as_ptr() as usize;
-        let address = pointer as usize;
-        require(
-            address >= start
-                && address
-                    .checked_add(size_of::<VS_FIXEDFILEINFO>())
-                    .is_some_and(|end| end <= start + bytes.len()),
-            "系统版本资源指针越界",
-        )?;
-        let info = unsafe { std::ptr::read_unaligned(pointer.cast::<VS_FIXEDFILEINFO>()) };
-        require(info.dwSignature == 0xfeef04bd, "系统映像版本签名无效")?;
-        self.verify()?;
-        Ok((info.dwFileVersionMS, info.dwFileVersionLS))
-    }
-}
-
-fn image_path(file: &File) -> io::Result<PathBuf> {
-    let mut buffer = [0_u16; 2048];
-    let count = unsafe {
-        GetFinalPathNameByHandleW(
-            HANDLE(file.as_raw_handle()),
-            &mut buffer,
-            FILE_NAME_NORMALIZED,
-        )
-    };
-    require(
-        count > 0 && count < buffer.len() as u32,
-        "原映像路径超出固定边界",
-    )?;
-    Ok(PathBuf::from(OsString::from_wide(
-        &buffer[..count as usize],
-    )))
-}
-
-fn birth(handle: HANDLE, thread: bool) -> io::Result<u64> {
-    let (mut created, mut exited, mut kernel, mut user) = (
-        FILETIME::default(),
-        FILETIME::default(),
-        FILETIME::default(),
-        FILETIME::default(),
-    );
-    if thread {
-        unsafe { GetThreadTimes(handle, &mut created, &mut exited, &mut kernel, &mut user) }
-    } else {
-        unsafe { GetProcessTimes(handle, &mut created, &mut exited, &mut kernel, &mut user) }
-    }
-    .map_err(io::Error::from)?;
-    Ok((u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
-}
-
-fn duplicate(source: HANDLE, target: HANDLE, access: u32) -> io::Result<HANDLE> {
-    let mut result = HANDLE::default();
-    unsafe {
-        DuplicateHandle(
-            GetCurrentProcess(),
-            source,
-            target,
-            &mut result,
-            access,
-            false,
-            DUPLICATE_HANDLE_OPTIONS(0),
-        )
-    }
-    .map_err(io::Error::from)?;
-    Ok(result)
-}
-
-struct Job(OwnedHandle);
-
-impl Job {
-    fn new() -> io::Result<Self> {
-        let handle = unsafe { CreateJobObjectW(None, None) }.map_err(io::Error::from)?;
-        let job = Self(unsafe { OwnedHandle::from_raw_handle(handle.0) });
-        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        unsafe {
-            SetInformationJobObject(
-                raw(&job.0),
-                JobObjectExtendedLimitInformation,
-                (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
-                size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-            )
-        }
-        .map_err(io::Error::from)?;
-        Ok(job)
-    }
-
-    fn assign(&self, process: HANDLE) -> io::Result<()> {
-        unsafe { AssignProcessToJobObject(raw(&self.0), process) }.map_err(io::Error::from)?;
-        let mut member = BOOL::default();
-        unsafe { IsProcessInJob(process, Some(raw(&self.0)), &mut member) }
-            .map_err(io::Error::from)?;
-        require(member.as_bool(), "夹具进程没有进入精确 Job")
-    }
-
-    fn terminate(&self) -> io::Result<()> {
-        unsafe { TerminateJobObject(raw(&self.0), 1) }.map_err(io::Error::from)
-    }
-
-    fn empty(&self) -> io::Result<bool> {
-        let mut info = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
-        unsafe {
-            QueryInformationJobObject(
-                Some(raw(&self.0)),
-                JobObjectBasicAccountingInformation,
-                (&mut info as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
-                size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
-                None,
-            )
-        }
-        .map_err(io::Error::from)?;
-        Ok(info.ActiveProcesses == 0)
-    }
-}
-
-fn empty_environment(command: &mut Command, root: &Path) -> io::Result<()> {
-    let system = std::env::var_os("SystemRoot").ok_or_else(|| io::Error::other("缺少系统根"))?;
-    command
-        .env_clear()
-        .env("SystemRoot", &system)
-        .env("WINDIR", system)
-        .env("TEMP", root)
-        .env("TMP", root)
-        .current_dir(root);
-    Ok(())
-}
-
-fn put32(bytes: &mut [u8], offset: usize, value: u32) {
-    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-}
-fn put64(bytes: &mut [u8], offset: usize, value: u64) {
-    bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
-}
-
-fn request(operation: u32, nonce: [u8; 16], deadline: Instant) -> io::Result<Vec<u8>> {
-    let mut bytes = vec![0; REQUEST_SIZE];
-    bytes[..8].copy_from_slice(b"G09CLR1\0");
-    put32(&mut bytes, 8, 1);
-    put32(&mut bytes, 12, operation);
-    bytes[16..32].copy_from_slice(&nonce);
-    put64(
-        &mut bytes,
-        96,
-        unsafe { GetTickCount64() } + u64::from(remaining(deadline)?),
-    );
-    Ok(bytes)
-}
-
-struct Reader {
-    child: Child,
-    job: Job,
-    output: PathBuf,
-    deadline: Instant,
-    cleanup_deadline: Instant,
-    reaped: bool,
-}
-
-impl Reader {
-    fn start(
-        image: &mut BoundFile,
-        root: &Path,
-        name: &str,
-        deadline: Instant,
-        cleanup_deadline: Instant,
-    ) -> io::Result<Self> {
-        image.verify()?;
-        let output = root.join(format!("{name}.stdout.json"));
-        let stdout = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&output)?;
-        let stderr = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(root.join(format!("{name}.stderr")))?;
-        let mut command = Command::new_with_managed_process_group(&image.path);
-        empty_environment(&mut command, root)?;
-        command.stdin(Stdio::piped()).stdout(stdout).stderr(stderr);
-        let job = Job::new()?;
-        let child = command.spawn()?;
-        let reader = Self {
-            child,
-            job,
-            output,
-            deadline,
-            cleanup_deadline,
-            reaped: false,
-        };
-        Ok(reader)
-    }
-
-    fn bind(&self, image: &mut BoundFile) -> io::Result<()> {
-        self.job.assign(HANDLE(self.child.as_raw_handle()))?;
-        image.verify()
-    }
-
-    fn send(&mut self, bytes: &[u8]) -> io::Result<()> {
-        // 固定小于匿名管道默认缓冲；不把阻塞 stdout 管道引入原停点。
-        require(bytes.len() < 4096, "reader 请求超过固定边界")?;
-        let mut stdin = self
-            .child
-            .stdin
-            .take()
-            .ok_or_else(|| io::Error::other("reader 请求已发送"))?;
-        stdin.write_all(bytes)
-    }
-
-    fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
-        self.wait_until(self.deadline)
-    }
-
-    fn wait_until(&mut self, deadline: Instant) -> io::Result<std::process::ExitStatus> {
-        let status = unsafe {
-            WaitForSingleObject(HANDLE(self.child.as_raw_handle()), remaining(deadline)?)
-        };
-        require(status == WAIT_OBJECT_0, "reader 没有在原期限内退出")?;
-        let exit = self.child.wait()?;
-        // 根进程 signaled 不等于整个 Job 已空；两者都必须在同一原期限内确认。
-        loop {
-            let wait_ms = remaining(deadline)?.min(10);
-            if self.job.empty()? {
-                break;
-            }
-            thread::sleep(Duration::from_millis(u64::from(wait_ms)));
-        }
-        remaining(deadline)?;
-        self.reaped = true;
-        Ok(exit)
-    }
-
-    fn finish(&mut self) -> io::Result<Value> {
-        let exit = self.wait()?;
-        require(
-            fs::metadata(&self.output)?.len() <= MAX_OUTPUT,
-            "reader 输出超过固定边界",
-        )?;
-        let result: Value = serde_json::from_slice(&fs::read(&self.output)?)?;
-        require(exit.success(), "reader 原生读取失败，原件已保留")?;
-        Ok(result)
-    }
-
-    fn abort(&mut self) -> io::Result<()> {
-        if self.reaped {
-            return Ok(());
-        }
-        drop(self.child.stdin.take());
-        let _ = self.job.terminate();
-        let _ = self.child.kill();
-        self.wait_until(self.cleanup_deadline).map(|_status| ())
-    }
-}
-
-impl Drop for Reader {
-    fn drop(&mut self) {
-        if !self.reaped {
-            // 不另开清理期限；失败留下原件，不能把 Job 关闭当已确认回收。
-            let _ = self.abort();
-        }
-    }
-}
-
-struct ClrImage {
-    image: BoundFile,
-    dac: BoundFile,
-    base: u64,
-    size: u32,
-    timestamp: u32,
-    version: (u32, u32),
-}
-
-impl ClrImage {
-    fn from_event(file: File, base: u64) -> io::Result<Self> {
-        let path = image_path(&file)?;
-        let mut image = BoundFile::open(&path)?;
-        require(
-            image.identity == file_identity(&information(&file)?),
-            "CLR 路径与原 LOAD 映像不同",
-        )?;
-        let system =
-            std::env::var_os("SystemRoot").ok_or_else(|| io::Error::other("缺少系统根"))?;
-        let expected = PathBuf::from(system)
-            .join("Microsoft.NET/Framework64/v4.0.30319/clr.dll")
-            .canonicalize()?;
-        require(
-            path.to_string_lossy()
-                .eq_ignore_ascii_case(&expected.to_string_lossy()),
-            "未加载固定 Framework64 CLR",
-        )?;
-        let mut header = [0_u8; 4096];
-        image.file.seek(SeekFrom::Start(0))?;
-        image.file.read_exact(&mut header)?;
-        let pe = u32::from_le_bytes(header[60..64].try_into().unwrap()) as usize;
-        require(&header[..2] == b"MZ" && pe <= 3900, "CLR PE 头无效")?;
-        require(
-            &header[pe..pe + 4] == b"PE\0\0"
-                && u16::from_le_bytes(header[pe + 4..pe + 6].try_into().unwrap()) == 0x8664
-                && u16::from_le_bytes(header[pe + 24..pe + 26].try_into().unwrap()) == 0x20b,
-            "CLR 不是固定 x64 PE32+",
-        )?;
-        let timestamp = u32::from_le_bytes(header[pe + 8..pe + 12].try_into().unwrap());
-        let size = u32::from_le_bytes(header[pe + 80..pe + 84].try_into().unwrap());
-        require(size > 0 && size <= MAX_FILE as u32, "CLR 映像大小越界")?;
-        let mut dac = BoundFile::open(&path.with_file_name("mscordacwks.dll"))?;
-        let version = image.version()?;
-        require(version.0 == 0x00040008, "夹具不是固定 Framework 4.8")?;
-        require(dac.version()? == version, "CLR 与 DAC 的实际文件版本不匹配")?;
-        // 相同版本只是前置条件；实际 DAC 建实例/读取失败仍明确失败，不能据版本认定 ABI 已通过。
-        Ok(Self {
-            image,
-            dac,
-            base,
-            size,
-            timestamp,
-            version,
-        })
-    }
-}
-
 struct Fixture {
     child: Child,
     job: Job,
     threads: HashMap<u32, OwnedHandle>,
     main_thread: Option<u32>,
-    clr: Option<ClrImage>,
+    clr: Option<ClrRuntimeBinding>,
     exited: bool,
     exit_code: Option<u32>,
     sequence: u64,
@@ -519,7 +54,7 @@ struct Fixture {
     events: Vec<Value>,
     image_identity: (u32, u32, u32, u32, u32),
     cleanup_deadline: Instant,
-    active_reader: Option<Reader>,
+    active_reader: Option<ClrReader>,
     pending: Option<(DEBUG_EVENT, NTSTATUS)>,
     termination_requested: bool,
 }
@@ -587,7 +122,7 @@ impl Fixture {
     fn capture(
         &mut self,
         event: &DEBUG_EVENT,
-        image: &mut BoundFile,
+        image: &mut ClrReaderImage,
         root: &Path,
         deadline: Instant,
     ) -> io::Result<()> {
@@ -601,79 +136,54 @@ impl Fixture {
             .clr
             .as_mut()
             .ok_or_else(|| io::Error::other("CLR 异常先于原映像绑定"))?;
-        clr.image.verify()?;
-        clr.dac.verify()?;
-        self.active_reader = Some(Reader::start(
-            image,
-            root,
-            &format!("reader-{}", self.sequence),
-            deadline,
-            self.cleanup_deadline,
-        )?);
+        let exception = unsafe { event.u.Exception };
+        require(
+            exception.ExceptionRecord.NumberParameters >= 1,
+            "CLR 原事件缺少 HRESULT",
+        )?;
+        let hresult = exception.ExceptionRecord.ExceptionInformation[0] as u32;
+        self.active_reader = Some(ClrReader::start(image, root, self.sequence, deadline)?);
         let reader = self
             .active_reader
             .as_mut()
             .expect("刚创建的 reader 必须存在");
-        reader.bind(image)?;
-        let process = duplicate(
-            HANDLE(self.child.as_raw_handle()),
-            HANDLE(reader.child.as_raw_handle()),
-            (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_SYNCHRONIZE).0,
+        reader.bind_and_send(
+            image,
+            clr,
+            ClrExceptionStop {
+                process: self.child.as_handle(),
+                thread: thread.as_handle(),
+                process_id: self.child.id(),
+                thread_id: event.dwThreadId,
+                event_sequence: self.sequence,
+                exception_code: exception.ExceptionRecord.ExceptionCode.0 as u32,
+                first_chance: exception.dwFirstChance,
+                hresult,
+                read_budget_bytes: 16 * 1024 * 1024,
+            },
         )?;
-        let copied_thread = duplicate(
-            raw(thread),
-            HANDLE(reader.child.as_raw_handle()),
-            (THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION).0,
-        )?;
-        let nonce = *uuid::Uuid::new_v4().as_bytes();
-        let process_birth = birth(HANDLE(self.child.as_raw_handle()), false)?;
-        let thread_birth = birth(raw(thread), true)?;
-        let mut bytes = request(1, nonce, deadline)?;
-        put64(&mut bytes, 32, self.sequence);
-        put32(&mut bytes, 40, self.child.id());
-        put32(&mut bytes, 44, event.dwThreadId);
-        put64(&mut bytes, 48, process_birth);
-        put64(&mut bytes, 56, thread_birth);
-        put64(&mut bytes, 64, process.0 as u64);
-        put64(&mut bytes, 72, copied_thread.0 as u64);
-        put64(&mut bytes, 80, clr.base);
-        put32(&mut bytes, 88, clr.size);
-        put32(&mut bytes, 92, clr.timestamp);
-        put32(&mut bytes, 104, 16 * 1024 * 1024);
-        put32(&mut bytes, 108, 8192);
-        put64(&mut bytes, 112, clr.dac.size);
-        bytes[120..152].copy_from_slice(&clr.dac.sha);
-        let path: Vec<u16> = clr.dac.path.as_os_str().encode_wide().collect();
-        require(
-            !path.contains(&0) && path.len() <= 1024,
-            "DAC 路径超过固定边界",
-        )?;
-        put32(&mut bytes, 152, path.len() as u32);
-        let exception = unsafe { event.u.Exception };
-        put32(
-            &mut bytes,
-            156,
-            exception.ExceptionRecord.ExceptionInformation[0] as u32,
-        );
-        put32(&mut bytes, 160, exception.dwFirstChance);
-        put32(
-            &mut bytes,
-            164,
-            exception.ExceptionRecord.ExceptionCode.0 as u32,
-        );
-        bytes.extend(path.iter().flat_map(|unit| unit.to_le_bytes()));
-        reader.send(&bytes)?;
-        let result = reader.finish()?;
-        clr.image.verify()?;
-        clr.dac.verify()?;
-        self.observations.push(json!({"event_sequence":self.sequence,"pid":self.child.id(),"tid":event.dwThreadId,"main_tid":self.main_thread,"process_birth":process_birth,"thread_birth":thread_birth,"event_hresult":exception.ExceptionRecord.ExceptionInformation[0] as u32,"nonce":hex(&nonce),"reader":result,"reader_reaped":reader.reaped,"reader_job_empty":reader.job.empty()?}));
+        let result = loop {
+            if let Some(result) = reader.poll(|| false)? {
+                break result;
+            }
+        };
+        clr.verify()?;
+        let mut observation = reader
+            .binding()
+            .expect("成功读取必须保留原停点绑定")
+            .clone();
+        observation["main_tid"] = json!(self.main_thread);
+        observation["reader"] = result;
+        observation["reader_reaped"] = json!(reader.is_reaped());
+        observation["reader_job_empty"] = json!(reader.job_empty_fixture()?);
+        self.observations.push(observation);
         self.active_reader.take();
         Ok(())
     }
 
     fn release_reader(&mut self) -> io::Result<()> {
         if let Some(reader) = self.active_reader.as_mut() {
-            reader.abort()?;
+            reader.abort_and_reap(self.cleanup_deadline)?;
         }
         self.active_reader.take();
         Ok(())
@@ -714,7 +224,7 @@ impl Fixture {
     fn handle(
         &mut self,
         event: &DEBUG_EVENT,
-        image: &mut BoundFile,
+        image: &mut ClrReaderImage,
         root: &Path,
         deadline: Instant,
         cleanup: bool,
@@ -779,11 +289,10 @@ impl Fixture {
                         .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("clr.dll"))
                     {
                         require(self.clr.is_none(), "重复 CLR 映像")?;
-                        self.clr =
-                            Some(ClrImage::from_event(
-                                file,
-                                unsafe { event.u.LoadDll.lpBaseOfDll } as u64,
-                            )?);
+                        self.clr = Some(ClrRuntimeBinding::from_load(&file, unsafe {
+                            event.u.LoadDll.lpBaseOfDll
+                        }
+                            as u64)?);
                     }
                 }
                 Ok(())
@@ -812,7 +321,7 @@ impl Fixture {
 
     fn pump(
         &mut self,
-        reader: &mut BoundFile,
+        reader: &mut ClrReaderImage,
         root: &Path,
         deadline: Instant,
         cleanup: bool,
@@ -1051,13 +560,15 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["stage"] = json!("input_binding");
     let prepared: Value = serde_json::from_slice(&fs::read(root.join("preparation.safe.json"))?)?;
     require(prepared["status"] == "prepared", "CLR 夹具未完成准备")?;
-    let mut reader = BoundFile::open(&root.join("reader.exe"))?;
+    let reader_file = BoundFile::open(&root.join("reader.exe"))?;
     let mut fixture_image = BoundFile::open(&root.join("fixture.exe"))?;
     require(
-        prepared["reader_sha256"] == hex(&reader.sha)
+        prepared["reader_sha256"] == hex(&reader_file.sha)
             && prepared["fixture_sha256"] == hex(&fixture_image.sha),
         "CLR 夹具与准备摘要不符",
     )?;
+    let mut reader = ClrReaderImage::bind(&reader_file.path, reader_file.sha)?;
+    drop(reader_file);
     report["reader_image"] = reader.receipt();
     report["fixture_image"] = fixture_image.receipt();
     let deadline = Instant::now() + TIMEOUT;
@@ -1072,51 +583,50 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
         ("truncated-request", truncated),
         ("block-with-target", invalid_target),
     ] {
-        let mut child = Reader::start(&mut reader, root, name, active_deadline, deadline)?;
-        child.bind(&mut reader)?;
-        child.send(&bytes)?;
-        require(
-            child.wait()?.code() == Some(2),
-            "非法或不完整请求未在入口拒绝",
-        )?;
-        require(
-            fs::metadata(&child.output)?.len() <= MAX_OUTPUT,
-            "非法请求输出超过边界",
-        )?;
-        let result: Value = serde_json::from_slice(&fs::read(&child.output)?)?;
-        require(
-            result["stage"] == "request"
-                && result["target_identity_verified"] == false
-                && result["dac_loaded"] == false
-                && result["read_bytes"] == 0
-                && result["read_calls"] == 0,
-            "非法请求已越过目标读取边界",
-        )?;
-        rejected.push(json!({"case":name,"reader":result,"reaped":child.reaped,"job_empty":child.job.empty()?}));
+        let mut child = ClrReader::start_fixture(&mut reader, root, name, active_deadline)?;
+        let result = (|| {
+            child.send_fixture(&mut reader, &bytes)?;
+            require(
+                child.wait_fixture()?.code() == Some(2),
+                "非法或不完整请求未在入口拒绝",
+            )?;
+            let result = child.output_fixture()?;
+            require(
+                result["stage"] == "request"
+                    && result["target_identity_verified"] == false
+                    && result["dac_loaded"] == false
+                    && result["read_bytes"] == 0
+                    && result["read_calls"] == 0,
+                "非法请求已越过目标读取边界",
+            )?;
+            Ok::<_, io::Error>(result)
+        })();
+        let cleanup = child.abort_and_reap(deadline);
+        rejected.push(json!({"case":name,"reader":result.as_ref().ok(),"reaped":child.is_reaped(),"job_empty":child.job_empty_fixture()?}));
+        report["request_rejections"] = json!(rejected);
+        cleanup?;
+        result?;
     }
     report["request_rejections"] = json!(rejected);
 
     report["stage"] = json!("reader_termination");
-    let mut blocked = Reader::start(
-        &mut reader,
-        root,
-        "blocked-reader",
-        active_deadline,
-        deadline,
-    )?;
-    blocked.bind(&mut reader)?;
-    blocked.send(&request(
-        2,
-        *uuid::Uuid::new_v4().as_bytes(),
-        active_deadline,
-    )?)?;
+    let mut blocked =
+        ClrReader::start_fixture(&mut reader, root, "blocked-reader", active_deadline)?;
+    let result = (|| {
+        blocked.send_fixture(
+            &mut reader,
+            &request(2, *uuid::Uuid::new_v4().as_bytes(), active_deadline)?,
+        )?;
+        require(blocked.remains_running_fixture(), "阻塞夹具提前退出")
+    })();
+    let cleanup = blocked.abort_and_reap(deadline);
+    report["blocked_reader"] = json!({"reaped":blocked.is_reaped(),"job_empty":blocked.job_empty_fixture()?,"target_handles_sent":false});
+    cleanup?;
+    result?;
     require(
-        unsafe { WaitForSingleObject(HANDLE(blocked.child.as_raw_handle()), 500) } == WAIT_TIMEOUT,
-        "阻塞夹具提前退出",
+        !blocked.wait_fixture()?.success(),
+        "阻塞 reader 未被精确终止",
     )?;
-    blocked.job.terminate()?;
-    require(!blocked.wait()?.success(), "阻塞 reader 未被精确终止")?;
-    report["blocked_reader"] = json!({"reaped":blocked.reaped,"job_empty":blocked.job.empty()?,"target_handles_sent":false});
     drop(blocked);
 
     report["stage"] = json!("native_exception_capture");

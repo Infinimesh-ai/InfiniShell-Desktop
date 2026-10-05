@@ -269,6 +269,7 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
             creation_unavailable: None,
             snapshot: None,
             root_thread: None,
+            clr: None,
             expected_temp_environment: [vec![], vec![], vec![]],
             early_root_cpu: None,
             late_snapshot: None,
