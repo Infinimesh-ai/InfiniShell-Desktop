@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 实际异常类型已映射，具体退出分支仍待确定**：[b163静态运行37328199520](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37328199520)已采齐39方法/9类型；仅既有两个no_body使整轮failure/partial，未执行候选。187–203为ExitException/RethrowException传播，175–179的四条为模块发现ItemNotFoundException；不是已证实的启动权限错误。静态实现存在末端原生命令在ShellExecute/Windows应用分类为真时跳过等待及退出码写入的分支，但实际布尔值未取得，不能宣称首因。26结果均保留候选对象与不完整EH tracker边界，178/179读取调用预算耗尽。b7eb [Linux门禁37305012082](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37305012082)终审完成：5526 nextest PASS、23离线通过、hook23通过/2跳过；终审SHA `b82cb67164b401e3c85e342431e9f21af12574ef71f43fb1ae4a2d5231230998`，不解释旧超时或替代最终同源双平台门禁。**新增关闭0项，G09仍开放，PR草稿。**
+
 - **2026-10-05 原PS组合终态失败，已取得同进程异常记录**：`a74ba3c8f`的[37299690314](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314)首updated实际返回ProbeFailed；PowerShell在13917ms退出1，Node/Codex随后均退出0，完整原生工件SHA `65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17`及182成员CRC已核。26异常记录含8 observed/18 partial，实际晚期帧未在原71方法静态合同中，不能推断唯一首因。本次仅追加原MVID绑定的39方法和9异常类型静态解析，本机14项及warp check通过；原候选、权限、期限及验收要求不变。b7eb Linux源码门禁官方success、终审待完整归档；无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
 
 - **2026-10-05 Linux 外层超时诊断补齐，原失败仍开放**：原Node调用只增加PID、Linux出生字段、kill前状态/时刻与原超时输出长度，未知保留null；8秒、原命令和POSIX清理/异常语义保持。离线23项及warp check通过，无真实hook重跑或远端派发，不以离线通过解释`74ddcaa42`原失败，也不声称具体后代持有管道。当前a74 Windows原轮继续；无需本地化变更。**新增关闭0项，G09和最终同源门禁仍开放，PR草稿。**

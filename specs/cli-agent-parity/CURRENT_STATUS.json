@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a74原PS组合终态失败：首updated为ProbeFailed，PS退出1而Node/Codex随后退出0；26份原CLR记录已保全，具体退出原因尚待实际模块元数据映射。Python27通过/1个夹具权限错误另计，已提交修复尚待Windows执行。b7eb Linux源码门禁官方success、终审待完整归档，最终同源门禁未完成。新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a74首updated为ProbeFailed，PS退出1而Node/Codex随后退出0；原26异常及b163实际元数据已核，后段是ExitException/RethrowException传播，但缺实际NCP分支值，不能断言退出首因。Python夹具修复尚待Windows执行。b7eb Linux源码门禁完成独审，最终同源双平台门禁未完成。新增关闭0项。",
   "g09_original_ps_exception_mapping_20261005": {
     "base_commit": "b7eb5447685dfab521c44c0531c28dff920f34db",
     "failed_run": 37299690314,
@@ -10,6 +10,27 @@
     "generation": "f961a206-028e-4f4c-a1c0-7ab642db1176",
     "result": "updated accepted=false/ProbeFailed；PS root 13917ms退出1，Node 12303ms创建后19109ms退出0，Codex 17112ms创建后18746ms退出0。26份异常记录8 observed/18 partial，不能把启动期异常或清理成功当作首因或功能通过。",
     "mapping_gap": "原71方法静态合同未覆盖实际晚期帧；仅追加原MVID绑定的39方法及9异常TypeDef元数据，不调用方法、不重跑候选。原128方法/IL/收据上限不变。",
+    "original_final_index_sha256": "775e9d870b77b5ea904acc93179131ead041151780e37224d37fe7a505f283a5",
+    "static_result": {
+      "run_id": 37328199520,
+      "commit": "b16390e7430e7de677acedf10029a128acf5c83f",
+      "conclusion": "failure：仅原两个no_body导致partial；stage=completed、failure=null，新39方法及9类型均完整采齐",
+      "contract_sha256": "d6ae4082fe989adf7622b326bddab86a14deeefa17166578a03d0fd5bdc01baf",
+      "audit_sha256": "64d7c0e1fb0c761109d08afef1dbb9894a5aeae92d78f641a090b595dfc2f525",
+      "mapping": "175/176/178/179为ItemNotFoundException及模块自动发现栈；187–203为ExitException/RethrowException解释器传播。37个不同常规IL位置均命中指令起点；40次特殊标记不作IL。",
+      "limits": "26结果均为last_thrown_object_candidate且无完整EH tracker；178/179读取调用预算耗尽。不得从映射位置反推分支布尔、异常Argument或原LASTEXITCODE。",
+      "remaining": "NCP末端原生命令在UseShellExecute或IsWindowsApplication为真时跳过WaitForExit和LASTEXITCODE写入；本轮缺这些实际值，尚不能确认命中。"
+    },
+    "linux_source_gate": {
+      "run_id": 37305012082,
+      "commit": "b7eb5447685dfab521c44c0531c28dff920f34db",
+      "status": "success_and_independently_audited",
+      "nextest_pass": 5526,
+      "offline_pass": 23,
+      "hook": "23 ok、2 skipped（fish/zsh缺失，不计通过）",
+      "audit_sha256": "b82cb67164b401e3c85e342431e9f21af12574ef71f43fb1ae4a2d5231230998",
+      "boundary": "新源码独立通过，不解释或覆盖旧74dd超时，不等于最终同源双平台门禁"
+    },
     "local_gates": {
       "powershell_tests": 14,
       "powershell_run": "r-ha6kyad5",

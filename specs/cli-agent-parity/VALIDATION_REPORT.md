@@ -2,6 +2,10 @@
 
 ## 2026-10-05：原PS失败异常已保全，按实际帧补齐静态映射
 
+后续静态[b163运行37328199520](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37328199520)已终态failure：stage=completed、failure=null，110方法中108 decoded，仅原两个no_body导致partial；新增39方法和9类型均采齐，原71方法IL/EH未变。合同SHA `d6ae4082fe989adf7622b326bddab86a14deeefa17166578a03d0fd5bdc01baf`，独审SHA `64d7c0e1fb0c761109d08afef1dbb9894a5aeae92d78f641a090b595dfc2f525`。175/176/178/179为ItemNotFoundException及模块发现栈；187–203为ExitException/RethrowException解释器传播。37个不同常规IL位置皆落指令起点，40次特殊位置不作普通IL。所有26条仍为last_thrown_object_candidate、EH tracker不完整，178/179达到8192读取调用上限；IL映射不能反推对象Argument或运行时布尔。
+
+实际NCP实现对末端原生命令在UseShellExecute或IsWindowsApplication为真时跳过输出读取、WaitForExit与LASTEXITCODE写入；外层管道和重定向不证明内部命令不是末端。目前缺实际分类返回值和布尔状态，只能记录该分支与时序相容，不能认定命中或据此放宽候选。a74完整终审索引SHA `775e9d870b77b5ea904acc93179131ead041151780e37224d37fe7a505f283a5`。b7eb Linux终审已完成（SHA `b82cb67164b401e3c85e342431e9f21af12574ef71f43fb1ae4a2d5231230998`）：5526 nextest PASS、23离线通过、hook23通过/2跳过，全部官方工件校验；旧下载错误与超时仍保留。以下记录为先前准备及原始失败边界，不把静态采集当作升级通过。
+
 `a74ba3c8f`的[37299690314](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314)已终态失败。官方完整日志SHA `0180131bc08eec3c437596b872fcb3671981a1aeabb11ad0d97bbac7c700b6ee`；原生ZIP 463813541字节、SHA `65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17`与官方一致，182成员CRC通过。原600秒传输失败及只读partial保留，同一工件的一次续传补齐并验全件，不将下载期限用于候选执行。
 
 首updated已实际执行，结果`accepted=false/error=ProbeFailed`。PS generation `f961a206-028e-4f4c-a1c0-7ab642db1176`在13917ms退出1；Node在12303ms创建、19109ms退出0，Codex在17112ms创建、18746ms退出0。26份CLR记录全部保全，8 observed/18 partial，启动期含Win32 5的异常不能单独归因退出；清理确认也不改变候选失败。后四场景及三独立冷恢复未执行。
