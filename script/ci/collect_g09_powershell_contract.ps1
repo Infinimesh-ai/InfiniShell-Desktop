@@ -47,6 +47,13 @@ function Get-ContractMember($Member) {
        assembly = $Member.Module.Assembly.FullName }
 }
 
+function Resolve-ContractObservedMember([Reflection.Module] $Module, [string] $ExpectedMvid, [int] $Token) {
+    # token 只能在原收据的模块内解释，系统组件换版时不能套用旧编号。
+    if ($Module.ModuleVersionId.ToString() -cne $ExpectedMvid) { throw [IO.InvalidDataException]::new('observed_module_mismatch') }
+    if (($Token -band -16777216) -notin @(33554432, 100663296)) { throw [IO.InvalidDataException]::new('observed_token_kind') }
+    return $Module.ResolveMember($Token)
+}
+
 function Read-ContractIL([byte[]] $Bytes, [Reflection.MethodBase] $Method, $Opcodes, $Limits) {
     if ($Bytes.Length -gt $Limits.method_bytes) { throw [IO.InvalidDataException]::new('method_il_limit') }
     $rows = [Collections.Generic.List[object]]::new()
@@ -257,7 +264,7 @@ function Invoke-PowerShellContractCollection {
         powershell_version = $PSVersionTable.PSVersion.ToString(); clr_version = [Environment]::Version.ToString()
         scope = 'static_loaded_module_il_not_restricted_execution_or_g09_closure'; target_invoked = $false
         passed = $false; status = 'failed'; stage = 'output_directory'; failure = $null; files = @(); assemblies = @(); ncp_inventory = @(); methods = @()
-        unresolved = @(); limits = $limits; handles_released = $false }
+        unresolved = @(); observed_types = @(); limits = $limits; handles_released = $false }
     $output = $null; $receipt = $null
     $held = [Collections.Generic.List[object]]::new()
     try {
@@ -304,6 +311,31 @@ function Invoke-PowerShellContractCollection {
         foreach ($pair in @(@{ type = [Diagnostics.Process]; names = $processNames }, @{ type = [Console]; names = $consoleNames })) {
             foreach ($method in $pair.type.GetMethods($flags)) {
                 if ($method.Name -cin $pair.names) { $queue.Enqueue($method) }
+            }
+        }
+        # 来自 a74 原失败进程的晚期异常帧；只解码元数据，不重跑候选或调用这些方法。
+        $report.observed_source = @{ run_id = '37299690314'; generation = 'f961a206-028e-4f4c-a1c0-7ab642db1176'
+            artifact_sha256 = '65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17'
+            frame_events = @(175, 176, 178, 179, 187, 189, 191, 193, 195, 197, 199, 201, 203) }
+        $observed = @(
+            @{ module = $ncp.Module; mvid = '0a210000-3870-4dec-b53e-175f62acb623'
+               types = @(33555000, 33555147, 33555165, 33555173, 33555450)
+               methods = @(100666493, 100666540, 100666542, 100666970, 100666972, 100667326, 100667348, 100667353,
+                   100668184, 100668501, 100672923, 100672926, 100672927, 100672928, 100672951, 100673698,
+                   100673702, 100676943, 100677064, 100677096, 100677435, 100677592, 100680528, 100680530,
+                   100680555, 100685212, 100685213, 100686754, 100686773, 100686810, 100686815, 100686829,
+                   100686872, 100691784, 100695809) }
+            @{ module = [Console].Module; mvid = '3020f90f-960f-4330-86d5-45c4e07afdfd'
+               types = @(33554772, 33554839, 33554927); methods = @(100678670, 100678671, 100678672, 100678945) }
+            @{ module = [Diagnostics.Process].Module; mvid = 'c9e847ed-2baf-4284-8d70-833560c74034'
+               types = @(33555900); methods = @() }
+        )
+        foreach ($entry in $observed) {
+            foreach ($token in $entry.types) {
+                $report.observed_types += Get-ContractMember (Resolve-ContractObservedMember $entry.module $entry.mvid $token)
+            }
+            foreach ($token in $entry.methods) {
+                $queue.Enqueue((Resolve-ContractObservedMember $entry.module $entry.mvid $token))
             }
         }
         $budget = @{ methods = 0; il_bytes = 0; method_json_bytes = 0 }

@@ -6,7 +6,7 @@ $source = Join-Path $PSScriptRoot 'collect_g09_powershell_contract.ps1'
 $tokens = $null; $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count -ne 0) { throw 'collector_parse_failed' }
-foreach ($name in @('Get-ContractLimits', 'Get-ContractHash', 'Get-ContractStreamHash', 'Get-ContractFailure', 'Get-ContractOpcodes', 'Get-ContractMember', 'Read-ContractIL', 'Get-ContractMethod', 'Save-ContractReceipt', 'Assert-ContractX64Image')) {
+foreach ($name in @('Get-ContractLimits', 'Get-ContractHash', 'Get-ContractStreamHash', 'Get-ContractFailure', 'Get-ContractOpcodes', 'Get-ContractMember', 'Resolve-ContractObservedMember', 'Read-ContractIL', 'Get-ContractMethod', 'Save-ContractReceipt', 'Assert-ContractX64Image')) {
     $nodes = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name }, $true))
     if ($nodes.Count -ne 1) { throw 'function_extraction_ambiguous' }
     . ([scriptblock]::Create($nodes[0].Extent.Text))
@@ -57,6 +57,14 @@ $opcodes = Get-ContractOpcodes
 $type = [G09ContractFixture.Sample]
 $budget = @{ methods = 0; il_bytes = 0 }
 $branchMethod = $type.GetMethod('Branch')
+$mvid = $type.Module.ModuleVersionId.ToString()
+$resolvedMethod = Resolve-ContractObservedMember $type.Module $mvid $branchMethod.MetadataToken
+$resolvedType = Resolve-ContractObservedMember $type.Module $mvid $type.MetadataToken
+Assert-ContractTest ($resolvedMethod -eq $branchMethod -and $resolvedType -eq $type) 'observed_member_exact_module_and_token'
+Assert-ContractReject { Resolve-ContractObservedMember $type.Module ([Guid]::Empty.ToString()) $branchMethod.MetadataToken } 'different_module_token_rejected'
+Assert-ContractReject { Resolve-ContractObservedMember $type.Module $mvid 67108865 } 'field_token_rejected'
+Assert-ContractReject { Resolve-ContractObservedMember $type.Module $mvid 117440511 } 'missing_method_token_rejected'
+$passed.Add('observed_members_require_exact_module_and_valid_type_or_method_token')
 $branch = Get-ContractMethod $branchMethod $opcodes $limits $budget
 Assert-ContractTest ($branch.status -eq 'decoded' -and @($branch.instructions | Where-Object { $_.branch_targets.Count -ne 0 }).Count -gt 0) 'real_branch_targets'
 Assert-ContractTest ($branch.instructions.Count -gt 3 -and @($branch.instructions | Where-Object { $_.offset -isnot [int] }).Count -eq 0) 'instruction_array_must_be_flat'

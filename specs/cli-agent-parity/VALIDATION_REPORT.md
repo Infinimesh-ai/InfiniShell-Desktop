@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：原PS失败异常已保全，按实际帧补齐静态映射
+
+`a74ba3c8f`的[37299690314](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314)已终态失败。官方完整日志SHA `0180131bc08eec3c437596b872fcb3671981a1aeabb11ad0d97bbac7c700b6ee`；原生ZIP 463813541字节、SHA `65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17`与官方一致，182成员CRC通过。原600秒传输失败及只读partial保留，同一工件的一次续传补齐并验全件，不将下载期限用于候选执行。
+
+首updated已实际执行，结果`accepted=false/error=ProbeFailed`。PS generation `f961a206-028e-4f4c-a1c0-7ab642db1176`在13917ms退出1；Node在12303ms创建、19109ms退出0，Codex在17112ms创建、18746ms退出0。26份CLR记录全部保全，8 observed/18 partial，启动期含Win32 5的异常不能单独归因退出；清理确认也不改变候选失败。后四场景及三独立冷恢复未执行。
+
+原静态合同的71方法没有覆盖实际晚期帧。本次仅在现有收集器追加这些原MVID下的39个方法和9个异常TypeDef，保留元数据身份不符拒绝、原128方法、IL和收据预算；不调用所审方法或重跑原生候选。原始IL、指令边界与异常区域用于后续精确解释，不能以相邻调用猜测实际操作。
+
+本机PowerShell解析/反射14项通过（r-ha6kyad5，SHA `21d76b33bab38ebf032678605eb81e991a2f7429f4bde6bf8e499ada161a5bbb`），包含真实模块和token解析、错MVID/字段token/不存在方法拒绝；`cargo check --locked -p warp`通过（r-9dml289o，SHA `6ff50f5177b672371db7f7966bdd4c8e8baedd5f300f682e6aa92964c974109c`）。两根均清理。无需本地化变更。b7eb的[Linux源码门禁37305012082](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37305012082)官方success、终审待完整归档，不解释或覆盖旧超时。新增关闭0项，G09和最终同源门禁仍开放，PR草稿。
+
 ## 2026-10-05：保留 Linux 外层 Node 超时的原进程状态
 
 `74ddcaa42` 的 [37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 在原 Node 的8秒调用超时后未留下PID、出生身份或根进程状态，零字节preload/native trace不能解释该失败。本次仅将已有`run_hook`的`subprocess.run`原地展开为`Popen`：记录同一子进程PID、限长读取的Linux starttime、kill前poll观察时刻与状态及原TimeoutExpired的stdout/stderr长度，未知保持null，原始输出不进入诊断。

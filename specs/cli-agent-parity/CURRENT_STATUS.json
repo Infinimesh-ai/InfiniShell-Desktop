@@ -1,7 +1,27 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。特殊权限范围按用户决定，普通及已支持只读ACL自动升级保留。a74原PS组合继续运行；已结束Python步骤的页面原日志为27通过/1错误，唯一错误是创建测试符号链接缺少特权1314，时间字段三项通过。仅离线测试已消除该特权依赖，完整Windows验证仍待；原升级故障、Linux失败及最终同源门禁开放，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。a74原PS组合终态失败：首updated为ProbeFailed，PS退出1而Node/Codex随后退出0；26份原CLR记录已保全，具体退出原因尚待实际模块元数据映射。Python27通过/1个夹具权限错误另计，已提交修复尚待Windows执行。b7eb Linux源码门禁官方success、终审待完整归档，最终同源门禁未完成。新增关闭0项。",
+  "g09_original_ps_exception_mapping_20261005": {
+    "base_commit": "b7eb5447685dfab521c44c0531c28dff920f34db",
+    "failed_run": 37299690314,
+    "failed_commit": "a74ba3c8f38c75e5f8991e4f9b02b1df9db4b3f5",
+    "native_artifact_sha256": "65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17",
+    "generation": "f961a206-028e-4f4c-a1c0-7ab642db1176",
+    "result": "updated accepted=false/ProbeFailed；PS root 13917ms退出1，Node 12303ms创建后19109ms退出0，Codex 17112ms创建后18746ms退出0。26份异常记录8 observed/18 partial，不能把启动期异常或清理成功当作首因或功能通过。",
+    "mapping_gap": "原71方法静态合同未覆盖实际晚期帧；仅追加原MVID绑定的39方法及9异常TypeDef元数据，不调用方法、不重跑候选。原128方法/IL/收据上限不变。",
+    "local_gates": {
+      "powershell_tests": 14,
+      "powershell_run": "r-ha6kyad5",
+      "powershell_log_sha256": "21d76b33bab38ebf032678605eb81e991a2f7429f4bde6bf8e499ada161a5bbb",
+      "cargo_check_run": "r-9dml289o",
+      "cargo_check_log_sha256": "6ff50f5177b672371db7f7966bdd4c8e8baedd5f300f682e6aa92964c974109c",
+      "cleanup": "两登记根均exit0/cleaned"
+    },
+    "native_cause_proven": false,
+    "newly_closed_gaps": [],
+    "localization": "无需本地化变更；仅静态取证脚本，无产品行为、文案、权限或超时变化。"
+  },
   "g09_linux_outer_node_timeout_evidence_20261005": {
     "base_commit": "0e671ea39c791876ba485c7802b3f11f21cd8f1e",
     "original_failed_run": 37267752920,

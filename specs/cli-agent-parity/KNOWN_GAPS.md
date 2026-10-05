@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 原PS组合终态失败，已取得同进程异常记录**：`a74ba3c8f`的[37299690314](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314)首updated实际返回ProbeFailed；PowerShell在13917ms退出1，Node/Codex随后均退出0，完整原生工件SHA `65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17`及182成员CRC已核。26异常记录含8 observed/18 partial，实际晚期帧未在原71方法静态合同中，不能推断唯一首因。本次仅追加原MVID绑定的39方法和9异常类型静态解析，本机14项及warp check通过；原候选、权限、期限及验收要求不变。b7eb Linux源码门禁官方success、终审待完整归档；无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
 - **2026-10-05 Linux 外层超时诊断补齐，原失败仍开放**：原Node调用只增加PID、Linux出生字段、kill前状态/时刻与原超时输出长度，未知保留null；8秒、原命令和POSIX清理/异常语义保持。离线23项及warp check通过，无真实hook重跑或远端派发，不以离线通过解释`74ddcaa42`原失败，也不声称具体后代持有管道。当前a74 Windows原轮继续；无需本地化变更。**新增关闭0项，G09和最终同源门禁仍开放，PR草稿。**
 
 - **2026-10-05 原运行页面确认离线夹具权限错误，真实候选继续**：`a74ba3c8f`的[37299690314步骤13](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314/job/111729240747#step:13:49)页面原日志为Python28项中27通过/1错误，唯一错误是测试创建符号链接时WinError1314；ctime三项均通过，完整终态日志尚待统一归档。现仅离线测试改为直接模拟文件/父目录reparse元数据并调用真实driver，断言在解析/打开前拒绝；Unix真实symlink仍保留，未提权或跳过整条测试。28项、Windows分支选择器模拟及warp check本机通过，不冒充Windows原生链接或升级验收。当前运行继续、验证引用不动；无需本地化变更。**新增关闭0项，G09仍开放，PR草稿。**
