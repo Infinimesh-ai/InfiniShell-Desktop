@@ -254,11 +254,57 @@ class NativePowerShellNotificationTests(unittest.TestCase):
                 self.assertEqual(result.stdout, b'')
                 self.assertIn(b'native_notification_failed', result.stderr)
 
-    def test_absent_console_is_failure_without_stdout_fallback(self):
-        result = self.run_hook('on-session-start.sh', b'{"session_id":"no-console"}')
+    def test_notify_process_without_console_fails_without_stdout_fallback(self):
+        # 只验证通知进程的无控制台边界；最外层 cmd 的 CREATE_NO_WINDOW 不约束后代。
+        # 在同一 PS 进程先脱离并核验，再直接加载真实入口，不能让新建子 PS 分配控制台。
+        bootstrap = r'''
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+    throw 'Windows PowerShell 5.1 is required'
+}
+Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+public static class NotificationConsoleFixture {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool FreeConsole();
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security,
+                                    uint disposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr handle);
+    public static void DetachAndVerify() {
+        if (!FreeConsole()) throw new Win32Exception(Marshal.GetLastWin32Error());
+        IntPtr handle = CreateFileW("CONOUT$", 0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+        if (handle == new IntPtr(-1)) return;
+        try {
+            uint mode;
+            if (GetConsoleMode(handle, out mode)) throw new InvalidOperationException("Fixture still has a console");
+        } finally {
+            CloseHandle(handle);
+        }
+    }
+}
+'@
+[NotificationConsoleFixture]::DetachAndVerify()
+[IO.File]::WriteAllText($env:INFINISHELL_NO_CONSOLE_RECEIPT, '{"detached":true,"conout_console":false}')
+. $env:INFINISHELL_NOTIFICATION_ENTRY -NotificationHook 'on-session-start.sh'
+'''
+        receipt = self.root / 'no-console.json'
+        environment = {**self.environment, 'INFINISHELL_NO_CONSOLE_RECEIPT': str(receipt),
+                       'INFINISHELL_NOTIFICATION_ENTRY': str(self.plugin / 'scripts/on-notification.ps1')}
+        powershell = Path(environment['SYSTEMROOT']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+        command = [str(powershell), '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand',
+                   base64.b64encode(bootstrap.encode('utf-16le')).decode('ascii')]
+        result = private_run(command, environment, self.root, b'{"session_id":"no-console"}')
+        self.assertEqual(json.loads(receipt.read_bytes()), {'detached': True, 'conout_console': False})
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, b'')
-        self.assertIn(b'native_notification_failed', result.stderr)
+        self.assertEqual(result.stderr, b'infinishell_codex_hook_transport_error: native_notification_failed\r\n')
 
     def test_install_preflight_uses_only_system_powershell_and_cmd(self):
         # 安装预检还需解析 cmd.exe；System32 可能存在 WSL bash，但不能引入 Git Bash/jq。
