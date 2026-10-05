@@ -385,19 +385,23 @@ def clr_reader_configuration(requested, mode, cases, path, expected):
     require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
             and 0 < before.st_size <= 64 * 1024 * 1024, "clr_reader_file")
     bound = canonical(original)
-    identity = lambda info: (info.st_dev, info.st_ino, info.st_nlink, info.st_size,
-                             info.st_mtime_ns, info.st_ctime_ns)
+    identity = lambda info: (info.st_dev, info.st_ino, info.st_nlink, info.st_size, info.st_mtime_ns)
     with bound.open("rb") as stream:
-        require(identity(os.fstat(stream.fileno())) == identity(before), "clr_reader_changed")
+        opened_before = os.fstat(stream.fileno())
+        require(identity(opened_before) == identity(before), "clr_reader_changed")
         digest = hashlib.sha256()
         length = 0
         for block in iter(lambda: stream.read(65536), b""):
             length += len(block)
             require(length <= before.st_size, "clr_reader_changed")
             digest.update(block)
-        require(length == before.st_size and identity(os.fstat(stream.fileno())) == identity(before), "clr_reader_changed")
-    require(identity(plain(original)) == identity(before) and canonical(original) == bound
-            and digest.hexdigest() == expected, "clr_reader_binding")
+        opened_after = os.fstat(stream.fileno())
+        # Windows CPython 3.13 的路径 ctime 为创建时间，fstat ctime 为变更时间；各自前后核验。
+        require(length == before.st_size and identity(opened_after) == identity(before)
+                and opened_after.st_ctime_ns == opened_before.st_ctime_ns, "clr_reader_changed")
+    after = plain(original)
+    require(identity(after) == identity(before) and after.st_ctime_ns == before.st_ctime_ns
+            and canonical(original) == bound and digest.hexdigest() == expected, "clr_reader_binding")
     return {"path":str(bound), "sha256":expected}
 
 

@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：共享 CLR 原生能力通过，修正驱动时间字段比较
+
+精确 `e84e8004759179ac3e812927747a8817fa59ddb9` 的 [37288696146](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37288696146) 为20普通PASS与唯一原生PASS。四链完整、原码1234/5678可区分，原工作线程及出生身份一致，实际throw IL为16/16/36/24；PARTIAL2及tracker不完整原值保留。53事件全部Continue，fixture自然退出0，reader与fixture Job空，无pending。18来源、9编译输入、36工件成员与官方ZIP摘要已核；独审SHA `9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc`，最终索引SHA `9a38fdf6427189ce1ccd4f037ba7ae116eb7b9c89f5f9ce6eabba25cd239c1bf`。编译/Actions警告及runner清理记录保留，不称全部日志无异常；本机观察器和审计根已确认清理。
+
+同提交原PS组合 [37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804) 的Python驱动门禁已失败，整轮仍运行，完整首因与实际候选结果待审。独立核实 [CPython3.13.15路径实现](https://github.com/python/cpython/blob/v3.13.15/Modules/posixmodule.c#L2067-L2076)与[句柄实现](https://github.com/python/cpython/blob/v3.13.15/Python/fileutils.c#L1033-L1036)：两者ctime分别为创建时间与变更时间，不能跨API直接等值比较。修复保留dev/ino/nlink/size/mtime、普通文件/无reparse/父路径与SHA绑定，ctime各自在读取前后核验；不变候选命令、期限或拒绝条件。原25测试及新增3项（含身份/时间变化负例）共28通过（r-qzl7j9oj，日志SHA `c41fd314b187559ce913e9c8d1eb7ce48df38e3b700de46b3a1b509d1afcb552`），`cargo check --locked -p warp`通过（r-zc445jno，日志SHA `7b4bc3412fe62020af1b96dbab791f416f34a4d1691159cad0172c168d169b96`）；两个短根均清理。仅内部验收驱动变化，无需本地化变更。新增关闭0项，旧Windows真实升级失败、Linux两轮失败及最终同源门禁仍开放。
+
 ## 2026-10-05：共享 CLR 控制器与原PS停点接线，本机门禁通过
 
 以已验`1d85bdb36`为基础，将固定夹具的读取器生命周期抽为双方实际共用实现。spawn成功即保留reader所有权，后续Job分配、原句柄复制、请求发送、取消或解析失败均显式回收；100ms轮询切片与原硬期限分开，不重放请求。原fixture的四异常顺序、动态inner链、原线程/MVID/实际throw帧IL及两Job清理断言保持。新增9条共享普通规则，总计20条普通和唯一原生用例将由新冻结提交验证，尚未执行。

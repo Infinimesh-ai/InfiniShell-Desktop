@@ -237,6 +237,71 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "clr_reader_sha256"):
             runner.clr_reader_configuration(True, "powershell", ["updated"], reader, "../not-a-hash")
 
+    def test_clr_reader_accepts_distinct_path_birthtime_and_handle_changetime(self):
+        reader = Path(self.binaries["worker"]["path"])
+        digest = runner.sha(reader)
+        original_fstat = os.fstat
+
+        def handle_stat(descriptor):
+            info = original_fstat(descriptor)
+            return SimpleNamespace(**{name:getattr(info, name) for name in (
+                "st_dev", "st_ino", "st_nlink", "st_size", "st_mtime_ns")},
+                st_ctime_ns=info.st_ctime_ns + 100)
+
+        with patch.object(runner.os, "fstat", side_effect=handle_stat):
+            result = runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+        self.assertEqual(result, {"path":str(runner.canonical(reader)), "sha256":digest})
+
+    def test_clr_reader_rejects_handle_ctime_or_identity_change_during_read(self):
+        reader = Path(self.binaries["worker"]["path"])
+        digest = runner.sha(reader)
+        original_fstat = os.fstat
+        fields = ("st_dev", "st_ino", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+        for field in fields:
+            with self.subTest(field=field):
+                calls = 0
+
+                def handle_stat(descriptor):
+                    nonlocal calls
+                    calls += 1
+                    info = original_fstat(descriptor)
+                    values = {name:getattr(info, name) for name in fields}
+                    # 两次句柄观测均与路径 ctime 不同，第二次只改变本轮待核字段。
+                    values["st_ctime_ns"] += 100
+                    if calls == 2:
+                        values[field] += 1
+                    return SimpleNamespace(**values)
+
+                with patch.object(runner.os, "fstat", side_effect=handle_stat):
+                    with self.assertRaisesRegex(ValueError, "clr_reader_changed"):
+                        runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+                self.assertEqual(calls, 2)
+
+    def test_clr_reader_rejects_path_ctime_or_identity_change_after_read(self):
+        reader = Path(self.binaries["worker"]["path"])
+        digest = runner.sha(reader)
+        original_plain = runner.plain
+        fields = ("st_dev", "st_ino", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+        for field in fields:
+            with self.subTest(field=field):
+                calls = 0
+
+                def path_stat(path):
+                    nonlocal calls
+                    info = original_plain(path)
+                    if path != reader.absolute():
+                        return info
+                    calls += 1
+                    values = {name:getattr(info, name) for name in (*fields, "st_mode")}
+                    if calls == 2:
+                        values[field] += 1
+                    return SimpleNamespace(**values)
+
+                with patch.object(runner, "plain", side_effect=path_stat):
+                    with self.assertRaisesRegex(ValueError, "clr_reader_binding"):
+                        runner.clr_reader_configuration(True, "powershell", ["updated"], reader, digest)
+                self.assertEqual(calls, 2)
+
     def test_actual_npm_cli_arguments_only_target_private_prefix(self):
         archive = self.root / "official-inputs/fixed.tgz"
         archive.parent.mkdir()

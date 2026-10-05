@@ -1,7 +1,33 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。1d85固定CLR四异常完整链、原码、throw帧与Job回收通过独审，仅证明诊断能力。原Windows升级矩阵首updated失败、Linux74dd外层Node超时及旧b5发送超时保持，最终同源双平台门禁未完成，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。e84共享CLR四异常能力通过独审；原PS组合Python门禁已失败、整轮结果待审，独立ctime语义修复本机通过。原Windows升级矩阵首updated失败、Linux两轮超时保持，最终同源双平台门禁未完成，新增关闭0项。",
+  "g09_clr_shared_native_and_reader_stat_fix_20261005": {
+    "source_commit": "e84e8004759179ac3e812927747a8817fa59ddb9",
+    "fixed_native_run": 37288696146,
+    "fixed_native_result": "success_independently_verified",
+    "ordinary_pass": 20,
+    "native_pass": 1,
+    "observed": "四条完整异常链、1234/5678、原工作线程/出生身份及throw IL16/16/36/24匹配；PARTIAL2与tracker不完整原值保留。",
+    "cleanup": "53事件全部Continue，fixture自然exit0，reader/fixture Job空，无pending；本机observer与审计根已清理。",
+    "source_boundary": "18来源、9编译输入、36工件成员及官方ZIP摘要已核；不外推真实PowerShell候选或升级成功。",
+    "audit_sha256": "9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc",
+    "final_index_sha256": "9a38fdf6427189ce1ccd4f037ba7ae116eb7b9c89f5f9ce6eabba25cd239c1bf",
+    "original_ps_run": 37289665804,
+    "original_ps_status": "in_progress_python_runner_step_failed_complete_log_pending",
+    "independent_source_fix": "固定CPython3.13.15路径ctime为创建时间、fstat ctime为变更时间；改为同API前后核验，跨API身份/size/mtime/SHA及所有普通文件/链接边界保留，不能提前归因为本轮首因。",
+    "local_gates": {
+      "python_pass": 28,
+      "python_run": "r-qzl7j9oj",
+      "python_log_sha256": "c41fd314b187559ce913e9c8d1eb7ce48df38e3b700de46b3a1b509d1afcb552",
+      "warp_check": "r-zc445jno",
+      "warp_check_log_sha256": "7b4bc3412fe62020af1b96dbab791f416f34a4d1691159cad0172c168d169b96",
+      "cleanup": "两个登记根均exit0/cleaned"
+    },
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "localization": "无需本地化变更；仅内部验收驱动，无GUI/TUI文案或布局变化。"
+  },
   "g09_clr_ps_binding_preparation_20261005": {
     "status": "shared_reader_and_original_ps_binding_local_gates_passed_native_pending",
     "base_commit": "1d85bdb36913f9f1bbe5a1dbecaa3018b118d2f2",

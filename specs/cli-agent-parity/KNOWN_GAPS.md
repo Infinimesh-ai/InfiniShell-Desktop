@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 共享 CLR 能力通过，原PS组合仍待验**：精确 `e84e80047` 的 [37288696146](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37288696146) 已独审通过20普通项与唯一四异常原生夹具；原工作线程/出生身份、四条完整链、1234/5678及实际throw IL均核，53事件全部Continue，fixture自然退出0且所有Job为空。18来源/9编译输入/36工件成员已核，独审SHA `9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc`。同提交原PS组合 [37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804) 的Python驱动门禁已失败、整轮仍运行，完整首因待审。独立源码核实固定CPython3.13.15的路径ctime为创建时间、fstat ctime为变更时间，现只改为同API前后比较，保留跨API文件身份、mtime和SHA校验；本机28项及warp check通过，不据此提前认定本轮首因或升级通过。**新增关闭0项；无需本地化变更，PR草稿。**
+
 - **2026-10-05 共享读取器接入原首PS候选，尚待原生验证**：固定夹具与PS改为复用同一Rust控制器；首代授权以私有sidecar绑定generation和原启动清单摘要，reader配置不进入CLI环境。保留原CREATE线程句柄、逐个first-chance停点及原HRESULT低32位，合法partial/unavailable仅留证不替代候选判定；候选先终止、reader精确回收后才Continue，原期限不变。PS额度按既存SMA/宿主完整文件上界预先固定24MiB，夹具保持16MiB，无失败后增额。共享9普通加原11普通及原四异常用例尚待新冻结源码的Windows执行。本机warp check、Windows command目标check、首代记录测试1项、i18n11项、Python25项、workflow19项和静态格式/语法门禁通过；两组静态独审无确定阻断。所有本机登记根已清理，早期缺文件编译和格式/脚本调用失败原件保留。无需本地化变更。**新增关闭0项，真实升级故障与最终同源门禁仍开放。**
 
 - **2026-10-05 固定 CLR 四异常能力通过，实际升级仍失败**：精确`1d85bdb36`的[37277365566](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37277365566)为11普通PASS／唯一原生PASS。四条真实异常链完整，两个Win32原码1234/5678未混淆；原工作线程与出生身份一致，实际抛出帧IL为16/16/36/24，第三项direct、其它三项严格terminal-map校验，原E_NOINTERFACE与PARTIAL保留。55事件全部Continue，fixture自然退出0，全部reader已回收、Job空、无pending。独审SHA `2871934437a1a19181b9c1925c704bb7e8c712473ea8428ae8e2c9b605ad992e`，官方ZIP摘要与36成员CRC及16来源／9编译输入已核。该结果只解除异常读取原生能力缺失，不解释原PowerShell故障；下一步接入原授权首PS候选，实际完整升级矩阵及最终同源门禁仍待满足。无需本地化变更。**新增关闭0项。**
