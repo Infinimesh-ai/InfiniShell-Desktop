@@ -71,6 +71,63 @@ fn test_split_path() {
     );
 }
 
+#[test]
+fn split_path_keeps_escaped_leading_tilde_relative_to_pwd() {
+    let pwd = TypedPathBuf::from_unix("/work");
+    let split = SplitPath::new(pwd.to_path(), r"\~/file", Some("/home/me"), &['/']);
+
+    assert_eq!(
+        split.directory_absolute_path,
+        TypedPathBuf::from_unix("/work/~/")
+    );
+    assert_eq!(split.directory_relative_path_name, r"\~/");
+}
+
+#[test]
+fn split_path_keeps_unknown_session_home_relative_to_pwd() {
+    let pwd = TypedPathBuf::from_unix("/work");
+    let split = SplitPath::new(pwd.to_path(), "~/file", None, &['/']);
+
+    assert_eq!(
+        split.directory_absolute_path,
+        TypedPathBuf::from_unix("/work/~/")
+    );
+    assert_eq!(split.directory_relative_path_name, "~/");
+}
+
+#[test]
+fn split_path_expands_remote_session_home_with_spaces() {
+    let pwd = TypedPathBuf::from_unix("/work");
+    let split = SplitPath::new(
+        pwd.to_path(),
+        "~/project/file name.txt",
+        Some("/srv/remote user"),
+        &['/'],
+    );
+
+    assert_eq!(
+        split.directory_absolute_path,
+        TypedPathBuf::from_unix("/srv/remote user/project/")
+    );
+    assert_eq!(split.directory_relative_path_name, "~/project/");
+    assert_eq!(split.file_name, "file name.txt");
+}
+
+#[test]
+fn cdpath_expands_session_home_with_unix_separators_on_any_host() {
+    let ctx = MockPathCompletionContext::new(TypedPathBuf::from_unix("/work"))
+        .with_home_directory("/srv/remote user".to_owned());
+
+    assert_eq!(
+        resolve_cdpath_entry("~/src", &ctx),
+        TypedPathBuf::from_unix("/srv/remote user/src")
+    );
+    assert_eq!(
+        resolve_cdpath_entry("~other/src", &ctx),
+        TypedPathBuf::from_unix("/work/~other/src")
+    );
+}
+
 fn file_entry(file_name: &str) -> EngineDirEntry {
     EngineDirEntry {
         file_name: file_name.to_owned(),
