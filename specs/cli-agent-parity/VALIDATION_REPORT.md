@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：保留 Linux 外层 Node 超时的原进程状态
+
+`74ddcaa42` 的 [37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 在原 Node 的8秒调用超时后未留下PID、出生身份或根进程状态，零字节preload/native trace不能解释该失败。本次仅将已有`run_hook`的`subprocess.run`原地展开为`Popen`：记录同一子进程PID、限长读取的Linux starttime、kill前poll观察时刻与状态及原TimeoutExpired的stdout/stderr长度，未知保持null，原始输出不进入诊断。
+
+原argv、env、setsid、三个PIPE、pass_fds和一次communicate的8秒期限保持；超时仍kill→wait→重抛原异常，其他异常、非零退出及上下文清理语义保持。不额外执行Node/worker/hook，不预读或散列二进制，不重试、不增加期限或终止进程组。poll只证明观察时刻的状态，不能确定截止瞬间或哪个后代持有管道，也不能追补旧轮缺失身份。
+
+离线23项通过（r-97szz6qt，日志SHA `0ed8e68bb09d98b9b798a58fa8397096420025a221b1a67aa9cdc4b91338f5c0`），覆盖根存活/已退出、原异常身份、缺失输出、出生身份读取失败及原清理语义；`cargo check --locked -p warp`通过（r-8w33ocwl，SHA `8651a22e0ed63460bcda891e467fb288a7af5f6c9e344b223707eb4663bcde16`），两登记根均清理。无需本地化变更。未派发新远端运行，当前a74 Windows原轮继续；Linux原失败仍未解释，新增关闭0项，G09及最终同源门禁开放，PR草稿。
+
 ## 2026-10-05：消除离线链接拒绝测试的系统特权依赖
 
 通过隐藏的已登录GitHub页面读取`a74ba3c8f` [37299690314已结束步骤13](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314/job/111729240747#step:13:49)：28项中27通过，唯一ERROR在测试第218行`link.symlink_to(reader)`，为WinError1314；三项新增ctime测试均ok。该提前页面观察归档于本轮`ui-step13-observation.safe.json`，不代替稍后完整终态日志和工件审计，当前原运行继续。

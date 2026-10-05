@@ -2,6 +2,25 @@
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
   "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。特殊权限范围按用户决定，普通及已支持只读ACL自动升级保留。a74原PS组合继续运行；已结束Python步骤的页面原日志为27通过/1错误，唯一错误是创建测试符号链接缺少特权1314，时间字段三项通过。仅离线测试已消除该特权依赖，完整Windows验证仍待；原升级故障、Linux失败及最终同源门禁开放，新增关闭0项。",
+  "g09_linux_outer_node_timeout_evidence_20261005": {
+    "base_commit": "0e671ea39c791876ba485c7802b3f11f21cd8f1e",
+    "original_failed_run": 37267752920,
+    "status": "offline_contract_passed_original_linux_failure_unexplained",
+    "change": "仅在既有run_hook原地展开Popen，记录原Node PID、Linux starttime、kill前poll观察时刻与状态及TimeoutExpired输出长度；缺失仍为null，不导出原始内容。",
+    "preserved": "原argv/env/setsid/pass_fds/三个PIPE、一次communicate的8秒期限、POSIX kill→wait→原异常、其他异常及非零退出语义不变；不增加运行、重试、二进制预读或进程组终止。",
+    "evidence_boundary": "poll仅表示kill前观察状态，不能证明截止瞬间状态或哪个后代持有管道；旧失败未保留的进程及二进制身份不能追补。",
+    "local_gates": {
+      "offline_tests": 23,
+      "offline_run": "r-97szz6qt",
+      "offline_log_sha256": "0ed8e68bb09d98b9b798a58fa8397096420025a221b1a67aa9cdc4b91338f5c0",
+      "warp_check": "r-8w33ocwl",
+      "warp_check_log_sha256": "8651a22e0ed63460bcda891e467fb288a7af5f6c9e344b223707eb4663bcde16",
+      "cleanup": "两登记根均exit0/cleaned；未执行真实Node/worker/hook或远端探针"
+    },
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "localization": "无需本地化变更；仅测试诊断，无GUI/TUI文案、语义或布局变化。"
+  },
   "g09_reader_offline_reparse_fixture_fix_20261005": {
     "base_commit": "a74ba3c8f38c75e5f8991e4f9b02b1df9db4b3f5",
     "original_run": 37299690314,

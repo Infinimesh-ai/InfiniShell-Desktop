@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
 
 import installed_grok_hook_tests as detached
 from run_installed_grok_hook import DIAGNOSTIC_LIMIT, hook_failure, verify_installed_hook, worker_diagnostics
@@ -177,6 +177,8 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
     def test_detached_deadline_retains_protocol_failure_without_retry_or_raw_text(self):
         before = dict(self.case.env)
         descriptors = []
+        processes = []
+        process_exit = subprocess.Popen.__exit__
         calls = [encode(row("preload"), row("protocol", elapsed_ms=500, signal="SIGKILL",
                                            error_code="ETIMEDOUT")),
                  encode(row("preload", private="private-sentinel"))]
@@ -188,11 +190,10 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
             self.assertIn("ENXIO", argv[4])
             self.assertEqual(argv[5], str(self.case.hook))
             self.assertEqual(options["env"], {**before, "SSH_TTY": "/dev/pts/isolated"})
-            self.assertEqual(options["timeout"], 8)
             self.assertTrue(options["start_new_session"])
-            self.assertTrue(options["check"])
-            self.assertTrue(options["capture_output"])
-            self.assertEqual(options["input"], self.case.payload)
+            self.assertEqual(set(options), {"stdin", "stdout", "stderr", "start_new_session", "env", "pass_fds"})
+            for stream in ("stdin", "stdout", "stderr"):
+                self.assertEqual(options[stream], subprocess.PIPE)
             descriptor, *native_fds = options["pass_fds"]
             self.assertTrue(stat.S_ISREG(os.fstat(descriptor).st_mode))
             self.assertEqual(stat.S_IMODE(Path(argv[2]).stat().st_mode), 0o600)
@@ -200,9 +201,16 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
             os.write(descriptor, calls.pop(0))
             descriptors.append(descriptor)
             descriptors.extend(native_fds)
-            return SimpleNamespace(stdout=b"", stderr=b"")
+            process = MagicMock()
+            process.pid, process.args = 0, argv
+            process.__enter__.return_value = process
+            process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+            process.communicate.return_value = (b"", b"")
+            process.poll.return_value = 0
+            processes.append(process)
+            return process
 
-        with patch.object(detached.subprocess, "run", side_effect=observe_call) as run:
+        with patch.object(detached.subprocess, "Popen", side_effect=observe_call) as run:
             self.case.run_hook({"SSH_TTY": "/dev/pts/isolated"})
             self.assertEqual(run.call_count, 1)
             with patch.object(detached, "collect_terminal_output", side_effect=AssertionError("terminal_read_deadline")):
@@ -218,30 +226,149 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
             self.assertNotIn("private-sentinel", str(invalid_frame.exception))
         self.assertEqual(self.case.env, before)
         self.assertEqual(list(self.root.iterdir()), [])
+        for process in processes:
+            process.communicate.assert_called_once_with(self.case.payload, timeout=8)
+            process.kill.assert_not_called()
+            process.wait.assert_called_once_with()
+            for stream in (process.stdin, process.stdout, process.stderr):
+                stream.close.assert_called_once_with()
         for descriptor in descriptors:
             with self.assertRaises(OSError):
                 os.fstat(descriptor)
 
-    def test_detached_spawn_timeout_preserves_exception_and_releases_diagnostics(self):
-        error = subprocess.TimeoutExpired("synthetic-no-execution", 8)
-        descriptors = []
+    def test_detached_timeout_preserves_live_or_exited_root_and_original_exception(self):
+        process_exit = subprocess.Popen.__exit__
+        for returncode, output, stderr in ((None, None, b""), (0, b"private-sentinel-output", None)):
+            with self.subTest(returncode=returncode):
+                error = subprocess.TimeoutExpired("synthetic-no-execution", 8, output=output, stderr=stderr)
+                descriptors = []
+                process = MagicMock()
+                process.pid = 12345
+                process.__enter__.return_value = process
+                process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+                process.communicate.side_effect = error
+                process.poll.return_value = returncode
 
-        def fail_spawn(argv, **options):
-            descriptor, *native_fds = options["pass_fds"]
-            os.write(descriptor, encode(row("preload")))
-            descriptors.append(descriptor)
-            descriptors.extend(native_fds)
-            raise error
+                def spawn(argv, **options):
+                    descriptor, *native_fds = options["pass_fds"]
+                    os.write(descriptor, encode(row("preload")))
+                    descriptors.extend((descriptor, *native_fds))
+                    return process
 
-        with patch.object(detached.subprocess, "run", side_effect=fail_spawn) as run:
-            with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                with patch.object(detached.subprocess, "Popen", side_effect=spawn) as run, \
+                        patch.object(detached.sys, "platform", "linux"), \
+                        patch.object(detached.Path, "open", autospec=True) as birth_open, \
+                        patch.object(detached.time, "monotonic_ns", return_value=123456789):
+                    birth_file = birth_open.return_value.__enter__.return_value
+                    birth_file.read.return_value = b"12345 (node) private) R " + b"0 " * 18 + b"98765 0\n"
+                    with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                        self.case.run_hook({})
+                    self.assertIs(failure.exception, error)
+                    self.assertEqual(run.call_count, 1)
+                    birth_open.assert_called_once_with(Path("/proc/12345/stat"), "rb")
+                    birth_file.read.assert_called_once_with(4097)
+                process.assert_has_calls([call.communicate(self.case.payload, timeout=8), call.poll(),
+                                          call.kill(), call.wait()])
+                process.communicate.assert_called_once_with(self.case.payload, timeout=8)
+                process.kill.assert_called_once_with()
+                self.assertEqual(process.wait.call_args_list, [call(), call()])
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    stream.close.assert_called_once_with()
+                self.assertEqual(self.case.hook_diagnostics[-1]["node_diagnostics"], {
+                    "pid": 12345, "linux_starttime_ticks": 98765, "timeout_poll_monotonic_ns": 123456789,
+                    "timeout_poll_succeeded": True, "timeout_returncode": returncode,
+                    "timeout_stdout_bytes": None if output is None else len(output),
+                    "timeout_stderr_bytes": None if stderr is None else len(stderr)})
+                self.assertIs(error.stdout, output)
+                self.assertIs(error.stderr, stderr)
+                self.assertIn('"stage":"preload"', error.__notes__[0])
+                self.assertNotIn("private-sentinel", error.__notes__[0])
+                self.assertEqual(list(self.root.iterdir()), [])
+                for descriptor in descriptors:
+                    with self.assertRaises(OSError):
+                        os.fstat(descriptor)
+
+    def test_unavailable_or_invalid_birth_and_poll_leave_timeout_evidence_unknown(self):
+        process_exit = subprocess.Popen.__exit__
+        for birth in (OSError("private-sentinel"), b"x" * 4097, b"invalid-stat"):
+            with self.subTest(birth_type=type(birth).__name__):
+                error = subprocess.TimeoutExpired("synthetic-no-execution", 8)
+                process = MagicMock()
+                process.pid = 12345
+                process.__enter__.return_value = process
+                process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+                process.communicate.side_effect = error
+                process.poll.side_effect = OSError("private-sentinel")
+                with patch.object(detached.subprocess, "Popen", return_value=process) as run, \
+                        patch.object(detached.sys, "platform", "linux"), \
+                        patch.object(detached.Path, "open", autospec=True) as birth_open:
+                    birth_file = birth_open.return_value.__enter__.return_value
+                    if isinstance(birth, OSError):
+                        birth_file.read.side_effect = birth
+                    else:
+                        birth_file.read.return_value = birth
+                    with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                        self.case.run_hook({})
+                    self.assertIs(failure.exception, error)
+                    run.assert_called_once()
+                    birth_open.assert_called_once_with(Path("/proc/12345/stat"), "rb")
+                    birth_file.read.assert_called_once_with(4097)
+                observed = self.case.hook_diagnostics[-1]["node_diagnostics"]
+                self.assertIsNone(observed["linux_starttime_ticks"])
+                self.assertIsNone(observed["timeout_returncode"])
+                self.assertFalse(observed["timeout_poll_succeeded"])
+                self.assertIsNone(observed["timeout_stdout_bytes"])
+                self.assertIsNone(observed["timeout_stderr_bytes"])
+                self.assertNotIn("private-sentinel", error.__notes__[0])
+                process.communicate.assert_called_once_with(self.case.payload, timeout=8)
+                process.kill.assert_called_once_with()
+                self.assertEqual(process.wait.call_args_list, [call(), call()])
+                self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_communicate_base_exception_keeps_original_kill_and_context_cleanup(self):
+        process_exit = subprocess.Popen.__exit__
+        for error in (RuntimeError("synthetic-failure"), KeyboardInterrupt()):
+            with self.subTest(exception_type=type(error).__name__):
+                process = MagicMock()
+                process.pid, process._sigint_wait_secs = 0, 0
+                process.__enter__.return_value = process
+                process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+                process.communicate.side_effect = error
+                with patch.object(detached.subprocess, "Popen", return_value=process) as run:
+                    with self.assertRaises(type(error)) as failure:
+                        self.case.run_hook({})
+                    self.assertIs(failure.exception, error)
+                    run.assert_called_once()
+                process.communicate.assert_called_once_with(self.case.payload, timeout=8)
+                process.kill.assert_called_once_with()
+                process.poll.assert_not_called()
+                self.assertEqual(process.wait.call_count, 0 if isinstance(error, KeyboardInterrupt) else 1)
+                for stream in (process.stdin, process.stdout, process.stderr):
+                    stream.close.assert_called_once_with()
+                self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_nonzero_exit_preserves_called_process_error_without_kill(self):
+        process_exit = subprocess.Popen.__exit__
+        process = MagicMock()
+        process.pid, process.args = 0, ["synthetic-no-execution"]
+        process.__enter__.return_value = process
+        process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+        process.communicate.return_value = (b"private-sentinel-output", b"private-sentinel-error")
+        process.poll.return_value = 7
+        with patch.object(detached.subprocess, "Popen", return_value=process) as run:
+            with self.assertRaises(subprocess.CalledProcessError) as failure:
                 self.case.run_hook({})
-            self.assertIs(failure.exception, error)
-            self.assertEqual(run.call_count, 1)
-            self.assertIn('"stage":"preload"', error.__notes__[0])
+            run.assert_called_once()
+        self.assertEqual(failure.exception.returncode, 7)
+        self.assertIs(failure.exception.cmd, process.args)
+        self.assertEqual((failure.exception.stdout, failure.exception.stderr), process.communicate.return_value)
+        self.assertNotIn("private-sentinel", failure.exception.__notes__[0])
+        process.communicate.assert_called_once_with(self.case.payload, timeout=8)
+        process.kill.assert_not_called()
+        process.wait.assert_called_once_with()
+        for stream in (process.stdin, process.stdout, process.stderr):
+            stream.close.assert_called_once_with()
         self.assertEqual(list(self.root.iterdir()), [])
-        with self.assertRaises(OSError):
-            os.fstat(descriptors[0])
 
 
 class NativeWorkerDiagnosticTests(unittest.TestCase):
@@ -327,29 +454,39 @@ class NativeWorkerDiagnosticTests(unittest.TestCase):
             case.hook_diagnostics = []
             created = []
             original = subprocess.TimeoutExpired("original-command", 8)
+            process_exit = subprocess.Popen.__exit__
+            process = MagicMock()
+            process.pid = 0
+            process.__enter__.return_value = process
+            process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+            process.communicate.side_effect = original
+            process.poll.return_value = None
 
             def trace_factory():
                 trace = NativeWorkerTrace(enabled=True)
                 created.append(trace)
                 return trace
 
-            def fail_spawn(argv, **options):
+            def spawn(argv, **options):
                 trace = created[0]
-                self.assertEqual(options["input"], case.payload)
                 self.assertEqual(options["env"], case.env)
-                self.assertEqual(options["timeout"], 8)
                 diagnostic_fd, native_fd = options["pass_fds"]
                 self.assertEqual(native_fd, trace.writer)
                 os.write(diagnostic_fd, encode(row("preload")))
                 os.write(native_fd, NATIVE_TRACE_RECORD.pack(b"INW1", 2, 0, 4321, 500, trace.nonce))
-                raise original
+                return process
 
             with patch.object(detached, "NativeWorkerTrace", side_effect=trace_factory), \
-                    patch.object(detached.subprocess, "run", side_effect=fail_spawn) as run:
+                    patch.object(detached.subprocess, "Popen", side_effect=spawn) as run:
                 with self.assertRaises(subprocess.TimeoutExpired) as failure:
                     case.run_hook({})
                 self.assertIs(failure.exception, original)
                 self.assertEqual(run.call_count, 1)
+            process.communicate.assert_called_once_with(case.payload, timeout=8)
+            process.kill.assert_called_once_with()
+            self.assertEqual(process.wait.call_args_list, [call(), call()])
+            for stream in (process.stdin, process.stdout, process.stderr):
+                stream.close.assert_called_once_with()
             self.assertIn('"stage":"fluent_begin"', original.__notes__[0])
             self.assertNotIn("private-sentinel", original.__notes__[0])
             self.assertIsNone(created[0].reader)

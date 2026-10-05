@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import stat
 import subprocess
+import sys
 import time
 import shlex
 from types import SimpleNamespace
@@ -220,17 +221,56 @@ class DetachedGrokHookTests(unittest.TestCase):
                                             dir=self.root) as preload:
             preload.write(diagnostic_preload(self.worker, diagnostic_file.fileno(), native_trace.binding))
             preload.flush()
+            node_diagnostics = {"pid": None, "linux_starttime_ticks": None,
+                                "timeout_poll_monotonic_ns": None, "timeout_poll_succeeded": None,
+                                "timeout_returncode": None, "timeout_stdout_bytes": None,
+                                "timeout_stderr_bytes": None}
             try:
                 try:
-                    result = subprocess.run([str(self.node), "--require", preload.name, "-e", check,
-                                             str(hook or self.hook)],
-                                            input=self.payload, capture_output=True, start_new_session=True,
-                                            env={**self.env, **extra}, timeout=8, check=True,
-                                            pass_fds=(diagnostic_file.fileno(), *native_trace.pass_fds))
+                    with subprocess.Popen([str(self.node), "--require", preload.name, "-e", check,
+                                           str(hook or self.hook)],
+                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                          start_new_session=True, env={**self.env, **extra},
+                                          pass_fds=(diagnostic_file.fileno(), *native_trace.pass_fds)) as process:
+                        node_diagnostics["pid"] = process.pid
+                        try:
+                            if sys.platform == "linux":
+                                try:
+                                    with Path(f"/proc/{process.pid}/stat").open("rb") as birth_file:
+                                        birth = birth_file.read(4097)
+                                    if len(birth) <= 4096 and int(birth.split(b" ", 1)[0]) == process.pid:
+                                        starttime = int(birth.rsplit(b")", 1)[1].split()[19])
+                                        if starttime >= 0:
+                                            node_diagnostics["linux_starttime_ticks"] = starttime
+                                except (OSError, ValueError, IndexError):
+                                    pass
+                            stdout, stderr = process.communicate(self.payload, timeout=8)
+                        except subprocess.TimeoutExpired as error:
+                            node_diagnostics["timeout_stdout_bytes"] = None if error.stdout is None else len(error.stdout)
+                            node_diagnostics["timeout_stderr_bytes"] = None if error.stderr is None else len(error.stderr)
+                            # 这是 kill 前观察时刻，不声称等于截止瞬间，也不推断哪个后代持有管道。
+                            node_diagnostics["timeout_poll_monotonic_ns"] = time.monotonic_ns()
+                            try:
+                                node_diagnostics["timeout_returncode"] = process.poll()
+                                node_diagnostics["timeout_poll_succeeded"] = True
+                            except OSError:
+                                node_diagnostics["timeout_poll_succeeded"] = False
+                            # 保留 subprocess.run 的 POSIX 清理与原异常；不再 communicate 或终止进程组。
+                            process.kill()
+                            process.wait()
+                            raise
+                        except BaseException:
+                            process.kill()
+                            raise
+                        returncode = process.poll()
+                        if returncode:
+                            raise subprocess.CalledProcessError(returncode, process.args, output=stdout, stderr=stderr)
+                    result = subprocess.CompletedProcess(process.args, returncode, stdout, stderr)
                 finally:
                     raw = os.pread(diagnostic_file.fileno(), DIAGNOSTIC_LIMIT + 1, 0)
                     self.hook_diagnostics.append({**worker_diagnostics(raw),
-                                                  "native_worker_diagnostics": native_trace.summary()})
+                                                  "native_worker_diagnostics": native_trace.summary(),
+                                                  "node_diagnostics": node_diagnostics})
                 self.assertEqual(result.stdout, b"")
                 self.assertEqual(result.stderr, b"")
             except (OSError, subprocess.SubprocessError, AssertionError) as error:
