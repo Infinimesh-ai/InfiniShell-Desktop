@@ -16,6 +16,8 @@ cl /nologo /std:c++17 /utf-8 /W4 /WX /O2 /MT /EHsc reader.cpp /Fo:<私有构建�
 
 `112adcc74` 已完成 Windows 编译和真实夹具执行，但原 `GetCurrentExceptionState` 在三个 first-chance 停点分别无对象、读到前一次 Win32Exception、读到前一次 InvalidOperationException，未满足当前异常合同。`9578948db` 的 last-thrown 候选已区分相同 HRESULT 的原码 1234/5678，但 Win32 字段读取耗尽旧额度，包装链的 inner 类型又退化为声明类型 System.Exception，栈映射也未完整。本次修改仍须新的固定夹具验证；macOS 的格式检查不能覆盖 Windows SDK 类型、COM ABI 或 Framework 4.8 行为。
 
+`a8766acff` 已完整读到前两条 Win32 字段和不同原码，约 4.924 MB 读取未耗预算，但固定 Throw 方法的 IL 映射仍返回 E_NOINTERFACE，且第二个 reader 退出后的即时 Job 空检查失败，中断后两条包装异常。因此没有完整夹具通过结论；现有原件未记录原 RIP 与映射范围，不能断言失败已由方法端点解释。
+
 ## 单次控制协议
 
 `wire.h` 定义 168 字节、小端、无填充的请求。尾部仅为指定长度、无 NUL 的 UTF-16LE DAC 路径，再以 stdin EOF 结束。没有命令行参数。读完整请求、尾部和 EOF 并再次核期限前，不查询目标或加载 DAC。
@@ -44,9 +46,11 @@ stdout 必须由控制器绑定为本轮全新普通文件；不能使用可能�
 
 原 `CLRDATA_EXCEPTION_PARTIAL` 完整保留在 `exception_state_flags`，`tracker_complete` 始终为 false。该标志表示 last-thrown 状态没有完整异常 tracker，不能清掉标志来声明成功。`object_chain_complete` 独立表示本轮对象字段及 InnerException 链已完整读到实际 null 尾端；它不声明 tracker 完整或候选必然是当前对象。
 
-顶层 `status="observed"` 要求对象链与栈读取完整、至少一个托管帧、预算未耗尽且期限未到。任何上限截断、字段错误、未知映射或 API 失败均保留为 `partial`/`unavailable`，不冒充完整异常链。`inner_status` 仅为 `object`、`null`、`unavailable`、`truncated`；`null` 仅来自实际读取到的零引用。旧原件的字段 E_INVALIDARG、读取预算耗尽和 IL 映射失败不能仅由更换对象来源解释，也没有放宽其失败条件。
+顶层 `status="observed"` 要求对象链与栈读取完整、至少一个托管帧、预算未耗尽且期限未到。任何上限截断、字段错误、未知映射或未解决的 API 失败均保留为 `partial`/`unavailable`，不冒充完整异常链。`inner_status` 仅为 `object`、`null`、`unavailable`、`truncated`；`null` 仅来自实际读取到的零引用。旧原件的字段 E_INVALIDARG、读取预算耗尽和 IL 映射失败不能仅由更换对象来源解释，也没有放宽其失败条件。
 
-所有 HRESULT 字段都是无符号 32 位 JSON 数字；`native_error_code` 是有符号 32 位或 null。`event_hresult` 是原事件数值对照，不与字段值自动等同。帧仅输出模块 MVID、MethodDef token、IL 偏移列表及映射状态；不输出原始地址/路径。`context_hresult` 保留 GetContext 的原返回值，`mapping_hresult` 保留 GetILOffsetsByAddress 的原返回值（未调用时为 E_PENDING）；`il_status` 仍包含原长度/映射数量校验，不因拆分记录而放宽失败条件，也不调整指令地址重试。
+仅当 `GetILOffsetsByAddress` 返回 E_NOINTERFACE 时，才允许读取同一个 MethodInstance 的完整 `GetILAddressMap`（最多 256 项）、代表入口和一个原生代码范围。官方旧版 DAC 仅为 EPILOG 处理末项 `nativeEndOffset=0`；现代实现也处理末条有效 IL。兼容路径要求入口等于范围起点、原 RIP 严格落在 `[start,end)`、末项为非 sentinel 的 IL 且原始 end 等于入口、所有先前条目连续且有界，并且只有末项命中。它不读取或宣称证明 IL opcode 为 throw；实际抛出 MethodDef 与有效 IL 的对应仍由夹具验证。范围外（包括恰好等于 end）、多范围、超限、不完整或歧义均保留 partial。枚举器始终释放，所有读取仍使用原 16 MiB、8192 次和绝对期限；没有 IP 减一、猜测长度、最近项或默认第二项回退。
+
+所有 HRESULT 字段都是无符号 32 位 JSON 数字；`native_error_code` 是有符号 32 位或 null。`event_hresult` 是原事件数值对照，不与字段值自动等同。帧仅输出模块 MVID、MethodDef token、IL 偏移列表及映射状态；不输出原始地址/路径。`context_hresult` 保留 GetContext 的原返回值，`mapping_hresult` 始终保留 GetILOffsetsByAddress 的原返回值（未调用时为 E_PENDING）。`mapping_source="terminal_end_marker"` 仅表示上述精确兼容路径成功，`il_status` 表示含边界检查的最终映射结果，原 API 的失败不会被覆盖。尝试兼容时的 `terminal_map` 保留固定 stage、兼容及枚举释放 HRESULT、条目/命中数量、已绑定范围长度、原 RIP 相对偏移和末项序号/相对起止；未取得的数值为 null。包括 `ip_offset==extent_length` 在内的失败证据不转换成成功。
 
 退出码 0 表示已经绑定目标和 DAC 并产出读取结果，仍可能是 `partial` 或 DAC API 不可用；2 为非法/截断请求（`stage="request"`，未查询目标/未加载 DAC）；3 为绑定或 reader 自身失败；4 为输出失败。最终夹具必须按原事件顺序核四条固定异常链：Win32 原码 1234、在其 catch 内抛出的同 HRESULT 原码 5678、包装后者的 InvalidOperationException、再包装它的 ApplicationException；每条还须核固定 C# MVID/实际抛出 MethodDef 的真实 IL 帧。前一次同 HRESULT 对象、乱序、丢失 PARTIAL、字段/栈不完整均不得通过，不接受仅退出 0。
 
@@ -58,6 +62,10 @@ stdout 必须由控制器绑定为本轮全新普通文件；不能使用可能�
 - [ICLRDataTarget](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/iclrdatatarget-interface)
 - [IXCLRDataTask](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/ixclrdatatask-interface)
 - [IXCLRDataStackWalk::Next](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/ixclrdatastackwalk-next-method)
+- [GetILAddressMap 接口](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/ixclrdatamethodinstance-getiladdressmap-method)
+- [旧版 DAC 末项映射边界](https://github.com/dotnet/coreclr/blob/v2.0.0/src/debug/daccess/task.cpp#L3891-L3912)
+- [现代 DAC 末条有效 IL 结束标记](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/task.cpp#L3834-L3904)
+- [同一 MethodDesc 的原生范围](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/daccess.cpp#L5916-L5957)
 - [Windows first-chance 与异常处理器顺序](https://learn.microsoft.com/en-us/windows/win32/debug/debugger-exception-handling)
 - [固定官方字段枚举实现](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/inspect.cpp)
 - [固定官方 SOS 主接口](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/inc/sospriv.idl)

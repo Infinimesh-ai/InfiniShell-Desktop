@@ -584,6 +584,95 @@ HRESULT collect_chain(IXCLRDataProcess *clr, IXCLRDataTask *task, Target &target
   }
   return S_FALSE;
 }
+struct TerminalMapEvidence {
+  const char *stage = "entry";
+  HRESULT extent_end_hr = E_PENDING;
+  ULONG32 map_count = 0;
+  ULONG32 entry_index = 0;
+  ULONG32 match_count = 0;
+  ULONG64 extent_length = 0;
+  ULONG64 ip_offset = 0;
+  ULONG64 entry_start_offset = 0;
+  bool extent_bound = false;
+  bool ip_after_entry = false;
+  bool entry_bound = false;
+};
+
+HRESULT terminal_il_mapping(IXCLRDataMethodInstance *method, CLRDATA_ADDRESS ip, Target &target,
+                            ULONG32 &offset, TerminalMapEvidence &evidence) {
+  // 旧 DAC 可能漏掉末条非 EPILOG、nativeEndOffset 为零的有效 IL 映射。
+  // 只补同一方法的已知结束标记；不修改 IP，也不选择最近项或默认 IL。
+  constexpr ULONG32 max_maps = 256;
+  if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+  CLRDATA_ADDRESS entry = 0;
+  HRESULT hr = method->GetRepresentativeEntryAddress(&entry);
+  if (hr != S_OK) return hr;
+  if (!entry) return E_UNEXPECTED;
+  evidence.stage = "extent_start";
+  if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+  CLRDATA_ENUM handle = 0;
+  hr = method->StartEnumExtents(&handle);
+  if (hr != S_OK) return hr;
+  CLRDATA_ADDRESS_RANGE extent{}, extra{};
+  // 这里只支持一个完整代码范围；第二次枚举必须明确结束，且每条路径都释放枚举器。
+  const HRESULT extent_hr =
+      target.expired() ? HRESULT_FROM_WIN32(ERROR_TIMEOUT) : method->EnumExtent(&handle, &extent);
+  const HRESULT extra_hr = extent_hr != S_OK  ? E_PENDING
+                           : target.expired() ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
+                                              : method->EnumExtent(&handle, &extra);
+  const HRESULT end_hr = method->EndEnumExtents(handle);
+  evidence.extent_end_hr = end_hr;
+  evidence.stage = "extent_read";
+  if (extent_hr != S_OK) return extent_hr == S_FALSE ? E_NOINTERFACE : extent_hr;
+  evidence.stage = "extent_limit";
+  if (extra_hr != S_FALSE) return extra_hr == S_OK ? S_FALSE : extra_hr;
+  evidence.stage = "extent_end";
+  if (end_hr != S_OK) return end_hr;
+  evidence.stage = "extent_binding";
+  if (extent.startAddress != entry || extent.endAddress <= entry) return E_UNEXPECTED;
+  evidence.extent_bound = true;
+  evidence.extent_length = extent.endAddress - entry;
+  evidence.ip_after_entry = ip >= entry;
+  if (evidence.ip_after_entry) evidence.ip_offset = ip - entry;
+  evidence.stage = "ip_outside_extent";
+  // 保留等于 end 的相对偏移，但不把返回地址端点自动当作范围内指令。
+  if (ip < entry || ip >= extent.endAddress) return E_NOINTERFACE;
+  evidence.stage = "map_read";
+  if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+  std::array<CLRDATA_IL_ADDRESS_MAP, max_maps> maps{};
+  hr = method->GetILAddressMap(max_maps, &evidence.map_count, maps.data());
+  if (hr != S_OK) return hr;
+  evidence.stage = "map_limit";
+  if (evidence.map_count == 0 || evidence.map_count > max_maps) return S_FALSE;
+  evidence.entry_index = evidence.map_count - 1;
+  const auto &last = maps[evidence.entry_index];
+  evidence.stage = "terminal_marker";
+  if (last.ilOffset >= 0xfffffffdU || last.endAddress != entry || last.startAddress < entry ||
+      last.startAddress >= extent.endAddress)
+    return E_NOINTERFACE;
+  evidence.entry_bound = true;
+  evidence.entry_start_offset = last.startAddress - entry;
+  evidence.stage = "map_ranges";
+  for (ULONG32 i = 0; i < evidence.map_count; ++i) {
+    if (target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    const auto &map = maps[i];
+    const bool terminal = i == evidence.entry_index;
+    const CLRDATA_ADDRESS end = terminal ? extent.endAddress : map.endAddress;
+    if (map.startAddress < entry || map.startAddress >= extent.endAddress || end < map.startAddress ||
+        end > extent.endAddress || (!terminal && end != maps[i + 1].startAddress))
+      return E_UNEXPECTED;
+    if (map.startAddress <= ip && ip < end) {
+      ++evidence.match_count;
+      if (!terminal || map.ilOffset >= 0xfffffffdU) return E_NOINTERFACE;
+    }
+  }
+  evidence.stage = "unique_terminal_match";
+  if (evidence.match_count != 1) return E_NOINTERFACE;
+  offset = last.ilOffset;
+  evidence.stage = "matched";
+  return S_OK;
+}
+
 HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Result &result) {
   Com<IXCLRDataStackWalk> walk;
   HRESULT hr =
@@ -633,6 +722,9 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Re
         walk->GetContext(CONTEXT_CONTROL, sizeof(context), &context_size, reinterpret_cast<BYTE *>(&context));
     HRESULT mapping = context_hr;
     HRESULT mapping_hr = E_PENDING;
+    HRESULT terminal_hr = E_PENDING;
+    TerminalMapEvidence terminal;
+    const char *mapping_source = "direct";
     std::array<ULONG32, 8> offsets{};
     ULONG32 needed = 0;
     if (mapping == S_OK && context_size >= offsetof(CONTEXT, Rip) + sizeof(context.Rip) &&
@@ -640,13 +732,20 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Re
       mapping_hr = method->GetILOffsetsByAddress(context.Rip, static_cast<ULONG32>(offsets.size()), &needed,
                                                  offsets.data());
       mapping = mapping_hr;
+      if (mapping_hr == E_NOINTERFACE) {
+        terminal_hr = terminal_il_mapping(method.value, context.Rip, target, offsets[0], terminal);
+        mapping = terminal_hr;
+        needed = terminal_hr == S_OK ? 1 : 0;
+        if (terminal_hr == S_OK) mapping_source = "terminal_end_marker";
+      }
     } else if (SUCCEEDED(mapping)) mapping = E_UNEXPECTED;
     if (mapping == S_OK && (needed == 0 || needed > offsets.size())) mapping = S_FALSE;
     if (mapping != S_OK) partial = true;
     std::ostringstream item;
     item << "{\"module_mvid\":\"" << guid(mvid) << "\",\"method_token\":" << token
          << ",\"context_hresult\":" << static_cast<std::uint32_t>(context_hr)
-         << ",\"mapping_hresult\":" << static_cast<std::uint32_t>(mapping_hr)
+         << ",\"mapping_hresult\":" << static_cast<std::uint32_t>(mapping_hr) << ",\"mapping_source\":\""
+         << mapping_source << "\""
          << ",\"il_status\":" << static_cast<std::uint32_t>(mapping) << ",\"il_offsets\":[";
     if (mapping == S_OK && needed <= offsets.size()) {
       for (ULONG32 i = 0; i < needed; ++i) {
@@ -654,7 +753,27 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, Target &target, Re
         item << offsets[i];
       }
     }
-    item << "],\"il_offsets_needed\":" << needed << "}";
+    item << "],\"il_offsets_needed\":" << needed;
+    if (mapping_hr == E_NOINTERFACE) {
+      item << ",\"terminal_map\":{\"stage\":\"" << terminal.stage
+           << "\",\"hresult\":" << static_cast<std::uint32_t>(terminal_hr)
+           << ",\"extent_end_hresult\":" << static_cast<std::uint32_t>(terminal.extent_end_hr)
+           << ",\"map_count\":" << terminal.map_count << ",\"match_count\":" << terminal.match_count
+           << ",\"extent_length\":";
+      if (terminal.extent_bound) item << terminal.extent_length;
+      else item << "null";
+      item << ",\"ip_offset\":";
+      if (terminal.extent_bound && terminal.ip_after_entry) item << terminal.ip_offset;
+      else item << "null";
+      item << ",\"entry_index\":";
+      if (terminal.entry_bound) item << terminal.entry_index;
+      else item << "null";
+      item << ",\"entry_start_offset\":";
+      if (terminal.entry_bound) item << terminal.entry_start_offset;
+      else item << "null";
+      item << ",\"entry_end_offset\":" << (terminal.entry_bound ? "0" : "null") << "}";
+    }
+    item << "}";
     result.frames.push_back(item.str());
   }
   return S_FALSE;

@@ -1,7 +1,24 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Linux74dd本轮外层Node8秒超时、无同进程阶段，旧b5发送超时仍未解释；Windows9578948db的两个同HRESULT停点已取得不同当前原生码，但字段、内链实际类型和IL映射仍失败，正按真实MethodTable修复读取；原Windows升级矩阵首updated失败及最终同源双平台门禁仍未解决，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Linux74dd本轮外层Node8秒超时、无同进程阶段，旧b5发送超时仍未解释；Windowsa8766acff的两个停点已完整读取Win32字段且未耗额度，但throw帧IL映射仍失败，第二个reader在根退出后的Job即时查询失败，后两包装异常未执行；原Windows升级矩阵首updated失败及最终同源双平台门禁仍未解决，新增关闭0项。",
+  "g09_clr_sos_native_20261005": {
+    "status": "native_failure_job_wait_and_il_mapping_open",
+    "run": 37275551089,
+    "commit": "a8766acff7457b42a724e97d94c5f93a8e0a2cee",
+    "formal_result": "failure",
+    "observed": "MSVC/PS5.1及11普通项通过；reader43/44原stdout均完整Win32字段与原码1234/5678，约4.924MB未耗额度，context均S_OK；各throw帧IL映射E_NOINTERFACE。",
+    "failure": "seq44在reader根退出后立即查询Job仍非空，未加入observations；控制器精确终止原fixture，后两包装异常未执行。不能声称完整动态inner链通过。",
+    "cleanup": "51原事件均Continue，fixture被终止退出1，所有Job/reader/fixture退出已核，pending=false；远端cleanup_ready=false保留。",
+    "next_fix": "reader回收在原绝对期限内等待精确Job为空。仅direct E_NOINTERFACE时按同一method的唯一真实extent和完整最多256条map识别末项开放结束标记，原RIP必须严格位于范围内部且唯一匹配真实IL；原HRESULT及相对数值保留，不调IP或默认选项，未知仍partial。原失败不重标。",
+    "repair_local_gates": "r-xh5j_i_h Windows目标command类型check、r-oak149tr warp check、r-j5cvwr4b完整自有C++文件格式通过且短目录已清理；MSVC及四异常新源码验收待执行。",
+    "artifact_sha256": "2f3adbc08405ea2a08ba8fa1fab82210acbb5027922c638527f978897d634c90",
+    "audit_sha256": "c6ecf32ad1192ebe6be1ff02dba4a264c6cd53e2a59be86fd1067163802d9eeb",
+    "full_log_sha256": "64c3e19a14d1eaa45eefd30faafda0abe33a6b27e3dcd06f76c8082ed2fdf548",
+    "g09_closed": false,
+    "newly_closed_gaps": [],
+    "localization": "无需本地化变更"
+  },
   "g09_clr_last_thrown_native_20261005": {
     "status": "native_partial_sos_field_repair_pending",
     "run": 37272950186,

@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：实际MT读取到完整Win32字段，Job回收与throw映射仍失败
+
+精确 `a8766acff7457b42a724e97d94c5f93a8e0a2cee` 的 [37275551089](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37275551089)正式失败：MSVC `/W4 /WX`、PS5.1准备及11普通项通过；唯一原生项在seq44报“reader 退出后 Job 仍有进程”。reader43/44的原stdout均已完整读取Win32异常HResult、1234/5678原码及真实null尾端，约4.924MB且未耗额度；context全部S_OK，但实际throw帧仍E_NOINTERFACE。reader44未进入聚合observations，后两包装异常未执行，不能证明完整动态inner链。
+
+原fixture被精确终止后退出1，51事件全部Continue，reader/fixture已回收且Job空、pending=false；清理不替代功能成功，远端cleanup_ready=false保持。官方ZIP 11330061964为32成员，SHA `2f3adbc08405ea2a08ba8fa1fab82210acbb5027922c638527f978897d634c90`；完整Windows日志SHA `64c3e19a14d1eaa45eefd30faafda0abe33a6b27e3dcd06f76c8082ed2fdf548`。独审SHA `c6ecf32ad1192ebe6be1ff02dba4a264c6cd53e2a59be86fd1067163802d9eeb` 已核16来源、9编译输入及全部原件；本机观察／提取／审计短目录均exit0并确认清理。
+
+根进程signaled与精确Job清空是两个完成条件。现仅将即时Job判断改为在同一个已有绝对期限内等待；根句柄、Job身份、失败和回收条件保持，不给新的时间窗口，也不声称原非空的具体内核/后代原因已证。IL映射的固定官方版本差异提供兼容依据：旧coreclr v2.0.0仅处理EPILOG的nativeEndOffset=0，runtime v8还覆盖最后一项。现仅在direct返回E_NOINTERFACE后，读取同一个method的唯一真实extent及完整最多256条map；末项必须是有效IL且raw end==同方法entry，原RIP严格位于extent内部、所有范围合法且唯一命中末项才接收。原API错误、相对偏移、枚举结束状态和固定失败stage均保留；不接受end端点、不减IP、不加0x20或默认第二项，也不声称已读取throw opcode。该公开版本差异不是Framework本轮实际原因的证明，仍待真实固定四链。本机Windows目标command类型check（`r-xh5j_i_h`）、warp check（`r-oak149tr`）、全自有C++既定格式（`r-j5cvwr4b`）通过，短目录已清理。**新增关闭0项，G09及最终同源门禁开放；无需本地化变更。**
+
 ## 2026-10-05：四异常定位器取得部分字段，完整原生能力仍失败
 
 精确 `9578948db948248747f1c46b5290ce6fdf0c947b` 的 [37272950186](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37272950186) 为11普通PASS／唯一原生FAIL，4份reader均partial。原生43/44两个相同HRESULT停点取得1234/5678，仍在_HResult/inner遇到E_INVALIDARG及读取预算不足。45/46的根类型正确，内链却呈声明类型System.Exception，不能冒称实际派生类型；拆分结果确认context均S_OK、部分IL mapping为E_NOINTERFACE。原fixture自然退出0、53事件均Continue、所有reader及Job已回收，无pending；这些不代替完整字段/帧断言。14源码、7构建输入、34官方ZIP成员及原日志独审SHA `94acfa2d8c652a8137a7d7d5b7fd82890af8a863278a9dac7bafd74257022d32`，远端证据cleanup_ready=false保持。

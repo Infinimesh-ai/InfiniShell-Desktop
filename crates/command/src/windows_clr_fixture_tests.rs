@@ -10,6 +10,7 @@ use std::os::windows::fs::OpenOptionsExt as _;
 use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
@@ -404,7 +405,15 @@ impl Reader {
         };
         require(status == WAIT_OBJECT_0, "reader 没有在原期限内退出")?;
         let exit = self.child.wait()?;
-        require(self.job.empty()?, "reader 退出后 Job 仍有进程")?;
+        // 根进程 signaled 不等于整个 Job 已空；两者都必须在同一原期限内确认。
+        loop {
+            let wait_ms = remaining(deadline)?.min(10);
+            if self.job.empty()? {
+                break;
+            }
+            thread::sleep(Duration::from_millis(u64::from(wait_ms)));
+        }
+        remaining(deadline)?;
         self.reaped = true;
         Ok(exit)
     }
