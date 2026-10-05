@@ -50,6 +50,14 @@ class NotificationPatchTests(unittest.TestCase):
             originals[name] = original
         return root, metadata, originals, replacements
 
+    def test_codex_additions_cannot_use_per_file_cache_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            metadata, replacements = PATCH.bundle_data(PATCH.default_bundle(), 'codex')
+            with self.assertRaisesRegex(ValueError, '完整来源事务'):
+                PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual(list(root.iterdir()), [])
+
     def test_hook_manifest_failure_restores_scripts_in_spaced_chinese_path(self):
         for agent in PATCH.CONTRACTS:
             with self.subTest(agent=agent), tempfile.TemporaryDirectory() as temporary:

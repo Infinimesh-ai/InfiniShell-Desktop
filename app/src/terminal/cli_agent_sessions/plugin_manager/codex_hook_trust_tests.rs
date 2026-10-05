@@ -18,11 +18,19 @@ fn controlled_home() -> tempfile::TempDir {
         ("scripts/on-session-start.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-session-start.sh").as_slice()),
         ("scripts/on-stop.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-stop.sh").as_slice()),
         ("scripts/should-use-structured.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/should-use-structured.sh").as_slice()),
+        ("scripts/on-notification.ps1", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-notification.ps1").as_slice()),
+        ("scripts/warp-notify.ps1", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/warp-notify.ps1").as_slice()),
         ("scripts/warp-notify.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/warp-notify.sh").as_slice()),
     ] {
         let path = root.join(relative);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, contents).unwrap();
+        fs::write(&path, contents).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = if relative.ends_with(".sh") { 0o755 } else { 0o644 };
+            fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+        }
     }
     fs::write(directory.path().join("config.toml"), config().to_string()).unwrap();
     directory
@@ -125,7 +133,7 @@ fn native_contract_is_exactly_the_recorded_cli_response_and_bundled_manifest() {
         "../../../../assets/bundled/cli-agent-plugins/codex/PATCH_METADATA.json"
     ))
     .unwrap();
-    assert_eq!(patch_metadata["patch_revision"], 6);
+    assert_eq!(patch_metadata["patch_revision"], 7);
     assert_eq!(
         bundled["cli"],
         format!(
@@ -133,17 +141,27 @@ fn native_contract_is_exactly_the_recorded_cli_response_and_bundled_manifest() {
             patch_metadata["cli_contract_version"].as_str().unwrap()
         )
     );
-    assert_eq!(
-        bundled["hooks_file_sha256"],
-        patch_metadata["files"]["hooks/hooks.json"]["replacement_sha256"]
-    );
     assert_eq!(HOOKS.hooks.len(), 5);
+    // Windows 入口变更不影响 Unix 命令；旧原生摘要只复用于逐项相同的 Unix 注册。
+    let current: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../assets/bundled/cli-agent-plugins/codex/hooks/hooks.json"
+    ))
+    .unwrap();
+    for recorded in bundled["hooks"].as_array().unwrap() {
+        let (_, entries) = current["hooks"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(event, _)| event.eq_ignore_ascii_case(recorded["eventName"].as_str().unwrap()))
+            .unwrap();
+        assert_eq!(entries[0]["hooks"][0]["command"], recorded["command"]);
+    }
     assert_eq!(
         bundled["hooks_file_sha256"],
         format!(
             "{:x}",
             Sha256::digest(include_bytes!(
-                "../../../../assets/bundled/cli-agent-plugins/codex/hooks/hooks.json"
+                "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev6/hooks/hooks.json"
             ))
         )
     );
@@ -346,14 +364,14 @@ fn manual_authorization_is_inside_codex_and_has_no_automatic_shell_execution() {
 }
 
 #[test]
-fn windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
+fn historical_windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
     use sha2::{Digest as _, Sha256};
     let source: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../../specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust-rev4-windows.json"
     ))
     .unwrap();
     let bundled: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST_WINDOWS.json"
+        "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev6/NATIVE_HOOK_TRUST_WINDOWS.json"
     ))
     .unwrap();
     assert_eq!(source["hooks"], bundled["hooks"]);
@@ -378,8 +396,9 @@ fn windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
             ))
         )
     );
-    let hooks_bytes =
-        include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/hooks/hooks.json");
+    let hooks_bytes = include_bytes!(
+        "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev6/hooks/hooks.json"
+    );
     assert_eq!(
         bundled["hooks_file_sha256"],
         format!("{:x}", Sha256::digest(hooks_bytes))
@@ -438,6 +457,9 @@ fn windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
         ),
     )
     .unwrap();
+    fs::write(plugin.join("hooks/hooks.json"), hooks_bytes).unwrap();
+    fs::remove_file(plugin.join("scripts/on-notification.ps1")).unwrap();
+    fs::remove_file(plugin.join("scripts/warp-notify.ps1")).unwrap();
     let tree = source["resource_tree_sha256"].as_object().unwrap();
     assert_eq!(tree.len(), 10);
     for (relative, expected) in tree {

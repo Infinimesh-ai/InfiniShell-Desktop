@@ -13,7 +13,7 @@ fn synthetic_bundle() -> (tempfile::TempDir, BTreeMap<String, FileHashes>) {
         hashes.insert(
             relative,
             FileHashes {
-                upstream_sha256: sha256(original.as_bytes()),
+                upstream_sha256: Some(sha256(original.as_bytes())),
                 replacement_sha256: sha256(replacement.as_bytes()),
                 previous_replacement_sha256: Vec::new(),
             },
@@ -46,13 +46,24 @@ fn bundle_hashes_and_reviewed_versions_are_consistent() {
                 .iter()
                 .find(|base| base.version == kind.version())
                 .unwrap();
-            assert_eq!(target.tree_sha256[*relative], hashes.upstream_sha256);
-            assert!(
-                metadata
-                    .compatible_bases
-                    .iter()
-                    .all(|base| base.tree_sha256.contains_key(*relative))
+            assert_eq!(
+                target.tree_sha256.get(*relative),
+                hashes.upstream_sha256.as_ref()
             );
+            if hashes.upstream_sha256.is_none() {
+                assert_eq!(kind, PatchKind::Codex);
+                assert!(matches!(
+                    *relative,
+                    "scripts/on-notification.ps1" | "scripts/warp-notify.ps1"
+                ));
+            } else {
+                assert!(
+                    metadata
+                        .compatible_bases
+                        .iter()
+                        .all(|base| base.tree_sha256.contains_key(*relative))
+                );
+            }
         }
     }
     assert_eq!(PatchKind::Claude.version(), "2.2.0");
@@ -197,7 +208,7 @@ fn hook_manifest_and_notify_failures_restore_files_in_spaced_chinese_path() {
             hashes.insert(
                 (*relative).to_owned(),
                 FileHashes {
-                    upstream_sha256: sha256(original.as_bytes()),
+                    upstream_sha256: Some(sha256(original.as_bytes())),
                     replacement_sha256: sha256(replacement.as_bytes()),
                     previous_replacement_sha256: Vec::new(),
                 },
@@ -520,51 +531,26 @@ fn windows_native_binary_preflight_rejects_shims_and_unreviewed_executables() {
 #[test]
 fn windows_dependency_receipt_requires_exact_output_and_empty_error_stream() {
     assert!(windows_dependency_receipt_matches(
-        b"infinishell-codex-windows-dependencies-v1\r\n",
+        b"infinishell-codex-windows-native-notifications-v2\r\n",
         b""
     ));
     assert!(!windows_dependency_receipt_matches(b"", b""));
     assert!(!windows_dependency_receipt_matches(
-        b"infinishell-codex-windows-dependencies-v1\n",
+        b"infinishell-codex-windows-dependencies-v1\r\n",
         b""
     ));
     assert!(!windows_dependency_receipt_matches(
-        b"infinishell-codex-windows-dependencies-v1\r\n",
+        b"infinishell-codex-windows-native-notifications-v2\n",
+        b""
+    ));
+    assert!(!windows_dependency_receipt_matches(
+        b"infinishell-codex-windows-native-notifications-v2\r\n",
         b"dependency failed"
     ));
     assert!(!windows_dependency_receipt_matches(
-        b"infinishell-codex-windows-dependencies-v1\r\nextra",
+        b"infinishell-codex-windows-native-notifications-v2\r\nextra",
         b""
     ));
-}
-
-#[test]
-fn windows_dependency_preflight_reuses_reviewed_launcher_argument_encoding() {
-    let original =
-        include_str!("../../../../../script/cli-agent-parity/codex_windows_hook_command.ps1")
-            .replace("\r\n", "\n");
-    let preamble = original
-        .split("# BEGIN_NOTIFICATION_LAUNCH")
-        .next()
-        .unwrap();
-    let dependency = WINDOWS_DEPENDENCY_PROBE.replace("\r\n", "\n").replacen(
-        "$ProgressPreference = 'SilentlyContinue'\n",
-        "",
-        1,
-    );
-    assert!(
-        dependency.starts_with(preamble),
-        "依赖预检除进度流抑制外必须复用已审阅的原生 argv 编码"
-    );
-}
-
-#[test]
-fn windows_dependency_preflight_accepts_reviewed_git_bash_runtime_names() {
-    assert!(
-        WINDOWS_DEPENDENCY_PROBE
-            .contains(r#"case "$OSTYPE" in msys*|cygwin) ;; *) exit 1 ;; esac"#)
-    );
-    assert!(WINDOWS_DEPENDENCY_PROBE.contains("$ProgressPreference = 'SilentlyContinue'"));
 }
 
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -592,4 +578,11 @@ fn windows_installer_binary_is_bound_to_the_formal_native_evidence() {
     assert_eq!(evidence["fixed_cli"]["sha256"], WINDOWS_CODEX_SHA256);
     assert_eq!(evidence["verified_architecture"], "x86_64");
     assert_eq!(evidence["cli"], "codex-cli 0.147.0");
+}
+
+#[test]
+fn codex_cannot_bypass_the_complete_source_transaction() {
+    let home = tempfile::tempdir().unwrap();
+    assert!(apply(home.path(), PatchKind::Codex, "").is_err());
+    assert_eq!(fs::read_dir(home.path()).unwrap().count(), 0);
 }

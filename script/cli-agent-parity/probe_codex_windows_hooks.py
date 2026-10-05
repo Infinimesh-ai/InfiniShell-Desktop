@@ -17,9 +17,9 @@ import threading
 import time
 
 sys.dont_write_bytecode = True
-from codex_windows_hook_command import (SCRIPTS, encode, encode_source, verify_encoding,
+from codex_windows_hook_command import (SCRIPTS, encode, encode_legacy, encode_source, verify_encoding,
                                         verify_windows_argv, verify_windows_bytes_and_boundary,
-                                        verify_windows_syntax, windows_environment)
+                                        verify_windows_syntax, windows_environment, native_windows_environment)
 from codex_windows_hook_inputs import (CODEX_VERSION, HOOK_CODEX_VERSIONS, RELEASE_ASSETS, codex_contract, obtain_inputs,
                                        plugin_base, require, verify_plugin)
 from codex_windows_formal import (EVENTS, authorize_config, exact_plugin_tree, formal_transport_expectations,
@@ -354,6 +354,7 @@ def capture_case_markers(directory, evidence):
 
 def prepare_case(args, directory, evidence, mode):
     from apply_notification_patch import apply_files, validate_tree
+    from codex_persistent_source import materialize_plugin_fixture
     metadata, replacements, source_hash = probe_bundle(args.repo, mode)
     cli_home = directory / 'codex'
     cli_home.mkdir(parents=True)
@@ -368,9 +369,12 @@ def prepare_case(args, directory, evidence, mode):
     marketplace = directory / 'marketplace'
     plugin = marketplace / 'plugins/warp'
     verify_plugin(args.upstream_plugin, plugin_base(args.repo))
-    shutil.copytree(args.upstream_plugin, plugin)
-    validate_tree(plugin, '0.4.0', metadata)
-    apply_files(plugin, metadata, replacements)
+    if mode == 'formal':
+        materialize_plugin_fixture(args.repo / 'app/assets/bundled/cli-agent-plugins', plugin)
+    else:
+        shutil.copytree(args.upstream_plugin, plugin)
+        validate_tree(plugin, '0.4.0', metadata)
+        apply_files(plugin, metadata, replacements)
     evidence.update(mode=mode, patch_revision=metadata['patch_revision'],
                     source_metadata_sha256=source_hash, resource_tree_sha256=exact_plugin_tree(plugin, metadata))
     index = marketplace / '.agents/plugins/marketplace.json'
@@ -533,7 +537,7 @@ def instrument_candidate(plugin, evidence):
         for group in groups:
             for handler in group['hooks']:
                 script = next(script for script in SCRIPTS if script in handler['command'])
-                handler['commandWindows'] = encode(script)
+                handler['commandWindows'] = encode_legacy(script)
     hooks_path.write_text(json.dumps(hooks), encoding='utf-8')
     original_hashes = {}
     for script in ('on-session-start.sh', 'on-prompt-submit.sh'):
@@ -560,6 +564,7 @@ printf '%s' "$input" | bash -- "$SCRIPT_DIR/__FIXTURE_ENTRY__"
 
 def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
     mode = getattr(args, 'mode', 'formal')
+    commands = {(encode if mode == 'formal' else encode_legacy)(script) for script in SCRIPTS}
     formal = None
     if mode == 'formal':
         evidence['formal_registration'] = {}
@@ -594,7 +599,7 @@ def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
         initial_hooks = native_hooks(listed)
         evidence['native_initial_hooks'] = initial_hooks
         installed_root = validate_native_hooks(initial_hooks, cli_home, plugin,
-                                              {encode(script) for script in SCRIPTS} | {blocker}, 'untrusted')
+                                              commands | {blocker}, 'untrusted')
         if formal is not None:
             evidence['trigger_validation'] = split_trigger_hooks(formal, initial_hooks, blocker)
     finally:
@@ -606,7 +611,7 @@ def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
     try:
         recorder = start_codex(args.codex_executable, env, directory, evidence['traces'])
         trusted_hooks = native_hooks(recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 3))
-        validate_native_hooks(trusted_hooks, cli_home, plugin, {encode(script) for script in SCRIPTS} | {blocker}, 'trusted')
+        validate_native_hooks(trusted_hooks, cli_home, plugin, commands | {blocker}, 'trusted')
         same_native_registration(initial_hooks, trusted_hooks)
         if formal is not None:
             evidence['trigger_validation'] = split_trigger_hooks(formal, trusted_hooks, blocker)
@@ -661,14 +666,17 @@ def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=('formal', 'candidate'), default='formal')
+    parser.add_argument('--registration-only', action='store_true', help='只采集正式五项 hooks/list 与信任往返，不创建 thread/turn')
     parser.add_argument('--codex-version', choices=HOOK_CODEX_VERSIONS, default=CODEX_VERSION)
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--architecture', choices=RELEASE_ASSETS, default='x86_64')
     for name in ('codex-executable', 'upstream-plugin', 'download-dir'):
         parser.add_argument('--' + name, type=Path)
-    for name in ('bash-executable', 'jq-executable', 'output'):
-        parser.add_argument('--' + name, type=Path, required=True)
+    for name in ('bash-executable', 'jq-executable'):
+        parser.add_argument('--' + name, type=Path)
+    parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    require(not args.registration_only or args.mode == 'formal', '只注册模式仅适用于正式资源')
     # 所有写入都在源树之外；-B / dont_write_bytecode 阻止导入产生源树 pycache。
     args.repo = args.repo.resolve()
     for name in ('codex_executable', 'upstream_plugin', 'download_dir', 'bash_executable', 'jq_executable', 'output'):
@@ -682,7 +690,8 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report = {'schema_version': 2, 'mode': args.mode, 'passed': False, 'codex_version': args.codex_version,
               'official_commit': codex_contract(args.codex_version)['commit'], 'cases': [], 'checks': {},
-              'scope': args.mode + '_native_registration_and_two_blocked_hook_events',
+              'scope': ('formal_native_registration_only' if args.registration_only else
+                        args.mode + '_native_registration_and_two_blocked_hook_events'),
               'credentials_provided': False, 'windows_product_enabled': False, 'native_conpty_notifications_verified': False,
               'full_lifecycle_verified': False, 'model_generation_verified': False}
     requests = []
@@ -698,7 +707,8 @@ def main():
         phase = 'encoding_roundtrip'
         report['checks']['encoding'] = verify_encoding()
         phase = 'native_prerequisites'
-        args.native_environment = windows_environment(args.bash_executable, args.jq_executable)
+        args.native_environment = (native_windows_environment() if args.mode == 'formal' else
+                                   windows_environment(args.bash_executable, args.jq_executable))
         verified_version(args.codex_executable, Path(tempfile.gettempdir()), args.codex_version)
         report['cli'] = codex_contract(args.codex_version)['cli']
         phase = 'powershell_51_syntax'
@@ -709,9 +719,10 @@ def main():
         report['checks'][phase] = True
         phase = 'native_bytes_and_cmd_boundary'
         report['checks'][phase] = verify_windows_bytes_and_boundary(args.native_environment)
-        phase = 'jq_newline_boundary'
-        report['jq_newline_boundary'] = {}
-        verify_jq_newline_boundary(args.native_environment, report['jq_newline_boundary'])
+        if args.mode == 'candidate':
+            phase = 'jq_newline_boundary'
+            report['jq_newline_boundary'] = {}
+            verify_jq_newline_boundary(args.native_environment, report['jq_newline_boundary'])
 
         class RejectModel(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -736,7 +747,12 @@ def main():
         for name, prompt in zip(('插件 空 格', "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"), HOOK_PROMPTS):
             evidence = {'name': name, 'passed': False, 'traces': []}
             report['cases'].append(evidence)
-            evidence.update(one_case(args, private / name, requests, evidence, prompt))
+            if args.registration_only:
+                # 使用原正式注册函数；不加阻断 hook，也不发送 thread/start 或 turn/start。
+                formal_registration(args, private / name, evidence)
+                evidence['mode'] = 'registration-only'
+            else:
+                evidence.update(one_case(args, private / name, requests, evidence, prompt))
             evidence['passed'] = True
         phase = 'zero_model_requests'
         require(not requests, f'原生进程关闭前出现模型 HTTP 请求: {requests}')

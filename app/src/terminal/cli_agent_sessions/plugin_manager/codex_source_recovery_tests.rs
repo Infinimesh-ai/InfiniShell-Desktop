@@ -261,6 +261,133 @@ fn legacy_completed_archive_is_retained_but_legacy_unfinished_state_is_not_guess
     assert!(!cache_root(&home, "warp").exists());
 }
 
+fn completed_manual_archive() -> serde_json::Value {
+    // 与 Python commit 的六字段格式一致；缓存模式为十进制，不使用 Rust 快照格式。
+    let cache: BTreeMap<_, _> = REV6_BUNDLE
+        .files
+        .iter()
+        .filter_map(|(path, entry)| {
+            path.strip_prefix("plugins/warp/").map(|relative| {
+                (
+                    format!("0.4.0/{relative}"),
+                    format!("{}:{}", entry.sha256, entry.mode),
+                )
+            })
+        })
+        .collect();
+    json!({
+        "plugin": "warp@codex-warp",
+        "phase": "verified",
+        "old_config_sha256": digest(b"old config"),
+        "installed_config_sha256": digest(b"installed config"),
+        "original_cache": cache,
+        "installed_cache": cache,
+    })
+}
+
+#[test]
+fn completed_manual_archives_preserve_later_user_changes_and_archive_bytes() {
+    for phase in ["verified", "rolled_back"] {
+        for old_state_present in [false, true] {
+            let (_directory, home) = private_home();
+            rev6_home(&home);
+            let transaction = home.join("plugins/infinishell-transactions/manual-completed");
+            fs::create_dir_all(&transaction).unwrap();
+            let path = transaction.join("state.json");
+            let mut state = completed_manual_archive();
+            state["phase"] = json!(phase);
+            if !old_state_present {
+                state["old_config_sha256"] = json!(null);
+                state["original_cache"] = json!(null);
+            }
+            let archive = serde_json::to_vec(&state).unwrap();
+            fs::write(&path, &archive).unwrap();
+            let mut document = config(&home);
+            document["plugins"]["warp@codex-warp"]["enabled"] = toml_edit::value(false);
+            document["model"] = toml_edit::value("归档后用户修改");
+            save(&home, &document);
+            let config_before = fs::read(home.join("config.toml")).unwrap();
+            let cache_before = cache_snapshot(&cache_root(&home, "warp")).unwrap();
+            recover_transactions(&home).unwrap();
+            assert_eq!(fs::read(&path).unwrap(), archive);
+            assert_eq!(fs::read(home.join("config.toml")).unwrap(), config_before);
+            assert_eq!(
+                cache_snapshot(&cache_root(&home, "warp")).unwrap(),
+                cache_before
+            );
+        }
+    }
+}
+
+#[test]
+fn incomplete_or_malformed_manual_archives_fail_closed_without_writes() {
+    let cache_path = "0.4.0/scripts/warp-notify.sh";
+    let mut missing = completed_manual_archive();
+    missing.as_object_mut().unwrap().remove("old_config_sha256");
+    let mut states = vec![missing];
+    for (key, value) in [
+        ("phase", json!("prepared")),
+        ("phase", json!("cache_written")),
+        ("phase", json!("configuration_written")),
+        ("phase", json!("needs_review")),
+        ("phase", json!("unknown")),
+        ("plugin", json!("orchestration@codex-warp")),
+        ("extra_field", json!(true)),
+        ("old_config_sha256", json!(false)),
+        ("old_config_sha256", json!("a".repeat(63))),
+        ("installed_config_sha256", json!("A".repeat(64))),
+        ("installed_config_sha256", json!(null)),
+        ("original_cache", json!(false)),
+        ("installed_cache", json!({})),
+        ("installed_cache", json!({cache_path: "bad-sha:493"})),
+        (
+            "installed_cache",
+            json!({cache_path: format!("{}:0777", digest(b"script"))}),
+        ),
+        (
+            "installed_cache",
+            json!({cache_path: format!("{}:4096", digest(b"script"))}),
+        ),
+        (
+            "installed_cache",
+            json!({cache_path: format!("{}:readonly=false", digest(b"script"))}),
+        ),
+        (
+            "installed_cache",
+            json!({"0.4.0/../outside": format!("{}:493", digest(b"script"))}),
+        ),
+        (
+            "installed_cache",
+            json!({"0.4.0/scripts\\warp-notify.sh": format!("{}:493", digest(b"script"))}),
+        ),
+    ] {
+        let mut state = completed_manual_archive();
+        state[key] = value;
+        states.push(state);
+    }
+    for state in states {
+        let (_directory, home) = private_home();
+        rev6_home(&home);
+        let transaction = home.join("plugins/infinishell-transactions/manual-invalid");
+        fs::create_dir_all(&transaction).unwrap();
+        let path = transaction.join("state.json");
+        let archive = serde_json::to_vec(&state).unwrap();
+        fs::write(&path, &archive).unwrap();
+        let config_before = fs::read(home.join("config.toml")).unwrap();
+        let cache_before = cache_snapshot(&cache_root(&home, "warp")).unwrap();
+        assert!(
+            recover_transactions(&home).is_err(),
+            "未拒绝未知归档：{state}"
+        );
+        assert_eq!(fs::read(&path).unwrap(), archive);
+        assert_eq!(fs::read(home.join("config.toml")).unwrap(), config_before);
+        assert_eq!(
+            cache_snapshot(&cache_root(&home, "warp")).unwrap(),
+            cache_before
+        );
+    }
+}
+
 #[test]
 fn publication_lock_blocks_a_second_recovery_until_the_owner_releases_it() {
     let (_directory, home) = private_home();

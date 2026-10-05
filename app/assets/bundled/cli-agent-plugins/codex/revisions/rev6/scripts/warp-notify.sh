@@ -36,59 +36,34 @@ open_terminal() {
         *[![:print:]]*|*' '*|*'..'*) return 1 ;;
     esac
     [ ! -L "$candidate" ] && [ -c "$candidate" ] || return 1
-    { exec 9>"$candidate"; } 2>/dev/null || return 1
+    exec 9>"$candidate" || return 1
     if [ ! -t 9 ]; then
         exec 9>&-
         return 1
     fi
 }
 
-open_named_terminal() {
-    local tty_name="$1"
-    case "$tty_name" in
-        /dev/pts/*|/dev/tty*) open_terminal "$tty_name" ;;
-        pts/*|tty*) open_terminal "/dev/$tty_name" ;;
-        s[0-9]*) open_terminal "/dev/tty$tty_name" ;;
-        *) return 1 ;;
-    esac
-}
-
 open_ancestor_terminal() {
-    local pid="$PPID" command_name tty_name parent_pid process_stat
-    local tty_number fd attempt platform
-    platform=$(uname -s) || return 1
-    for ((attempt = 0; attempt < 32; attempt++)); do
+    local pid="$PPID" command_name tty_name candidate attempt
+    for attempt in 1 2 3 4 5 6; do
         case "$pid" in
             ''|*[!0-9]*|0|1) return 1 ;;
         esac
-        if [ "$platform" = Linux ]; then
-            # comm 可含空格或括号；stat 的最后一个右括号之后才是固定字段。
-            { IFS= read -r command_name < "/proc/$pid/comm"; } 2>/dev/null || return 1
-            process_stat=$(<"/proc/$pid/stat") 2>/dev/null || return 1
-            read -r _ parent_pid _ _ tty_number _ \
-                <<< "${process_stat##*) }"
-        else
-            command_name=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
-            parent_pid=$(ps -o ppid= -p "$pid" 2>/dev/null) || return 1
-            parent_pid="${parent_pid//[[:space:]]/}"
-        fi
+        command_name=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
         command_name="${command_name##*/}"
         if [ "$command_name" = "codex" ] || [[ "$command_name" == codex-* ]]; then
-            # 只向最近的 Codex 所持终端投递，不能越过它误投宿主 shell。
-            if [ "$platform" = Linux ]; then
-                for fd in 0 1 2; do
-                    tty_name=$(readlink "/proc/$pid/fd/$fd" 2>/dev/null) || continue
-                    open_named_terminal "$tty_name" && return 0
-                done
-                # 兼容标准流全被捕获但仍有控制终端的旧场景；fd 回退不依赖 ps。
-                [ -n "$tty_number" ] && [ "$tty_number" != 0 ] || return 1
-            fi
             tty_name=$(ps -o tty= -p "$pid" 2>/dev/null) || return 1
             tty_name="${tty_name//[[:space:]]/}"
-            open_named_terminal "$tty_name"
-            return $?
+            case "$tty_name" in
+                ''|'??'|'?') ;;
+                *)
+                    candidate="/dev/$tty_name"
+                    open_terminal "$candidate" && return 0
+                    ;;
+            esac
         fi
-        pid="$parent_pid"
+        pid=$(ps -o ppid= -p "$pid" 2>/dev/null) || return 1
+        pid="${pid//[[:space:]]/}"
     done
     return 1
 }

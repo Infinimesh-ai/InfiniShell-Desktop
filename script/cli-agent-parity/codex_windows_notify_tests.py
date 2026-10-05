@@ -22,7 +22,7 @@ class NotifyCandidateTests(unittest.TestCase):
     def original(self):
         return (ASSETS / 'codex/revisions/rev3/scripts/warp-notify.sh').read_text(encoding='utf-8')
 
-    def test_rev6_resources_keep_reviewable_windows_payload_and_five_native_commands(self):
+    def test_rev7_keeps_legacy_transport_and_registers_five_native_powershell_commands(self):
         notify = (ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8')
         encoded = re.findall(r'-EncodedCommand ([A-Za-z0-9+/=]+)', notify)
         self.assertEqual(len(encoded), 1)
@@ -40,9 +40,10 @@ class NotifyCandidateTests(unittest.TestCase):
             self.assertEqual((ASSETS / 'codex' / name).read_bytes(),
                              (ASSETS / 'codex/source/plugins/warp' / name).read_bytes())
         metadata = json.loads((ASSETS / 'codex/PATCH_METADATA.json').read_text())
-        self.assertEqual(metadata['patch_revision'], 6)
-        self.assertFalse(metadata['windows_product_enabled'])
-        self.assertFalse(metadata['windows_uninstrumented_hooks_verified'])
+        self.assertEqual(metadata['patch_revision'], 7)
+        for name in ('on-notification.ps1', 'warp-notify.ps1'):
+            self.assertEqual((ASSETS / 'codex/scripts' / name).read_bytes(),
+                             (ASSETS / 'codex/source/plugins/warp/scripts' / name).read_bytes())
 
     @unittest.skipUnless(os.name == 'posix', 'Unix 兼容分支由真实 Bash/jq 回放')
     def test_unix_query_keeps_lf_crlf_without_requiring_jq_binary_option(self):

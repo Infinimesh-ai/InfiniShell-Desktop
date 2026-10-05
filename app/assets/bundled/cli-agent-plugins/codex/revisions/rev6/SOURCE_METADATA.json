@@ -3,8 +3,8 @@
   "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
   "cli_contract_version": "0.147.0",
   "plugin_version": "0.4.0",
-  "patch_revision": 7,
-  "directory": "codex-warp-0.4.0-rev7",
+  "patch_revision": 6,
+  "directory": "codex-warp-0.4.0-rev6",
   "files": {
     ".agents/plugins/marketplace.json": {
       "upstream_sha256": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce",
@@ -138,18 +138,13 @@
     },
     "plugins/warp/hooks/hooks.json": {
       "upstream_sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
-      "sha256": "9636c14558a69feaf9c6cdbbf3ec785ff705cfd76eac181fab1d1060dbdec271",
+      "sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
       "mode": 420
     },
     "plugins/warp/scripts/build-payload.sh": {
       "upstream_sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
       "sha256": "87fc88b087c7215d76b28206236ecd1eb1f82d1247f47e096065fb3506d63582",
       "mode": 493
-    },
-    "plugins/warp/scripts/on-notification.ps1": {
-      "upstream_sha256": null,
-      "sha256": "b56151ad21d91a62545c17ad1afa80a43a6f0b8a3c459c91f90b0213e2fd66a2",
-      "mode": 420
     },
     "plugins/warp/scripts/on-permission-request.sh": {
       "upstream_sha256": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
@@ -181,14 +176,9 @@
       "sha256": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
       "mode": 493
     },
-    "plugins/warp/scripts/warp-notify.ps1": {
-      "upstream_sha256": null,
-      "sha256": "f0beca15b5349e8783a6db1fcc07bdd578926beea3b1d519eb722d2bb07b525b",
-      "mode": 420
-    },
     "plugins/warp/scripts/warp-notify.sh": {
       "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
-      "sha256": "25c9bf4d4629b7cabcde91c9c26624454780e845047b2eef8cffcb0e9ca625f4",
+      "sha256": "536763501a57a3774c12850a1a028304f078f113ced05599e5c0964e54d4ad29",
       "mode": 493
     },
     "tests/test-hooks.sh": {

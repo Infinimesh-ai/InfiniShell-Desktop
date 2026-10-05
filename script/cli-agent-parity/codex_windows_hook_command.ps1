@@ -29,36 +29,33 @@ try {
     if ($NotificationHook -notin @(
         'on-session-start.sh', 'on-prompt-submit.sh', 'on-stop.sh',
         'on-permission-request.sh', 'on-post-tool-use.sh'
-    )) {
-        throw 'Unsupported notification hook'
-    }
+    )) { throw 'Unsupported notification hook' }
     $root = [Environment]::GetEnvironmentVariable('PLUGIN_ROOT')
-    if ([String]::IsNullOrWhiteSpace($root) -or -not [IO.Path]::IsPathRooted($root)) {
+    if ([String]::IsNullOrWhiteSpace($root) -or $root -notmatch '^(?:[a-zA-Z]:[\\/]|\\\\[^?\.\\]+\\[^\\]+)') {
         throw 'Missing absolute PLUGIN_ROOT'
     }
-    $script = [IO.Path]::GetFullPath((Join-Path $root ('scripts/' + $NotificationHook)))
-    if (-not [IO.File]::Exists($script)) {
-        throw 'Notification script is missing'
+    $root = [IO.Path]::GetFullPath($root)
+    $script = [IO.Path]::GetFullPath((Join-Path $root 'scripts/on-notification.ps1'))
+    # 路径只作为 argv；拒绝入口及其祖先的重解析点，避免验证根目录后跳到另一棵树。
+    $item = Get-Item -LiteralPath $script -Force
+    if ($item.PSIsContainer) { throw 'Notification script is missing' }
+    while ($null -ne $item) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Notification path is a reparse point' }
+        if ($item -is [IO.FileInfo]) { $item = $item.Directory } else { $item = $item.Parent }
     }
-    $bash = @(Get-Command bash.exe -CommandType Application -All -ErrorAction Stop |
-        Where-Object { [IO.File]::Exists((Join-Path (Split-Path $_.Source) 'msys-2.0.dll')) })
-    if ($bash.Count -eq 0) {
-        throw 'Git Bash usr/bin must be available on PATH'
-    }
-    $null = Get-Command jq.exe -CommandType Application -ErrorAction Stop
     $info = New-Object System.Diagnostics.ProcessStartInfo
-    $info.FileName = $bash[0].Source
+    $info.FileName = Join-Path $PSHOME 'powershell.exe'
     $info.UseShellExecute = $false
-    # 直接继承原始句柄；PS 5.1 的重定向 StreamWriter 会按控制台编码预先写入 BOM。
+    # 保留原始 stdin/stdout/stderr 与当前真实控制台，不经 PS 文本管道转码。
     $info.RedirectStandardInput = $false
     $info.RedirectStandardOutput = $false
     $info.RedirectStandardError = $false
     $info.CreateNoWindow = $false
-    $script = $script.Replace([char] 92, [char] 47)
-    $info.Arguments = '--noprofile --norc -- ' + (ConvertTo-NativeArgument $script)
+    $info.Arguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' +
+        (ConvertTo-NativeArgument $script) + ' -NotificationHook ' + (ConvertTo-NativeArgument $NotificationHook)
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $info
-    if (-not $process.Start()) { throw 'Git Bash did not start' }
+    if (-not $process.Start()) { throw 'PowerShell did not start' }
     try {
         $process.WaitForExit()
         $code = $process.ExitCode
@@ -67,6 +64,6 @@ try {
     }
     exit $code
 } catch {
-    [Console]::Error.WriteLine($_.Exception.Message)
+    [Console]::Error.WriteLine('infinishell_codex_hook_transport_error: native_launcher_failed')
     exit 1
 }
