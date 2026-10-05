@@ -5386,6 +5386,9 @@ ai-suggested-prompt-a11y = 建议的提示词：
     { $prompt }
 ai-mcp-tool-title = MCP 工具：{ $name }
 ai-mcp-tool-title-with-input = MCP 工具：{ $name }（{ $input }）
+ai-mcp-tool-timeout-before-dispatch = MCP 连接等待 { $seconds } 秒后超时，工具尚未派发。
+ai-mcp-tool-timeout-after-dispatch = MCP 工具调用等待 { $seconds } 秒后超时。工具可能已经执行，但结果未知，请勿自动重试。
+ai-mcp-tool-outcome-unknown = MCP 工具调用失败，未取得确认结果。工具可能已经执行，但结果未知，请勿自动重试。
 ai-navigate-to-open-comments = 导航到 { $path } 以打开这些评论
 ai-thought-for-duration = 思考了 { $duration }
 ai-stopped-task = 已停止任务：“{ $name }”

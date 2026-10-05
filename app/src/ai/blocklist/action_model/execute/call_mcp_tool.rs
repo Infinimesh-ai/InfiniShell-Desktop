@@ -3,6 +3,8 @@ use futures::future::BoxFuture;
 #[cfg(not(target_family = "wasm"))]
 use itertools::Itertools;
 #[cfg(not(target_family = "wasm"))]
+use mcp::tool_call::{TOOL_CALL_TIMEOUT, ToolCallError};
+#[cfg(not(target_family = "wasm"))]
 use warpui::SingletonEntity;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle};
 
@@ -388,7 +390,7 @@ mod tests;
 /// Handles the result of a call_tool request, converting it to an AIAgentActionResultType.
 #[cfg(not(target_family = "wasm"))]
 fn handle_call_tool_result(
-    res: Result<rmcp::model::CallToolResult, rmcp::ServiceError>,
+    res: Result<rmcp::model::CallToolResult, ToolCallError>,
     server_output_id: Option<crate::ai::blocklist::action_model::execute::ServerOutputId>,
     tool_name: String,
     ctx: &warpui::AppContext,
@@ -447,13 +449,46 @@ fn handle_call_tool_result(
             }
         }
         Err(e) => {
-            let error_message = e.to_string();
-            log::warn!("Executing MCP tool resulted in error: {e:?}");
+            let error_message = match &e {
+                ToolCallError::Service(error) => error.to_string(),
+                ToolCallError::OutcomeUnknown(_) => crate::t!("ai-mcp-tool-outcome-unknown"),
+                ToolCallError::DeadlineExceeded {
+                    may_have_executed: false,
+                } => crate::t!(
+                    "ai-mcp-tool-timeout-before-dispatch",
+                    seconds = TOOL_CALL_TIMEOUT.as_secs()
+                ),
+                ToolCallError::DeadlineExceeded {
+                    may_have_executed: true,
+                } => crate::t!(
+                    "ai-mcp-tool-timeout-after-dispatch",
+                    seconds = TOOL_CALL_TIMEOUT.as_secs()
+                ),
+            };
+            log::warn!("Executing MCP tool resulted in error");
+            let telemetry_error = match e {
+                ToolCallError::Service(error) => rmcp::RmcpError::Service(error).into(),
+                ToolCallError::OutcomeUnknown(_) => {
+                    crate::server::telemetry::MCPServerTelemetryError::TransportError(
+                        "mcp_tool_call_outcome_unknown".to_owned(),
+                    )
+                }
+                ToolCallError::DeadlineExceeded { may_have_executed } => {
+                    let code = if may_have_executed {
+                        "mcp_tool_call_deadline_after_dispatch"
+                    } else {
+                        "mcp_tool_call_deadline_before_dispatch"
+                    };
+                    crate::server::telemetry::MCPServerTelemetryError::TransportError(
+                        code.to_owned(),
+                    )
+                }
+            };
             send_telemetry_from_app_ctx!(
                 TelemetryEvent::MCPToolCallAccepted {
                     server_output_id,
                     tool_call: tool_name,
-                    error: Some(rmcp::RmcpError::Service(e).into()),
+                    error: Some(telemetry_error),
                 },
                 ctx
             );

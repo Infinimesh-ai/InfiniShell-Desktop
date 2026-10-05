@@ -9,6 +9,10 @@ use i18n_embed::fluent::fluent_language_loader;
 
 use super::*;
 
+#[cfg(target_os = "macos")]
+#[path = "i18n_mcp_layout_tests.rs"]
+mod mcp_layout;
+
 fn message_id(line: &str) -> Option<&str> {
     if line.starts_with(char::is_whitespace) || line.starts_with('#') || line.starts_with('-') {
         return None;
