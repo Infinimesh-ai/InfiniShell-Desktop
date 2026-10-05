@@ -174,19 +174,10 @@
     "real_transaction": {
       "source_commit": "74ddcaa42ada3e3f7306adab1fd5b7b69df30d13",
       "run_id": "r-f6ta9tcm",
-      "cases": [
-        "updated",
-        "swap_receipt_missing"
-      ],
+      "cases": ["updated", "swap_receipt_missing"],
       "independent_cold_recoveries": 1,
       "accepted": "真实公开入口升级至2.1.280；交换收据缺失后独立libtest恢复2.1.278，完整after与before相同。两场景before/prepared/after的README均为显式空ACL，包根及两CLI文件均保留非空只读ACL。",
-      "readme_acl": {
-        "format": "MacV1",
-        "extended": {
-          "flags": 0,
-          "entries": []
-        }
-      },
+      "readme_acl": {"format": "MacV1", "extended": {"flags": 0, "entries": []}},
       "native": "两代原候选均输出22字节2.1.280版本、退出0并确认清理；manifest/launch/exit/coalition及19份精确提交源码、四份官方tgz和签名后二进制原件均经独审。",
       "cleanup": "登记exit0/cleaned；先归档，再核进程/launchd/FD释放，仅对两个私有0500快照目录补owner写位并保持ACL，原短根已删除。",
       "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-claude-npm-empty-acl-macos-runs/r-f6ta9tcm",
@@ -10821,12 +10812,7 @@
     "run_exit_code": 1,
     "cleanup_ready": false,
     "full_failure_root": "/Users/zhishi/InfiniShell-Tests/r-75gduwee",
-    "completed_cases": [
-      "updated",
-      "swap_receipt_missing",
-      "external_change_preserved",
-      "candidate_changed_preserved"
-    ],
+    "completed_cases": ["updated", "swap_receipt_missing", "external_change_preserved", "candidate_changed_preserved"],
     "failed_case": "unreviewed_downgrade_rejected",
     "failure": "unreviewed_downgrade_not_rejected",
     "precise_contract": "Latest渠道的280→278返回ChannelMismatch且无计划；合法降级仅Stable。旧原件未保存refused.error，不据源码推断回填运行值。",
@@ -10843,11 +10829,7 @@
     "independent_review_sha256": "b046e46011afa93d08f678cfcdc8fe3a864bbc0f43d8a192cf31d0ea1d4f858b",
     "change": "仅受管官方PowerShell版本入口请求空输入与流式输出管道，并显式保留LASTEXITCODE；初值1避免无原生退出码时误报成功。",
     "boundary": "静态审查不证明ShellExecute回退被禁止、旧零输出根因或实际修复；固定正确版本/exit0/完整清理仍全部必需。",
-    "required_native_matrix": {
-      "cases": 5,
-      "independent_cold_recoveries": 3,
-      "witness": false
-    },
+    "required_native_matrix": {"cases": 5, "independent_cold_recoveries": 3, "witness": false},
     "local_gates": {
       "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-ps-pipeline-mac-channel-local-gates-v1.safe.json",
       "sha256": "8a7becbd1667b34ba05f7702aa09ced8d31d8d0905445be495323ecbc487ba75",
@@ -10877,14 +10859,7 @@
     "i18n_configurations": 2,
     "non_pass_nextest_statuses": 0,
     "warnings_retained": true,
-    "hooks": {
-      "pass": 23,
-      "skip": 2,
-      "missing_shells": [
-        "fish",
-        "zsh"
-      ]
-    },
+    "hooks": {"pass": 23, "skip": 2, "missing_shells": ["fish", "zsh"]},
     "independent_review_sha256": "58d69973ca853470ce265f9b761392052f7b31bba9ba0f00170e1dae1b0d231e"
   },
   "g09_mac_platform_binding_acceptance_20261004": {
@@ -10905,10 +10880,7 @@
     "supervisor_same_signed_bytes_association_sha256": "ecdb2bf9c13e3f43e2f26091955570e4119d0b14ecacbf37b8348bd66fec2164",
     "signed_worker_original_archived": false,
     "signed_worker_boundary": "此前wrapper部分删除；仅来源及签名后执行摘要留存，不以重建冒充原件。",
-    "old_failed_roots_archived_and_cleaned": [
-      "r-bn8_xz96",
-      "r-75gduwee"
-    ],
+    "old_failed_roots_archived_and_cleaned": ["r-bn8_xz96", "r-75gduwee"],
     "old_failure_exit_codes_preserved": true,
     "boundary": "后端原矩阵，不外推GUI/模型/忙碌消费者或其他平台；无需本地化变更。",
     "g09_closed": false
@@ -10924,11 +10896,7 @@
     "independent_cold_recoveries": 2,
     "native_exit_zero_and_cleanup_confirmed_generations": 4,
     "ordinary_pass": 2060,
-    "required_each_once": {
-      "linux_native": 12,
-      "npm": 18,
-      "i18n": 11
-    },
+    "required_each_once": {"linux_native": 12, "npm": 18, "i18n": 11},
     "busy_tests_pass_with_retained_eof_error_lines": 15,
     "scope_exact_match": true,
     "verified_official_artifacts": 3,
@@ -10977,6 +10945,9 @@
     },
     "newly_closed_gaps": [],
     "g09_closed": false,
-    "localization": "无需本地化变更；仅测试配置，无用户界面变化。"
+    "localization": "无需本地化变更；仅测试配置，无用户界面变化。",
+    "prior_final_index_sha256": "3e82fc75debafdbcc1e73ce8bc40224f1fe3dcc660ebcf4eed4ec1233fc01b4d",
+    "prior_errors_sha256": "d110ff5dbde657eb6b9c352648a9d9df5a1d1545b0ed055a577084f802f2fcc7",
+    "orphan_observer_cleanup_sha256": "c5da12cfbb0614e1b2f562bc5031987d0fde299af9461a5530f052441e42a336"
   }
 }
