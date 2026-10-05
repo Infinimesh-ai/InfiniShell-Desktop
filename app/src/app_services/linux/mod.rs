@@ -32,6 +32,11 @@ pub fn pass_startup_args_to_existing_instance(
     if args.finish_update {
         return Err(StartupArgsForwardingError::IgnoredAfterAutoUpdate);
     }
+    // FreeBSD 也编译本模块，但没有启用崩溃恢复模块。
+    #[cfg(target_os = "linux")]
+    if crate::crash_recovery::is_crash_recovery_process(args) {
+        return Err(StartupArgsForwardingError::IgnoredForCrashRecoveryProcess);
+    }
 
     warpui::r#async::block_on(async {
         let conn = zbus::Connection::session().await?;
@@ -72,6 +77,8 @@ pub enum StartupArgsForwardingError {
     /// arguments to the old (terminating) instance.
     #[error("should not forward args after an auto-update")]
     IgnoredAfterAutoUpdate,
+    #[error("should not forward arguments from the crash recovery process")]
+    IgnoredForCrashRecoveryProcess,
     /// An unknown D-Bus error occurred.
     #[error("unknown dbus error")]
     Unknown(zbus::Error),
@@ -259,3 +266,7 @@ impl warpui::Entity for DBusServiceHost {
 }
 
 impl SingletonEntity for DBusServiceHost {}
+
+#[cfg(all(test, feature = "release_bundle", target_os = "linux"))]
+#[path = "../startup_tests.rs"]
+mod startup_tests;

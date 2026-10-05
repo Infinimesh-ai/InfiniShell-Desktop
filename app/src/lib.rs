@@ -1126,6 +1126,9 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
             Err(app_services::linux::StartupArgsForwardingError::NoExistingInstance) => {}
             // If we just finished an auto-update, we should continue running.
             Err(app_services::linux::StartupArgsForwardingError::IgnoredAfterAutoUpdate) => {}
+            Err(
+                app_services::linux::StartupArgsForwardingError::IgnoredForCrashRecoveryProcess,
+            ) => {}
             // If we were unable to perform the forwarding for an unknown reason,
             // it's better to run a second instance than potentially end up in a
             // state where Zap refuses to run even a first instance.
@@ -1149,6 +1152,9 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
             Err(app_services::windows::StartupArgsForwardingError::NoExistingInstance) => {}
             // If we just finished an auto-update, we should continue running.
             Err(app_services::windows::StartupArgsForwardingError::IgnoredAfterAutoUpdate) => {}
+            Err(
+                app_services::windows::StartupArgsForwardingError::IgnoredForCrashRecoveryProcess,
+            ) => {}
             // If we were unable to perform the forwarding for an unknown reason,
             // it's better to run a second instance than potentially end up in a
             // state where Zap refuses to run even a first instance.
