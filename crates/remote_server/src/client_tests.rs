@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use futures::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use warp_core::SessionId;
@@ -442,6 +444,120 @@ async fn run_command_round_trip() {
     assert_eq!(success.stdout, b"output of: echo hello");
     assert!(success.stderr.is_empty());
     assert_eq!(success.exit_code, Some(0));
+}
+
+#[tokio::test]
+async fn caller_timeout_removes_pending_run_command_and_sends_abort() {
+    let (client_stream, server_stream) = tokio::io::duplex(4096);
+    let (server_read, _server_write) = tokio::io::split(server_stream);
+    let (client_read, client_write) = tokio::io::split(client_stream);
+    let executor = executor::Background::default();
+    let (client, _event_rx, _failure_rx, _host_rx) =
+        RemoteServerClient::new(client_read.compat(), client_write.compat_write(), &executor);
+    let mut server_read = server_read.compat();
+    let mut command = Box::pin(client.run_command(
+        SessionId::from(42u64),
+        "sleep 60".to_string(),
+        None,
+        Default::default(),
+    ));
+
+    // 先确认请求已发出，再取消调用方的 future，避免短超时与任务调度竞争。
+    let request = tokio::select! {
+        result = &mut command => panic!("服务端尚未响应，请求却已完成：{result:?}"),
+        request = tokio::time::timeout(
+            Duration::from_secs(5),
+            protocol::read_client_message(&mut server_read),
+        ) => request.expect("等待 RunCommand 超时").expect("读取 RunCommand"),
+    };
+    assert!(matches!(
+        unwrap_session_scoped(&request),
+        session_scoped_request::Message::RunCommand(_)
+    ));
+    assert_eq!(client.pending_requests.len(), 1);
+
+    assert!(tokio::time::timeout(Duration::ZERO, command).await.is_err());
+    assert!(client.pending_requests.is_empty());
+    let abort = tokio::time::timeout(
+        Duration::from_secs(5),
+        protocol::read_client_message(&mut server_read),
+    )
+    .await
+    .expect("取消请求后未收到 Abort")
+    .expect("读取 Abort");
+    let notification::Message::Abort(abort) = unwrap_notification(&abort) else {
+        panic!("取消请求后应发送 Abort");
+    };
+    assert_eq!(abort.request_id_to_abort, request.request_id);
+}
+
+#[tokio::test]
+async fn completed_run_command_does_not_send_abort() {
+    let (client_stream, server_stream) = tokio::io::duplex(4096);
+    let (server_read, server_write) = tokio::io::split(server_stream);
+    let (client_read, client_write) = tokio::io::split(client_stream);
+    let executor = executor::Background::default();
+    let (client, _event_rx, _failure_rx, _host_rx) =
+        RemoteServerClient::new(client_read.compat(), client_write.compat_write(), &executor);
+    let mut server_read = server_read.compat();
+    let mut server_write = server_write.compat_write();
+
+    let response = async {
+        let request = protocol::read_client_message(&mut server_read)
+            .await
+            .expect("读取 RunCommand");
+        protocol::write_server_message(
+            &mut server_write,
+            &ServerMessage {
+                request_id: request.request_id,
+                message: Some(server_message::Message::RunCommandResponse(
+                    RunCommandResponse {
+                        result: Some(run_command_response::Result::Success(RunCommandSuccess {
+                            stdout: Vec::new(),
+                            stderr: Vec::new(),
+                            exit_code: Some(0),
+                        })),
+                    },
+                )),
+            },
+        )
+        .await
+        .expect("写入 RunCommand 响应");
+    };
+    let (result, ()) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(
+            client.run_command(
+                SessionId::from(42u64),
+                "true".to_string(),
+                None,
+                Default::default(),
+            ),
+            response,
+        )
+    })
+    .await
+    .expect("正常请求未完成");
+    assert!(result.is_ok());
+    assert!(client.pending_requests.is_empty());
+
+    // 用后续通知作为队列边界，无需等待一段时间来猜测是否出现了多余 Abort。
+    let boundary = ClientMessage::notification(notification::Message::SessionBootstrapped(
+        SessionBootstrapped {
+            session_id: 43,
+            shell_type: "bash".to_string(),
+            shell_path: Some("/bin/bash".to_string()),
+            ..Default::default()
+        },
+    ));
+    client.send_notification(boundary.clone());
+    let next_message = tokio::time::timeout(
+        Duration::from_secs(5),
+        protocol::read_client_message(&mut server_read),
+    )
+    .await
+    .expect("未收到边界通知")
+    .expect("读取边界通知");
+    assert_eq!(next_message, boundary);
 }
 
 #[tokio::test]
