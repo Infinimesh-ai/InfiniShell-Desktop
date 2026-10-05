@@ -230,29 +230,46 @@ jobs:
             cargo check --locked -p warp --features "$APP_FEATURES"
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/cargo-check.log"
 
+      - name: 准备 Windows 作业内 Python
+        id: windows_notification_python
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
+
+      - name: 准备 Linux 固定 Python
+        id: linux_notification_python
+        if: ${{ matrix.platform == 'linux' }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        timeout-minutes: 10
+        with:
+          python-version: '3.13.15'
+          architecture: x64
+          check-latest: false
+          update-environment: true
+
       - name: 验证 Codex 通知安装事务与真实终端传输
         shell: bash
+        env:
+          PYTHONUTF8: "1"
         run: |
           set -euo pipefail
           python=python3
           if [[ "$RUNNER_OS" == Windows ]]; then
             python=python
           fi
-          {
-            "$python" -B script/cli-agent-parity/notification_patch_tests.py -v
-            "$python" -B script/cli-agent-parity/codex_persistent_source_tests.py -v
-            "$python" -B script/cli-agent-parity/codex_windows_hook_tests.py -v
-            "$python" -B script/cli-agent-parity/codex_windows_notify_tests.py -v
-            if [[ "$RUNNER_OS" == Windows ]]; then
-              "$python" -B script/cli-agent-parity/codex_native_windows_notification_tests.py -v
-            else
-              "$python" -B script/cli-agent-parity/codex_detached_notification_tests.py -v
-              "$python" -B script/cli-agent-parity/tmux_notification_tests.py -v
-            fi
-          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/codex-notifications.log"
+          modules=(notification_patch_tests codex_persistent_source_tests codex_windows_hook_tests codex_windows_notify_tests)
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            modules+=(codex_native_windows_notification_tests)
+          else
+            modules+=(codex_detached_notification_tests tmux_notification_tests)
+          fi
+          # 收齐独立用例的失败，不因首项失败掩盖其余平台证据。
+          "$python" -B -c 'import sys, unittest; sys.path.insert(0, "script/cli-agent-parity"); unittest.main(module=None)' \
+            "${modules[@]}" -v 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/codex-notifications.log"
 
       - name: 采集 Unix 正式 Codex Hook 信任摘要
-        if: ${{ matrix.platform == 'linux' }}
+        if: ${{ !cancelled() && matrix.platform == 'linux' && steps.linux_notification_python.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -262,7 +279,7 @@ jobs:
             --output "$UPSTREAM_ESSENCE_LOG_DIR/codex-hook-trust-0.156.1.json"
 
       - name: 采集 Windows 正式 Codex Hook 信任摘要
-        if: ${{ matrix.platform == 'windows' }}
+        if: ${{ !cancelled() && matrix.platform == 'windows' && steps.windows_notification_python.outcome == 'success' }}
         shell: pwsh
         env:
           PYTHONUTF8: "1"
