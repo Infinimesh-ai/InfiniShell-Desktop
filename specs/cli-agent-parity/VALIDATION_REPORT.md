@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：Mac 显式空 ACL 漏读修复，真实事务待验
+
+同一个原fd的公开 `fgetattrlist` 返回56字节完整属性（44字节显式空ACL、0条ACE），旧 `acl_get_fd_np` 却返回缺失；真实红测 `r-7nu39tcd` 失败日志SHA `fc5f2240de83b3c1bcd21178cc7daedada4a2a4d792ff1a9ca165c69503cfb43` 已保留。先前“APFS将空ACL归一化为缺失”的解释被该原生证据推翻；旧失败不改为通过，普通文件空ACL也不套用特殊链接权限的范围豁免。
+
+现已改用原fd的有界扩展安全属性读取，严格校验引用、长度、条数及原ACL字段；无ACL与显式空ACL保持不同。25项ACL回归通过，含真实复制到新inode、读回和移除；另2项真实包树回归确认普通链接不跟随带空ACL的目标、未跟踪ACL的独立消费者拒绝显式空ACL。日志SHA分别为 `200837f4bfc71c7d77b7def5c25ff42fa432769d2d1ddbad54cc361271fa6831`、`076471fab596a805e108456f40a437ea0129a939f3833c8ffd1e3e9744b87e46`。
+
+新增版本化 `readonly-inherited-empty-v1` 仅在Mac把README设为显式空ACL，包根及两CLI文件仍为非空只读ACL；保留旧v1和原两场景／一次独立冷恢复的断言。Mac更新385项（`r-lio7dh96`）、i18n11项（`r-3u9bmogv`）、warp／warp_tui check（`r-eq5a5xgc`）、Claude driver23项、通知driver20项、workflow15项和actionlint通过；Linux原生trace 7项未在Mac执行。真实事务尚未完成，不能由门禁通过推断升级完成。Linux仅新增专用feature的有界通知阶段记录，不连带启用test-util，不改既有发送期限；原失败和最终同源门禁仍待完成。**新增关闭0项，G09开放；无需本地化变更，既有英中提示语义和布局保持。**
+
+## 2026-10-05：固定 Windows PowerShell 实现取证完成，运行结论仍为失败
+
+[37264336924](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37264336924) 精确绑定 `d0d61069c3d9fb7f23e57a5ebf783b8ed4dbf5b0`，只读采集实际 PowerShell 5.1.26100.7462。71个目标方法中69个托管体解码成功（8243字节IL）；`FindExecutableW` 与 `SHGetFileInfo` 是无IL的原生PInvoke，现有严格规则因此返回 `partial`／exit1，**正式整轮为failure，不改记成功**。四个原文件前后SHA相同，句柄均释放，没有调用目标候选；官方ZIP大小、摘要、CRC、唯一成员及所有IL字节／分支／异常区域均已复核。根复核SHA `41970d6b52c672b1ed5d1172594053990b4fdf07b0632443cb33b106c76dbce3`，独审SHA `2bf88c99c0b72273c327816b72b0b745eab2be7839def023eca635a2598e8b5c`。
+
+`powershell.exe` 摘要与a5失败原件一致，但a5没有保存三个托管程序集的实际SHA／MVID，本轮IL不能反推为a5相同DLL或已执行分支。静态实现确认 `Process.Start` 在CreateProcess后仍构造标准流，PowerShell的部分启动／分类异常又发生于等待finally之前；Node已经CREATE不等于托管启动返回成功，也不证明发生ShellExecute回退。
+
+a5的原始stderr已核到完整seal／replay链，候选捕获流没有错误字节；这不排除内部ErrorRecord或隐藏控制台输出。原先保存的16次CLR异常全部早于Node CREATE，后10次仅记录丢弃数，不能用启动期HRESULT定位失败窗口。下一步需原事件线程的只读异常对象和方法／IL位置，既有原失败、原期限及后续未运行场景保持。**新增关闭0项，G09开放，PR草稿；无需本地化变更。**
+
 ## 2026-10-05：用户确认特殊权限安装可使用原安装工具升级
 
 用户明确允许：带额外共享写权限、文件保护标志或特殊链接权限的安装，可提示使用原安装工具升级；普通安装和已支持只读ACL安装继续保留自动升级要求。该决定不取消来源、身份、权限、恢复或清理核验，也不把安全拒绝记为自动升级成功。以下逐轮“范围待用户决定”保留为当时的历史记录，当前安全属性范围以本节为准，不改写既有源码与验收事实。

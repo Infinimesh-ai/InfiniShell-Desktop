@@ -591,7 +591,23 @@ jobs:
         shell: bash
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed::linux::tests::)'
 
-      # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
+      # 诊断仅在专用 feature 中经专用匿名管道启用；先保存通知 worker，再重建默认 supervisor。
+      - name: Build Linux notification worker with bounded phase evidence
+        id: notify_trace_worker
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 30
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          set -euo pipefail
+          cargo nextest run --locked --no-fail-fast -p warp --lib --features cli-agent-notify-trace -E 'test(cli_agent_notify_trace::tests::)'
+          cargo build -p warp_tui --bin infinishell-tui --features cli-agent-notify-trace
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          # 正式身份门禁要求单链接入口；保留独立副本，不修改 Cargo 缓存产物。
+          install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
+
+      # 默认构建仍用于正式 supervisor；通知诊断 feature 不传入原子更新等后续验收。
       - name: Build CLI process supervisor
         id: supervisor
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
@@ -601,16 +617,13 @@ jobs:
         run: cargo build -p warp_tui --bin infinishell-tui
 
       - name: Test installed Grok hook through the native notification worker
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' && steps.notify_trace_worker.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
-          # Cargo 可以把顶层二进制硬链接到 deps 产物；正式安装身份门禁要求单链接文件。
-          # 复制同提交构建产物到 runner 私有目录，不放宽生产 worker 的身份校验。
-          install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
           export INFINISHELL_TEST_NOTIFY_WORKER="$RUNNER_TEMP/infinishell-test-notify-worker"
+          export INFINISHELL_TEST_NOTIFY_TRACE_REQUIRED=1
           python3 -B script/cli-agent-parity/run_installed_grok_hook_tests.py -v
           python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
 

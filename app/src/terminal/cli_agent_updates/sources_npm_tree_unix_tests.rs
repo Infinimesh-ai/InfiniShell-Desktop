@@ -175,6 +175,52 @@ fn set_readonly_acl(file: &File, inherit: bool) -> acl::Acl {
     desired
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn mac_untracked_empty_acl_is_rejected() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let package = directory(&root, "package", b"payload");
+    let file = package.read_file(OsStr::new("payload")).unwrap();
+    reject_extra_permissions(&file).unwrap();
+    let empty: acl::Acl =
+        serde_json::from_str(r#"{"format":"MacV1","extended":{"flags":0,"entries":[]}}"#).unwrap();
+    acl::apply_to_new(&file, &acl::capture(&file).unwrap(), &empty).unwrap();
+
+    assert!(matches!(
+        reject_extra_permissions(&file),
+        Err(Error::UnsupportedSource)
+    ));
+    // 已跟踪 ACL 的普通包仍应接受该状态，不能将拒绝器的旧消费者策略扩展到完整快照。
+    assert_eq!(
+        package.snapshot().unwrap().nodes[Path::new("payload")]
+            .identity
+            .acl,
+        empty.into_optional()
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn mac_plain_symlink_does_not_follow_empty_acl_target() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    fs::write(root.join("grok-native"), b"native").unwrap();
+    symlink("./grok-native", root.join("grok")).unwrap();
+    let parent = Directory::open(&root).unwrap();
+    let target = parent.read_file(OsStr::new("grok-native")).unwrap();
+    let empty: acl::Acl =
+        serde_json::from_str(r#"{"format":"MacV1","extended":{"flags":0,"entries":[]}}"#).unwrap();
+    acl::apply_to_new(&target, &acl::capture(&target).unwrap(), &empty).unwrap();
+    assert!(reject_extra_permissions(&target).is_err());
+
+    // 走真实 O_SYMLINK 和原链接身份核验；目标的空 ACL 不能误当成链接自己的 ACL。
+    let before = fs::symlink_metadata(root.join("grok")).unwrap();
+    let link = parent.grok_link(OsStr::new("grok")).unwrap();
+    assert_eq!(link.device, before.dev());
+    assert_eq!(link.inode, before.ino());
+}
+
 #[test]
 fn replacement_preserves_existing_acl_and_inherits_new_members_before_exchange() {
     let temporary = tempfile::tempdir().unwrap();

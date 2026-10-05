@@ -14,6 +14,10 @@ mod autoupdate;
 mod banner;
 mod changelog_model;
 mod chip_configurator;
+#[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+#[path = "terminal/cli_agent_hook_writer_trace.rs"]
+#[doc(hidden)]
+pub mod cli_agent_notify_trace;
 mod cloud_object;
 mod code;
 mod code_review;

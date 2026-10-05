@@ -104,6 +104,139 @@ fn mac_absent_and_present_empty_acl_have_distinct_journal_descriptions() {
     );
 }
 
+fn mac_attribute_words(words: &[u32]) -> Vec<u8> {
+    words.iter().flat_map(|word| word.to_ne_bytes()).collect()
+}
+
+#[test]
+fn mac_attribute_buffer_distinguishes_missing_and_empty_acl_with_flags() {
+    assert_eq!(
+        decode_mac_attributes(&mac_attribute_words(&[12, 8, 0])).unwrap(),
+        None
+    );
+    let bytes = mac_attribute_words(&[
+        56,
+        8,
+        44,
+        MAC_MAGIC,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        MAC_NO_INHERIT,
+    ]);
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap(),
+        Some(MacAcl {
+            flags: MAC_NO_INHERIT,
+            entries: Entries(vec![]),
+        })
+    );
+}
+
+#[test]
+fn mac_attribute_buffer_converts_native_ace_without_losing_uuid_or_rights() {
+    let bytes = mac_attribute_words(&[
+        80, 8, 68, MAC_MAGIC, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0x11111111, 0x11111111, 0x11111111,
+        0x11111111, 0x162, 0x1004,
+    ]);
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap(),
+        Some(MacAcl {
+            flags: 0,
+            entries: Entries(vec![MacAce {
+                uuid: [0x11; 16],
+                tag: 2,
+                flags: 0x160,
+                rights: 0x1004,
+            }]),
+        })
+    );
+}
+
+#[test]
+fn mac_attribute_buffer_rejects_truncation_aliases_and_excessive_counts() {
+    assert_eq!(
+        decode_mac_attributes(&[0; 11]).unwrap_err().operation,
+        "mac_attribute_header"
+    );
+    assert_eq!(
+        decode_mac_attributes(&mac_attribute_words(&[56, 8, 44]))
+            .unwrap_err()
+            .operation,
+        "mac_attribute_size"
+    );
+    assert_eq!(
+        decode_mac_attributes(&mac_attribute_words(&[12, 0, 0]))
+            .unwrap_err()
+            .operation,
+        "mac_attribute_reference"
+    );
+    assert_eq!(
+        decode_mac_attributes(&mac_attribute_words(&[12, u32::MAX, 0]))
+            .unwrap_err()
+            .operation,
+        "mac_attribute_reference"
+    );
+    assert_eq!(
+        decode_mac_attributes(&mac_attribute_words(&[12, 8, 44]))
+            .unwrap_err()
+            .operation,
+        "mac_attribute_reference"
+    );
+    assert_eq!(
+        decode_mac_attributes(&mac_attribute_words(&[u32::MAX, 8, 0]))
+            .unwrap_err()
+            .kind,
+        FailureKind::TooLarge
+    );
+    let mut bytes = mac_attribute_words(&[56, 8, 44, MAC_MAGIC, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]);
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap_err().operation,
+        "mac_attribute_acl"
+    );
+    bytes[48..52].copy_from_slice(&129_u32.to_ne_bytes());
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap_err().operation,
+        "mac_count"
+    );
+}
+
+#[test]
+fn mac_attribute_buffer_rejects_unknown_security_fields_and_write_grants() {
+    let mut bytes = mac_attribute_words(&[56, 8, 44, MAC_MAGIC, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    bytes[12..16].copy_from_slice(&0_u32.to_ne_bytes());
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap_err().operation,
+        "mac_external_format"
+    );
+    bytes[12..16].copy_from_slice(&MAC_MAGIC.to_ne_bytes());
+    bytes[16] = 1;
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap_err().operation,
+        "mac_external_format"
+    );
+    bytes[16] = 0;
+    bytes[52..56].copy_from_slice(&1_u32.to_ne_bytes());
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap_err().operation,
+        "mac_acl_flags"
+    );
+    let bytes = mac_attribute_words(&[
+        80, 8, 68, MAC_MAGIC, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0x11111111, 0x11111111, 0x11111111,
+        0x11111111, 1, 4,
+    ]);
+    assert_eq!(
+        decode_mac_attributes(&bytes).unwrap_err().operation,
+        "mac_allow_write"
+    );
+}
+
 #[test]
 fn linux_fixed_xattr_preserves_mask_instead_of_recalculating_it() {
     let parsed = decode_posix(POSIX_READ).unwrap();
@@ -385,20 +518,51 @@ mod mac_native {
     }
 
     #[test]
-    fn mac_fd_empty_acl_normalization_is_not_reported_as_exact_copy() {
+    fn mac_fd_empty_acl_is_captured_copied_and_removed_exactly() {
         let root = tempfile::tempdir().unwrap();
         let file = create_file(&root.path().join("empty"));
         let before = capture(&file).unwrap();
         let empty = acl(vec![]);
-        // portable ACL 表示区分空与缺失；本机文件系统规范化后不能报告精确复制成功。
-        let error = apply_to_new(&file, &before, &empty).unwrap_err();
-        assert_eq!(error.operation, "acl_readback");
-        assert_eq!(error.kind, FailureKind::ReadbackMismatch);
-        assert!(error.write_attempted);
+        assert!(before.acl.is_absent());
+        // 用公开原 fd 属性接口独立核实内核保存了零条目 ACL，不能由 acl_get_fd_np 的缺失返回推断规范化。
+        platform::write(&file, &empty).unwrap();
+        let mut attributes = libc::attrlist {
+            bitmapcount: libc::ATTR_BIT_MAP_COUNT,
+            reserved: 0,
+            commonattr: libc::ATTR_CMN_EXTENDED_SECURITY,
+            volattr: 0,
+            dirattr: 0,
+            fileattr: 0,
+            forkattr: 0,
+        };
+        let mut raw = [0_u32; 32];
+        assert_eq!(
+            unsafe {
+                libc::fgetattrlist(
+                    file.as_raw_fd(),
+                    (&mut attributes as *mut libc::attrlist).cast(),
+                    raw.as_mut_ptr().cast(),
+                    std::mem::size_of_val(&raw),
+                    libc::FSOPT_REPORT_FULLSIZE,
+                )
+            },
+            0,
+            "{}",
+            io::Error::last_os_error()
+        );
+        assert_eq!(&raw[..4], &[56, 8, 44, MAC_MAGIC]);
+        assert_eq!(&raw[12..14], &[0, 0]);
         let actual = capture(&file).unwrap();
-        assert_eq!(actual.acl, Acl::absent());
-        assert_ne!(actual.acl, empty);
+        assert_eq!(actual.acl, empty);
         assert!(before.identity.unchanged_except_ctime(&actual.identity));
+        let copy = create_file(&root.path().join("copy"));
+        let applied = apply_to_new(&copy, &capture(&copy).unwrap(), &actual.acl).unwrap();
+        assert_eq!(applied.acl, empty);
+        verify(&copy, &applied).unwrap();
+        let removed = apply_to_new(&copy, &applied, &Acl::absent()).unwrap();
+        assert!(removed.acl.is_absent());
+        assert_ne!(removed.acl, empty);
+        drop(copy);
         drop(file);
         root.close().unwrap();
     }

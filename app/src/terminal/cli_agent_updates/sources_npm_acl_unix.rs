@@ -17,6 +17,8 @@ const MAC_HEADER: usize = 44;
 #[cfg(any(target_os = "macos", test))]
 const MAC_ACE: usize = 24;
 #[cfg(any(target_os = "macos", test))]
+const MAC_ATTRIBUTE_HEADER: usize = 12;
+#[cfg(any(target_os = "macos", test))]
 const MAC_MAGIC: u32 = 0x012c_c16d;
 const MAC_NO_INHERIT: u32 = 1 << 17;
 const MAC_ENTRY_FLAGS: u32 = 0x1f0;
@@ -429,6 +431,54 @@ fn decode_mac(bytes: &[u8]) -> Result<MacAcl, Failure> {
 }
 
 #[cfg(any(target_os = "macos", test))]
+fn decode_mac_attributes(bytes: &[u8]) -> Result<Option<MacAcl>, Failure> {
+    if bytes.len() < MAC_ATTRIBUTE_HEADER {
+        return Err(fail("mac_attribute_header", FailureKind::Invalid));
+    }
+    let word = |at| u32::from_ne_bytes(bytes[at..at + 4].try_into().unwrap());
+    let total = word(0) as usize;
+    if total > MAC_ATTRIBUTE_HEADER + MAC_HEADER + MAX_ENTRIES * MAC_ACE {
+        return Err(fail("mac_attribute_size", FailureKind::TooLarge));
+    }
+    if total < MAC_ATTRIBUTE_HEADER || total > bytes.len() {
+        return Err(fail("mac_attribute_size", FailureKind::Invalid));
+    }
+    // 只请求一个可变属性：长度后紧接 attrreference，偏移从该引用起算，不能指向头部或填充区。
+    let length = word(8) as usize;
+    if word(4) != 8 || length != total - MAC_ATTRIBUTE_HEADER {
+        return Err(fail("mac_attribute_reference", FailureKind::Invalid));
+    }
+    if length == 0 {
+        return Ok(None);
+    }
+    let native = &bytes[MAC_ATTRIBUTE_HEADER..total];
+    if native.len() < MAC_HEADER {
+        return Err(fail("mac_attribute_acl", FailureKind::Invalid));
+    }
+    let count = u32::from_ne_bytes(native[36..40].try_into().unwrap()) as usize;
+    if count > MAX_ENTRIES {
+        return Err(fail("mac_count", FailureKind::TooLarge));
+    }
+    if native.len() != MAC_HEADER + count * MAC_ACE {
+        return Err(fail("mac_attribute_acl", FailureKind::Invalid));
+    }
+    // XNU 的 ATTR_CMN_EXTENDED_SECURITY 返回本机字节序；仅转换整数，UUID 和条目顺序保持原样。
+    let mut portable = native.to_vec();
+    for at in [0, 36, 40] {
+        let value = u32::from_ne_bytes(portable[at..at + 4].try_into().unwrap());
+        portable[at..at + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    for entry in portable[MAC_HEADER..].chunks_exact_mut(MAC_ACE) {
+        for at in [16, 20] {
+            let value = u32::from_ne_bytes(entry[at..at + 4].try_into().unwrap());
+            entry[at..at + 4].copy_from_slice(&value.to_be_bytes());
+        }
+    }
+    // 复用既有完整校验；44 字节、零条目仍是 Some，不能折叠成属性缺失。
+    decode_mac(&portable).map(Some)
+}
+
+#[cfg(any(target_os = "macos", test))]
 fn encode_mac(value: &MacAcl) -> Result<Vec<u8>, Failure> {
     validate_mac(value)?;
     let mut bytes = vec![0; MAC_HEADER];
@@ -492,6 +542,12 @@ pub(super) fn capture(file: &File) -> Result<Captured, Failure> {
         identity: before,
         acl,
     })
+}
+
+/// 未跟踪 ACL 的消费者只判缺失；原 fd 的对象类型、所有权和前后身份仍由调用方校验。
+#[cfg(target_os = "macos")]
+pub(super) fn is_absent_on_fd(file: &File) -> Result<bool, Failure> {
+    platform::read(file).map(|value| value.is_absent())
 }
 
 pub(super) fn verify(file: &File, expected: &Captured) -> Result<(), Failure> {
@@ -616,12 +672,8 @@ mod platform {
     use std::ffi::c_void;
 
     unsafe extern "C" {
-        fn acl_get_fd_np(fd: libc::c_int, kind: libc::c_int) -> *mut c_void;
         fn acl_set_fd_np(fd: libc::c_int, acl: *mut c_void, kind: libc::c_int) -> libc::c_int;
         fn acl_free(acl: *mut c_void) -> libc::c_int;
-        fn acl_size(acl: *mut c_void) -> libc::ssize_t;
-        fn acl_copy_ext(bytes: *mut c_void, acl: *mut c_void, size: libc::ssize_t)
-        -> libc::ssize_t;
         fn acl_copy_int(bytes: *const c_void) -> *mut c_void;
     }
     struct OwnedAcl(*mut c_void);
@@ -632,35 +684,34 @@ mod platform {
     }
 
     pub(super) fn read(file: &File) -> Result<Acl, Failure> {
-        let raw = unsafe { acl_get_fd_np(file.as_raw_fd(), 0x100) };
-        if raw.is_null() {
-            let error = native("acl_get_fd_np");
-            return if error.errno == Some(libc::ENOENT) {
-                Ok(Acl::MacV1 { extended: None })
-            } else {
-                Err(error)
-            };
+        let mut attributes = libc::attrlist {
+            bitmapcount: libc::ATTR_BIT_MAP_COUNT,
+            reserved: 0,
+            commonattr: libc::ATTR_CMN_EXTENDED_SECURITY,
+            volattr: 0,
+            dirattr: 0,
+            fileattr: 0,
+            forkattr: 0,
+        };
+        // acl_get_fd_np 的 libc 路径会漏掉 44 字节空 ACL；直接从原 fd 读取公开属性，不按路径重开。
+        let mut aligned = [0_u32; (MAC_ATTRIBUTE_HEADER + MAC_HEADER + MAX_ENTRIES * MAC_ACE) / 4];
+        if unsafe {
+            libc::fgetattrlist(
+                file.as_raw_fd(),
+                (&mut attributes as *mut libc::attrlist).cast(),
+                aligned.as_mut_ptr().cast(),
+                std::mem::size_of_val(&aligned),
+                libc::FSOPT_REPORT_FULLSIZE,
+            )
+        } != 0
+        {
+            return Err(native("fgetattrlist_acl"));
         }
-        let owned = OwnedAcl(raw);
-        let size = unsafe { acl_size(owned.0) };
-        if size < 0 {
-            return Err(native("acl_size"));
-        }
-        if size as usize > MAC_HEADER + MAX_ENTRIES * MAC_ACE || size < MAC_HEADER as isize {
-            return Err(fail("acl_size", FailureKind::TooLarge));
-        }
-        // 使用 u32 数组保证公开 kauth_filesec 外部格式的对齐，不读 opaque acl_t 内存布局。
-        let mut aligned = [0_u32; (MAC_HEADER + MAX_ENTRIES * MAC_ACE) / 4];
-        let copied = unsafe { acl_copy_ext(aligned.as_mut_ptr().cast(), owned.0, size) };
-        if copied < 0 {
-            return Err(native("acl_copy_ext"));
-        }
-        if copied != size {
-            return Err(fail("acl_copy_size", FailureKind::Changed));
-        }
-        let bytes = unsafe { std::slice::from_raw_parts(aligned.as_ptr().cast(), size as usize) };
+        let bytes = unsafe {
+            std::slice::from_raw_parts(aligned.as_ptr().cast(), std::mem::size_of_val(&aligned))
+        };
         Ok(Acl::MacV1 {
-            extended: Some(decode_mac(bytes)?),
+            extended: decode_mac_attributes(bytes)?,
         })
     }
     pub(super) fn write(file: &File, value: &Acl) -> Result<(), Failure> {
@@ -806,6 +857,27 @@ pub(super) fn readonly_file_test_acl(mode: u32) -> Result<Acl, Failure> {
     }
     value.validate(false, mode)?;
     Ok(value)
+}
+
+/// 仅新版 Mac 真实事务夹具使用；显式空 ACL 仍要求原有普通文件 mode 合同。
+#[cfg(test)]
+pub(super) fn empty_file_test_acl(mode: u32) -> Result<Acl, Failure> {
+    if mode & !0o777 != 0 || mode & 0o022 != 0 {
+        return Err(fail("fixture_mode", FailureKind::Unsupported));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Ok(Acl::MacV1 {
+            extended: Some(MacAcl {
+                flags: 0,
+                entries: Entries(vec![]),
+            }),
+        })
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(fail("fixture_empty_acl_platform", FailureKind::Unsupported))
+    }
 }
 
 #[cfg(test)]

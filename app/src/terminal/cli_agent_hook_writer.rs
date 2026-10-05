@@ -187,6 +187,8 @@ fn read_input(mut input: impl io::Read) -> Result<Vec<u8>> {
 /// 只能从一次性 worker 入口调用：超时后入口退出，内核关闭所有句柄并释放锁。
 /// 成功仅说明终端写入完成，不能视为应用已接受通知或允许重投。
 pub(crate) fn run_worker(protocol_version: bool, require_protocol: Option<u32>) -> Result<()> {
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::Worker);
     // 在读取输入或打开终端前核对协议，避免查询与发送之间再派生一个 worker。
     if require_protocol.is_some_and(|version| version != 1 || protocol_version) {
         return Err(HookWriteError::ProtocolMismatch);
@@ -198,11 +200,15 @@ pub(crate) fn run_worker(protocol_version: bool, require_protocol: Option<u32>) 
     }
     let (sender, receiver) = mpsc::sync_channel(1);
     thread::spawn(move || {
+        #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+        crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::InputBegin);
         let _ = sender.send(read_input(io::stdin().lock()));
     });
     let bytes = receiver
         .recv_timeout(IO_TIMEOUT)
         .map_err(|_| HookWriteError::InputTimeout)??;
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::InputReceived);
     let notification = parse_notification(&bytes)?;
     let (sender, receiver) = mpsc::sync_channel(1);
     let progress = Arc::new(AtomicU8::new(0));
@@ -229,19 +235,29 @@ pub(crate) fn run_worker(protocol_version: bool, require_protocol: Option<u32>) 
             }
         })??;
     if require_protocol.is_some() {
+        #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+        crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::ReplyBegin);
         io::stdout()
             .write_all(PROTOCOL_REPLY)
             .map_err(|_| HookWriteError::WriteFailed)?;
+        #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+        crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::ReplyEnd);
     }
     Ok(())
 }
 
 fn send_notification(notification: Notification, progress: &AtomicU8) -> Result<()> {
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::Prepare);
     let tmux = std::env::var_os("TMUX").is_some_and(|value| !value.is_empty());
     let bytes = encode_frame(&notification, tmux)?;
     progress.store(1, Ordering::Relaxed);
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::Terminal);
     let mut terminal = open_terminal(tmux)?;
     progress.store(2, Ordering::Relaxed);
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::Cache);
     let cache = dirs::cache_dir().ok_or(HookWriteError::LockUnavailable)?;
     let directory = cache.join("infinishell-cli-agent-notifications-v1");
     send_frame(&directory, &mut terminal, &bytes, progress)
@@ -254,12 +270,23 @@ fn send_frame(
     progress: &AtomicU8,
 ) -> Result<()> {
     progress.store(3, Ordering::Relaxed);
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::LockOpen);
     let lock = open_lock(directory)?;
     progress.store(4, Ordering::Relaxed);
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::LockWait);
     acquire_lock(&lock, IO_TIMEOUT)?;
     // 锁句柄覆盖全部短写；保留空锁文件，进程死亡时仅由内核解除占用。
     progress.store(5, Ordering::Relaxed);
-    write_frame(terminal, bytes, IO_TIMEOUT)
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::FrameWrite);
+    let result = write_frame(terminal, bytes, IO_TIMEOUT);
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    if result.is_ok() {
+        crate::cli_agent_notify_trace::emit(crate::cli_agent_notify_trace::Stage::FrameWritten);
+    }
+    result
 }
 
 fn acquire_lock(lock: &File, timeout: Duration) -> Result<()> {

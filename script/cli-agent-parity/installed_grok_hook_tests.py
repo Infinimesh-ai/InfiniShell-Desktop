@@ -15,7 +15,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 
-from run_installed_grok_hook import (DIAGNOSTIC_LIMIT, diagnostic_preload, plain_file,
+from run_installed_grok_hook import (DIAGNOSTIC_LIMIT, NativeWorkerTrace, diagnostic_preload, plain_file,
                                      verify_installed_hook, worker_diagnostics)
 
 
@@ -122,6 +122,13 @@ class InstalledGrokHookTests(unittest.TestCase):
         self.assertEqual(result["worker_sha256"], self.worker_sha)
         self.assertEqual(result["stdout_bytes"], 0)
         self.assertEqual(result["stderr_bytes"], 0)
+        if os.environ.get("INFINISHELL_TEST_NOTIFY_TRACE_REQUIRED") == "1":
+            # 同一次成功调用还须证明专用取证通道有效；没有记录不能当成阶段未执行。
+            trace = result["native_worker_diagnostics"]
+            self.assertEqual(trace["status"], "captured", trace)
+            self.assertEqual(trace["events"][0]["stage"], "main", trace)
+            self.assertEqual(trace["events"][-1]["stage"], "main_ok", trace)
+            print("原生通知阶段取证：" + json.dumps(trace, sort_keys=True))
 
     def test_modified_cache_is_rejected_before_process_launch(self):
         self.hook.write_text("throw new Error('cache mutation');")
@@ -207,10 +214,11 @@ class DetachedGrokHookTests(unittest.TestCase):
                  "fs.closeSync(fd);process.exit(90)} catch(e) {if(e.code!=='ENXIO')process.exit(91)};"
                  + invocation)
         # 匿名诊断文件只传给原 Node；不传入 PTY，不改变 setsid、环境或原调用次数。
-        with tempfile.TemporaryFile(mode="w+b", dir=self.root) as diagnostic_file, \
+        with NativeWorkerTrace() as native_trace, \
+                tempfile.TemporaryFile(mode="w+b", dir=self.root) as diagnostic_file, \
                 tempfile.NamedTemporaryFile(mode="w", prefix="hook-diagnostic-", suffix=".cjs",
                                             dir=self.root) as preload:
-            preload.write(diagnostic_preload(self.worker, diagnostic_file.fileno()))
+            preload.write(diagnostic_preload(self.worker, diagnostic_file.fileno(), native_trace.binding))
             preload.flush()
             try:
                 try:
@@ -218,10 +226,11 @@ class DetachedGrokHookTests(unittest.TestCase):
                                              str(hook or self.hook)],
                                             input=self.payload, capture_output=True, start_new_session=True,
                                             env={**self.env, **extra}, timeout=8, check=True,
-                                            pass_fds=(diagnostic_file.fileno(),))
+                                            pass_fds=(diagnostic_file.fileno(), *native_trace.pass_fds))
                 finally:
                     raw = os.pread(diagnostic_file.fileno(), DIAGNOSTIC_LIMIT + 1, 0)
-                    self.hook_diagnostics.append(worker_diagnostics(raw))
+                    self.hook_diagnostics.append({**worker_diagnostics(raw),
+                                                  "native_worker_diagnostics": native_trace.summary()})
                 self.assertEqual(result.stdout, b"")
                 self.assertEqual(result.stderr, b"")
             except (OSError, subprocess.SubprocessError, AssertionError) as error:

@@ -42,6 +42,18 @@ class BoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "acl_fixture_unknown"):
             runner.selected_cases(list(runner.ACL_CASES), "write-enabled")
 
+    def test_empty_acl_fixture_requires_mac_and_the_same_two_cases(self):
+        self.assertEqual(runner.ACL_FIXTURES, ("readonly-inherited-v1", "readonly-inherited-empty-v1"))
+        for platform in ("darwin-arm64", "darwin-x64"):
+            with self.subTest(platform=platform):
+                self.assertEqual(runner.selected_cases(list(runner.ACL_CASES), runner.ACL_EMPTY_FIXTURE, platform), list(runner.ACL_CASES))
+        for platform in (None, "linux-x64", "linux-x64-musl", "linux-arm64", "win32-x64"):
+            with self.subTest(platform=platform), self.assertRaisesRegex(ValueError, "empty_acl_requires_macos"):
+                runner.selected_cases(list(runner.ACL_CASES), runner.ACL_EMPTY_FIXTURE, platform)
+        for cases in (None, ["updated"], ["updated", "updated"], list(runner.CASES)):
+            with self.subTest(cases=cases), self.assertRaisesRegex(ValueError, "acl_requires_explicit_two_cases"):
+                runner.selected_cases(cases, runner.ACL_EMPTY_FIXTURE, "darwin-arm64")
+
     def test_fixture_native_copies_are_independent_and_acl_is_opt_in(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -70,6 +82,9 @@ class BoundaryTests(unittest.TestCase):
             args.acl_fixture = runner.ACL_FIXTURE
             _, acl_manifest = runner.fixture(args, "updated", old, {}, binaries)
             self.assertEqual(acl_manifest["acl_fixture"], runner.ACL_FIXTURE)
+            args.acl_fixture = runner.ACL_EMPTY_FIXTURE
+            _, empty_acl_manifest = runner.fixture(args, "updated", old, {}, binaries)
+            self.assertEqual(empty_acl_manifest["acl_fixture"], runner.ACL_EMPTY_FIXTURE)
 
     def test_explicit_musl_selection_does_not_reuse_the_glibc_package(self):
         with patch.object(runner.platform, "system", return_value="Linux"), patch.object(runner.platform, "machine", return_value="x86_64"):

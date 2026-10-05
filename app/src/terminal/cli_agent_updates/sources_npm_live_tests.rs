@@ -182,6 +182,8 @@ struct Manifest {
 enum AclFixture {
     #[serde(rename = "readonly-inherited-v1")]
     ReadonlyInheritedV1,
+    #[serde(rename = "readonly-inherited-empty-v1")]
+    ReadonlyInheritedEmptyV1,
 }
 
 const SCOPE: &str = "claude_npm_transaction_no_model_v1";
@@ -349,6 +351,17 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
         manifest.acl_fixture.is_none()
             || matches!(manifest.case.as_str(), "updated" | "swap_receipt_missing"),
         "acl_fixture_case_unknown",
+    )?;
+    check(
+        !matches!(
+            manifest.acl_fixture,
+            Some(AclFixture::ReadonlyInheritedEmptyV1)
+        ) || (cfg!(target_os = "macos")
+            && matches!(
+                manifest.claude_platform.as_str(),
+                "darwin-arm64" | "darwin-x64"
+            )),
+        "acl_fixture_platform",
     )?;
     for (name, relative) in env_paths() {
         let expected = root.join(relative);
@@ -530,6 +543,10 @@ fn verify_preserved_permissions(
 
 async fn exercise(manifest: &Manifest) -> Result<Value, String> {
     let root = &manifest.root;
+    let empty_readme = matches!(
+        manifest.acl_fixture,
+        Some(AclFixture::ReadonlyInheritedEmptyV1)
+    );
     if manifest.acl_fixture.is_some() {
         // validate 已绑定新私有根、原入口及构建；只在首次 execute 设置 ACL。
         check(
@@ -541,13 +558,14 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
         )?;
         tree::Directory::open(&package(root))
             .and_then(|directory| {
-                directory.install_claude_readonly_acl_fixture(&manifest.claude_platform)
+                directory
+                    .install_claude_readonly_acl_fixture(&manifest.claude_platform, empty_readme)
             })
             .map_err(mapped)?;
     }
     let old = tree(root)?;
     if manifest.acl_fixture.is_some() {
-        old.verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+        old.verify_claude_readonly_acl_fixture(&manifest.claude_platform, empty_readme)
             .map_err(mapped)?;
     }
     save(&root.join("before-tree.safe.json"), &old)?;
@@ -662,7 +680,7 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
     verify_preserved_permissions(&old, &after)?;
     if manifest.acl_fixture.is_some() {
         after
-            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform, empty_readme)
             .map_err(mapped)?;
         let prepared: super::Journal = serde_json::from_slice(
             &fs::read(root.join("prepared-journal.safe.json"))
@@ -674,7 +692,7 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
             .prepared
             .as_ref()
             .ok_or("acl_prepared_tree_missing")?
-            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform, empty_readme)
             .map_err(mapped)?;
     }
     save(&root.join("after-tree.safe.json"), &after)?;
@@ -752,6 +770,10 @@ async fn exercise(manifest: &Manifest) -> Result<Value, String> {
 }
 
 async fn cold_recover(manifest: &Manifest) -> Result<Value, String> {
+    let empty_readme = matches!(
+        manifest.acl_fixture,
+        Some(AclFixture::ReadonlyInheritedEmptyV1)
+    );
     check(
         matches!(
             manifest.case.as_str(),
@@ -777,14 +799,14 @@ async fn cold_recover(manifest: &Manifest) -> Result<Value, String> {
     if manifest.acl_fixture.is_some() {
         // 冷恢复不设置权限；核对首次进程保存的旧/候选 ACL，交给真实恢复逻辑处理。
         before
-            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform, empty_readme)
             .map_err(mapped)?;
         check(saved.original == before, "cold_acl_original_changed")?;
         saved
             .prepared
             .as_ref()
             .ok_or("cold_acl_prepared_missing")?
-            .verify_claude_readonly_acl_fixture(&manifest.claude_platform)
+            .verify_claude_readonly_acl_fixture(&manifest.claude_platform, empty_readme)
             .map_err(mapped)?;
     }
     let journal_root = sources::journal_root().map_err(mapped)?;

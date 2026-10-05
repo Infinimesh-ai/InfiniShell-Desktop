@@ -20,6 +20,8 @@ MARKER = b"InfiniShell private npm transaction fixture; no credentials\n"
 OLD, TARGET = "2.1.278", "2.1.280"
 CASES = ("updated", "swap_receipt_missing", "external_change_preserved", "candidate_changed_preserved", "unreviewed_downgrade_rejected")
 ACL_FIXTURE = "readonly-inherited-v1"
+ACL_EMPTY_FIXTURE = "readonly-inherited-empty-v1"
+ACL_FIXTURES = (ACL_FIXTURE, ACL_EMPTY_FIXTURE)
 ACL_CASES = ("updated", "swap_receipt_missing")
 TEST = "terminal::cli_agent_updates::sources::npm_transaction::live_tests::real_claude_npm_update_without_model"
 BUSY_TESTS = (
@@ -270,11 +272,13 @@ def verify_product_archives(root, case, old, target_platform):
         "published_members":len(actual),"target":TARGET,"old":OLD,"claude_platform":target_platform,"global_installation_changed":False})
 
 
-def selected_cases(cases, acl_fixture):
+def selected_cases(cases, acl_fixture, claude_platform=None):
     selected = cases or CASES
     if acl_fixture is not None:
-        require(acl_fixture == ACL_FIXTURE, "acl_fixture_unknown")
+        require(acl_fixture in ACL_FIXTURES, "acl_fixture_unknown")
         require(tuple(selected) == ACL_CASES, "acl_requires_explicit_two_cases")
+        if acl_fixture == ACL_EMPTY_FIXTURE:
+            require(claude_platform in ("darwin-arm64", "darwin-x64"), "empty_acl_requires_macos")
     return selected
 
 
@@ -287,10 +291,10 @@ def main():
         parser.add_argument("--" + role + "-sha256", required=True)
     parser.add_argument("--case", choices=CASES, action="append")
     parser.add_argument("--linux-libc", choices=("glibc", "musl"), default="glibc")
-    parser.add_argument("--acl-fixture", choices=(ACL_FIXTURE,))
+    parser.add_argument("--acl-fixture", choices=ACL_FIXTURES)
     args = parser.parse_args()
-    cases = selected_cases(args.case, args.acl_fixture)
     args.claude_platform = selected_platform(args.linux_libc)
+    cases = selected_cases(args.case, args.acl_fixture, args.claude_platform)
     args.repo = args.repo.resolve(strict=True)
     require(not args.output.exists(), "output_must_be_new")
     args.output.mkdir(mode=0o700, parents=True)

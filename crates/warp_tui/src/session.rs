@@ -122,12 +122,20 @@ fn parse_resume_token(token: String) -> Result<ServerConversationToken> {
 
 /// Boots the headless Warp app and mounts the transcript-capable TUI session.
 pub fn run() -> Result<()> {
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    warp::cli_agent_notify_trace::emit(warp::cli_agent_notify_trace::Stage::FluentBegin);
     // TUI 与 GUI 共用 Fluent 资源；settings 初始化后会继续应用显式语言设置。
     warp::i18n::init(None);
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    warp::cli_agent_notify_trace::emit(warp::cli_agent_notify_trace::Stage::FluentEnd);
 
     // Protect this managed version before any worker dispatch or resource
     // access. The guard stays alive until this process exits.
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    warp::cli_agent_notify_trace::emit(warp::cli_agent_notify_trace::Stage::LeaseBegin);
     let _version_lease = crate::autoupdate::VersionLease::acquire_for_current_process()?;
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    warp::cli_agent_notify_trace::emit(warp::cli_agent_notify_trace::Stage::LeaseEnd);
     // If this process was re-exec'd as a Warp worker (e.g. the terminal
     // server), dispatch that instead of starting another TUI — otherwise the
     // worker re-exec would recursively launch TUIs.

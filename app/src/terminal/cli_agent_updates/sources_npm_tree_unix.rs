@@ -27,11 +27,14 @@ const MAX_TREE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_TREE_ACL_BYTES: usize = 1024 * 1024;
 
 #[cfg(test)]
-fn claude_acl_fixture_files(platform: &str) -> Result<[PathBuf; 3], Error> {
+fn claude_acl_fixture_files(platform: &str, empty_readme: bool) -> Result<[PathBuf; 3], Error> {
     if !matches!(
         platform,
         "darwin-arm64" | "darwin-x64" | "linux-x64" | "linux-arm64" | "linux-x64-musl"
     ) {
+        return Err(Error::UnsupportedPlatform);
+    }
+    if empty_readme && !(cfg!(target_os = "macos") && platform.starts_with("darwin-")) {
         return Err(Error::UnsupportedPlatform);
     }
     Ok([
@@ -115,14 +118,22 @@ pub(super) struct Snapshot {
 
 impl Snapshot {
     #[cfg(test)]
-    pub(super) fn verify_claude_readonly_acl_fixture(&self, platform: &str) -> Result<(), Error> {
+    pub(super) fn verify_claude_readonly_acl_fixture(
+        &self,
+        platform: &str,
+        empty_readme: bool,
+    ) -> Result<(), Error> {
         if self.root.acl != acl::readonly_test_acl(true).into_optional() {
             return Err(Error::SourceChanged);
         }
-        for path in claude_acl_fixture_files(platform)? {
+        for path in claude_acl_fixture_files(platform, empty_readme)? {
             let node = self.nodes.get(&path).ok_or(Error::SourceChanged)?;
-            let expected = acl::readonly_file_test_acl(node.identity.mode & 0o777)
-                .map_err(|_| Error::UnsupportedSource)?;
+            let expected = if empty_readme && path == Path::new("README.md") {
+                acl::empty_file_test_acl(node.identity.mode & 0o777)
+            } else {
+                acl::readonly_file_test_acl(node.identity.mode & 0o777)
+            }
+            .map_err(|_| Error::UnsupportedSource)?;
             if node.sha256.is_none() || node.identity.acl != expected.into_optional() {
                 return Err(Error::SourceChanged);
             }
@@ -334,16 +345,7 @@ fn file(fd: libc::c_int) -> Result<File, Error> {
 // 未保存 ACL 的独立消费者继续拒绝额外权限，不能仅改检查就静默丢失它们。
 #[cfg(target_os = "macos")]
 pub(super) fn reject_extra_permissions(file: &File) -> Result<(), Error> {
-    unsafe extern "C" {
-        fn acl_get_fd_np(fd: libc::c_int, kind: libc::c_int) -> *mut libc::c_void;
-        fn acl_free(acl: *mut libc::c_void) -> libc::c_int;
-    }
-    let acl = unsafe { acl_get_fd_np(file.as_raw_fd(), 0x100) };
-    if !acl.is_null() {
-        unsafe { acl_free(acl) };
-        return Err(Error::UnsupportedSource);
-    }
-    if std::io::Error::last_os_error().raw_os_error() != Some(libc::ENOENT) {
+    if !acl::is_absent_on_fd(file).map_err(|_| Error::UnsupportedSource)? {
         return Err(Error::UnsupportedSource);
     }
     Ok(())
@@ -402,14 +404,18 @@ fn reject_untracked_xattrs(file: &File, allow_acl: bool) -> Result<(), Error> {
 impl Directory {
     /// 仅验收入口在校验本轮新建私有 fixture 后调用；恢复分支不得重设 ACL。
     #[cfg(test)]
-    pub(super) fn install_claude_readonly_acl_fixture(&self, platform: &str) -> Result<(), Error> {
+    pub(super) fn install_claude_readonly_acl_fixture(
+        &self,
+        platform: &str,
+        empty_readme: bool,
+    ) -> Result<(), Error> {
         let before = self.snapshot()?;
         if before.has_acl() {
             return Err(Error::SourceChanged);
         }
         let mut files = Vec::new();
         let mut inodes = std::collections::BTreeSet::new();
-        for path in claude_acl_fixture_files(platform)? {
+        for path in claude_acl_fixture_files(platform, empty_readme)? {
             let node = before.nodes.get(&path).ok_or(Error::SourceChanged)?;
             let (parent, leaf) = self.relative_parent(&path, false)?;
             let opened = parent.read_file(&leaf)?;
@@ -420,13 +426,17 @@ impl Directory {
             {
                 return Err(Error::SourceChanged);
             }
-            files.push((opened, node));
+            files.push((opened, node, path == Path::new("README.md")));
         }
         // Python write_members/copytree 生成独立 inode；不能为硬链接放宽生产 apply。
-        for (file, node) in files {
+        for (file, node, readme) in files {
             let mode = node.identity.mode & 0o777;
-            let desired =
-                acl::readonly_file_test_acl(mode).map_err(|_| Error::UnsupportedSource)?;
+            let desired = if empty_readme && readme {
+                acl::empty_file_test_acl(mode)
+            } else {
+                acl::readonly_file_test_acl(mode)
+            }
+            .map_err(|_| Error::UnsupportedSource)?;
             Self::apply_new_permissions(
                 &file,
                 &node.identity,
@@ -445,7 +455,7 @@ impl Directory {
             &acl::readonly_test_acl(true),
         )?;
         self.snapshot()?
-            .verify_claude_readonly_acl_fixture(platform)
+            .verify_claude_readonly_acl_fixture(platform, empty_readme)
     }
 
     #[cfg(target_os = "macos")]

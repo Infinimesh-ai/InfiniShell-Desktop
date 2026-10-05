@@ -2,6 +2,71 @@
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
   "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。b5d9只读ACL真实升级至280及一次独立冷恢复278已通过原件独审，非空ACL和完整快照保留，短根已清理；本轮不覆盖新增相对路径。Mac新增路径异gid父目录问题已修复，379更新回归、i18n11项和cargo check通过。2026-10-05用户允许带额外共享写权限、文件保护标志或特殊链接权限的安装提示原安装工具升级；普通安装和已支持只读ACL自动升级保持。b5 Linux新增32项通过，但真实通知1项发送超时，整轮失败。Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，后4场景/3冷恢复未跑；两项失败及最终同源双平台门禁仍须完成，新增关闭0项。",
+  "g09_mac_empty_acl_fix_20261005": {
+    "status": "native_primitives_and_local_gates_pass_real_transaction_pending",
+    "base_commit": "d0d61069c3d9fb7f23e57a5ebf783b8ed4dbf5b0",
+    "root_cause": "真实fgetattrlist返回44字节空ACL；旧acl_get_fd_np的Libc读取路径误报属性缺失，先前APFS归一化判断不成立。",
+    "change": "Mac改为同fd公开扩展安全属性读取，严格校验长度、偏移、计数和原ACL字段；未跟踪ACL的消费者复用同一只读缺失判断，保留拒绝和不跟随链接。",
+    "red": {
+      "run": "r-7nu39tcd",
+      "log_sha256": "fc5f2240de83b3c1bcd21178cc7daedada4a2a4d792ff1a9ca165c69503cfb43"
+    },
+    "native_acl_tests": {
+      "pass": 25,
+      "run": "r-705u9ngu",
+      "log_sha256": "200837f4bfc71c7d77b7def5c25ff42fa432769d2d1ddbad54cc361271fa6831"
+    },
+    "native_untracked_and_symlink_tests": {
+      "pass": 2,
+      "run": "r-oktr53d6",
+      "log_sha256": "076471fab596a805e108456f40a437ea0129a939f3833c8ffd1e3e9744b87e46"
+    },
+    "real_fixture": "readonly-inherited-empty-v1：仅Mac的README显式空ACL，其余非空只读ACL及原两场景/一cold合同不变；旧readonly-inherited-v1保留。",
+    "real_transaction_executed": false,
+    "localization": "无需本地化变更；仅原生权限读写和内部验收，既有英中来源不支持提示语义适用，无布局变化。",
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "local_gates": {
+      "updates_nextest_pass": 385,
+      "updates_run": "r-lio7dh96",
+      "updates_log_sha256": "68683600610e280d2af1cd78508bca7cf1fb1961c0b419cdc8d36eb43a2bb58b",
+      "i18n_pass": 11,
+      "i18n_run": "r-3u9bmogv",
+      "i18n_log_sha256": "3c459cb554b1358e8c252edb20681379d5e5e465d9a5ad8bc4d37fbaade67fe8",
+      "check": "warp_and_warp_tui_with_notify_trace_feature_pass",
+      "check_run": "r-eq5a5xgc",
+      "check_log_sha256": "7df0aad6a01a2f497799924e29d66472f3741c23adc8074b2f38b1a53409a83c",
+      "claude_driver_python_pass": 23,
+      "notification_driver_python_pass": 20,
+      "workflow_python_pass": 15,
+      "actionlint": "passed_known_self_hosted_runner_labels",
+      "linux_native_trace_not_executed_on_mac": true
+    }
+  },
+  "g09_powershell_actual_il_20261005": {
+    "source_commit": "d0d61069c3d9fb7f23e57a5ebf783b8ed4dbf5b0",
+    "run": 37264336924,
+    "formal_status": "failure",
+    "collection_status": "partial",
+    "powershell_version": "5.1.26100.7462",
+    "managed_methods_decoded": 69,
+    "native_pinvoke_without_il": [
+      "FindExecutableW",
+      "SHGetFileInfo"
+    ],
+    "assembly_files_unchanged": true,
+    "powershell_exe_matches_a5": true,
+    "a5_managed_assembly_binding_available": false,
+    "accepted_scope": "只读采集当次实际加载的三个程序集 IL/MVID/SHA；不调用候选。2个PInvoke无IL使整轮按现有严格规则失败，69个托管体经独审及根任务逐指令核验。",
+    "finding": "Process.Start在CreateProcess成功后仍初始化标准流；PowerShell Complete的若干启动/分类异常发生于等待finally之前。仅为可能失败窗口，不能回填a5实际分支或根因。",
+    "original_stderr_audit": "a5候选捕获stderr完整seal/replay后无候选错误字节；旧首16个CLR异常全部早于Node CREATE，后10个仅丢弃计数，失败窗口缺实际异常对象。",
+    "root_review_sha256": "41970d6b52c672b1ed5d1172594053990b4fdf07b0632443cb33b106c76dbce3",
+    "artifact_verification_sha256": "cc89cd3a2c4827ef182dfc65dea4eff64e37eae00055f81d8b85e7f0af09b46f",
+    "independent_review_sha256": "2bf88c99c0b72273c327816b72b0b745eab2be7839def023eca635a2598e8b5c",
+    "native_upgrade_executed": false,
+    "newly_closed_gaps": [],
+    "g09_closed": false
+  },
   "g09_security_attributes_scope_decision_20261005": {
     "date": "2026-10-05",
     "decision": "user_confirmed_original_installer_fallback",

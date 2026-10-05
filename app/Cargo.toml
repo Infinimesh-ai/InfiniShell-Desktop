@@ -472,6 +472,8 @@ embed-resource = "3.0"
 
 # Note that we support channel-specific enables for these features
 [features]
+# 仅原通知 worker 的有界只读取证；不连带启用其他测试行为。
+cli-agent-notify-trace = []
 # 仅隔离原生候选取证构建使用；默认构建不暂停线程或设置诊断断点。
 cli-agent-native-witness = ["command/native-probe-witness", "windows/Win32_System_Memory"]
 tui = ["warpui_core/tui"]

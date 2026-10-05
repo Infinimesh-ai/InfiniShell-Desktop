@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import installed_grok_hook_tests as detached
 from run_installed_grok_hook import DIAGNOSTIC_LIMIT, hook_failure, verify_installed_hook, worker_diagnostics
+from run_installed_grok_hook import (NATIVE_TRACE_LIMIT, NATIVE_TRACE_RECORD, NativeWorkerTrace,
+                                     native_worker_diagnostics)
 
 
 def row(stage, **values):
@@ -135,10 +137,14 @@ class WorkerDiagnosticTests(unittest.TestCase):
                     "WARP_CLI_AGENT_NOTIFY_EXECUTABLE"})
                 self.assertEqual(options["env"]["WARP_CLI_AGENT_NOTIFY_EXECUTABLE"], str(files[2][0]))
                 self.assertEqual(options["cwd"], root)
-                terminal_fd, diagnostic_fd = options["pass_fds"]
+                terminal_fd, diagnostic_fd, *native_fds = options["pass_fds"]
                 self.assertTrue(os.isatty(terminal_fd))
                 self.assertTrue(stat.S_ISREG(os.fstat(diagnostic_fd).st_mode))
                 observed.update(terminal_fd=terminal_fd, diagnostic_fd=diagnostic_fd)
+                for index, descriptor in enumerate(native_fds):
+                    self.assertTrue(stat.S_ISFIFO(os.fstat(descriptor).st_mode))
+                    self.assertFalse(os.get_blocking(descriptor))
+                    observed[f"native_{index}"] = descriptor
                 raise RuntimeError("synthetic-spawn-failure")
 
             with patch("run_installed_grok_hook.subprocess.Popen", side_effect=fail_spawn):
@@ -187,12 +193,13 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
             self.assertTrue(options["check"])
             self.assertTrue(options["capture_output"])
             self.assertEqual(options["input"], self.case.payload)
-            descriptor, = options["pass_fds"]
+            descriptor, *native_fds = options["pass_fds"]
             self.assertTrue(stat.S_ISREG(os.fstat(descriptor).st_mode))
             self.assertEqual(stat.S_IMODE(Path(argv[2]).stat().st_mode), 0o600)
             self.assertIn("child.execFileSync", Path(argv[2]).read_text())
             os.write(descriptor, calls.pop(0))
             descriptors.append(descriptor)
+            descriptors.extend(native_fds)
             return SimpleNamespace(stdout=b"", stderr=b"")
 
         with patch.object(detached.subprocess, "run", side_effect=observe_call) as run:
@@ -220,9 +227,10 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
         descriptors = []
 
         def fail_spawn(argv, **options):
-            descriptor, = options["pass_fds"]
+            descriptor, *native_fds = options["pass_fds"]
             os.write(descriptor, encode(row("preload")))
             descriptors.append(descriptor)
+            descriptors.extend(native_fds)
             raise error
 
         with patch.object(detached.subprocess, "run", side_effect=fail_spawn) as run:
@@ -234,6 +242,119 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
         self.assertEqual(list(self.root.iterdir()), [])
         with self.assertRaises(OSError):
             os.fstat(descriptors[0])
+
+
+class NativeWorkerDiagnosticTests(unittest.TestCase):
+    def setUp(self):
+        self.nonce = bytes.fromhex("ab" * 16)
+
+    def record(self, stage=1, sequence=0, pid=4321, timestamp=500):
+        return NATIVE_TRACE_RECORD.pack(b"INW1", stage, sequence, pid, timestamp, self.nonce)
+
+    def test_same_invocation_records_preserve_phase_pid_and_monotonic_time(self):
+        raw = self.record() + self.record(stage=2, sequence=1, timestamp=600)
+        result = native_worker_diagnostics(raw, self.nonce)
+        self.assertEqual(result["status"], "captured")
+        self.assertEqual(result["events"], [
+            {"stage": "main", "sequence": 0, "pid": 4321, "monotonic_ns": 500},
+            {"stage": "fluent_begin", "sequence": 1, "pid": 4321, "monotonic_ns": 600}])
+        self.assertTrue(result["missing_stages_are_unknown"])
+        self.assertEqual(result["wire_sha256"], hashlib.sha256(raw).hexdigest())
+        rebuilt = b"".join(NATIVE_TRACE_RECORD.pack(b"INW1", stage, index, 4321, timestamp,
+                              bytes.fromhex(result["invocation_nonce"]))
+                           for index, (stage, timestamp) in enumerate(((1, 500), (2, 600))))
+        self.assertEqual(rebuilt, raw)
+        self.assertEqual(native_worker_diagnostics(b"", self.nonce)["status"], "missing")
+
+    def test_foreign_nonce_pid_sequence_time_and_reserved_data_are_rejected(self):
+        invalid = [self.record(stage=0), self.record(stage=20), self.record(pid=0),
+                   self.record(sequence=1), self.record()[:-1],
+                   self.record() + self.record(sequence=1, pid=4322),
+                   self.record() + self.record(sequence=1, timestamp=499),
+                   self.record()[:5] + b"x" + self.record()[6:],
+                   self.record()[:-1] + b"x"]
+        for raw in invalid:
+            with self.subTest(raw=raw):
+                self.assertEqual(native_worker_diagnostics(raw, self.nonce)["status"], "invalid")
+        self.assertEqual(native_worker_diagnostics(self.record(), bytes(16))["status"], "invalid")
+
+    def test_payload_and_oversized_bytes_are_not_exported(self):
+        for raw in (b"private-payload-and-path".ljust(48, b"x"), bytes(NATIVE_TRACE_LIMIT + 1)):
+            result = native_worker_diagnostics(raw, self.nonce)
+            self.assertNotIn("events", result)
+            self.assertNotIn("private-payload", json.dumps(result))
+        self.assertEqual(native_worker_diagnostics(bytes(NATIVE_TRACE_LIMIT + 1), self.nonce)["status"],
+                         "over_budget")
+
+    def test_pipe_is_nonblocking_read_once_and_closes_after_failure(self):
+        with self.assertRaisesRegex(RuntimeError, "original-failure"):
+            with NativeWorkerTrace(enabled=True) as trace:
+                descriptors = (trace.reader, trace.writer)
+                for descriptor in descriptors:
+                    self.assertFalse(os.get_blocking(descriptor))
+                    self.assertFalse(os.get_inheritable(descriptor))
+                self.assertEqual(trace.summary()["status"], "missing")
+                info = os.fstat(trace.writer)
+                self.assertEqual(trace.authorization, f"v1:{info.st_dev}:{info.st_ino}:{trace.nonce.hex()}")
+                raw = NATIVE_TRACE_RECORD.pack(b"INW1", 1, 0, 4321, 500, trace.nonce)
+                os.write(trace.writer, raw)
+                first = trace.summary()
+                self.assertEqual(first["status"], "captured")
+                self.assertEqual(first, trace.summary())
+                raise RuntimeError("original-failure")
+        for descriptor in descriptors:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+    def test_pipe_setup_failure_is_unavailable_without_replacing_business_result(self):
+        with patch("run_installed_grok_hook.os.pipe", side_effect=OSError("private-path")):
+            with NativeWorkerTrace(enabled=True) as trace:
+                self.assertEqual(trace.pass_fds, ())
+                self.assertIsNone(trace.binding)
+                self.assertEqual(trace.summary(), {"status": "unavailable"})
+        with NativeWorkerTrace(enabled=False) as trace:
+            self.assertEqual(trace.pass_fds, ())
+            self.assertEqual(trace.summary(), {"status": "not_enabled"})
+
+    def test_detached_failure_retains_native_phases_without_an_extra_send(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            case = detached.DetachedGrokHookTests()
+            case.root = root
+            case.node, case.worker, case.hook = root / "node", root / "worker", root / "notify.cjs"
+            case.env = {"HOME": temporary, "PATH": "/usr/bin:/bin", "TMPDIR": temporary}
+            case.payload = b"private-sentinel-payload"
+            case.hook_diagnostics = []
+            created = []
+            original = subprocess.TimeoutExpired("original-command", 8)
+
+            def trace_factory():
+                trace = NativeWorkerTrace(enabled=True)
+                created.append(trace)
+                return trace
+
+            def fail_spawn(argv, **options):
+                trace = created[0]
+                self.assertEqual(options["input"], case.payload)
+                self.assertEqual(options["env"], case.env)
+                self.assertEqual(options["timeout"], 8)
+                diagnostic_fd, native_fd = options["pass_fds"]
+                self.assertEqual(native_fd, trace.writer)
+                os.write(diagnostic_fd, encode(row("preload")))
+                os.write(native_fd, NATIVE_TRACE_RECORD.pack(b"INW1", 2, 0, 4321, 500, trace.nonce))
+                raise original
+
+            with patch.object(detached, "NativeWorkerTrace", side_effect=trace_factory), \
+                    patch.object(detached.subprocess, "run", side_effect=fail_spawn) as run:
+                with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                    case.run_hook({})
+                self.assertIs(failure.exception, original)
+                self.assertEqual(run.call_count, 1)
+            self.assertIn('"stage":"fluent_begin"', original.__notes__[0])
+            self.assertNotIn("private-sentinel", original.__notes__[0])
+            self.assertIsNone(created[0].reader)
+            self.assertIsNone(created[0].writer)
+            self.assertEqual(list(root.iterdir()), [])
 
 
 if __name__ == "__main__":
