@@ -1841,10 +1841,11 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
         .debugger
         .verify_package_initial_image_in_container(&fixture.process)
         .unwrap();
+    let deadline = Instant::now() + DEBUG_DRIVER_TIMEOUT;
     let event = fixture
         .debugger
         .next_event(
-            Instant::now() + DEBUG_DRIVER_TIMEOUT,
+            deadline,
             "测试未收到 loader 事件",
             #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
             None,
@@ -1856,8 +1857,7 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
             &event,
             Some(&fixture.process),
             #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-            Instant::now()
-                + DEBUG_DRIVER_TIMEOUT,
+            deadline,
         )
         .unwrap();
     let pending = fixture.debugger.pending_event.unwrap();

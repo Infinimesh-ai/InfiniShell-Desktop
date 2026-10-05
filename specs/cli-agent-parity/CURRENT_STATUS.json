@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。e84共享CLR四异常能力通过独审；原PS组合Python门禁已失败、整轮结果待审，独立ctime语义修复本机通过。原Windows升级矩阵首updated失败、Linux两轮超时保持，最终同源双平台门禁未完成，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Mac原件复核未见新增必要实机缺项。e84共享CLR原生能力通过；原PS组合取消前已有Python与Windows普通libtest独立失败，真实事务未执行，两项本地修复待Windows实跑。原升级故障、Linux失败及最终同源门禁仍开放，新增关闭0项。",
   "g09_clr_shared_native_and_reader_stat_fix_20261005": {
     "source_commit": "e84e8004759179ac3e812927747a8817fa59ddb9",
     "fixed_native_run": 37288696146,
@@ -14,7 +14,7 @@
     "audit_sha256": "9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc",
     "final_index_sha256": "9a38fdf6427189ce1ccd4f037ba7ae116eb7b9c89f5f9ce6eabba25cd239c1bf",
     "original_ps_run": 37289665804,
-    "original_ps_status": "in_progress_python_runner_step_failed_complete_log_pending",
+    "original_ps_status": "completed_cancelled_python_failure_and_ordinary_libtest_compile_errors_native_not_run",
     "independent_source_fix": "固定CPython3.13.15路径ctime为创建时间、fstat ctime为变更时间；改为同API前后核验，跨API身份/size/mtime/SHA及所有普通文件/链接边界保留，不能提前归因为本轮首因。",
     "local_gates": {
       "python_pass": 28,
@@ -174,10 +174,19 @@
     "real_transaction": {
       "source_commit": "74ddcaa42ada3e3f7306adab1fd5b7b69df30d13",
       "run_id": "r-f6ta9tcm",
-      "cases": ["updated", "swap_receipt_missing"],
+      "cases": [
+        "updated",
+        "swap_receipt_missing"
+      ],
       "independent_cold_recoveries": 1,
       "accepted": "真实公开入口升级至2.1.280；交换收据缺失后独立libtest恢复2.1.278，完整after与before相同。两场景before/prepared/after的README均为显式空ACL，包根及两CLI文件均保留非空只读ACL。",
-      "readme_acl": {"format": "MacV1", "extended": {"flags": 0, "entries": []}},
+      "readme_acl": {
+        "format": "MacV1",
+        "extended": {
+          "flags": 0,
+          "entries": []
+        }
+      },
       "native": "两代原候选均输出22字节2.1.280版本、退出0并确认清理；manifest/launch/exit/coalition及19份精确提交源码、四份官方tgz和签名后二进制原件均经独审。",
       "cleanup": "登记exit0/cleaned；先归档，再核进程/launchd/FD释放，仅对两个私有0500快照目录补owner写位并保持ACL，原短根已删除。",
       "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-claude-npm-empty-acl-macos-runs/r-f6ta9tcm",
@@ -10812,7 +10821,12 @@
     "run_exit_code": 1,
     "cleanup_ready": false,
     "full_failure_root": "/Users/zhishi/InfiniShell-Tests/r-75gduwee",
-    "completed_cases": ["updated", "swap_receipt_missing", "external_change_preserved", "candidate_changed_preserved"],
+    "completed_cases": [
+      "updated",
+      "swap_receipt_missing",
+      "external_change_preserved",
+      "candidate_changed_preserved"
+    ],
     "failed_case": "unreviewed_downgrade_rejected",
     "failure": "unreviewed_downgrade_not_rejected",
     "precise_contract": "Latest渠道的280→278返回ChannelMismatch且无计划；合法降级仅Stable。旧原件未保存refused.error，不据源码推断回填运行值。",
@@ -10829,7 +10843,11 @@
     "independent_review_sha256": "b046e46011afa93d08f678cfcdc8fe3a864bbc0f43d8a192cf31d0ea1d4f858b",
     "change": "仅受管官方PowerShell版本入口请求空输入与流式输出管道，并显式保留LASTEXITCODE；初值1避免无原生退出码时误报成功。",
     "boundary": "静态审查不证明ShellExecute回退被禁止、旧零输出根因或实际修复；固定正确版本/exit0/完整清理仍全部必需。",
-    "required_native_matrix": {"cases": 5, "independent_cold_recoveries": 3, "witness": false},
+    "required_native_matrix": {
+      "cases": 5,
+      "independent_cold_recoveries": 3,
+      "witness": false
+    },
     "local_gates": {
       "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-ps-pipeline-mac-channel-local-gates-v1.safe.json",
       "sha256": "8a7becbd1667b34ba05f7702aa09ced8d31d8d0905445be495323ecbc487ba75",
@@ -10859,7 +10877,14 @@
     "i18n_configurations": 2,
     "non_pass_nextest_statuses": 0,
     "warnings_retained": true,
-    "hooks": {"pass": 23, "skip": 2, "missing_shells": ["fish", "zsh"]},
+    "hooks": {
+      "pass": 23,
+      "skip": 2,
+      "missing_shells": [
+        "fish",
+        "zsh"
+      ]
+    },
     "independent_review_sha256": "58d69973ca853470ce265f9b761392052f7b31bba9ba0f00170e1dae1b0d231e"
   },
   "g09_mac_platform_binding_acceptance_20261004": {
@@ -10880,7 +10905,10 @@
     "supervisor_same_signed_bytes_association_sha256": "ecdb2bf9c13e3f43e2f26091955570e4119d0b14ecacbf37b8348bd66fec2164",
     "signed_worker_original_archived": false,
     "signed_worker_boundary": "此前wrapper部分删除；仅来源及签名后执行摘要留存，不以重建冒充原件。",
-    "old_failed_roots_archived_and_cleaned": ["r-bn8_xz96", "r-75gduwee"],
+    "old_failed_roots_archived_and_cleaned": [
+      "r-bn8_xz96",
+      "r-75gduwee"
+    ],
     "old_failure_exit_codes_preserved": true,
     "boundary": "后端原矩阵，不外推GUI/模型/忙碌消费者或其他平台；无需本地化变更。",
     "g09_closed": false
@@ -10896,7 +10924,11 @@
     "independent_cold_recoveries": 2,
     "native_exit_zero_and_cleanup_confirmed_generations": 4,
     "ordinary_pass": 2060,
-    "required_each_once": {"linux_native": 12, "npm": 18, "i18n": 11},
+    "required_each_once": {
+      "linux_native": 12,
+      "npm": 18,
+      "i18n": 11
+    },
     "busy_tests_pass_with_retained_eof_error_lines": 15,
     "scope_exact_match": true,
     "verified_official_artifacts": 3,
@@ -10919,5 +10951,32 @@
     "observer_binding_sha256": "748e39a6b1ae287658badd120f1f1c3a93b47ffefb3d996d1f7fc22d67cd19a4",
     "boundary": "Linux原生工作流终态后串行派发；旧PS零输出失败保留，新管道入口尚无原生功能结论。",
     "g09_closed": false
+  },
+  "g09_original_ps_compile_fix_20261005": {
+    "base_commit": "13d44328180292562c517823e9febdcda0206069",
+    "prior_run": 37289665804,
+    "formal_result": "cancelled",
+    "preserved_failures": [
+      "Python25项唯一失败：预期clr_reader_binding，实际clr_reader_changed；13d修复仍待Windows验证。",
+      "Windows普通libtest：1858复合表达式cfg触发E0658、不能移除表达式及E0061。"
+    ],
+    "native_executed": false,
+    "change": "仅测试调用先计算deadline并在两个调用共用，原cfg选择标识符；不修改产品、权限、命令、时限或断言。",
+    "local_gates": {
+      "warp_check": "r-gtfx7g_i",
+      "warp_check_log_sha256": "3fa7804a39b7c034a7a9317be66b00813b33884f703457841543b4e2409c55ba",
+      "isolated_windows_call_both_configurations": "r-4rhfhp_k",
+      "isolated_call_log_sha256": "7475cf261dd9ac81db3d0f782df693bf7969b76c74a6ef336dd56fefe39a74f6",
+      "scope": "仅真实调用片段，不是完整Windows应用编译",
+      "rustfmt_edition_2024": "r-npo1tgxg",
+      "preliminary_command_failures": [
+        "r-kie33e7q 未安装GNU目标",
+        "r-abhhhjuo 错误edition2021格式命令"
+      ],
+      "cleanup": "登记根均已清理"
+    },
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "localization": "无需本地化变更；仅测试配置，无用户界面变化。"
   }
 }

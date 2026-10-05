@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：原PS组合终态失败证据与测试配置修正
+
+`e84e80047` 的 [37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804) 已人工取消，完整官方日志保留取消前两项独立故障：Python25项中唯一失败期待`clr_reader_binding`却提前得到`clr_reader_changed`；Windows普通libtest在`managed_process_atomic_windows_tests.rs:1858`报E0658、不能移除表达式及E0061。`warp --lib --features cli-agent-native-witness`的check通过不覆盖普通libtest错误。真实事务步骤未运行，唯一工件为环境记录，不存在本轮候选、CLR结果或升级成功证据。
+
+`13d443281`已修前一时间字段路径；本次将测试的复合实参先绑定为`deadline`，等待事件与核验共用同一个原期限，再由原cfg选择该标识符。仅修测试调用，不改产品、原PowerShell命令、权限、时限或断言。`cargo check --locked -p warp`通过（r-gtfx7g_i，SHA `3fa7804a39b7c034a7a9317be66b00813b33884f703457841543b4e2409c55ba`）；真实调用片段在本机已装Windows MSVC目标的普通/诊断特性两配置类型检查通过（r-4rhfhp_k，SHA `7475cf261dd9ac81db3d0f782df693bf7969b76c74a6ef336dd56fefe39a74f6`），仅片段、不代替完整Windows应用门禁。仓库edition2024格式检查通过。首轮误选未安装GNU目标和edition2021格式命令失败分别保留，未安装工具链或改无关格式，登记根均清理。
+
+无需本地化变更。新增关闭0项；现有10项关闭，G09仍开放，V01/V02/V05移交不计通过，PR草稿。Mac原关闭条件只读复核未发现额外必要实机缺项，不扩展为所有CLI×来源×失败点的全排列。
+
 ## 2026-10-05：共享 CLR 原生能力通过，修正驱动时间字段比较
 
 精确 `e84e8004759179ac3e812927747a8817fa59ddb9` 的 [37288696146](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37288696146) 为20普通PASS与唯一原生PASS。四链完整、原码1234/5678可区分，原工作线程及出生身份一致，实际throw IL为16/16/36/24；PARTIAL2及tracker不完整原值保留。53事件全部Continue，fixture自然退出0，reader与fixture Job空，无pending。18来源、9编译输入、36工件成员与官方ZIP摘要已核；独审SHA `9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc`，最终索引SHA `9a38fdf6427189ce1ccd4f037ba7ae116eb7b9c89f5f9ce6eabba25cd239c1bf`。编译/Actions警告及runner清理记录保留，不称全部日志无异常；本机观察器和审计根已确认清理。
