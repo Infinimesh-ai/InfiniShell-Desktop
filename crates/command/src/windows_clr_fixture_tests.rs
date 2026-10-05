@@ -911,24 +911,41 @@ fn validate_observations(observations: &[Value], prepared: &Value) -> io::Result
     let tokens = prepared["fixture_method_tokens"]
         .as_array()
         .ok_or_else(|| io::Error::other("缺少夹具 MethodDef"))?;
-    let expected = [
-        ("System.ComponentModel.Win32Exception", 0x80004005_u32, 1),
-        ("System.InvalidOperationException", 0x80131509_u32, 2),
-        ("System.ApplicationException", 0x80131600_u32, 3),
+    require(tokens.len() == 5, "缺少独立的同 HRESULT 抛出方法")?;
+    let expected_chains: [&[(&str, u32, Option<i32>)]; 4] = [
+        &[(
+            "System.ComponentModel.Win32Exception",
+            0x80004005,
+            Some(1234),
+        )],
+        &[(
+            "System.ComponentModel.Win32Exception",
+            0x80004005,
+            Some(5678),
+        )],
+        &[
+            ("System.InvalidOperationException", 0x80131509, None),
+            (
+                "System.ComponentModel.Win32Exception",
+                0x80004005,
+                Some(5678),
+            ),
+        ],
+        &[
+            ("System.ApplicationException", 0x80131600, None),
+            ("System.InvalidOperationException", 0x80131509, None),
+            (
+                "System.ComponentModel.Win32Exception",
+                0x80004005,
+                Some(5678),
+            ),
+        ],
     ];
-    let mut counts = [0; 3];
+    let mut count = 0;
+    let mut previous_sequence = None;
     for observation in observations {
         validate_binding(observation)?;
         let reader = &observation["reader"];
-        let Some(chain) = reader["chain"].as_array() else {
-            continue;
-        };
-        let Some(root_type) = chain.first().and_then(|value| value["type"].as_str()) else {
-            continue;
-        };
-        let Some(index) = expected.iter().position(|entry| entry.0 == root_type) else {
-            continue;
-        };
         let Some(frames) = reader["frames"].as_array() else {
             continue;
         };
@@ -943,48 +960,82 @@ fn validate_observations(observations: &[Value], prepared: &Value) -> io::Result
                         .any(|offset| offset.as_u64().is_some_and(|offset| offset < 0xfffffffd))
                 })
         });
-        // 同名启动异常不是固定夹具证据；缺少目标帧最终仍因三项计数不足失败。
+        // 启动异常不能冒充固定夹具；缺少真实目标帧最终仍因四项顺序不完整失败。
         if !fixture_frame {
             continue;
         }
         validate_fixture_thread(observation)?;
-        let (_, hresult, length) = expected[index];
+        require(count < expected_chains.len(), "固定异常多于预期四次")?;
+        let expected = expected_chains[count];
         require(
             reader["status"] == "observed"
-                && reader["current_state_flags"]
-                    .as_u64()
-                    .is_some_and(|flags| flags & 2 == 0),
-            "不能用不完整或上次异常代替当前异常",
+                && reader["exception_source"] == "last_thrown_object_candidate"
+                && reader["object_chain_complete"] == true
+                && reader["tracker_complete"] == false
+                && reader["exception_state_flags"] == 2,
+            "当前对象链与缺失的 tracker 状态必须分别核验",
         )?;
-        require(chain.len() == length, "实际 InnerException 链长度不符")?;
+        let sequence = observation["event_sequence"]
+            .as_u64()
+            .ok_or_else(|| io::Error::other("缺少原异常事件序号"))?;
         require(
-            observation["event_hresult"].as_u64() == Some(u64::from(hresult)),
+            previous_sequence.is_none_or(|previous| sequence > previous),
+            "固定异常事件必须按原停点严格递增",
+        )?;
+        previous_sequence = Some(sequence);
+        require(
+            frames.iter().any(|frame| {
+                frame["module_mvid"]
+                    .as_str()
+                    .is_some_and(|value| value.eq_ignore_ascii_case(mvid))
+                    && frame["method_token"] == tokens[count]
+                    && frame["il_status"] == 0
+                    && frame["il_offsets"].as_array().is_some_and(|offsets| {
+                        offsets
+                            .iter()
+                            .any(|offset| offset.as_u64().is_some_and(|offset| offset < 0xfffffffd))
+                    })
+            }),
+            "异常缺少本次独立抛出方法的真实帧",
+        )?;
+        let chain = reader["chain"]
+            .as_array()
+            .ok_or_else(|| io::Error::other("缺少实际异常对象链"))?;
+        require(
+            chain.len() == expected.len(),
+            "实际 InnerException 链长度不符",
+        )?;
+        require(
+            observation["event_hresult"].as_u64() == Some(u64::from(expected[0].1)),
             "原事件 HRESULT 与固定异常不同",
         )?;
-        for (level, value) in chain.iter().enumerate() {
-            let (kind, code, _) = expected[index - level];
+        for (level, (value, (kind, code, native_code))) in chain.iter().zip(expected).enumerate() {
             require(
-                value["type"] == kind
-                    && value["hresult"].as_i64().map(|value| value as u32) == Some(code),
+                value["type"] == *kind && value["hresult"].as_u64() == Some(u64::from(*code)),
                 "异常对象类型或实际 HResult 不符",
             )?;
-            if level + 1 == length {
-                require(
-                    value["native_error_code"] == 1234 && value["inner_status"] == "null",
-                    "实际 Win32Exception NativeErrorCode 或链尾不符",
-                )?;
-            } else {
-                require(
-                    value["native_error_code"].is_null() && value["inner_status"] == "object",
-                    "非 Win32Exception 不能冒称原生错误码或省略内层",
-                )?;
-            }
+            require(
+                match native_code {
+                    Some(code) => value["native_error_code"].as_i64() == Some(i64::from(*code)),
+                    None => value["native_error_code"].is_null(),
+                },
+                "原生错误码必须属于本次对象，不能用相同 HRESULT 的旧对象替代",
+            )?;
+            require(
+                value["inner_status"]
+                    == if level + 1 == expected.len() {
+                        "null"
+                    } else {
+                        "object"
+                    },
+                "异常内链或真实链尾不符",
+            )?;
         }
         require(reader["budget_exhausted"] == false, "固定异常读取耗尽预算")?;
         require(frames.len() <= 32, "实际托管帧超过上限")?;
-        counts[index] += 1;
+        count += 1;
     }
-    require(counts == [1, 1, 1], "三次固定异常没有各读取一次")
+    require(count == 4, "四次固定异常没有按顺序各读取一次")
 }
 
 fn run(root: &Path, report: &mut Value) -> io::Result<()> {
@@ -1181,4 +1232,78 @@ fn startup_main_thread_identity_remains_an_observation_not_fixture_evidence() {
         "reader":{"schema":1,"operation":1,"event_sequence":7,"nonce":"0101","pid":41,"tid":40,"process_birth":100,"thread_birth":200,"target_identity_verified":true,"dac_sha256_verified":true,"dac_loaded":true}});
     assert!(validate_binding(&item).is_ok());
     assert!(validate_fixture_thread(&item).is_err());
+}
+
+fn ordered_fixed_exception_receipts() -> (Vec<Value>, Value) {
+    let win32 = |code| {
+        json!({"type":"System.ComponentModel.Win32Exception","hresult":0x80004005_u32,
+            "native_error_code":code,"inner_status":"null"})
+    };
+    let operation = json!({"type":"System.InvalidOperationException","hresult":0x80131509_u32,
+        "native_error_code":null,"inner_status":"object"});
+    let application = json!({"type":"System.ApplicationException","hresult":0x80131600_u32,
+        "native_error_code":null,"inner_status":"object"});
+    let chains = [
+        vec![win32(1234)],
+        vec![win32(5678)],
+        vec![operation.clone(), win32(5678)],
+        vec![application, operation, win32(5678)],
+    ];
+    let observations = chains
+        .into_iter()
+        .enumerate()
+        .map(|(index, chain)| {
+            let sequence = index + 10;
+            let hresult = chain[0]["hresult"].clone();
+            json!({"event_sequence":sequence,"nonce":"fixture","pid":41,"tid":42,"main_tid":40,
+            "process_birth":100,"thread_birth":200,"reader_reaped":true,"reader_job_empty":true,
+            "event_hresult":hresult,
+            "reader":{"schema":1,"operation":1,"event_sequence":sequence,"nonce":"fixture",
+                "pid":41,"tid":42,"process_birth":100,"thread_birth":200,
+                "target_identity_verified":true,"dac_sha256_verified":true,"dac_loaded":true,
+                "status":"observed","exception_source":"last_thrown_object_candidate",
+                "object_chain_complete":true,"tracker_complete":false,"exception_state_flags":2,
+                "budget_exhausted":false,"chain":chain,
+                "frames":[{"module_mvid":"fixture-mvid","method_token":index+1,"il_status":0,"il_offsets":[2]}]}})
+        })
+        .collect();
+    (
+        observations,
+        json!({"fixture_mvid":"fixture-mvid","fixture_method_tokens":[1,2,3,4,5]}),
+    )
+}
+
+#[test]
+fn exception_receipts_require_current_object_with_same_hresult() {
+    let (mut observations, prepared) = ordered_fixed_exception_receipts();
+    assert!(validate_observations(&observations, &prepared).is_ok());
+    // 两次 HRESULT 相同，沿用上一次对象的原生码仍必须失败。
+    observations[1]["reader"]["chain"][0]["native_error_code"] = json!(1234);
+    assert!(validate_observations(&observations, &prepared).is_err());
+}
+
+#[test]
+fn exception_receipts_reject_reordered_fixed_events() {
+    let (mut observations, prepared) = ordered_fixed_exception_receipts();
+    observations[1]["event_sequence"] = json!(9);
+    observations[1]["reader"]["event_sequence"] = json!(9);
+    assert!(validate_observations(&observations, &prepared).is_err());
+}
+
+#[test]
+fn exception_receipts_do_not_hide_partial_tracker_state() {
+    let (mut observations, prepared) = ordered_fixed_exception_receipts();
+    observations[0]["reader"]["exception_state_flags"] = json!(0);
+    assert!(validate_observations(&observations, &prepared).is_err());
+}
+
+#[test]
+fn exception_receipts_do_not_substitute_an_ancestor_mapping_for_the_throw_frame() {
+    let (mut observations, prepared) = ordered_fixed_exception_receipts();
+    let frames = observations[1]["reader"]["frames"].as_array_mut().unwrap();
+    frames[0]["il_status"] = json!(0x80004002_u32);
+    frames[0]["il_offsets"] = json!([]);
+    frames.push(json!({"module_mvid":"fixture-mvid","method_token":5,
+        "il_status":0,"il_offsets":[2]}));
+    assert!(validate_observations(&observations, &prepared).is_err());
 }

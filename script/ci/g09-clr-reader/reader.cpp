@@ -107,11 +107,13 @@ bool read_exact(HANDLE file, void *output, DWORD size) {
 struct Result {
   const char *status = "unavailable";
   const char *stage = "request";
+  const char *exception_source = "none";
   HRESULT error = S_OK;
   bool identity = false;
   bool dac_hash = false;
   bool dac_loaded = false;
   bool exhausted = false;
+  bool object_chain_complete = false;
   ULONG32 state_flags = 0;
   HRESULT exception_error = E_PENDING;
   HRESULT stack_error = E_PENDING;
@@ -374,6 +376,8 @@ HRESULT declaring_type(IXCLRDataValue *object, const wchar_t *wanted, Com<IXCLRD
     if (hr != S_OK || needed == 0 || needed > 256 || name[needed - 1] != 0)
       return FAILED(hr) ? hr : E_UNEXPECTED;
     if (std::wcscmp(name, wanted) == 0) return S_OK;
+    // 已确认到达根类型，才把不存在的可选声明类型与 API 失败区分。
+    if (std::wcscmp(name, L"System.Object") == 0) return E_NOINTERFACE;
     Com<IXCLRDataTypeInstance> base;
     hr = output->GetBase(base.put());
     output.put();
@@ -414,7 +418,9 @@ const char *known_type(const wchar_t *name) {
 }
 HRESULT collect_chain(IXCLRDataTask *task, Target &target, Result &result) {
   Com<IXCLRDataExceptionState> state;
-  HRESULT hr = task->GetCurrentExceptionState(state.put());
+  // first-chance 先于 CLR tracker 更新；保留 last-thrown 候选来源及原 PARTIAL 标志。
+  result.exception_source = "last_thrown_object_candidate";
+  HRESULT hr = task->GetLastExceptionState(state.put());
   if (hr != S_OK || !state.value) return FAILED(hr) ? hr : E_NOINTERFACE;
   hr = state->GetFlags(&result.state_flags);
   if (hr != S_OK) return hr;
@@ -493,7 +499,7 @@ HRESULT collect_chain(IXCLRDataTask *task, Target &target, Result &result) {
     else item << "null";
     item << ",\"native_error_read_hr\":" << static_cast<std::uint32_t>(native_hr) << ",\"inner_status\":\""
          << inner_status << "\",\"inner_read_hr\":" << static_cast<std::uint32_t>(inner_hr)
-         << ",\"current_state_flags\":" << result.state_flags << "}";
+         << ",\"exception_state_flags\":" << result.state_flags << "}";
     result.chain.push_back(item.str());
     if (hresult_hr != S_OK) return hresult_hr;
     if (win32_type_hr != S_OK && win32_type_hr != E_NOINTERFACE) return win32_type_hr;
@@ -535,19 +541,24 @@ HRESULT collect_stack(IXCLRDataTask *task, Target &target, Result &result) {
     if (hr != S_OK) return hr;
     alignas(16) CONTEXT context{};
     ULONG32 context_size = 0;
-    HRESULT mapping =
+    const HRESULT context_hr =
         walk->GetContext(CONTEXT_CONTROL, sizeof(context), &context_size, reinterpret_cast<BYTE *>(&context));
+    HRESULT mapping = context_hr;
+    HRESULT mapping_hr = E_PENDING;
     std::array<ULONG32, 8> offsets{};
     ULONG32 needed = 0;
     if (mapping == S_OK && context_size >= offsetof(CONTEXT, Rip) + sizeof(context.Rip) &&
-        context_size <= sizeof(context))
-      mapping = method->GetILOffsetsByAddress(context.Rip, static_cast<ULONG32>(offsets.size()), &needed,
-                                              offsets.data());
-    else if (SUCCEEDED(mapping)) mapping = E_UNEXPECTED;
+        context_size <= sizeof(context)) {
+      mapping_hr = method->GetILOffsetsByAddress(context.Rip, static_cast<ULONG32>(offsets.size()), &needed,
+                                                 offsets.data());
+      mapping = mapping_hr;
+    } else if (SUCCEEDED(mapping)) mapping = E_UNEXPECTED;
     if (mapping == S_OK && (needed == 0 || needed > offsets.size())) mapping = S_FALSE;
     if (mapping != S_OK) partial = true;
     std::ostringstream item;
     item << "{\"module_mvid\":\"" << guid(mvid) << "\",\"method_token\":" << token
+         << ",\"context_hresult\":" << static_cast<std::uint32_t>(context_hr)
+         << ",\"mapping_hresult\":" << static_cast<std::uint32_t>(mapping_hr)
          << ",\"il_status\":" << static_cast<std::uint32_t>(mapping) << ",\"il_offsets\":[";
     if (mapping == S_OK && needed <= offsets.size()) {
       for (ULONG32 i = 0; i < needed; ++i) {
@@ -647,17 +658,18 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, Result &resul
     result.error = E_ACCESSDENIED;
     return;
   }
-  // 同一原停点读取完成前不 Continue；不以 LastException 或 GetPrevious
-  // 替代当前异常/InnerException。
+  // 同一原停点读取完成前不 Continue；候选新鲜性由固定夹具逐事件核验，
+  // 不凭 HRESULT 相同宣称当前对象，也不把 GetPrevious 当作 InnerException。
   result.stage = "observation";
   result.exception_error = collect_chain(task.value, target, result);
+  result.object_chain_complete = result.exception_error == S_OK && !result.chain.empty();
   result.stack_error = target.expired()   ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
                        : result.exhausted ? HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_QUOTA)
                                           : collect_stack(task.value, target, result);
-  result.status = result.exception_error == S_OK && result.stack_error == S_OK &&
-                          !(result.state_flags & CLRDATA_EXCEPTION_PARTIAL)
-                      ? "observed"
-                      : "partial";
+  result.status =
+      result.object_chain_complete && result.stack_error == S_OK && !result.exhausted && !target.expired()
+          ? "observed"
+          : "partial";
   result.error = S_OK;
 }
 
@@ -697,7 +709,9 @@ std::string output(const G09ClrRequest &r, const Result &result) {
        << ",\"event_hresult\":" << r.exception_hresult
        << ",\"exception_api_hresult\":" << static_cast<std::uint32_t>(result.exception_error)
        << ",\"stack_api_hresult\":" << static_cast<std::uint32_t>(result.stack_error)
-       << ",\"current_state_flags\":" << result.state_flags << ",\"read_bytes\":" << result.read_bytes
+       << ",\"exception_source\":\"" << result.exception_source << "\",\"tracker_complete\":false"
+       << ",\"object_chain_complete\":" << (result.object_chain_complete ? "true" : "false")
+       << ",\"exception_state_flags\":" << result.state_flags << ",\"read_bytes\":" << result.read_bytes
        << ",\"read_calls\":" << result.read_calls
        << ",\"budget_exhausted\":" << (result.exhausted ? "true" : "false") << ",\"chain\":[";
   for (std::size_t i = 0; i < result.chain.size(); ++i) {

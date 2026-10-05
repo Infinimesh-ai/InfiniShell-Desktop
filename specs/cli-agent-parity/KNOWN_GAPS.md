@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 原生夹具与Linux门禁仍失败**：[Windows 37271419406](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37271419406) 已越过MSVC编译，真实CLR的CurrentExceptionState在first-chance停点给出空或前一次对象，三个读取均partial；目标绑定及退出清理不代替对象验收。正修复定位器，并加入相同HRESULT、不同原生码的四事件顺序断言，保留PARTIAL原状态、预算和期限。[Linux 37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 本轮外层Node8秒超时且preload/trace缺失；上次refreshed用例本轮ok不解释旧超时。两轮原件均已独审，不增加相近探针、不放宽期限。**新增关闭0项；无需本地化变更。**
+
 - **2026-10-05 固定 CLR 夹具编译失败，最窄修复待验**：精确 `bd6ecb498` 的 [37269594308](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37269594308) 正式失败；Windows类型检查和7普通项通过，MSVC在`GetFlags`实参报C2664，真实夹具未执行。现仅把`state_flags`从`ULONG`改为接口要求的`ULONG32`；不强转指针、不降低告警或验收条件。官方ZIP及完整日志已保留，旧PowerShell故障未解决；新增关闭0项。
 
 - **2026-10-05 Windows 固定 CLR 夹具准备**：原异常线程／当前异常对象／InnerException／Win32原码及方法帧读取、期限内reader回收均有明确夹具条件；本机Windows目标类型门禁、warp check及18项workflow校验通过，MSVC与真实Framework读取尚未执行。只验证诊断原生能力，不执行实际CLI候选，不计G09关闭；无需本地化变更。

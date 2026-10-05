@@ -63,7 +63,7 @@ try {
     $receipt.fixture_mvid = $assembly.ManifestModule.ModuleVersionId.ToString('D')
     $type = $assembly.GetType('ClrFixture', $true)
     $flags = [Reflection.BindingFlags]'Static, NonPublic'
-    $receipt.fixture_method_tokens = @('ThrowNative', 'WrapNative', 'WrapOperation', 'Exercise') | ForEach-Object {
+    $receipt.fixture_method_tokens = @('ThrowNative', 'ThrowSecondNative', 'WrapNative', 'WrapOperation', 'Exercise') | ForEach-Object {
         $method = $type.GetMethod($_, $flags)
         if ($null -eq $method) { throw '固定夹具方法元数据缺失' }
         $method.MetadataToken

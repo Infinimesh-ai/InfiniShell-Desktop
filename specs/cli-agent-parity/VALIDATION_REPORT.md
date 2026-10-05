@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：真实CLR定位器反证与Linux外层超时
+
+Windows精确 `112adcc74998b43663aba8b6c0645eed9da23d39` 的 [37271419406](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37271419406) 仍正式失败：MSVC `/W4 /WX`、PS5.1准备和7普通项通过；原生单项失败，三次CurrentExceptionState读取为空／前一Win32／前一InvalidOperation。实际目标与原线程出生绑定、54次Continue、reader和fixture退出／Job空已核；这些不代替当前对象、内链和方法帧验证。官方32成员ZIP、源码及二进制绑定已独审，收据SHA `e44d71fb034c937b74366032f968b172a5bc63161ee1426fe77dc136129ff428`。
+
+固定官方源码中Current读取EH tracker；last-thrown在RaiseException前更新。修复只把后者明确作为候选来源，保留PARTIAL与tracker不完整，不能清位或仅凭相同HRESULT宣称当前对象。夹具强化为Win32(1234)→catch内新Win32(5678)→InvalidOperation[5678]→Application[InvalidOperation,5678]，四次独立方法与原事件严格有序；实际字段、链尾、帧、预算及回收仍须通过。[固定DAC合同](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/task.cpp)、[固定抛出顺序](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/vm/excep.cpp)。公开CoreCLR不等于本机Framework二进制，后续真实夹具不可省略；尚未接入PS。
+
+Linux精确74dd的 [37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 正式失败。5525 nextest PASS；hook22ok/1ERROR/2skip。唯一失败为`test_failed_tmux_query_never_falls_back_to_outer_terminal`外层Node超过原8秒；preload与原生trace均missing，不能证明worker已进入。旧refreshed用例本轮ok，另一真实main正例的18阶段及46.648005ms只属于该次成功发送，不解释b5旧失败。33 Git来源、2官方ZIP与完整日志已核；未归档该轮Node/worker原二进制SHA，不能事后补证失败阶段。终审SHA `1c1e8d7940fb8d4f51db3c856597edaa15aa644eefe057306b43d1136db65f5b`。不为此重复相近探针或改期限。
+
+本机Windows目标类型check（`r-d4imb4or`）、warp check（`r-c83yje47`）、workflow18项（`r-0455ftye`）、PS7静态解析（`r-j14_hn8p`）及原显式C++风格检查（`r-frbcx9a_`）通过。新增同HRESULT旧对象、乱序、隐藏PARTIAL及祖先IL替代本次throw帧的4项普通拒绝回归仍待真实Windows执行，不冒称原生已通过。
+
+**本轮新增关闭0项，G09仍开放；无需本地化变更。最终同源双平台门禁未完成。**
+
 ## 2026-10-05：固定 CLR 读取器 MSVC 类型失败，原生夹具未执行
 
 精确 `bd6ecb498bc8e36affd1ffa7c34f027e282aea9a` 的 [37269594308](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37269594308) 正式失败。Windows类型门禁及7项普通测试各一次通过；MSVC `/W4 /WX` 在`reader.cpp:419`报C2664：`IXCLRDataExceptionState::GetFlags`需要`ULONG32*`，而`Result.state_flags`是`ULONG`。固定官方头与7份构建输入的前后／副本SHA全部一致，没有生成reader.exe，prepare／真实CLR夹具均未执行。

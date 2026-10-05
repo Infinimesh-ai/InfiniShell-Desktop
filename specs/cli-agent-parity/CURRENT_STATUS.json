@@ -1,7 +1,32 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。74dd/r-f6ta9tcm的显式空ACL真实两场景及一次独立冷恢复已通过原件独审：升级280、冷恢复278，README空ACL与其余非空只读ACL精确保留，冷恢复完整快照等于before，短根已清理；不覆盖新增相对路径、GUI或原完整5/2重跑。2026-10-05用户允许带额外共享写权限、文件保护标志或特殊链接权限的安装提示原安装工具升级；普通安装和已支持只读ACL自动升级保持。b5 Linux通知发送超时的原失败保留，后续37267752920的原生hook步骤已失败，等待终态原日志确认具体原因。Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，后4场景/3冷恢复未跑；固定CLR夹具尚未原生验证，最终同源双平台门禁仍须完成，新增关闭0项。",
+  "status_zh": "本次Mac范围G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Mac显式空ACL真实两场景及一次冷恢复已独审通过。用户允许三类特殊权限安装交原工具升级，普通和已支持只读ACL自动升级保留。Linux74dd本轮外层Node8秒超时、无同进程阶段，旧b5发送超时仍未解释；Windows112adcc74已通过读取器编译，但真实CLR当前状态接口读到空或前一对象，夹具失败。正修复候选对象定位并加强同HRESULT旧对象拒绝；原Windows升级矩阵首updated失败及最终同源双平台门禁仍未解决，新增关闭0项。",
+  "g09_clr_current_object_fix_20261005": {
+    "status": "original_native_failure_preserved_locator_fix_pending",
+    "windows": {
+      "run": 37271419406,
+      "commit": "112adcc74998b43663aba8b6c0645eed9da23d39",
+      "formal_result": "failure",
+      "executed": "MSVC与PS5.1准备通过，7普通项通过；真实固定异常测试失败，3 reader均partial。",
+      "failure": "原first-chance的CurrentExceptionState读到空/前一异常，不能接PS；另有字段、基类遍历和IL映射问题，不能相互冒代解释。",
+      "cleanup": "54原事件均Continue、原线程出生绑定、reader/fixture退出和Job空已核，pending=false。",
+      "audit_sha256": "e44d71fb034c937b74366032f968b172a5bc63161ee1426fe77dc136129ff428"
+    },
+    "linux": {
+      "run": 37267752920,
+      "commit": "74ddcaa42ada3e3f7306adab1fd5b7b69df30d13",
+      "formal_result": "failure",
+      "failure": "test_failed_tmux_query_never_falls_back_to_outer_terminal的外层Node超过8秒，preload和原生trace均missing，不能确定已进worker。",
+      "test_boundary": "5525 nextest PASS；真实hook22ok/1ERROR/2skip；旧refreshed用例本轮ok不解释b5旧故障。",
+      "source_boundary": "33 Git来源及2官方ZIP已核；Node/worker原二进制与实际SHA未归档，不能事后补证失败执行阶段。",
+      "audit_sha256": "1c1e8d7940fb8d4f51db3c856597edaa15aa644eefe057306b43d1136db65f5b"
+    },
+    "local_checks": "r-d4imb4or Windows目标类型check、r-c83yje47 warp check、r-0455ftye workflow18项、r-j14_hn8p PS7静态解析及r-frbcx9a_原显式C++风格检查通过；11普通项待真实Windows运行。",
+    "next_fix": "GetLastExceptionState只记last_thrown_object_candidate，保留PARTIAL和tracker不完整；以四次原停点顺序、相同HRESULT但不同原生码/独立throw方法证明实际对象新鲜性，不变预算/期限/回收。",
+    "localization": "无需本地化变更",
+    "newly_closed_gaps": []
+  },
   "g09_windows_clr_fixture_preparation_20261005": {
     "status": "msvc_type_failure_minimal_fix_pending",
     "base_commit": "74ddcaa42ada3e3f7306adab1fd5b7b69df30d13",

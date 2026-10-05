@@ -24,12 +24,23 @@ internal static class ClrFixture
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowSecondNative()
+    {
+        // 与第一次相同 HRESULT；原生错误码和方法身份必须指向这次新抛出的对象。
+        throw new Win32Exception(5678, "fixed fixture");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
     private static void WrapNative()
     {
         try { ThrowNative(); }
-        catch (Win32Exception exception)
+        catch (Win32Exception)
         {
-            throw new InvalidOperationException("fixed fixture", exception);
+            try { ThrowSecondNative(); }
+            catch (Win32Exception exception)
+            {
+                throw new InvalidOperationException("fixed fixture", exception);
+            }
         }
     }
 
@@ -50,7 +61,7 @@ internal static class ClrFixture
         {
             InvalidOperationException middle = exception.InnerException as InvalidOperationException;
             Win32Exception inner = middle == null ? null : middle.InnerException as Win32Exception;
-            result = inner != null && inner.NativeErrorCode == 1234 ? 0 : 2;
+            result = inner != null && inner.NativeErrorCode == 5678 ? 0 : 2;
         }
     }
 }

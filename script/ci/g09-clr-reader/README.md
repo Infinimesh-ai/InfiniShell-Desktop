@@ -14,7 +14,7 @@ cl /nologo /std:c++17 /utf-8 /W4 /WX /O2 /MT /EHsc reader.cpp /Fo:<私有构建�
 
 控制器必须先绑定实际 CLR `LOAD_DLL` 原文件句柄、映像基址、PE 时间戳/SizeOfImage/SHA，并确认同目录 DAC 与该 CLR 的数字文件版本完全相同。两文件保持拒写租约。reader 再核目标 CLR 内存 PE、DAC 全文件 SHA、逐级无重解析点父目录、加载后的 HMODULE 实际文件路径及 FileID。版本相同只是前提，不能代替实际 DAC 建实例、字段与栈读取成功。
 
-当前没有 Windows 编译或真实 DAC 成功声明；macOS 的格式检查不能覆盖 Windows SDK 类型、COM ABI 或 Framework 4.8 行为。
+`112adcc74` 已完成 Windows 编译和真实夹具执行，但原 `GetCurrentExceptionState` 在三个 first-chance 停点分别无对象、读到前一次 Win32Exception、读到前一次 InvalidOperationException，未满足当前异常合同。本次修改仍须新的固定夹具验证；macOS 的格式检查不能覆盖 Windows SDK 类型、COM ABI 或 Framework 4.8 行为。
 
 ## 单次控制协议
 
@@ -34,13 +34,17 @@ stdout 必须由控制器绑定为本轮全新普通文件；不能使用可能�
 
 仅提供 ICLRDataTarget 的身份/固定 CLR 基址、ReadVirtual 和原线程 GetThreadContext。所有目标写入、SetContext/TLS 写入都返回拒绝，不调用 Attach、Invoke、Suspend、Continue 或目标函数。只允许固定标准 CONTEXT 标志，不提供 XSTATE/任意其它线程。
 
-使用 `GetCurrentExceptionState` 和 `GetManagedObject`，不回退 `GetLastExceptionState`，不把 `GetPrevious` 冒充 InnerException，也不把 `IsSameState2` 的弱匹配当事件身份。字段通过真实元数据定位声明类型，只读取 `System.Exception._HResult`、`_innerException` 与 `System.ComponentModel.Win32Exception.nativeErrorCode`。不会读取 Message/Data/StackTrace/局部变量；输出类型名称限制在代码中的固定白名单，其它类型只报 `unknown_type` 并保留 MVID/TypeDef token。
+使用 `GetLastExceptionState` 和 `GetManagedObject`，明确输出 `exception_source="last_thrown_object_candidate"`，不回退旧 tracker，不把 `GetPrevious` 冒充 InnerException，也不把 `IsSameState2` 的弱匹配当事件身份。固定官方参考实现先将待抛对象写入线程的 last-thrown handle，再调用 RaiseException；first-chance 通知早于 CLR 异常处理器更新 tracker。但这不是本机 Framework 实际新鲜性的证明：控制器必须保持原停点，并用实际线程、事件顺序、同 HRESULT 的不同 Win32 原码、完整包装链和固定 MethodDef/IL 逐项验证，不能仅凭事件 HRESULT 相同就把候选称为当前对象。
 
-顶层 `status="observed"` 要求当前异常链与栈读取完整、至少一个托管帧且无 `CLRDATA_EXCEPTION_PARTIAL`。任何上限截断、字段错误、未知映射或 API 失败均保留为 `partial`/`unavailable`，不冒充完整异常链。`inner_status` 仅为 `object`、`null`、`unavailable`、`truncated`；`null` 仅来自实际读取到的零引用。
+字段通过真实元数据定位声明类型，只读取 `System.Exception._HResult`、`_innerException` 与 `System.ComponentModel.Win32Exception.nativeErrorCode`。查找可选 Win32Exception 声明类型时，仅在成功读到 `System.Object` 根类型后认定该基类不存在；其它 GetName/GetBase/字段错误仍保留失败。不会读取 Message/Data/StackTrace/局部变量；输出类型名称限制在代码中的固定白名单，其它类型只报 `unknown_type` 并保留 MVID/TypeDef token。
 
-所有 HRESULT 字段都是无符号 32 位 JSON 数字；`native_error_code` 是有符号 32 位或 null。`event_hresult` 是原事件数值对照，不与字段值自动等同。帧仅输出模块 MVID、MethodDef token、IL 偏移列表及映射状态；不输出原始地址/路径。
+原 `CLRDATA_EXCEPTION_PARTIAL` 完整保留在 `exception_state_flags`，`tracker_complete` 始终为 false。该标志表示 last-thrown 状态没有完整异常 tracker，不能清掉标志来声明成功。`object_chain_complete` 独立表示本轮对象字段及 InnerException 链已完整读到实际 null 尾端；它不声明 tracker 完整或候选必然是当前对象。
 
-退出码 0 表示已经绑定目标和 DAC 并产出读取结果，仍可能是 `partial` 或 DAC API 不可用；2 为非法/截断请求（`stage="request"`，未查询目标/未加载 DAC）；3 为绑定或 reader 自身失败；4 为输出失败。最终夹具必须逐项核三条固定异常链、Win32 原码 1234 和固定 C# MVID/MethodDef 的真实帧，不接受仅退出 0。
+顶层 `status="observed"` 要求对象链与栈读取完整、至少一个托管帧、预算未耗尽且期限未到。任何上限截断、字段错误、未知映射或 API 失败均保留为 `partial`/`unavailable`，不冒充完整异常链。`inner_status` 仅为 `object`、`null`、`unavailable`、`truncated`；`null` 仅来自实际读取到的零引用。旧原件的字段 E_INVALIDARG、读取预算耗尽和 IL 映射失败不能仅由更换对象来源解释，也没有放宽其失败条件。
+
+所有 HRESULT 字段都是无符号 32 位 JSON 数字；`native_error_code` 是有符号 32 位或 null。`event_hresult` 是原事件数值对照，不与字段值自动等同。帧仅输出模块 MVID、MethodDef token、IL 偏移列表及映射状态；不输出原始地址/路径。`context_hresult` 保留 GetContext 的原返回值，`mapping_hresult` 保留 GetILOffsetsByAddress 的原返回值（未调用时为 E_PENDING）；`il_status` 仍包含原长度/映射数量校验，不因拆分记录而放宽失败条件，也不调整指令地址重试。
+
+退出码 0 表示已经绑定目标和 DAC 并产出读取结果，仍可能是 `partial` 或 DAC API 不可用；2 为非法/截断请求（`stage="request"`，未查询目标/未加载 DAC）；3 为绑定或 reader 自身失败；4 为输出失败。最终夹具必须按原事件顺序核四条固定异常链：Win32 原码 1234、在其 catch 内抛出的同 HRESULT 原码 5678、包装后者的 InvalidOperationException、再包装它的 ApplicationException；每条还须核固定 C# MVID/实际抛出 MethodDef 的真实 IL 帧。前一次同 HRESULT 对象、乱序、丢失 PARTIAL、字段/栈不完整均不得通过，不接受仅退出 0。
 
 没有用户可见文案变化，无需本地化变更。
 
@@ -50,7 +54,9 @@ stdout 必须由控制器绑定为本轮全新普通文件；不能使用可能�
 - [ICLRDataTarget](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/iclrdatatarget-interface)
 - [IXCLRDataTask](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/ixclrdatatask-interface)
 - [IXCLRDataStackWalk::Next](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/ixclrdatastackwalk-next-method)
+- [Windows first-chance 与异常处理器顺序](https://learn.microsoft.com/en-us/windows/win32/debug/debugger-exception-handling)
 - [固定官方字段枚举实现](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/inspect.cpp)
-- [固定官方当前异常实现](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/task.cpp)
+- [固定官方 last-thrown 状态与 PARTIAL 实现](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/debug/daccess/task.cpp#L539-L557)
+- [固定官方 RaiseException 前更新 last-thrown handle](https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/coreclr/vm/excep.cpp#L2736-L2795)
 
-后两项是所固定 ABI 版本的公开参考实现，不是本机 Framework 私有实现的验证替身。
+固定提交源码是所固定 ABI 版本的公开参考实现，不是本机 Framework 私有实现的验证替身。
