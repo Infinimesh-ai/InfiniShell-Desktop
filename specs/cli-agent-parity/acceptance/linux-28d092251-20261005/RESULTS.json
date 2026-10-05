@@ -78,7 +78,12 @@
     "stage": "未认证 Wayland 启动预检",
     "description": "初次把 D-Bus 放在挂载空间外，secrets 服务激活超时 120 秒；应用后续形成数据库/绘制帧，已用精确 PID SIGTERM 退出 -15，并确认所记自有进程原身份退出",
     "correction": "后续脚本将 D-Bus daemon/服务激活放进持久挂载空间、独立 XDG_RUNTIME_DIR，真实 IME 地址显式传入",
-    "boundary": "修正后的私有总线 Python 探针通过；实际应用、物理 IME 和活跃宿主重关联仍待验。未改产品源码，不计 V01 失败或通过"
+    "boundary": "修正后的私有总线 Python 探针通过；实际应用、物理 IME 和活跃宿主重关联仍待验。未改产品源码，不计 V01 失败或通过",
+    "raw_evidence": [
+      "evidence/initial-smoke/app-original.log",
+      "evidence/initial-smoke/dbus-stderr-excerpt.txt"
+    ],
+    "raw_evidence_boundary": "应用原始日志完整保全；初次 D-Bus stderr 只有工具会话摘录，完整流未落盘。不冒称连续录屏或完整原生模型事件。"
   },
   "structure_verification": {
     "status": "incomplete_expected",

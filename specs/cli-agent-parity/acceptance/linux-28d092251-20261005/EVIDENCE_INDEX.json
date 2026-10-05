@@ -152,6 +152,18 @@
       "path": "tools/CONTINUE.txt",
       "bytes": 972,
       "sha256": "2fceefc3a2e26a4164656e1e53ce1f05dbf2934c20d26eea0bd45dc89f11c160"
+    },
+    {
+      "path": "evidence/initial-smoke/app-original.log",
+      "bytes": 18840,
+      "sha256": "cda81e3a0b7f705b7e1a54b0e8b627e3110c729a7b12ece1caf03f0fa81a177f",
+      "scope": "启动预检原生日志；D-Bus 仅工具 stderr 摘录，未保存完整流"
+    },
+    {
+      "path": "evidence/initial-smoke/dbus-stderr-excerpt.txt",
+      "bytes": 236,
+      "sha256": "3e77ddc29e16234c764ba945fb7320e1fe988416c5f98dfbc0696258a790d1b7",
+      "scope": "启动预检原生日志；D-Bus 仅工具 stderr 摘录，未保存完整流"
     }
   ],
   "excluded_private_trees": [
