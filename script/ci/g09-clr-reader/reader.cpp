@@ -112,7 +112,7 @@ struct Result {
   bool dac_hash = false;
   bool dac_loaded = false;
   bool exhausted = false;
-  ULONG state_flags = 0;
+  ULONG32 state_flags = 0;
   HRESULT exception_error = E_PENDING;
   HRESULT stack_error = E_PENDING;
   std::uint64_t read_bytes = 0;

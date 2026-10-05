@@ -278,6 +278,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-05 固定 CLR 夹具编译失败，最窄修复待验**：精确 `bd6ecb498` 的 [37269594308](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37269594308) 正式失败；Windows类型检查和7普通项通过，MSVC在`GetFlags`实参报C2664，真实夹具未执行。现仅把`state_flags`从`ULONG`改为接口要求的`ULONG32`；不强转指针、不降低告警或验收条件。官方ZIP及完整日志已保留，旧PowerShell故障未解决；新增关闭0项。
+
 - **2026-10-05 Windows 固定 CLR 夹具准备**：原异常线程／当前异常对象／InnerException／Win32原码及方法帧读取、期限内reader回收均有明确夹具条件；本机Windows目标类型门禁、warp check及18项workflow校验通过，MSVC与真实Framework读取尚未执行。只验证诊断原生能力，不执行实际CLI候选，不计G09关闭；无需本地化变更。
 
 - **2026-10-05 Mac 显式空 ACL 真实事务通过，仍开放**：精确 `74ddcaa42ada3e3f7306adab1fd5b7b69df30d13/r-f6ta9tcm` 的 `updated` 公开入口升级至2.1.280，`swap_receipt_missing` 经独立libtest冷恢复2.1.278且完整after等于before。两场景before／prepared／after的README均精确保留显式空ACL，包根与两CLI文件保留非空只读ACL；四份官方归档、19份Git源码、签名后二进制及两代原生退出／清理绑定已独审，登记短根已清理。独审 `g09-claude-npm-empty-acl-macos-runs/r-f6ta9tcm/independent-native-empty-acl-review.safe.json` SHA `7571567a5e135478b59ae0ce92f734603d0021c1b3edafa419f95d5a53e5a9d2`。仅两场景／一次冷恢复，不计新增相对路径、GUI或原完整5/2重跑；Linux后续37267752920仍运行，Windows固定CLR夹具尚未原生验证，原失败和最终同源门禁保留。**新增关闭0项，G09开放；无需本地化变更。**

@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。74dd/r-f6ta9tcm的显式空ACL真实两场景及一次独立冷恢复已通过原件独审：升级280、冷恢复278，README空ACL与其余非空只读ACL精确保留，冷恢复完整快照等于before，短根已清理；不覆盖新增相对路径、GUI或原完整5/2重跑。2026-10-05用户允许带额外共享写权限、文件保护标志或特殊链接权限的安装提示原安装工具升级；普通安装和已支持只读ACL自动升级保持。b5 Linux通知发送超时的原失败保留，后续37267752920正在运行。Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，后4场景/3冷恢复未跑；固定CLR夹具尚未原生验证，最终同源双平台门禁仍须完成，新增关闭0项。",
+  "status_zh": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。74dd/r-f6ta9tcm的显式空ACL真实两场景及一次独立冷恢复已通过原件独审：升级280、冷恢复278，README空ACL与其余非空只读ACL精确保留，冷恢复完整快照等于before，短根已清理；不覆盖新增相对路径、GUI或原完整5/2重跑。2026-10-05用户允许带额外共享写权限、文件保护标志或特殊链接权限的安装提示原安装工具升级；普通安装和已支持只读ACL自动升级保持。b5 Linux通知发送超时的原失败保留，后续37267752920的原生hook步骤已失败，等待终态原日志确认具体原因。Windows原矩阵37209945616首updated仍ProbeFailed，PS根先退出1/输出0B，后4场景/3冷恢复未跑；固定CLR夹具尚未原生验证，最终同源双平台门禁仍须完成，新增关闭0项。",
   "g09_windows_clr_fixture_preparation_20261005": {
-    "status": "local_type_gate_pass_native_fixture_pending",
+    "status": "msvc_type_failure_minimal_fix_pending",
     "base_commit": "74ddcaa42ada3e3f7306adab1fd5b7b69df30d13",
     "scope": "固定Framework 4.8异常夹具，先证明原停点当前异常链、真实方法帧和reader回收；不执行真实PowerShell/npm候选。",
     "reader": "官方固定ABI头；只加载原CLR配套DAC，以原进程/异常线程句柄及出生身份绑定，不按PID重开；原绝对期限内有界读取。",
@@ -19,6 +19,15 @@
       "powershell_parser": "本机PS7仅静态解析prepare/build-reader；不代替Windows PS5.1/MSVC或原生验收。"
     },
     "workflow_scope": "g09_clr_fixture：仍25输入，只允许独立Windows，无重试；保留构建/夹具原件。",
+    "failed_run": 37269594308,
+    "failed_source_commit": "bd6ecb498bc8e36affd1ffa7c34f027e282aea9a",
+    "formal_status": "failure",
+    "failure": "MSVC C2664：GetFlags要求ULONG32*，Result.state_flags原为ULONG；现仅将字段改为ULONG32，未用指针强转或降低/W4 /WX。",
+    "executed_boundary": "实际Windows类型检查和7普通测试通过，构建reader失败；prepare及真实CLR夹具均未执行。",
+    "original_artifact_sha256": "ce17e5fc191d0f3f173d196564532a58c8a8abc96aa5841937f17467c8c9fdb5",
+    "original_full_log_sha256": "f6b7e73f315a1bd2d0d54367f35b9d94c5a9eb0cbcf488a3e0d027773bb9a2bb",
+    "failure_audit_sha256": "813e2d83ad5a27bb4daeb53eb1b7a66665729f886ce5835ade678d5953a00be6",
+    "fix_local_check": "r-25410g6b：cargo check --locked -p warp通过；r-ei6gwn9c按原显式LLVM风格格式检查通过。默认clang-format检查命中既有格式，原失败r-75ltj6v1保留，不改无关格式。",
     "native_executed": false,
     "g09_closed": false,
     "newly_closed_gaps": [],

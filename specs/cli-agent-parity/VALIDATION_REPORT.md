@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-05：固定 CLR 读取器 MSVC 类型失败，原生夹具未执行
+
+精确 `bd6ecb498bc8e36affd1ffa7c34f027e282aea9a` 的 [37269594308](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37269594308) 正式失败。Windows类型门禁及7项普通测试各一次通过；MSVC `/W4 /WX` 在`reader.cpp:419`报C2664：`IXCLRDataExceptionState::GetFlags`需要`ULONG32*`，而`Result.state_flags`是`ULONG`。固定官方头与7份构建输入的前后／副本SHA全部一致，没有生成reader.exe，prepare／真实CLR夹具均未执行。
+
+现仅将字段类型改为`ULONG32`，保留官方头、警告等级、候选期限与全部固定夹具断言。原完整日志SHA `f6b7e73f315a1bd2d0d54367f35b9d94c5a9eb0cbcf488a3e0d027773bb9a2bb`；官方ZIP 11328401931 的API大小、SHA及全成员CRC一致，SHA `ce17e5fc191d0f3f173d196564532a58c8a8abc96aa5841937f17467c8c9fdb5`。原件位于仓外 `g08-build-preparation/g09-clr-fixture-bd6ecb498-ci`。修复须经新源码Windows复验，不将编译修正、7普通项或该诊断夹具计为G09关闭；**无需本地化变更**。 独审SHA `813e2d83ad5a27bb4daeb53eb1b7a66665729f886ce5835ade678d5953a00be6`。本机 `r-25410g6b` 的 `cargo check --locked -p warp` 通过；格式检查沿用原显式LLVM风格（110列及既有短语句规则），`r-ei6gwn9c`通过。默认格式检查`r-75ltj6v1`命中既有样式，保留失败且不改无关格式。
+
 ## 2026-10-05：Windows 固定 CLR 原生读取夹具准备，尚未执行
 
 以 `74ddcaa42` 为基线，仅新增内部固定 Framework 4.8 夹具、只读 DAC reader 和独立工作流范围。原调试停点的进程／线程句柄、出生身份、CLR/DAC 原文件及版本绑定后，读取当前异常链、Win32 原码和有界方法帧；固定 C# 工作线程的三层异常必须与实际 MVID／MethodDef／IL 逐项对账。reader 已退出且精确 Job 为空后才能继续原事件，失败保留首因和 pending；不改变真实候选的期限、命令或安装权限。
