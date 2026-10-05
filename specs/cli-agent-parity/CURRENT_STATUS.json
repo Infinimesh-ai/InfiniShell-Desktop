@@ -11034,11 +11034,16 @@
   },
   "g09_shell_classification_capability_20261005": {
     "base_commit": "11a18a8d06a9c9af1dd3f8461d1c637f0620d0b4",
-    "status": "fixed_native_capability_pending",
+    "status": "fixed_native_capability_failed_before_managed_start",
     "local_gate_summary_sha256": "794fea446eca094bad7d5ecd90f077be06a1c6f7522d9b20227b47cb3fde42fb",
     "local_gates": "warp check/i18n11、Windows测试及诊断特性metadata、Python28/19、PowerShell AST、actionlint通过；8登记根均清理，不等于Windows原生通过",
-    "windows_ordinary_tests_pending": 38,
-    "windows_native_test_pending": 1,
+    "windows_ordinary_tests_passed": 38,
+    "windows_native_test_failed": 1,
+    "native_run": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37335113246",
+    "native_source_commit": "8bdbeec004277cb2a3222d00e6d8e9c8dd6f3896",
+    "native_audit_sha256": "d2b261fceccb0d30d248e71556e5b506ada52797a95a14b40fd069362c33e6a8",
+    "native_failure": "seq6在根工作线程创建和CLR绑定前收到PID23888/TID28804的CREATE；首任意后代被当作固定子模式，复合身份守卫失败，实际失配分项未保存，不能命名该进程。",
+    "native_boundary": "无分类入口/返回或CLR观察，DR从未修改；根已reap、Job为空，但debug drain/子退出/core退出未确认，cleanup_ready=false。真实PowerShell候选未重跑。",
     "scope": "一次已绑定Node的SHGetFileInfoW返回与原停点CLR frames-only栈；尚未接入真实PowerShell候选",
     "identity": "原CREATE/LOAD句柄、工作线程出生身份、入口栈/返回RSP、映射及有界代码字节；返回前自有DR恢复读回，退出回收分别记证",
     "fixture": "唯一无害本地子CREATE、工作线程MEM_PRIVATE返回、原生低32返回与夹具自行输出一致、精确MVID/MethodDef及原四异常回归",
@@ -11046,5 +11051,20 @@
     "newly_closed_gaps": [],
     "g09_closed": false,
     "localization": "无需本地化变更；仅默认关闭诊断、固定夹具及源码绑定，无GUI/TUI文案、语义或布局变化。"
+  },
+  "g09_classification_descendant_fix_20261006": {
+    "base_commit": "8bdbeec004277cb2a3222d00e6d8e9c8dd6f3896",
+    "status": "fixed_native_capability_pending_after_descendant_and_handle_fix",
+    "local_gate_summary_sha256": "451f0250c8d4db16f9e94322386a4581b12dd898235532162da456bec043e5ad",
+    "source_review_sha256": "eb08ecb6fc496e6334ac51b3484cda1a2ac8b2913f374a53c1c806301c93f845",
+    "local_gates": "warp check、i18n11、Windows普通及诊断特性metadata、格式与静态复审通过；不等于原生验收通过",
+    "windows_ordinary_tests_pending": 45,
+    "windows_native_test_pending": 1,
+    "fix": "原CREATE精确选择唯一固定目标；其他后代不计正例且全部须原句柄退出/birth核验。显式复制所需等待权限，WAIT_FAILED保留原码，清理按先后保留首错。",
+    "unchanged": "原C#及控制台子系统、四异常、分类返回和同停点CLR栈正例、4096事件/30秒/5秒清理预留、读取预算；真实PS候选未重跑",
+    "continuation": "用户考虑转Windows继续；本轮保存进度，不派发新CI。接续见specs/cli-agent-parity/G09_WINDOWS_HANDOFF.zh-CN.md，先验45普通与唯一固定原生能力。",
+    "newly_closed_gaps": [],
+    "g09_closed": false,
+    "localization": "无需本地化变更；仅内部诊断及夹具，无GUI/TUI文案、语义或布局变化。"
   }
 }

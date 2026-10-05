@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-06：区分调试后代与固定分类目标
+
+基于`8bdbeec00`原事件暴露的角色假设，只修Rust固定夹具与原生核心。每个后代CREATE保留原句柄、PID/TID及出生身份，映像只记安全身份／摘要和匹配布尔；只有精确路径、FileID、SHA全匹配者计作唯一固定目标。缺映像保持unknown，不计正例；固定路径的身份／摘要不符或未知立即拒绝。非目标不要求退出0，但必须有原EXIT、原句柄signaled及相同birth；固定目标仍要求退出0。正常最多16后代，清理中新发生CREATE也精确保留并终止，原4096事件／30秒及5秒清理预留不变。C#、控制台子系统、准备脚本、分类栈／返回正例与原四异常保持。
+
+核心显式复制原句柄的读取、查询、上下文和SYNCHRONIZE所需权限，不按PID/TID重开。WAIT_FAILED原OS码、未退出及意外状态分别保留；这修正API权限合同，不证明旧失败具体错误就是拒绝访问。每个EXIT继续后的等待阶段及错误进入原事件收据；清理按实际先后保留首错，已继续的错误仍drain其它后代，pending未继续时停止。独审发现的后续超时覆盖首错已在派发前修正。
+
+warp check、i18n11、Windows测试目标及诊断特性metadata、格式和静态复审通过；门禁汇总SHA `451f0250c8d4db16f9e94322386a4581b12dd898235532162da456bec043e5ad`，登记根均已清理，初次格式失败r-dfyuuvos保留。Windows45普通项（夹具19／核心13／reader13）及唯一原生项尚待实际执行；尚未接入真实PS候选。无需本地化变更：仅内部诊断及夹具，没有GUI/TUI文案、语义或布局变化。新增关闭0项，G09仍开放，PR草稿。
+
+## 2026-10-05：固定分类夹具在托管启动前失败
+
+精确`8bdbeec004277cb2a3222d00e6d8e9c8dd6f3896`的[37335113246](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37335113246)终态failure。38项普通测试通过，唯一原生项在0.76秒失败：seq1为根PID27140创建，seq2–5为四个DLL加载，seq6为PID23888/TID28804创建；尚无根CREATE_THREAD、CLR绑定或分类入口。固定C#必须先创建工作线程才启动无害子模式，因此此时不能将该事件计作预期子模式。原收据只记录复合身份守卫失败，没有逐项实际值，不据此给未知进程命名或推断具体映像失配原因。
+
+分类selected/returned/dirty均为0，shell_observation和node_created均为空，原四异常也未执行；不证明operation 3或真实PowerShell诊断可用。根EXIT1、reaped=true、Job empty=true，但debug_events_drained=false、descendant_exits为空、core original_process_exit_confirmed=false，cleanup_ready=false原样保留。官方ZIP SHA `0300fc2fabb9281ba2178fd4b98c5583ca94fbd0b4859000f98f5d3bd0d09d82`，完整Windows日志SHA `4d9b056c2034bcad7610872e6b22ee91de677655ba403dfce38cc7c4f4d92481`；25冻结来源、9构建输入和29工件成员逐字节独审SHA `d2b261fceccb0d30d248e71556e5b506ada52797a95a14b40fd069362c33e6a8`。
+
+后续仅修复任意调试后代与固定目标的选择边界，以及原句柄退出确认。保留原控制台子系统、唯一精确目标、工作线程、同停点栈、四异常、期限和完整回收要求。原观察器本机目录r-ifr8kx2r因出现归属不明RustDesk launchd标签保留，不终止该服务；下载与独审登记根已清理。无需本地化变更。新增关闭0项，G09仍开放，V01/V02/V05移交不计通过，PR草稿。
+
 ## 2026-10-05：一次原生分类返回与同停点CLR栈能力准备
 
 以`11a18a8d06a9c9af1dd3f8461d1c637f0620d0b4`为基础，新增只对本轮绑定Node、flags=0x2000的SHGetFileInfoW入口／返回观察。原CREATE/LOAD句柄及线程出生身份、原入口栈与返回RSP、私有或映像可执行映射及有界代码字节均需匹配；返回前恢复全部仍持有线程的自有DR并读回整数／控制上下文，首次返回后永久停止。退出回收与恢复读回分别记录，未取得返回保持unknown，不据此推断UseShellExecute或退出原因。

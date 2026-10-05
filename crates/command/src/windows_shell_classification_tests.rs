@@ -1,5 +1,28 @@
 use super::*;
 
+#[test]
+fn exit_confirmation_preserves_original_wait_failure_code() {
+    let denied = require_signaled(Err(io::Error::from_raw_os_error(5))).unwrap_err();
+    assert_eq!(denied.raw_os_error(), Some(5));
+    let invalid_handle = require_signaled(Err(io::Error::from_raw_os_error(6))).unwrap_err();
+    assert_eq!(invalid_handle.raw_os_error(), Some(6));
+}
+
+#[test]
+fn nonsignaled_object_is_not_an_exit_or_an_os_failure() {
+    let error = require_signaled(Ok(WAIT_TIMEOUT)).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
+    assert_eq!(error.raw_os_error(), None);
+    assert!(require_signaled(Ok(WAIT_OBJECT_0)).is_ok());
+}
+
+#[test]
+fn unexpected_wait_status_cannot_confirm_process_or_thread_exit() {
+    let error = require_signaled(Ok(WAIT_EVENT(128))).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(error.to_string(), "原对象等待返回意外状态 128");
+}
+
 fn empty_registers() -> Registers {
     Registers {
         address: [0; 4],

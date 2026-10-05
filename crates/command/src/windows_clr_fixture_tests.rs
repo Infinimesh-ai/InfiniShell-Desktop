@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use windows::Win32::Foundation::{
     DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, HANDLE,
-    NTSTATUS, WAIT_OBJECT_0,
+    NTSTATUS, WAIT_FAILED, WAIT_OBJECT_0,
 };
 use windows::Win32::System::Diagnostics::Debug::{
     CREATE_PROCESS_DEBUG_EVENT, CREATE_THREAD_DEBUG_EVENT, ContinueDebugEvent, DEBUG_EVENT,
@@ -36,6 +36,7 @@ use crate::blocking::Command;
 const TIMEOUT: Duration = Duration::from_secs(30);
 const CLEANUP_RESERVE: Duration = Duration::from_secs(5);
 const CLR_EXCEPTION: u32 = 0xe0434352;
+const MAX_DESCENDANTS: usize = 16;
 
 fn save(path: &Path, value: &Value) -> io::Result<()> {
     let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
@@ -61,6 +62,7 @@ struct Fixture {
     termination_requested: bool,
     node_image: BoundFile,
     descendants: HashMap<u32, OwnedHandle>,
+    descendant_creates: HashMap<u32, Value>,
     descendant_exits: HashMap<u32, u32>,
     node_created: Option<Value>,
     shell32: Option<BoundFile>,
@@ -69,6 +71,7 @@ struct Fixture {
     shell_observation: Option<Value>,
     initial_breakpoints: HashSet<u32>,
     handling_stage: &'static str,
+    continuation_stage: &'static str,
 }
 
 impl Fixture {
@@ -119,6 +122,7 @@ impl Fixture {
             termination_requested: false,
             node_image,
             descendants: HashMap::new(),
+            descendant_creates: HashMap::new(),
             descendant_exits: HashMap::new(),
             node_created: None,
             shell32: None,
@@ -127,6 +131,7 @@ impl Fixture {
             shell_observation: None,
             initial_breakpoints: HashSet::new(),
             handling_stage: "not_started",
+            continuation_stage: "not_started",
         })
     }
 
@@ -301,7 +306,7 @@ impl Fixture {
         self.handling_stage = "descendant_event";
         match event.dwDebugEventCode {
             CREATE_PROCESS_DEBUG_EVENT => {
-                self.handling_stage = "node_create_binding";
+                self.handling_stage = "descendant_create_binding";
                 let info = unsafe { event.u.CreateProcessInfo };
                 require(
                     !self.descendants.contains_key(&event.dwProcessId),
@@ -315,32 +320,60 @@ impl Fixture {
                 self.descendants.insert(event.dwProcessId, unsafe {
                     OwnedHandle::from_raw_handle(handle.0)
                 });
+                self.descendant_creates.insert(event.dwProcessId, json!({
+                    "pid":event.dwProcessId,"tid":event.dwThreadId,"sequence":self.sequence,
+                    "birth":null,"process_id_matched":unsafe { GetProcessId(info.hProcess) } == event.dwProcessId,
+                    "thread_process_id_matched":unsafe { GetProcessIdOfThread(info.hThread) } == event.dwProcessId,
+                    "thread_id_matched":unsafe { GetThreadId(info.hThread) } == event.dwThreadId,
+                    "image":null,"image_present":file.is_some(),"path_matched":null,
+                    "file_identity_matched":null,"sha256_matched":null,"role":"unclassified",
+                    "cleanup_create":cleanup,"exit_confirmed":false
+                }));
                 if cleanup {
-                    // 精确 Job 可能已请求退出；继续原事件并在收尾核原句柄，不能卡住调试清理。
+                    // 收尾时新出现的原 CREATE 也保留句柄并精确终止，不依赖它已进入根 Job。
                     let _ = unsafe { TerminateProcess(handle, 1) };
+                }
+                let binding = self
+                    .descendant_creates
+                    .get_mut(&event.dwProcessId)
+                    .expect("刚保留的原 CREATE 收据必须存在");
+                let created = birth(handle, false)?;
+                binding["birth"] = json!(created);
+                validate_descendant_create(binding, false)?;
+                // 正常执行限制 16 个后代；失败收尾仍保留新句柄，并受原 4096 事件总上限约束。
+                require(
+                    cleanup || self.descendants.len() <= MAX_DESCENDANTS,
+                    "固定夹具后代数量超过资源上限",
+                )?;
+                if cleanup {
                     return Ok(());
                 }
-                require(
-                    self.node_created.is_none() && self.descendants.len() == 1,
-                    "无害子模式必须只有一个真实 CREATE",
-                )?;
                 self.node_image.verify()?;
-                let file = file.ok_or_else(|| io::Error::other("子 CREATE 缺少原映像"))?;
-                let created = birth(info.hProcess, false)?;
-                require(
-                    unsafe { GetProcessId(info.hProcess) } == event.dwProcessId
-                        && unsafe { GetProcessIdOfThread(info.hThread) } == event.dwProcessId
-                        && unsafe { GetThreadId(info.hThread) } == event.dwThreadId
-                        && created != 0
-                        && file_identity(&information(file)?) == self.node_image.identity
-                        && image_path(file)? == self.node_image.path
-                        && BoundFile::digest(file)? == self.node_image.sha,
-                    "子 CREATE 未匹配唯一固定映像及出生身份",
-                )?;
+                if let Some(file) = file {
+                    let image = (|| -> io::Result<()> {
+                        let identity = file_identity(&information(file)?);
+                        binding["file_identity_matched"] =
+                            json!(identity == self.node_image.identity);
+                        binding["image"] = json!({"file_identity":identity,"sha256":null});
+                        binding["path_matched"] = json!(image_path(file)? == self.node_image.path);
+                        let digest = BoundFile::digest(file)?;
+                        binding["sha256_matched"] = json!(digest == self.node_image.sha);
+                        binding["image"]["sha256"] = json!(hex(&digest));
+                        Ok(())
+                    })();
+                    if let Err(error) = image {
+                        binding["image_error"] = json!({"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
+                    }
+                }
+                if !validate_descendant_create(binding, self.node_created.is_some())? {
+                    return Ok(());
+                }
+                self.handling_stage = "node_create_binding";
                 self.shell
                     .as_mut()
                     .ok_or_else(|| io::Error::other("子 CREATE 先于原根绑定"))?
                     .set_node_created(event, self.sequence, created)?;
+                binding["role"] = json!("fixed_node");
                 self.node_created = Some(
                     json!({"pid":event.dwProcessId,"birth":created,"sequence":self.sequence,
                     "image":self.node_image.receipt(),"original_create_bound":true}),
@@ -395,50 +428,108 @@ impl Fixture {
     }
 
     fn continue_pending(&mut self) -> io::Result<()> {
-        require(
-            self.active_reader.is_none(),
-            "reader 未确认退出，不能继续原停点",
-        )?;
-        if let Some((event, status)) = self.pending {
-            unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) }
-                .map_err(io::Error::from)?;
-            self.pending.take();
-            if let Some(last) = self.events.last_mut() {
-                last["continued"] = json!(true);
-                last["continue_status"] = json!(status.0 as u32);
-            }
-            if event.dwProcessId == self.child.id() {
-                if event.dwDebugEventCode == EXIT_THREAD_DEBUG_EVENT {
-                    if let Some(thread) = self.threads.get(&event.dwThreadId) {
-                        require(
-                            unsafe {
+        let result = (|| {
+            self.continuation_stage = "reader_release_check";
+            require(
+                self.active_reader.is_none(),
+                "reader 未确认退出，不能继续原停点",
+            )?;
+            if let Some((event, status)) = self.pending {
+                self.continuation_stage = "continue_debug_event";
+                unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) }
+                    .map_err(io::Error::from)?;
+                self.pending.take();
+                if let Some(last) = self.events.last_mut() {
+                    last["continued"] = json!(true);
+                    last["continue_status"] = json!(status.0 as u32);
+                }
+                if event.dwProcessId == self.child.id() {
+                    if event.dwDebugEventCode == EXIT_THREAD_DEBUG_EVENT {
+                        if let Some(thread) = self.threads.get(&event.dwThreadId) {
+                            self.continuation_stage = "root_thread_exit_wait";
+                            let waited = unsafe {
                                 WaitForSingleObject(raw(thread), remaining(self.cleanup_deadline)?)
-                            } == WAIT_OBJECT_0,
-                            "原线程 EXIT 继续后尚未退出",
-                        )?;
-                        if let Some(shell) = self.shell.as_mut() {
-                            shell.thread_exited(&event)?;
+                            };
+                            let error = (waited == WAIT_FAILED).then(io::Error::last_os_error);
+                            if let Some(last) = self.events.last_mut() {
+                                last["exit_wait"] = json!({"stage":self.continuation_stage,"result":waited.0,
+                                "os_code":error.as_ref().and_then(io::Error::raw_os_error)});
+                            }
+                            if let Some(error) = error {
+                                return Err(error);
+                            }
+                            require(waited == WAIT_OBJECT_0, "原线程 EXIT 继续后尚未退出")?;
+                            if let Some(shell) = self.shell.as_mut() {
+                                self.continuation_stage = "shell_thread_exit_confirmation";
+                                shell.thread_exited(&event)?;
+                            }
                         }
-                    }
-                    self.threads.remove(&event.dwThreadId);
-                } else if event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT {
-                    require(
-                        unsafe {
+                        self.threads.remove(&event.dwThreadId);
+                    } else if event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT {
+                        self.continuation_stage = "root_process_exit_wait";
+                        let waited = unsafe {
                             WaitForSingleObject(
                                 HANDLE(self.child.as_raw_handle()),
                                 remaining(self.cleanup_deadline)?,
                             )
-                        } == WAIT_OBJECT_0,
-                        "原进程 EXIT 继续后尚未退出",
-                    )?;
-                    if let Some(shell) = self.shell.as_mut() {
-                        shell.confirm_process_exit()?;
+                        };
+                        let error = (waited == WAIT_FAILED).then(io::Error::last_os_error);
+                        if let Some(last) = self.events.last_mut() {
+                            last["exit_wait"] = json!({"stage":self.continuation_stage,"result":waited.0,
+                            "os_code":error.as_ref().and_then(io::Error::raw_os_error)});
+                        }
+                        if let Some(error) = error {
+                            return Err(error);
+                        }
+                        require(waited == WAIT_OBJECT_0, "原进程 EXIT 继续后尚未退出")?;
+                        if let Some(shell) = self.shell.as_mut() {
+                            self.continuation_stage = "shell_process_exit_confirmation";
+                            shell.confirm_process_exit()?;
+                        }
+                        self.threads.clear();
                     }
-                    self.threads.clear();
+                } else if event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT {
+                    self.continuation_stage = "descendant_process_exit_wait";
+                    let child = self
+                        .descendants
+                        .get(&event.dwProcessId)
+                        .ok_or_else(|| io::Error::other("后代退出缺少原句柄"))?;
+                    let waited = unsafe {
+                        WaitForSingleObject(raw(child), remaining(self.cleanup_deadline)?)
+                    };
+                    let error = (waited == WAIT_FAILED).then(io::Error::last_os_error);
+                    if let Some(last) = self.events.last_mut() {
+                        last["exit_wait"] = json!({"stage":self.continuation_stage,"result":waited.0,
+                        "os_code":error.as_ref().and_then(io::Error::raw_os_error)});
+                    }
+                    if let Some(error) = error {
+                        return Err(error);
+                    }
+                    require(waited == WAIT_OBJECT_0, "后代 EXIT 继续后尚未退出")?;
+                    self.continuation_stage = "descendant_exit_birth_confirmation";
+                    let binding = self
+                        .descendant_creates
+                        .get_mut(&event.dwProcessId)
+                        .ok_or_else(|| io::Error::other("后代退出缺少原出生收据"))?;
+                    let exited_birth = birth(raw(child), false)?;
+                    binding["exit_birth"] = json!(exited_birth);
+                    require(
+                        binding["birth"].as_u64() == Some(exited_birth),
+                        "后代退出出生身份改变",
+                    )?;
+                    binding["exit_code"] = json!(unsafe { event.u.ExitProcess.dwExitCode });
+                    binding["exit_confirmed"] = json!(true);
                 }
             }
+            Ok(())
+        })();
+        if let Err(error) = &result {
+            if let Some(last) = self.events.last_mut() {
+                last["continuation_error"] = json!({"stage":self.continuation_stage,
+                    "kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
+            }
         }
-        Ok(())
+        result
     }
 
     fn handle(
@@ -635,71 +726,109 @@ impl Fixture {
         deadline: Instant,
         cleanup: bool,
     ) -> io::Result<()> {
-        self.release_reader()?;
-        self.continue_pending()?;
-        while !self.exited || self.descendant_exits.len() != self.descendants.len() {
-            require(self.sequence < 4096, "CLR 夹具调试事件超过上限")?;
-            let mut event = DEBUG_EVENT::default();
-            match unsafe { WaitForDebugEvent(&mut event, remaining(deadline)?.min(100)) } {
-                Ok(()) => {}
-                Err(error) if error.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0) => continue,
-                Err(error) => return Err(io::Error::from(error)),
-            }
-            self.sequence += 1;
-            let exception = (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT)
-                .then(|| unsafe { event.u.Exception });
-            let status: NTSTATUS = if let Some(exception) = exception {
-                if exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT
-                    && exception.dwFirstChance == 1
-                    && (event.dwProcessId == self.child.id()
-                        || self.descendants.contains_key(&event.dwProcessId))
-                    && self.initial_breakpoints.insert(event.dwProcessId)
-                {
-                    DBG_CONTINUE
-                } else {
-                    DBG_EXCEPTION_NOT_HANDLED
+        let mut first_error = None;
+        // 所有提前返回都先汇回此处；后续等待或清理错误不能替换已经记录的首错。
+        let outcome = (|| {
+            self.handling_stage = "reader_release";
+            self.release_reader()?;
+            if let Err(error) = self.continue_pending() {
+                self.handling_stage = self.continuation_stage;
+                if !cleanup || self.pending.is_some() {
+                    return Err(error);
                 }
-            } else {
-                DBG_CONTINUE
-            };
-            self.pending = Some((event, status));
-            let result = self.handle(&event, reader, root, deadline, cleanup);
-            self.events.push(json!({"sequence":self.sequence,"code":event.dwDebugEventCode.0,"pid":event.dwProcessId,"tid":event.dwThreadId,
+                first_error = Some((error, self.continuation_stage));
+            }
+            while !self.exited || self.descendant_exits.len() != self.descendants.len() {
+                self.handling_stage = "wait_debug_event";
+                require(self.sequence < 4096, "CLR 夹具调试事件超过上限")?;
+                let mut event = DEBUG_EVENT::default();
+                match unsafe { WaitForDebugEvent(&mut event, remaining(deadline)?.min(100)) } {
+                    Ok(()) => {}
+                    Err(error) if error.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0) => {
+                        continue;
+                    }
+                    Err(error) => return Err(io::Error::from(error)),
+                }
+                self.sequence += 1;
+                let exception = (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT)
+                    .then(|| unsafe { event.u.Exception });
+                let status: NTSTATUS = if let Some(exception) = exception {
+                    if exception.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT
+                        && exception.dwFirstChance == 1
+                        && (event.dwProcessId == self.child.id()
+                            || self.descendants.contains_key(&event.dwProcessId))
+                        && self.initial_breakpoints.insert(event.dwProcessId)
+                    {
+                        DBG_CONTINUE
+                    } else {
+                        DBG_EXCEPTION_NOT_HANDLED
+                    }
+                } else {
+                    DBG_CONTINUE
+                };
+                self.pending = Some((event, status));
+                let result = self.handle(&event, reader, root, deadline, cleanup);
+                let result_stage = self.handling_stage;
+                let handling_failed = result.is_err();
+                self.events.push(json!({"sequence":self.sequence,"code":event.dwDebugEventCode.0,"pid":event.dwProcessId,"tid":event.dwThreadId,
                 "exception_code":exception.map(|value| value.ExceptionRecord.ExceptionCode.0 as u32),
                 "first_chance":exception.map(|value| value.dwFirstChance),
                 "continue_status":self.pending.as_ref().map(|pending| pending.1.0 as u32),
                 "handling_stage":self.handling_stage,"shell_state":self.shell.as_ref().map(|shell| shell.summary()),
                 "handled":result.is_ok(),"continued":false}));
-            if let Err(error) = &result {
-                if let Some(last) = self.events.last_mut() {
-                    last["handling_error"] =
-                        json!({"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
-                }
-            }
-            if result.is_err() {
-                if event.dwProcessId == self.child.id()
-                    && event.dwDebugEventCode != EXIT_PROCESS_DEBUG_EVENT
-                {
-                    if let Some(shell) = self
-                        .shell
-                        .as_mut()
-                        .filter(|shell| shell.requires_restoration())
-                    {
-                        let restored = shell.withdraw_all(&event);
-                        if let Some(last) = self.events.last_mut() {
-                            last["failure_register_restoration"] = json!(restored.is_ok());
-                        }
+                if let Err(error) = &result {
+                    if let Some(last) = self.events.last_mut() {
+                        last["handling_error"] = json!({"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
                     }
                 }
-                // 首 CREATE 绑定失败也先终止原对象，不能让未获准的用户态执行。
-                self.terminate_original()?;
+                if let Err(error) = result {
+                    // handle 先于恢复、终止、reader 释放及 Continue，必须先保留它的原始失败。
+                    if first_error.is_none() {
+                        first_error = Some((error, result_stage));
+                    }
+                    if event.dwProcessId == self.child.id()
+                        && event.dwDebugEventCode != EXIT_PROCESS_DEBUG_EVENT
+                    {
+                        if let Some(shell) = self
+                            .shell
+                            .as_mut()
+                            .filter(|shell| shell.requires_restoration())
+                        {
+                            let restored = shell.withdraw_all(&event);
+                            if let Some(last) = self.events.last_mut() {
+                                last["failure_register_restoration"] = json!(restored.is_ok());
+                            }
+                        }
+                    }
+                    // 首 CREATE 绑定失败也先终止原对象，不能让未获准的用户态执行。
+                    self.terminate_original()?;
+                }
+                // 明确确认 reader 退出且 Job 空以后才能 Continue；失败保留 pending。
+                self.handling_stage = "reader_release";
+                self.release_reader()?;
+                if let Err(error) = self.continue_pending() {
+                    self.handling_stage = self.continuation_stage;
+                    if !cleanup || self.pending.is_some() {
+                        return Err(error);
+                    }
+                    // 已继续的 EXIT 确认失败不能让其他原后代失去 drain；最终仍返回首次失败。
+                    if first_error.is_none() {
+                        first_error = Some((error, self.continuation_stage));
+                    }
+                }
+                if handling_failed && !cleanup {
+                    break;
+                }
             }
-            // 明确确认 reader 退出且 Job 空以后才能 Continue；失败保留 pending。
-            self.release_reader()?;
-            self.continue_pending()?;
-            result?;
+            Ok(())
+        })();
+        match first_error {
+            Some((error, stage)) => {
+                self.handling_stage = stage;
+                Err(error)
+            }
+            None => outcome,
         }
-        Ok(())
     }
 }
 
@@ -710,6 +839,69 @@ impl Drop for Fixture {
             let _ = self.child.kill();
         }
     }
+}
+
+fn validate_descendant_create(binding: &Value, node_already_bound: bool) -> io::Result<bool> {
+    require(
+        binding["pid"].as_u64().is_some_and(|value| value != 0)
+            && binding["tid"].as_u64().is_some_and(|value| value != 0)
+            && binding["birth"].as_u64().is_some_and(|value| value != 0)
+            && binding["process_id_matched"] == true
+            && binding["thread_process_id_matched"] == true
+            && binding["thread_id_matched"] == true,
+        "后代原 CREATE 的进程、线程或出生身份不符",
+    )?;
+    let fixed_node = binding["path_matched"] == true
+        && binding["file_identity_matched"] == true
+        && binding["sha256_matched"] == true;
+    require(
+        binding["path_matched"] != true || fixed_node,
+        "固定子模式路径的文件身份或摘要不匹配",
+    )?;
+    require(
+        !fixed_node || !node_already_bound,
+        "固定无害子模式出现第二个匹配 CREATE",
+    )?;
+    Ok(fixed_node)
+}
+
+fn validate_descendant_receipts(report: &Value) -> io::Result<()> {
+    let creates = report["descendant_creates"]
+        .as_object()
+        .ok_or_else(|| io::Error::other("后代原 CREATE 收据缺失"))?;
+    require(
+        !creates.is_empty()
+            && creates.len() <= MAX_DESCENDANTS
+            && report["all_descendants_reaped"] == true,
+        "后代数量越界或未全部退出回收",
+    )?;
+    let mut fixed_count = 0;
+    for binding in creates.values() {
+        let fixed_node = validate_descendant_create(binding, fixed_count != 0)?;
+        require(
+            binding["exit_confirmed"] == true
+                && binding["exit_birth"] == binding["birth"]
+                && binding["cleanup_create"] == false,
+            "后代未自然完成原退出确认",
+        )?;
+        if fixed_node {
+            require(
+                binding["role"] == "fixed_node"
+                    && binding["pid"] == report["node_created"]["pid"]
+                    && binding["birth"] == report["node_created"]["birth"]
+                    && binding["sequence"] == report["node_created"]["sequence"]
+                    && binding["exit_code"] == 0,
+                "固定子模式与唯一匹配 CREATE 或退出身份不符",
+            )?;
+            fixed_count += 1;
+        } else {
+            require(
+                binding["role"] == "unclassified",
+                "非目标后代不能记为固定子模式",
+            )?;
+        }
+    }
+    require(fixed_count == 1, "缺少唯一固定子模式原 CREATE")
 }
 
 fn validate_binding(item: &Value) -> io::Result<()> {
@@ -893,6 +1085,7 @@ fn validate_observations(observations: &[Value], prepared: &Value) -> io::Result
 }
 
 fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
+    validate_descendant_receipts(report)?;
     let item = &report["shell_observation"];
     let reader = &item["reader"];
     let receipt = &item["classification"];
@@ -1117,8 +1310,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     let mut fixture = Fixture::start(&mut fixture_image, node_image, root, deadline)?;
     let result = fixture.pump(&mut reader, root, active_deadline, false);
     if let Err(error) = &result {
-        report["native_result_error"] =
-            json!({"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
+        report["native_result_error"] = json!({"stage":fixture.handling_stage,"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
     }
     if result.is_err()
         && (!fixture.exited
@@ -1128,13 +1320,18 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     {
         let terminated = fixture.terminate_original();
         let drained = fixture.pump(&mut reader, root, deadline, true);
-        report["failure_cleanup"] = json!({"termination_requested":terminated.is_ok(),"debug_events_drained":drained.is_ok()});
+        let drain_error = drained.as_ref().err().map(|error| {
+            json!({"stage":fixture.handling_stage,"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()})
+        });
+        report["failure_cleanup"] = json!({"termination_requested":terminated.is_ok(),
+            "debug_events_drained":drained.is_ok(),"drain_error":drain_error});
     }
     report["events"] = json!(fixture.events);
     report["observations"] = json!(fixture.observations);
     report["shell_entries"] = json!(fixture.shell_entries);
     report["shell_observation"] = json!(fixture.shell_observation);
     report["node_created"] = json!(fixture.node_created);
+    report["descendant_creates"] = json!(fixture.descendant_creates);
     report["descendant_exits"] = json!(fixture.descendant_exits);
     if let Some(shell) = fixture.shell.as_ref() {
         report["shell_classification"] = serde_json::to_value(shell.summary())?;
@@ -1166,21 +1363,41 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
                 .is_ok_and(|status| status.is_some())
     );
     report["fixture_job_empty"] = json!(fixture.job.empty().is_ok_and(|empty| empty));
-    report["node_exit_confirmed"] = json!(
-        fixture.descendants.len() == 1
-            && fixture
-                .descendants
-                .iter()
-                .all(|(pid, child)| fixture.descendant_exits.get(pid) == Some(&0)
-                    && unsafe { WaitForSingleObject(raw(child), 0) } == WAIT_OBJECT_0
-                    && birth(raw(child), false).ok() == report["node_created"]["birth"].as_u64())
-    );
+    report["all_descendants_reaped"] = json!(fixture.descendants.iter().all(|(pid, child)| {
+        fixture.descendant_exits.contains_key(pid)
+            && unsafe { WaitForSingleObject(raw(child), 0) } == WAIT_OBJECT_0
+            && fixture.descendant_creates.get(pid).is_some_and(|binding| {
+                binding["exit_confirmed"] == true
+                    && binding["birth"].as_u64().is_some_and(|expected| {
+                        expected != 0
+                            && birth(raw(child), false).is_ok_and(|actual| actual == expected)
+                    })
+            })
+    }));
+    let node_pid = fixture
+        .node_created
+        .as_ref()
+        .and_then(|node| node["pid"].as_u64())
+        .and_then(|pid| u32::try_from(pid).ok());
+    report["node_exit_confirmed"] = json!(node_pid.is_some_and(|pid| {
+        fixture.descendants.get(&pid).is_some_and(|child| {
+            fixture.descendant_exits.get(&pid) == Some(&0)
+                && unsafe { WaitForSingleObject(raw(child), 0) } == WAIT_OBJECT_0
+                && report["node_created"]["birth"]
+                    .as_u64()
+                    .is_some_and(|expected| {
+                        expected != 0
+                            && birth(raw(child), false).is_ok_and(|actual| actual == expected)
+                    })
+        })
+    }));
     result?;
     report["stage"] = json!("receipt_validation");
     require(
         fixture.exit_code == Some(0)
             && report["fixture_reaped"] == true
             && report["fixture_job_empty"] == true
+            && report["all_descendants_reaped"] == true
             && fixture.pending.is_none()
             && fixture.active_reader.is_none(),
         "CLR 夹具未自然退出并回收",
@@ -1366,6 +1583,10 @@ fn classification_or_exercise_frames_cannot_replace_fixed_exception_methods() {
 
 fn fixed_native_return_receipt() -> (Value, Value) {
     let generation = [1_u8; 16];
+    let descendant = json!({"pid":51,"tid":52,"birth":300,"sequence":8,
+        "process_id_matched":true,"thread_process_id_matched":true,"thread_id_matched":true,
+        "path_matched":true,"file_identity_matched":true,"sha256_matched":true,
+        "role":"fixed_node","cleanup_create":false,"exit_confirmed":true,"exit_birth":300,"exit_code":0});
     let reader = json!({"schema":1,"operation":3,"status":"observed","event_sequence":11,"nonce":"return-fixture",
         "pid":41,"tid":42,"process_birth":100,"thread_birth":200,"event_hresult":0,
         "target_identity_verified":true,"dac_sha256_verified":true,"dac_loaded":true,"stack_api_hresult":0,"budget_exhausted":false,
@@ -1381,6 +1602,7 @@ fn fixed_native_return_receipt() -> (Value, Value) {
         "live_threads_restored_before_reader":true,"classification":classification,"reader":reader});
     let report = json!({
         "node_created":{"pid":51,"birth":300,"sequence":8,"original_create_bound":true},
+        "descendant_creates":{"51":descendant},"all_descendants_reaped":true,
         "node_exit_confirmed":true,"fixture_shell_return_low32":17744,
         "shell_entries":[{"sequence":10,"tid":42}],
         "shell_classification":{"generation":generation,"root_process_id":41,"selected_calls":1,"returned_calls":1,
@@ -1392,6 +1614,71 @@ fn fixed_native_return_receipt() -> (Value, Value) {
         report,
         json!({"fixture_mvid":"fixture-mvid","fixture_shell_method_token":6}),
     )
+}
+
+#[test]
+fn descendant_create_roles_require_original_identity_and_one_fixed_target() {
+    let (report, prepared) = fixed_native_return_receipt();
+    let target = &report["descendant_creates"]["51"];
+    assert!(validate_descendant_create(target, false).unwrap());
+    assert!(validate_descendant_create(target, true).is_err());
+    let mut mismatched = target.clone();
+    mismatched["thread_process_id_matched"] = json!(false);
+    assert!(validate_descendant_create(&mismatched, false).is_err());
+    let mut unknown = target.clone();
+    unknown["path_matched"] = Value::Null;
+    unknown["file_identity_matched"] = Value::Null;
+    unknown["sha256_matched"] = Value::Null;
+    unknown["role"] = json!("unclassified");
+    assert!(!validate_descendant_create(&unknown, false).unwrap());
+    let mut no_target = report;
+    no_target["descendant_creates"]["51"] = unknown;
+    assert!(validate_native_return(&no_target, &prepared).is_err());
+}
+
+#[test]
+fn fixed_descendant_path_rejects_mismatched_or_unknown_image_identity() {
+    let (report, _) = fixed_native_return_receipt();
+    let target = &report["descendant_creates"]["51"];
+    let mut different_file = target.clone();
+    different_file["file_identity_matched"] = json!(false);
+    assert!(validate_descendant_create(&different_file, false).is_err());
+    let mut different_bytes = target.clone();
+    different_bytes["sha256_matched"] = json!(false);
+    assert!(validate_descendant_create(&different_bytes, false).is_err());
+    let mut unreadable = target.clone();
+    unreadable["sha256_matched"] = Value::Null;
+    assert!(validate_descendant_create(&unreadable, false).is_err());
+}
+
+#[test]
+fn non_target_descendant_before_fixed_node_does_not_replace_its_binding() {
+    let (mut report, prepared) = fixed_native_return_receipt();
+    let other = json!({"pid":49,"tid":50,"birth":250,"sequence":6,
+        "process_id_matched":true,"thread_process_id_matched":true,"thread_id_matched":true,
+        "path_matched":false,"file_identity_matched":false,"sha256_matched":false,
+        "role":"unclassified","cleanup_create":false,"exit_confirmed":true,"exit_birth":250,"exit_code":1});
+    assert!(!validate_descendant_create(&other, false).unwrap());
+    report["descendant_creates"]["49"] = other;
+    assert!(validate_native_return(&report, &prepared).is_ok());
+    assert_eq!(report["node_created"]["pid"], json!(51));
+    assert_eq!(report["node_created"]["sequence"], json!(8));
+}
+
+#[test]
+fn native_return_requires_every_original_descendant_exit_and_birth() {
+    let (mut report, prepared) = fixed_native_return_receipt();
+    report["descendant_creates"]["49"] = json!({"pid":49,"tid":50,"birth":250,"sequence":6,
+        "process_id_matched":true,"thread_process_id_matched":true,"thread_id_matched":true,
+        "path_matched":false,"file_identity_matched":false,"sha256_matched":false,
+        "role":"unclassified","cleanup_create":false,"exit_confirmed":false,"exit_birth":250,"exit_code":1});
+    assert!(validate_native_return(&report, &prepared).is_err());
+    report["descendant_creates"]["49"]["exit_confirmed"] = json!(true);
+    report["descendant_creates"]["49"]["exit_birth"] = json!(251);
+    assert!(validate_native_return(&report, &prepared).is_err());
+    report["descendant_creates"]["49"]["exit_birth"] = json!(250);
+    report["all_descendants_reaped"] = json!(false);
+    assert!(validate_native_return(&report, &prepared).is_err());
 }
 
 #[test]

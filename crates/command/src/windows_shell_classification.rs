@@ -14,8 +14,8 @@ use std::os::windows::io::{
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use windows::Win32::Foundation::{
-    DUPLICATE_SAME_ACCESS, DuplicateHandle, EXCEPTION_SINGLE_STEP, FILETIME, GENERIC_READ, HANDLE,
-    WAIT_OBJECT_0,
+    DUPLICATE_HANDLE_OPTIONS, DuplicateHandle, EXCEPTION_SINGLE_STEP, FILETIME, GENERIC_READ,
+    HANDLE, WAIT_EVENT, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
@@ -35,7 +35,9 @@ use windows::Win32::System::SystemInformation::{
 };
 use windows::Win32::System::Threading::{
     GetCurrentProcess, GetCurrentProcessId, GetCurrentThreadId, GetProcessId, GetProcessIdOfThread,
-    GetProcessTimes, GetThreadId, GetThreadTimes, IsWow64Process2, WaitForSingleObject,
+    GetProcessTimes, GetThreadId, GetThreadTimes, IsWow64Process2, PROCESS_QUERY_INFORMATION,
+    PROCESS_SYNCHRONIZE, PROCESS_VM_READ, THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION,
+    THREAD_SET_CONTEXT, THREAD_SYNCHRONIZE, WaitForSingleObject,
 };
 use windows::core::BOOL;
 
@@ -74,7 +76,7 @@ fn require(value: bool, message: &'static str) -> io::Result<()> {
 fn raw(handle: &OwnedHandle) -> HANDLE {
     HANDLE(handle.as_raw_handle())
 }
-fn duplicate(handle: HANDLE) -> io::Result<OwnedHandle> {
+fn duplicate(handle: HANDLE, access: u32) -> io::Result<OwnedHandle> {
     let current = unsafe { GetCurrentProcess() };
     let mut copied = HANDLE::default();
     unsafe {
@@ -83,13 +85,32 @@ fn duplicate(handle: HANDLE) -> io::Result<OwnedHandle> {
             handle,
             current,
             &mut copied,
-            0,
+            access,
             false,
-            DUPLICATE_SAME_ACCESS,
+            DUPLICATE_HANDLE_OPTIONS(0),
         )
     }
     .map_err(io::Error::from)?;
     Ok(unsafe { OwnedHandle::from_raw_handle(copied.0) })
+}
+fn require_signaled(result: io::Result<WAIT_EVENT>) -> io::Result<()> {
+    match result? {
+        WAIT_OBJECT_0 => Ok(()),
+        WAIT_TIMEOUT => Err(io::Error::new(io::ErrorKind::WouldBlock, "原对象尚未退出")),
+        status => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("原对象等待返回意外状态 {}", status.0),
+        )),
+    }
+}
+fn confirm_exit(handle: HANDLE) -> io::Result<()> {
+    let status = unsafe { WaitForSingleObject(handle, 0) };
+    // 仅 WAIT_FAILED 读取原错误码；未退出不能被包装成同一个笼统错误。
+    require_signaled(if status == WAIT_FAILED {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(status)
+    })
 }
 fn birth(handle: HANDLE, thread: bool) -> io::Result<u64> {
     let (mut created, mut exited, mut kernel, mut user) = (
@@ -687,7 +708,11 @@ impl ShellClassificationWitness {
             "原 root CREATE 或固定 Node 路径无效",
         )?;
         let created = unsafe { event.u.CreateProcessInfo };
-        let process = duplicate(created.hProcess)?;
+        // 原调试句柄不保证等待权限；只向同一原对象请求读取、身份查询及退出核验。
+        let process = duplicate(
+            created.hProcess,
+            (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_SYNCHRONIZE).0,
+        )?;
         require(
             unsafe { GetProcessId(raw(&process)) } == event.dwProcessId
                 && birth(raw(&process), false)? == process_birth,
@@ -741,7 +766,14 @@ impl ShellClassificationWitness {
             tid != 0 && !self.threads.contains_key(&tid) && self.threads.len() < MAX_THREADS,
             "原线程重复或数量超限",
         )?;
-        let handle = duplicate(original)?;
+        let handle = duplicate(
+            original,
+            (THREAD_GET_CONTEXT
+                | THREAD_SET_CONTEXT
+                | THREAD_QUERY_INFORMATION
+                | THREAD_SYNCHRONIZE)
+                .0,
+        )?;
         let identity = ObjectIdentity {
             process_id: self.root_pid,
             thread_id: tid,
@@ -1041,25 +1073,19 @@ impl ShellClassificationWitness {
             .threads
             .get(&event.dwThreadId)
             .ok_or_else(|| invalid("退出线程未绑定"))?;
-        require(
-            unsafe { WaitForSingleObject(raw(&thread.handle), 0) } == WAIT_OBJECT_0,
-            "原线程退出未确认",
-        )?;
+        confirm_exit(raw(&thread.handle))?;
         self.exited_dirty += u64::from(thread.dirty);
         self.threads.remove(&event.dwThreadId);
         Ok(())
     }
     pub fn confirm_process_exit(&mut self) -> io::Result<()> {
         require(
-            unsafe { GetCurrentThreadId() } == self.debugger_tid
-                && unsafe { WaitForSingleObject(raw(&self.process), 0) } == WAIT_OBJECT_0,
-            "原进程退出未确认",
+            unsafe { GetCurrentThreadId() } == self.debugger_tid,
+            "必须由原调试线程确认退出",
         )?;
+        confirm_exit(raw(&self.process))?;
         for thread in self.threads.values_mut() {
-            require(
-                unsafe { WaitForSingleObject(raw(&thread.handle), 0) } == WAIT_OBJECT_0,
-                "原线程退出未确认",
-            )?;
+            confirm_exit(raw(&thread.handle))?;
             self.exited_dirty += u64::from(thread.dirty);
             thread.dirty = false;
             thread.pending = None;

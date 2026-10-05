@@ -278,6 +278,10 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-06 修正固定目标选择及原句柄回收，原生待验**：保留控制台夹具，只让原CREATE的路径／FileID／SHA及出生身份全部匹配者成为唯一固定目标；其他有效身份后代不计正例，也必须按原句柄确认退出及出生身份。固定路径身份未知或改变立即失败。核心从原句柄显式复制所需等待权限，保留WAIT_FAILED原OS码；清理保留首错及阶段，不能继续的pending立即停止。warp check、i18n11、Windows普通／诊断目标metadata检查和源码复审通过，本机门禁汇总SHA `451f0250c8d4db16f9e94322386a4581b12dd898235532162da456bec043e5ad`；45普通项及唯一原生项尚待Windows执行。原失败和所有原生正例、预算、期限不变；无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
+- **2026-10-05 固定分类夹具首个后代绑定失败，尚未取得返回**：精确`8bdbeec004277cb2a3222d00e6d8e9c8dd6f3896`的[37335113246](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37335113246)正式失败，38普通项通过；seq6在根工作线程创建／CLR绑定前收到另一进程CREATE，夹具错误地将第一个后代直接当作固定子模式，复合身份守卫失败。原件未保存具体失配分项，不能命名该进程。无分类入口／返回、无CLR观察、自有DR从未修改；根已回收且Job空，但debug事件未确认排空、子退出未确认，cleanup_ready=false保持。25来源、9构建输入和29工件成员已独审，SHA `d2b261fceccb0d30d248e71556e5b506ada52797a95a14b40fd069362c33e6a8`。正在修正目标选择及原句柄退出确认，不原样重跑或改控制台子系统避开。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
 - **2026-10-05 原生分类返回能力准备，尚未用于真实候选**：针对原PS失败唯一尚缺的分类返回值，新增一次已绑定Node的SHGetFileInfoW入口／返回观察，以及独立operation 3的CLR frames-only读取。原工作线程、出生身份、栈、代码映射及DR恢复必须在同一pending事件核对；无命中保持unknown，不推断ShellExecute分支。先用固定工作线程、无害本地子进程及原四异常回归验证，真实Windows能力结果待验。普通更新命令、权限、期限与五场景／三冷恢复要求不变。无需本地化变更；**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
 
 - **2026-10-05 实际异常类型已映射，具体退出分支仍待确定**：[b163静态运行37328199520](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37328199520)已采齐39方法/9类型；仅既有两个no_body使整轮failure/partial，未执行候选。187–203为ExitException/RethrowException传播，175–179的四条为模块发现ItemNotFoundException；不是已证实的启动权限错误。静态实现存在末端原生命令在ShellExecute/Windows应用分类为真时跳过等待及退出码写入的分支，但实际布尔值未取得，不能宣称首因。26结果均保留候选对象与不完整EH tracker边界，178/179读取调用预算耗尽。b7eb [Linux门禁37305012082](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37305012082)终审完成：5526 nextest PASS、23离线通过、hook23通过/2跳过；终审SHA `b82cb67164b401e3c85e342431e9f21af12574ef71f43fb1ae4a2d5231230998`，不解释旧超时或替代最终同源双平台门禁。**新增关闭0项，G09仍开放，PR草稿。**
