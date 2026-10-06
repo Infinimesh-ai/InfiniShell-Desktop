@@ -151,7 +151,11 @@ Run unit tests with `cargo nextest run`. See [WARP.md](WARP.md) for more detail.
 ## Commit and Branch Conventions
 
 - Branch names should be prefixed with your handle (e.g. `alice/fix-parser`).
-- Commit messages should explain *what* and *why*, not just *what*.
+- Write new commit subjects and bodies in English. The Simplified Chinese requirement in `AGENTS.md` applies to code comments and conversational replies, not commit messages.
+- Use `type(scope): description` for commit subjects; the scope is optional. Use one of `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, or `revert` as the type. Scopes should identify stable modules or subsystems, such as `cli-agent` or `terminal`, rather than temporary acceptance IDs.
+- Use a concise imperative description of the actual change, without a trailing period. Commit messages should explain *what* and *why*; when the subject cannot explain the reason, add a body separated by a blank line describing the problem, motivation, or tradeoff.
+- Example: `fix(cli-agent): preserve PowerShell 5.1 script encoding`.
+- These conventions apply to new commits; existing commit history does not need to be rewritten.
 
 ## Code of Conduct
 
