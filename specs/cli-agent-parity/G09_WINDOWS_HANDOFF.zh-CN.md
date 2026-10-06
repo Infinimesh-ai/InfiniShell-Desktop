@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：取得真实等待分支，PATHEXT最小修复待原机验证
+## 当前接续状态（2026-10-07）：PATHEXT单键修复未解决原故障
+
+`67089b6098915c85f5d6947a613f15d391b67134`的[原runner22运行37525407224](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37525407224)已正式失败，只有真实npm步骤62失败。编译检查、1146项warp及93项command普通回归、其中i18n11项和142项诊断普通回归通过，不能替代产品验收。唯一产品变化为PS候选PATHEXT=.EXE；本轮仍为updated/ProbeFailed，libtest退出101。
+
+实际pre181→182取得17744/0x4550，Node190后op4191在原Complete IL0x293仍读到Boolean local0=true及PSI local5.useShellExecute=true，所需API全部成功；post分类仍未观察到。PS在12924ms零输出退出1，Codex17669ms、Node18033ms均退出0，无取消。原PS/Node字节与FileID、实际CLR/DAC身份及SMA/System MVID保持；不是换机器结果。pre/op4各32帧partial；CLR193的28帧完整栈和LastThrown候选不证明异常freshness。新增两条CLR仅体现溢出计数，不能定位到pre→Node或认定Win32回退。
+
+三份官方工件及完整日志已保全；候选ZIP SHA为`6c27ea1660a7bbee90a4ffaaa6e5cba57b0123e09590bfefd996fb87c02c2c82`，90成员CRC/SHA通过。终态独审`5451dffd7c668bdf5d873a416570181102a1b597bb1a7669a5c726ec8913a84f`、op4独审`0228962017edfbec12627ac40aa5e60ebcad7e434632c4a2944168f26ad5b0c6`，路径和完整绑定见CURRENT_STATUS.json的g09_pathext_original_counterexample_20261007。67项来源仅执行前逐Git字节核验；失败后driver末尾复核未执行。全部423个PS/202个CMD事件已继续，无pending，三个reader与进程/Job/站/LSA已核清理；90次live恢复与31个先退出线程分开记录，cleanup_ready=false保留。
+
+下一步拟区分同一Complete首次Start前的PSI初值与现有终态，而非再重采原26异常：IL0x46可复用字段及已初始化Boolean local4能力，但必须有真正pre-Node阶段，不能直接套用等待Node的暂停协议。初始false/最终true才支持后续ShellExecute切换；初始true仍需区分环境与直接分类。该观察方案尚未实现或原生验证，不算关闭。此前“.EXE即可修复”的预测按失败保留，不把本机机制实验当原机首因。
+
+**新增关闭0项，G09仍开放，PR22保持草稿。** 正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁仍欠；V01/V02/V05移交不计通过。无需本地化变更。
+
+## 历史记录：取得真实等待分支，PATHEXT最小修复待原机验证
 
 G01–G08、G10、V03共10项关闭；G09开放，新增关闭0项；V01/V02/V05仍移交后续实机、不计通过。PR #22保持草稿，当前不满足合并条件。
 
