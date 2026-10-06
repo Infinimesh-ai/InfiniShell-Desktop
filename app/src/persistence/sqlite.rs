@@ -1350,6 +1350,8 @@ fn save_app_state(conn: &mut SqliteConnection, app_state: &AppState) -> Result<(
                     .as_ref()
                     .and_then(|k| serde_json::to_string(k).ok()),
                 team_uid: window.team_uid.map(Into::into),
+                cli_subagent_width: window.cli_subagent_width,
+                cli_subagent_height: window.cli_subagent_height,
             };
             diesel::insert_into(schema::windows::dsl::windows)
                 .values(new_window)
@@ -3235,6 +3237,8 @@ fn read_sqlite_data(
                         fullscreen_state: fullscreen_state_val,
                         left_panel_width,
                         right_panel_width,
+                        cli_subagent_width: window.cli_subagent_width,
+                        cli_subagent_height: window.cli_subagent_height,
                         agent_management_filters: window
                             .agent_management_filters
                             .and_then(|s| serde_json::from_str(&s).ok()),

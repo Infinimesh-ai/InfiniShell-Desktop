@@ -84,6 +84,9 @@ use crate::settings::{AISettings, SelectionSettings};
 use crate::settings_view::SettingsSection;
 use crate::terminal::input::SET_INPUT_MODE_TERMINAL_ACTION_NAME;
 use crate::terminal::model::block::{AgentInteractionMetadata, BlockId};
+use crate::terminal::resizable_data::{
+    DEFAULT_CLI_SUBAGENT_HEIGHT, DEFAULT_CLI_SUBAGENT_WIDTH, ResizableData,
+};
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::terminal::{ShellLaunchData, TerminalModel};
 use crate::ui_components::blended_colors;
@@ -815,6 +818,13 @@ impl CLISubagentView {
             _ => {}
         });
 
+        let resizable_data = ResizableData::handle(ctx);
+        let (width, height) = resizable_data
+            .as_ref(ctx)
+            .get_all_handles(ctx.window_id())
+            .map(|sizes| (sizes.cli_subagent_width, sizes.cli_subagent_height))
+            .unwrap_or((DEFAULT_CLI_SUBAGENT_WIDTH, DEFAULT_CLI_SUBAGENT_HEIGHT));
+
         let mut view = Self {
             block_id,
             model,
@@ -845,8 +855,8 @@ impl CLISubagentView {
             hidden_response_scroll_offset: None,
             is_input_dismissed: false,
             input_dismiss_timer_handle: None,
-            resizable_width: resizable_state_handle(MIN_RESIZABLE_WIDTH),
-            resizable_height: resizable_state_handle(MAX_HEIGHT),
+            resizable_width: resizable_state_handle(width),
+            resizable_height: resizable_state_handle(height),
             current_working_directory,
             shell_launch_data,
             selected_text: Arc::new(RwLock::new(None)),
@@ -2018,7 +2028,7 @@ impl View for CLISubagentView {
             .finish();
         let width_resizable = Resizable::new(self.resizable_width.clone(), content)
             .with_dragbar_side(DragBarSide::Left)
-            .on_resize(|ctx, _| ctx.notify())
+            .on_resize(|ctx, _| ctx.dispatch_typed_action(CLISubagentAction::Resize))
             .with_bounds_callback(Box::new(|window_size| {
                 cli_subagent_width_bounds(window_size.x())
             }))
@@ -2027,7 +2037,7 @@ impl View for CLISubagentView {
         // 外层负责纵向缩放，内层负责横向缩放；拖拽边放在左上两侧，贴合右下角浮窗形态。
         Resizable::new(self.resizable_height.clone(), width_resizable)
             .with_dragbar_side(DragBarSide::Top)
-            .on_resize(|ctx, _| ctx.notify())
+            .on_resize(|ctx, _| ctx.dispatch_typed_action(CLISubagentAction::Resize))
             .with_bounds_callback(Box::new(|window_size| {
                 cli_subagent_height_bounds(window_size.y())
             }))
@@ -2072,6 +2082,7 @@ pub enum CLISubagentAction {
     CopyDebugId(String),
     OpenFeedbackDocs,
     ConversationScrollWheel { vertical_delta: f32 },
+    Resize,
 }
 
 impl TypedActionView for CLISubagentView {
@@ -2201,6 +2212,24 @@ impl TypedActionView for CLISubagentView {
             }
             CLISubagentAction::OpenFeedbackDocs => {
                 ctx.open_url("");
+            }
+            CLISubagentAction::Resize => {
+                let width = self
+                    .resizable_width
+                    .lock()
+                    .map(|state| state.size())
+                    .unwrap_or(DEFAULT_CLI_SUBAGENT_WIDTH);
+                let height = self
+                    .resizable_height
+                    .lock()
+                    .map(|state| state.size())
+                    .unwrap_or(DEFAULT_CLI_SUBAGENT_HEIGHT);
+                let window_id = ctx.window_id();
+                ResizableData::handle(ctx).update(ctx, |data, _| {
+                    data.set_cli_subagent_size(window_id, width, height);
+                });
+                ctx.dispatch_global_action("workspace:save_app", ());
+                ctx.notify();
             }
             CLISubagentAction::ConversationScrollWheel { vertical_delta } => {
                 let did_change = cli_subagent_update_conversation_scroll_pin_after_wheel(
@@ -2794,6 +2823,10 @@ fn render_blocked_action(props: BlockedActionProps<'_>, app: &AppContext) -> Box
     )
     .finish()
 }
+
+#[cfg(test)]
+#[path = "cli_resize_tests.rs"]
+mod resize_tests;
 
 #[cfg(test)]
 mod tests {

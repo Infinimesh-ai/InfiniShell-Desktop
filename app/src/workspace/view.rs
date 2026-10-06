@@ -12369,6 +12369,8 @@ impl Workspace {
             vertical_tabs_panel_open: self.vertical_tabs_panel_open,
             left_panel_width,
             right_panel_width,
+            cli_subagent_width: modal_sizes.map(|sizes| sizes.cli_subagent_width),
+            cli_subagent_height: modal_sizes.map(|sizes| sizes.cli_subagent_height),
             agent_management_filters: None,
             theme_override: self.theme_override.clone(),
             tab_groups,

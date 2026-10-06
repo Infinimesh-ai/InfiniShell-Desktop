@@ -12,6 +12,8 @@ pub const DEFAULT_WARP_DRIVE_INDEX_WIDTH: f32 = 300.;
 pub const DEFAULT_SETTINGS_PANEL_WIDTH: f32 = 194.;
 pub const DEFAULT_LEFT_PANEL_WIDTH: f32 = 240.;
 pub const DEFAULT_RIGHT_PANEL_WIDTH: f32 = 480.;
+pub const DEFAULT_CLI_SUBAGENT_WIDTH: f32 = 360.;
+pub const DEFAULT_CLI_SUBAGENT_HEIGHT: f32 = 320.;
 /// A naming system for the ResizableStateHandles
 pub enum ModalType {
     UniversalSearchWidth,
@@ -33,6 +35,9 @@ pub struct ModalSizes {
     pub settings_panel_width: ResizableStateHandle,
     pub left_panel_width: ResizableStateHandle,
     pub right_panel_width: ResizableStateHandle,
+    // 只记忆尺寸；各浮窗独立持有拖拽状态，避免分屏和历史浮窗互相干扰。
+    pub cli_subagent_width: f32,
+    pub cli_subagent_height: f32,
 }
 
 impl ModalSizes {
@@ -68,6 +73,12 @@ impl ModalSizes {
             settings_panel_width: resizable_state_handle(settings_panel_width),
             left_panel_width: resizable_state_handle(left_panel_width),
             right_panel_width: resizable_state_handle(right_panel_width),
+            cli_subagent_width: window_snapshot
+                .cli_subagent_width
+                .unwrap_or(DEFAULT_CLI_SUBAGENT_WIDTH),
+            cli_subagent_height: window_snapshot
+                .cli_subagent_height
+                .unwrap_or(DEFAULT_CLI_SUBAGENT_HEIGHT),
         }
     }
 
@@ -80,6 +91,8 @@ impl ModalSizes {
             settings_panel_width: resizable_state_handle(DEFAULT_SETTINGS_PANEL_WIDTH),
             left_panel_width: resizable_state_handle(left_default),
             right_panel_width: resizable_state_handle(right_default),
+            cli_subagent_width: DEFAULT_CLI_SUBAGENT_WIDTH,
+            cli_subagent_height: DEFAULT_CLI_SUBAGENT_HEIGHT,
         }
     }
 
@@ -108,6 +121,8 @@ impl Default for ModalSizes {
             settings_panel_width: resizable_state_handle(DEFAULT_SETTINGS_PANEL_WIDTH),
             left_panel_width: resizable_state_handle(DEFAULT_LEFT_PANEL_WIDTH),
             right_panel_width: resizable_state_handle(DEFAULT_RIGHT_PANEL_WIDTH),
+            cli_subagent_width: DEFAULT_CLI_SUBAGENT_WIDTH,
+            cli_subagent_height: DEFAULT_CLI_SUBAGENT_HEIGHT,
         }
     }
 }
@@ -149,6 +164,13 @@ impl ResizableData {
     pub fn get_all_handles(&self, window_id: WindowId) -> Option<&ModalSizes> {
         self.sizes_per_window.get(&window_id)
     }
+
+    pub fn set_cli_subagent_size(&mut self, window_id: WindowId, width: f32, height: f32) {
+        if let Some(modal_sizes) = self.sizes_per_window.get_mut(&window_id) {
+            modal_sizes.cli_subagent_width = width;
+            modal_sizes.cli_subagent_height = height;
+        }
+    }
 }
 
 impl Entity for ResizableData {
@@ -156,3 +178,7 @@ impl Entity for ResizableData {
 }
 
 impl SingletonEntity for ResizableData {}
+
+#[cfg(test)]
+#[path = "resizable_data_tests.rs"]
+mod tests;
