@@ -186,7 +186,7 @@ jobs:
       - name: Package remote-server tarball
         run: |
           binary="${{ steps.bundle_cli.outputs.binary_path }}"
-          [[ "$(lipo -archs "$binary")" == "${{ matrix.arch }}" ]]
+          [[ "$(lipo -archs "$binary")" == "${{ matrix.arch == 'aarch64' && 'arm64' || matrix.arch }}" ]]
           cp "$binary" infinishell
           tar czf infinishell-macos-${{ matrix.arch }}.tar.gz \
             infinishell \
