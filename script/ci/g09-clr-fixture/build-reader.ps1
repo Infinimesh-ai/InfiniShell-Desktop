@@ -30,6 +30,7 @@ $postFailure = $false
 $receipt = [ordered]@{
     schema = 1; status = 'started'; stage = 'private_directory'; source_commit = $context.SourceIdentity.commit
     preparation_mode = $context.Mode; source_identity = $context.SourceIdentity
+    source_identity_accepted = $false; source_identity_unchanged = $false
     context_script_sha256 = $contextScriptHash; context_script_unchanged = $false
     run_id = $context.RunId; run_attempt = $context.RunAttempt
     native_execution_started = $false; dac_loaded = $false; cleanup_ready = $false
@@ -37,6 +38,8 @@ $receipt = [ordered]@{
     scope = '仅编译固定只读 reader；不执行 reader、DAC、CLR 夹具或任何 CLI'
 }
 try {
+    Assert-G09SourceIdentity $Local $context.SourceIdentity $env:GITHUB_SHA
+    $receipt.source_identity_accepted = $true
     New-Item -ItemType Directory -Path $snapshot | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $snapshot 'vendor') | Out-Null
 
@@ -133,6 +136,16 @@ try {
     $receipt.error_hresult = $_.Exception.HResult
 } finally {
     # 编译失败也重核已保全输入；不让后续清理或再次构建覆盖首次失败。
+    try {
+        $receipt.source_identity_after = Get-G09SourceIdentity
+        Assert-G09SourceUnchanged $context.SourceIdentity $receipt.source_identity_after
+        Assert-G09SourceIdentity $Local $receipt.source_identity_after $env:GITHUB_SHA
+        $receipt.source_identity_unchanged = $true
+    } catch {
+        $postFailure = $true
+        $receipt.source_recheck_error_kind = $_.Exception.GetType().FullName
+        $receipt.source_recheck_error_hresult = $_.Exception.HResult
+    }
     foreach ($item in $inputs) {
         try {
             $item.sha256_after = Get-RegularFileHash (Join-Path $sourceRoot $item.path)
@@ -160,7 +173,7 @@ try {
     }
     $receipt.inputs = $inputs
     $receipt.inputs_rechecked = $inputs.Count
-    $receipt.sources_unchanged = $inputs.Count -eq 9 -and -not $postFailure
+    $receipt.sources_unchanged = $receipt.source_identity_accepted -and $inputs.Count -eq 9 -and -not $postFailure
     if ($postFailure) { $receipt.status = 'failed' }
     if ($receipt.status -eq 'compiled') { $receipt.stage = 'complete' }
     $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($receipt | ConvertTo-Json -Depth 8))

@@ -67,6 +67,7 @@ struct Fixture {
     node_created: Option<Value>,
     shell32: Option<BoundFile>,
     shell: Option<ShellClassificationWitness>,
+    shell_skips: Vec<Value>,
     shell_entries: Vec<Value>,
     shell_observation: Option<Value>,
     initial_breakpoints: HashSet<u32>,
@@ -127,6 +128,7 @@ impl Fixture {
             node_created: None,
             shell32: None,
             shell: None,
+            shell_skips: vec![],
             shell_entries: vec![],
             shell_observation: None,
             initial_breakpoints: HashSet::new(),
@@ -660,6 +662,7 @@ impl Fixture {
             }
             EXCEPTION_DEBUG_EVENT => {
                 self.handling_stage = "shell_observe";
+                let before = self.shell.as_ref().map(ShellClassificationWitness::summary);
                 let observation = self
                     .shell
                     .as_mut()
@@ -669,6 +672,21 @@ impl Fixture {
                     ShellClassificationObservation::NotOwned => (),
                     ShellClassificationObservation::OwnedSkipped => {
                         self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        let before = before.expect("跳过入口必须有原根");
+                        let after = self.shell.as_ref().expect("原根必须保留").summary();
+                        let thread = self
+                            .threads
+                            .get(&event.dwThreadId)
+                            .ok_or_else(|| io::Error::other("跳过入口缺少原线程"))?;
+                        self.shell_skips.push(json!({
+                            "sequence":self.sequence,"pid":event.dwProcessId,"tid":event.dwThreadId,
+                            "thread_birth":birth(raw(thread), true)?,
+                            "node_created_before_event":self.node_created.is_some(),
+                            "resume_flag_writes_before":before.resume_flag_writes,
+                            "resume_flag_writes_after":after.resume_flag_writes,
+                            "fixed_eflags_api_readbacks_before":before.fixed_eflags_api_readbacks,
+                            "fixed_eflags_api_readbacks_after":after.fixed_eflags_api_readbacks,
+                        }));
                         return Ok(());
                     }
                     ShellClassificationObservation::OwnedEntry => {
@@ -1165,6 +1183,33 @@ fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
             && report["node_exit_confirmed"] == true,
         "分类未绑定唯一原子 CREATE 与 entry/return",
     )?;
+    let skips = report["shell_skips"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("缺少固定启动前跳过入口收据"))?;
+    require(skips.len() == 1, "固定启动前跳过入口不唯一")?;
+    let skipped = &skips[0];
+    let resume_before = skipped["resume_flag_writes_before"].as_u64();
+    let fixed_before = skipped["fixed_eflags_api_readbacks_before"].as_u64();
+    let fixed_after = skipped["fixed_eflags_api_readbacks_after"].as_u64();
+    require(
+        skipped["node_created_before_event"] == false
+            && sequence(&skipped["sequence"])? < sequence(&node["sequence"])?
+            && skipped["pid"] == item["pid"]
+            && skipped["tid"] == item["tid"]
+            && skipped["thread_birth"] == item["thread_birth"]
+            && skipped["resume_flag_writes_after"].as_u64()
+                == resume_before.and_then(|value| value.checked_add(1))
+            && resume_before.is_some()
+            && fixed_before
+                .zip(fixed_after)
+                .is_some_and(|(before, after)| {
+                    after == before || before.checked_add(1) == Some(after)
+                })
+            && summary["skipped_entries"] == 1
+            && summary["resume_flag_writes"] == skipped["resume_flag_writes_after"]
+            && summary["fixed_eflags_api_readbacks"] == skipped["fixed_eflags_api_readbacks_after"],
+        "固定启动前入口未证明同一工作线程的自有 RF 写入读回",
+    )?;
     require(
         receipt["expected_node_matched"] == true
             && receipt["flags"] == 0x2000
@@ -1173,6 +1218,8 @@ fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
             && receipt["execution_context_unchanged"] == true
             && item["live_threads_restored_before_reader"] == true
             && receipt["post_start_clr_stack_required"] == true
+            && receipt["raw_return_u64"] == 0x4550
+            && report["fixture_shell_return_u64"] == receipt["raw_return_u64"]
             && report["fixture_shell_return_low32"]
                 .as_u64()
                 .is_some_and(|value| value <= u32::MAX as u64)
@@ -1372,6 +1419,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     }
     report["events"] = json!(fixture.events);
     report["observations"] = json!(fixture.observations);
+    report["shell_skips"] = json!(fixture.shell_skips);
     report["shell_entries"] = json!(fixture.shell_entries);
     report["shell_observation"] = json!(fixture.shell_observation);
     report["node_created"] = json!(fixture.node_created);
@@ -1448,17 +1496,18 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     )?;
     validate_observations(&fixture.observations, &prepared)?;
     let output = fs::read(root.join("fixture.stdout"))?;
-    require(output.len() <= 12, "固定分类返回输出超过数值边界")?;
+    require(output.len() <= 22, "固定分类返回输出超过数值边界")?;
     let returned = std::str::from_utf8(&output)
         .ok()
-        .and_then(|value| value.trim().parse::<u32>().ok())
-        .ok_or_else(|| io::Error::other("固定分类返回不是低 32 位整数"))?;
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .ok_or_else(|| io::Error::other("固定分类返回不是完整 64 位整数"))?;
     require(
         output == format!("{returned}\r\n").as_bytes()
             || output == format!("{returned}\n").as_bytes(),
         "固定分类返回存在额外输出",
     )?;
-    report["fixture_shell_return_low32"] = json!(returned);
+    report["fixture_shell_return_u64"] = json!(returned);
+    report["fixture_shell_return_low32"] = json!(returned as u32);
     validate_native_return(report, &prepared)?;
     reader.verify()?;
     fixture_image.verify()?;
@@ -1641,7 +1690,7 @@ fn fixed_native_return_receipt() -> (Value, Value) {
             "il_status":0,"il_offsets":[2],"il_offsets_needed":1}]});
     let classification = json!({"generation":generation,"identity":{"process_id":41,"thread_id":42,"process_birth":100,"thread_birth":200},
         "entry_sequence":10,"return_sequence":11,"node_create_sequence":8,"node_process_id":51,"node_process_birth":300,
-        "expected_node_matched":true,"flags":0x2000,"raw_return_low32":17744,"return_region_kind":"private",
+        "expected_node_matched":true,"flags":0x2000,"raw_return_u64":17744,"raw_return_low32":17744,"return_region_kind":"private",
         "registers_restored":true,"execution_context_unchanged":true,"post_start_clr_stack_required":true});
     let observation = json!({"event_sequence":11,"nonce":"return-fixture","pid":41,"tid":42,"main_tid":40,
         "process_birth":100,"thread_birth":200,"event_hresult":0,"reader_reaped":true,"reader_job_empty":true,
@@ -1649,9 +1698,13 @@ fn fixed_native_return_receipt() -> (Value, Value) {
     let report = json!({
         "node_created":{"pid":51,"birth":300,"sequence":8,"original_create_bound":true},
         "descendant_creates":{"51":descendant},"all_descendants_reaped":true,
-        "node_exit_confirmed":true,"fixture_shell_return_low32":17744,
+        "node_exit_confirmed":true,"fixture_shell_return_u64":17744,"fixture_shell_return_low32":17744,
+        "shell_skips":[{"sequence":7,"pid":41,"tid":42,"thread_birth":200,
+            "node_created_before_event":false,"resume_flag_writes_before":0,"resume_flag_writes_after":1,
+            "fixed_eflags_api_readbacks_before":0,"fixed_eflags_api_readbacks_after":1}],
         "shell_entries":[{"sequence":10,"tid":42}],
         "shell_classification":{"generation":generation,"root_process_id":41,"selected_calls":1,"returned_calls":1,
+            "skipped_entries":1,"resume_flag_writes":1,"fixed_eflags_api_readbacks":1,
             "dirty_threads":0,"threads_exited_before_restore":0,"restoration":"readback_verified",
             "restored_threads":2,"original_process_exit_confirmed":true,"stopped":true},
         "shell_observation":observation
@@ -1835,10 +1888,54 @@ fn native_return_receipts_require_one_pair_after_original_child_create() {
 }
 
 #[test]
+fn native_return_requires_pre_node_skipped_entry_on_the_original_worker() {
+    let (report, prepared) = fixed_native_return_receipt();
+    for (field, value) in [
+        ("sequence", json!(8)),
+        ("node_created_before_event", json!(true)),
+        ("pid", json!(51)),
+        ("tid", json!(40)),
+        ("thread_birth", json!(201)),
+    ] {
+        let mut changed = report.clone();
+        changed["shell_skips"][0][field] = value;
+        assert!(validate_native_return(&changed, &prepared).is_err());
+    }
+    let mut missing = report.clone();
+    missing["shell_skips"] = json!([]);
+    assert!(validate_native_return(&missing, &prepared).is_err());
+    let mut repeated = report;
+    let skips = repeated["shell_skips"].as_array_mut().unwrap();
+    skips.push(skips[0].clone());
+    assert!(validate_native_return(&repeated, &prepared).is_err());
+}
+
+#[test]
+fn native_return_requires_one_successful_control_readback_for_the_skipped_entry() {
+    let (report, prepared) = fixed_native_return_receipt();
+    for (field, value) in [
+        ("resume_flag_writes_before", Value::Null),
+        ("resume_flag_writes_after", json!(0)),
+        ("resume_flag_writes_after", json!(2)),
+        ("fixed_eflags_api_readbacks_before", Value::Null),
+        ("fixed_eflags_api_readbacks_after", json!(2)),
+    ] {
+        let mut changed = report.clone();
+        changed["shell_skips"][0][field] = value;
+        assert!(validate_native_return(&changed, &prepared).is_err());
+    }
+    let mut exact = report;
+    exact["shell_skips"][0]["fixed_eflags_api_readbacks_after"] = json!(0);
+    exact["shell_classification"]["fixed_eflags_api_readbacks"] = json!(0);
+    assert!(validate_native_return(&exact, &prepared).is_ok());
+}
+
+#[test]
 fn native_return_receipts_require_private_mapping_fixture_value_and_restoration() {
     let (report, prepared) = fixed_native_return_receipt();
     for (field, value) in [
         ("return_region_kind", json!("image")),
+        ("raw_return_u64", json!(0x1_0000_4550_u64)),
         ("raw_return_low32", json!(0)),
         ("registers_restored", json!(false)),
         ("execution_context_unchanged", json!(false)),

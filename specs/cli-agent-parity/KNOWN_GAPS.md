@@ -1,5 +1,9 @@
 # CLI 能力缺项与验收缺口
 
+[真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。
+
+本机60普通及唯一原生夹具通过：preNode skipped71、NodeCREATE73→entry148→return150、完整0x4550、同worker caller IL179、原四异常及164事件继续和退出清理均已核；另有36应用诊断特性及21准备入口测试通过。这些绑定本轮明确dirty源码，不能标成7f6冻结执行，也不覆盖真实PS/LSA清理。下一步先在原runner复核固定能力，再恢复真实PS取证；G09仍开放，正常五场景/三冷恢复和最终同源双平台门禁仍待完成。无需本地化变更。
+
 固定能力后续已在原runner37344743491通过并独审，精确绑定e4e690dd及与原失败相同的CLR/DAC字节；这没有运行真实PS候选，也不关闭G09。真实分类接入、正常五场景/三次冷恢复和最终同源双平台门禁仍待完成。
 
 2026-10-06 Windows接续：本机固定能力55普通、唯一native、28离线来源合同及warp check通过，实际读到0x4550与精确caller IL160；原runner37340942346的DR失败及本地a1–a7失败全部保留。原runner与本机CLR/SMA版本不同，尚未取得真实PS的分类返回与同停点栈，G09仍开放。原10项关闭数不变，V01/V02/V05移交不计通过；五场景、三次冷恢复及最终同源双平台门禁仍未完成，PR保持草稿。细节与摘要见验证结论及CURRENT_STATUS。

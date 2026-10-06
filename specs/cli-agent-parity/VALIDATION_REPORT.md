@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-06：启动前 RF 读回失败及固定能力修复
+
+[真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。
+
+本轮保持 `execution_equal` 严格比较，只在自有RF实际写入的即时读回处接受固定bit1的第二完整视图；完整RAX与low32同时保全。原退出和reader回收确认后释放分类观察器的进程/线程句柄，避免拖延登录会话清理。准备入口新增13项原始blob前后校验，CI拒绝字节不同，Local如实记录dirty；不伪造Actions或自动改写来源。
+
+本机60普通及唯一原生夹具通过：preNode skipped71、NodeCREATE73→entry148→return150、完整0x4550、同worker caller IL179、原四异常及164事件继续和退出清理均已核；另有36应用诊断特性及21准备入口测试通过。这些绑定本轮明确dirty源码，不能标成7f6冻结执行，也不覆盖真实PS/LSA清理。下一步先在原runner复核固定能力，再恢复真实PS取证；G09仍开放，正常五场景/三冷恢复和最终同源双平台门禁仍待完成。无需本地化变更。
+
+本轮精确 `cargo check --locked -p warp` 与 `cargo test --locked -p warp --lib i18n::tests`（11项）通过；本机固定能力独审SHA `c4bc5e4d6d31e2cfd98b4e860b909da998c2955c615ba8c403e3a9b9d08f9ee0`，12份变动源码与全部本地门禁综合收据SHA `ba62b52df0145f5effef0bc3191de53391ad3550d5f383d8203e02313fee0e9e`。原生command测试exe只有事后摘要，按本机开发验证记录，不升级为执行前后独立二进制绑定。
+
 ## 2026-10-06：候选前取消，补齐本代私有映射路径绑定
 
 `b1150f4a4aeb9c2f5b4f847716d2470d67f3114f` 的 [37349685626](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37349685626) 已在源码检查阶段主动取消。原runner22的最终API确认reader与真实候选步骤全部跳过，不能记成候选失败。日志ZIP与现有环境工件完整保留，取消独审SHA `9c782642a6f0bc9039a3d34b8a81220312f2144b34eba6f4626e9b2e479210b7`。

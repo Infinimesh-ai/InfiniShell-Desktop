@@ -59,6 +59,11 @@ fn validate_return_binding(
             .is_none_or(|birth| birth == 0)
         || classification["expected_node_matched"] != true
         || classification["flags"] != 0x2000
+        || !classification["raw_return_u64"]
+            .as_u64()
+            .is_some_and(|value| {
+                classification["raw_return_low32"].as_u64() == Some(u64::from(value as u32))
+            })
         || classification["registers_restored"] != true
         || classification["execution_context_unchanged"] != true
         || classification["post_start_clr_stack_required"] != true

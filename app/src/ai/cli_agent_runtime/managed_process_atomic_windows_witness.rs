@@ -171,6 +171,7 @@ pub(super) struct NativeWitness {
     root_thread: Option<RootThread>,
     clr: Option<NativeClr>,
     classification: Option<ShellClassificationWitness>,
+    completed_classification: Option<serde_json::Value>,
     expected_node: Option<Vec<u16>>,
     node_create: Option<serde_json::Value>,
     classification_entry: Option<serde_json::Value>,
@@ -397,6 +398,7 @@ impl WindowsImageDebugSession {
                 root_thread: None,
                 clr,
                 classification: None,
+                completed_classification: None,
                 expected_node,
                 node_create: None,
                 classification_entry: None,
@@ -1516,6 +1518,11 @@ impl WindowsImageDebugSession {
                 clr.ensure_reaped()?;
                 clr.process_exited();
             }
+            // 原退出和 reader 回收确认后只保留摘要；关闭进程、线程句柄再释放登录会话。
+            witness.completed_classification = witness
+                .classification
+                .take()
+                .map(|shell| serde_json::json!(shell.summary()));
             witness.root_thread.take();
             witness.exit_confirmed = true;
         }
@@ -1535,6 +1542,7 @@ impl WindowsImageDebugSession {
                 .classification
                 .as_ref()
                 .map(|shell| serde_json::json!(shell.summary()))
+                .or_else(|| witness.completed_classification.clone())
                 .unwrap_or(serde_json::Value::Null);
             summary["classification_node_create"] = serde_json::json!(witness.node_create);
             summary["classification_entry"] = serde_json::json!(witness.classification_entry);

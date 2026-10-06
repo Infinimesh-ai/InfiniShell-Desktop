@@ -197,7 +197,7 @@ fn return_pair_requires_exact_stack_and_preserves_register_scalar() {
     let mut value = CONTEXT {
         Rip: pending.returned_to,
         Rsp: pending.stack + 8,
-        Rax: 0x1234,
+        Rax: 0x100001234,
         ..CONTEXT::default()
     };
     assert!(matching_return(&pending, &value));
@@ -230,6 +230,7 @@ fn pair_nonce_is_unique_per_original_event_and_contains_no_path() {
         node_process_birth: 6,
         expected_node_matched: true,
         flags: 0x2000,
+        raw_return_u64: 0x4550,
         raw_return_low32: 0x4550,
         return_region_kind: "private",
         registers_restored: true,
@@ -265,6 +266,80 @@ fn resume_flag_restoration_never_changes_another_instruction_or_original_flag() 
     assert_eq!(current.EFlags, RF | 0x202);
     restore_own_resume_flag(&mut current, Some((0x20000, false)));
     assert_eq!(current.EFlags, 0x202);
+}
+
+#[test]
+fn fixed_eflags_api_view_requires_an_owned_control_write_and_one_to_zero_direction() {
+    let requested = CONTEXT {
+        EFlags: 0x10202,
+        ..CONTEXT::default()
+    };
+    let actual = CONTEXT {
+        EFlags: 0x10200,
+        ..requested
+    };
+    assert!(!execution_equal(&requested, &actual));
+    assert!(fixed_eflags_api_readback(&requested, &actual, true));
+    assert!(!fixed_eflags_api_readback(&requested, &actual, false));
+    assert!(!fixed_eflags_api_readback(&actual, &requested, true));
+    assert!(execution_equal(&requested, &requested));
+    assert!(!fixed_eflags_api_readback(&requested, &requested, true));
+}
+
+#[test]
+fn fixed_eflags_api_view_rejects_every_other_flag_bit_change() {
+    let requested = CONTEXT {
+        EFlags: 0x10202,
+        ..CONTEXT::default()
+    };
+    for bit in 0..32 {
+        if bit == 1 {
+            continue;
+        }
+        let actual = CONTEXT {
+            EFlags: 0x10200 ^ (1 << bit),
+            ..requested
+        };
+        assert!(
+            !fixed_eflags_api_readback(&requested, &actual, true),
+            "EFLAGS bit {bit}"
+        );
+    }
+}
+
+#[test]
+fn fixed_eflags_api_view_rejects_every_changed_execution_register() {
+    let requested = CONTEXT {
+        EFlags: 0x10202,
+        ..CONTEXT::default()
+    };
+    let mutations: [fn(&mut CONTEXT); 17] = [
+        |value| value.Rip ^= 1,
+        |value| value.Rsp ^= 1,
+        |value| value.Rax ^= 1,
+        |value| value.Rcx ^= 1,
+        |value| value.Rdx ^= 1,
+        |value| value.Rbx ^= 1,
+        |value| value.Rbp ^= 1,
+        |value| value.Rsi ^= 1,
+        |value| value.Rdi ^= 1,
+        |value| value.R8 ^= 1,
+        |value| value.R9 ^= 1,
+        |value| value.R10 ^= 1,
+        |value| value.R11 ^= 1,
+        |value| value.R12 ^= 1,
+        |value| value.R13 ^= 1,
+        |value| value.R14 ^= 1,
+        |value| value.R15 ^= 1,
+    ];
+    for mutate in mutations {
+        let mut actual = CONTEXT {
+            EFlags: 0x10200,
+            ..requested
+        };
+        mutate(&mut actual);
+        assert!(!fixed_eflags_api_readback(&requested, &actual, true));
+    }
 }
 
 fn export_fixture() -> Vec<u8> {

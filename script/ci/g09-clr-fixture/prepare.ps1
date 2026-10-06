@@ -19,15 +19,19 @@ $copiedReader = Join-Path $root 'reader.exe'
 $copiedSource = Join-Path $root 'Fixture.cs'
 $fixture = Join-Path $root 'fixture.exe'
 $fixtureNode = Join-Path $root 'fixture-node.exe'
+$sourceRecheckFailed = $false
 $receipt = [ordered]@{
     schema = 1; source_commit = $context.SourceIdentity.commit; status = 'preparing'
     preparation_mode = $context.Mode; source_identity = $context.SourceIdentity
+    source_identity_accepted = $false; source_identity_unchanged = $false; sources_unchanged = $false
     context_script_sha256 = $contextScriptHash; context_script_unchanged = $false
     run_id = $context.RunId; run_attempt = $context.RunAttempt
     native_execution_started = $false; dac_loaded = $false; cleanup_ready = $false
     scope = '固定 Framework 异常及本地映像分类读取夹具；不代表 PowerShell 或 G09 通过'
 }
 try {
+    Assert-G09SourceIdentity $Local $context.SourceIdentity $env:GITHUB_SHA
+    $receipt.source_identity_accepted = $true
     $inputReader = (Resolve-Path -LiteralPath $Reader).Path
     foreach ($path in @($source, $compiler, $inputReader)) {
         $item = Get-Item -LiteralPath $path
@@ -58,6 +62,7 @@ try {
             $buildReceipt.executable.sha256 -cne $readerHash -or @($buildReceipt.inputs).Count -ne 9) {
             throw 'reader 构建收据与本轮源码或可执行文件不匹配'
         }
+        Assert-G09SourceUnchanged $buildReceipt.source_identity $context.SourceIdentity
         foreach ($name in @('reader.cpp', 'wire.h', 'sos_layout.h', 'README.md', 'sources.safe.json',
                             'vendor/clrdata.h', 'vendor/xclrdata.h', 'vendor/sospriv.h', 'vendor/LICENSE.TXT')) {
             $entries = @($buildReceipt.inputs | Where-Object { $_.path -ceq $name })
@@ -134,7 +139,21 @@ try {
     $receipt.error_hresult = $_.Exception.HResult
     throw
 } finally {
-    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($receipt | ConvertTo-Json -Depth 5))
+    try {
+        $receipt.source_identity_after = Get-G09SourceIdentity
+        Assert-G09SourceUnchanged $context.SourceIdentity $receipt.source_identity_after
+        Assert-G09SourceIdentity $Local $receipt.source_identity_after $env:GITHUB_SHA
+        $receipt.source_identity_unchanged = $true
+    } catch {
+        $sourceRecheckFailed = $true
+        $receipt.status = 'failed'
+        $receipt.source_recheck_error_kind = $_.Exception.GetType().FullName
+        $receipt.source_recheck_error_hresult = $_.Exception.HResult
+    }
+    $receipt.sources_unchanged = $receipt.sources_unchanged -and $receipt.source_identity_accepted -and
+        $receipt.source_identity_unchanged
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($receipt | ConvertTo-Json -Depth 8))
     $file = [IO.File]::Open((Join-Path $root 'preparation.safe.json'), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
     try { $file.Write($bytes, 0, $bytes.Length); $file.Flush() } finally { $file.Dispose() }
 }
+if ($sourceRecheckFailed) { throw '固定准备来源的提交或原始字节发生变化' }

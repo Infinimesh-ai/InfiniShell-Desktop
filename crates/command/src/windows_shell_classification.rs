@@ -50,6 +50,7 @@ const OWN_STATUS: u64 = 15;
 // x64 DR6 非活动状态及 DR7 固定置一位；不把内核初始零视图作为硬件命中后的期望值。
 const DR6_INACTIVE: u64 = 0xffff_0ff0;
 const DR7_FIXED_ONE: u64 = 1 << 10;
+const EFLAGS_FIXED_ONE: u32 = 1 << 1;
 const RF: u32 = 1 << 16;
 const TF: u32 = 1 << 8;
 
@@ -207,6 +208,7 @@ pub struct ReturnReceipt {
     pub node_process_birth: u64,
     pub expected_node_matched: bool,
     pub flags: u32,
+    pub raw_return_u64: u64,
     pub raw_return_low32: u32,
     pub return_region_kind: &'static str,
     pub registers_restored: bool,
@@ -224,6 +226,8 @@ pub struct Summary {
     pub dirty_threads: usize,
     pub restored_threads: u64,
     pub inactive_api_readbacks: u64,
+    pub resume_flag_writes: u64,
+    pub fixed_eflags_api_readbacks: u64,
     pub threads_exited_before_restore: u64,
     pub original_process_exit_confirmed: bool,
     pub stopped: bool,
@@ -327,6 +331,20 @@ fn execution_equal(left: &CONTEXT, right: &CONTEXT) -> bool {
         right.Rdi, right.R8, right.R9, right.R10, right.R11, right.R12, right.R13, right.R14,
         right.R15,
     ] && left.EFlags == right.EFlags
+}
+fn fixed_eflags_api_readback(
+    requested: &CONTEXT,
+    actual: &CONTEXT,
+    change_resume_flag: bool,
+) -> bool {
+    if !change_resume_flag || requested.EFlags & EFLAGS_FIXED_ONE == 0 {
+        return false;
+    }
+    // EFLAGS bit 1 是架构保留常一位；原 Windows CONTROL 写入后的 API 视图将其读为零。
+    // 只允许此次自有 RF 写入的这一方向；全部可变标志、RIP/RSP 和通用寄存器仍逐项相等。
+    let mut expected_api = *requested;
+    expected_api.EFlags ^= EFLAGS_FIXED_ONE;
+    execution_equal(&expected_api, actual)
 }
 fn restore_own_resume_flag(current: &mut CONTEXT, introduced: Option<(u64, bool)>) {
     if let Some((rip, was_set)) = introduced {
@@ -633,6 +651,8 @@ struct Thread {
     resume_flag: Option<(u64, bool)>,
     pending: Option<Pending>,
     inactive_api_readbacks: u64,
+    resume_flag_writes: u64,
+    fixed_eflags_api_readbacks: u64,
 }
 impl Thread {
     fn verify(&self, process: HANDLE) -> io::Result<()> {
@@ -667,8 +687,9 @@ impl Thread {
         }
         let after = context(raw(&self.handle))?;
         let actual = Registers::read(&after.0);
+        let fixed_flags_view = fixed_eflags_api_readback(&current.0, &after.0, change_resume_flag);
         if (actual != registers && actual != registers.inactive_api_view())
-            || !execution_equal(&current.0, &after.0)
+            || !(execution_equal(&current.0, &after.0) || fixed_flags_view)
         {
             // 只保留控制位及逐项相等性，不输出目标地址或通用寄存器内容。
             return Err(io::Error::other(format!(
@@ -684,6 +705,8 @@ impl Thread {
             )));
         }
         self.inactive_api_readbacks += u64::from(actual != registers);
+        self.resume_flag_writes += u64::from(change_resume_flag);
+        self.fixed_eflags_api_readbacks += u64::from(fixed_flags_view);
         Ok(())
     }
     fn restore(&mut self) -> io::Result<bool> {
@@ -734,6 +757,8 @@ pub struct ShellClassificationWitness {
     stopped: bool,
     first_unowned_single_step: Option<serde_json::Value>,
     completed_inactive_api_readbacks: u64,
+    completed_resume_flag_writes: u64,
+    completed_fixed_eflags_api_readbacks: u64,
 }
 impl std::fmt::Debug for ShellClassificationWitness {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -796,6 +821,8 @@ impl ShellClassificationWitness {
             stopped: false,
             first_unowned_single_step: None,
             completed_inactive_api_readbacks: 0,
+            completed_resume_flag_writes: 0,
+            completed_fixed_eflags_api_readbacks: 0,
         };
         value.insert_thread(event.dwThreadId, created.hThread)?;
         Ok(value)
@@ -843,6 +870,8 @@ impl ShellClassificationWitness {
             resume_flag: None,
             pending: None,
             inactive_api_readbacks: 0,
+            resume_flag_writes: 0,
+            fixed_eflags_api_readbacks: 0,
         };
         thread.verify(raw(&self.process))?;
         self.threads.insert(tid, thread);
@@ -1081,6 +1110,7 @@ impl ShellClassificationWitness {
             node_process_birth: node.2,
             expected_node_matched: true,
             flags: 0x2000,
+            raw_return_u64: current.0.Rax,
             raw_return_low32: current.0.Rax as u32,
             return_region_kind: if pending.region.kind == MEM_PRIVATE.0 {
                 "private"
@@ -1146,6 +1176,8 @@ impl ShellClassificationWitness {
         confirm_exit(raw(&thread.handle))?;
         self.exited_dirty += u64::from(thread.dirty);
         self.completed_inactive_api_readbacks += thread.inactive_api_readbacks;
+        self.completed_resume_flag_writes += thread.resume_flag_writes;
+        self.completed_fixed_eflags_api_readbacks += thread.fixed_eflags_api_readbacks;
         self.threads.remove(&event.dwThreadId);
         Ok(())
     }
@@ -1191,6 +1223,18 @@ impl ShellClassificationWitness {
                     .threads
                     .values()
                     .map(|thread| thread.inactive_api_readbacks)
+                    .sum::<u64>(),
+            resume_flag_writes: self.completed_resume_flag_writes
+                + self
+                    .threads
+                    .values()
+                    .map(|thread| thread.resume_flag_writes)
+                    .sum::<u64>(),
+            fixed_eflags_api_readbacks: self.completed_fixed_eflags_api_readbacks
+                + self
+                    .threads
+                    .values()
+                    .map(|thread| thread.fixed_eflags_api_readbacks)
                     .sum::<u64>(),
             threads_exited_before_restore: self.exited_dirty,
             original_process_exit_confirmed: self.exited,

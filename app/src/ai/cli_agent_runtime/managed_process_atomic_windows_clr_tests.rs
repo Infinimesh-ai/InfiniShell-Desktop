@@ -20,6 +20,7 @@ fn classification_receipt() -> serde_json::Value {
     serde_json::json!({"identity":{"process_id":7,"thread_id":8},
         "node_create_sequence":2,"entry_sequence":3,"return_sequence":4,
         "node_process_id":9,"node_process_birth":100,"expected_node_matched":true,
+        "raw_return_u64":0x4550,"raw_return_low32":0x4550,
         "flags":0x2000,"registers_restored":true,"execution_context_unchanged":true,
         "post_start_clr_stack_required":true})
 }
@@ -52,6 +53,37 @@ fn clr_reader_requires_node_create_before_the_classification_pair() {
     receipt["node_create_sequence"] = serde_json::json!(2);
     receipt["node_process_birth"] = serde_json::json!(0);
     assert!(validate_return_binding(&event, 7, 4, &receipt).is_err());
+}
+
+#[test]
+fn clr_reader_preserves_the_complete_native_return_without_interpreting_it() {
+    let event = return_event(7, 1, SINGLE_STEP);
+    for value in [0u64, 0x4550, 0x5a4d, 0x1_0000_4550, u64::MAX] {
+        let mut receipt = classification_receipt();
+        receipt["raw_return_u64"] = serde_json::json!(value);
+        receipt["raw_return_low32"] = serde_json::json!(value as u32);
+        assert!(validate_return_binding(&event, 7, 4, &receipt).is_ok());
+    }
+}
+
+#[test]
+fn clr_reader_rejects_missing_or_inconsistent_native_return_bits() {
+    let event = return_event(7, 1, SINGLE_STEP);
+    for (complete, low) in [
+        (serde_json::Value::Null, serde_json::json!(0x4550)),
+        (serde_json::json!(-1), serde_json::json!(u32::MAX)),
+        (serde_json::json!(0x4550), serde_json::Value::Null),
+        (serde_json::json!(0x4550), serde_json::json!(0x5a4d)),
+        (
+            serde_json::json!(0x1_0000_4550u64),
+            serde_json::json!(0x1_0000_4550u64),
+        ),
+    ] {
+        let mut receipt = classification_receipt();
+        receipt["raw_return_u64"] = complete;
+        receipt["raw_return_low32"] = low;
+        assert!(validate_return_binding(&event, 7, 4, &receipt).is_err());
+    }
 }
 
 #[test]

@@ -2,6 +2,12 @@
 
 ## Windows 接续最新状态（2026-10-06）
 
+[真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。
+
+本机60普通及唯一原生夹具通过：preNode skipped71、NodeCREATE73→entry148→return150、完整0x4550、同worker caller IL179、原四异常及164事件继续和退出清理均已核；另有36应用诊断特性及21准备入口测试通过。这些绑定本轮明确dirty源码，不能标成7f6冻结执行，也不覆盖真实PS/LSA清理。下一步先在原runner复核固定能力，再恢复真实PS取证；G09仍开放，正常五场景/三冷恢复和最终同源双平台门禁仍待完成。无需本地化变更。
+
+以下接入与固定能力记录按各自历史提交保留：
+
 真实PS接入的 `b1150f4a4` 已合入main `d155f1daf`，本机31项诊断特性测试通过。其运行37349685626在源码检查阶段主动取消，reader及候选均未启动，取消独审SHA `9c782642a6f0bc9039a3d34b8a81220312f2144b34eba6f4626e9b2e479210b7`。原因是旧诊断只绑定Node宿主路径，未绑定候选本代私有DeviceMap根；现已接入同一spawn的原目录/Node租约及已验证映射根，本机warp check和34项诊断特性测试通过。这个诊断缺口不解释原PS首因，仍须取得真实分类返回及同停点CLR栈。
 
 原runner复核已完成：37344743491 / `e4e690dd7e9e6986237d5f9c43d6107dc84f62f7` 的55普通与唯一native全通过，独审SHA `5c4c331f2fd700d77d669c3dee60bb7d47e6de4c9ad845244b39ae1795e7fef5`。与原PS失败同机器、同CLR/DAC字节，SMA不在本固定夹具采集范围。现在可以接入首个真实PS分类返回及同停点CLR栈；G09仍开放。

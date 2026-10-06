@@ -271,6 +271,7 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
             root_thread: None,
             clr: None,
             classification: None,
+            completed_classification: None,
             expected_node: None,
             node_create: None,
             classification_entry: None,

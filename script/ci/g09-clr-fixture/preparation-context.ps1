@@ -19,8 +19,18 @@ function Assert-G09LocalDirectory([string]$Path) {
     return $full.TrimEnd('\')
 }
 
-function Get-G09SourceIdentity {
-    $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
+function Get-G09SourcePaths {
+    @('script/ci/g09-clr-fixture/preparation-context.ps1', 'script/ci/g09-clr-fixture/build-reader.ps1',
+      'script/ci/g09-clr-fixture/prepare.ps1', 'script/ci/g09-clr-fixture/Fixture.cs',
+      'script/ci/g09-clr-reader/reader.cpp', 'script/ci/g09-clr-reader/wire.h',
+      'script/ci/g09-clr-reader/sos_layout.h', 'script/ci/g09-clr-reader/README.md',
+      'script/ci/g09-clr-reader/sources.safe.json', 'script/ci/g09-clr-reader/vendor/clrdata.h',
+      'script/ci/g09-clr-reader/vendor/xclrdata.h', 'script/ci/g09-clr-reader/vendor/sospriv.h',
+      'script/ci/g09-clr-reader/vendor/LICENSE.TXT')
+}
+
+function Get-G09SourceIdentity([string]$Repository = (Join-Path $PSScriptRoot '..\..\..')) {
+    $repository = [IO.Path]::GetFullPath($Repository)
     $actual = @(& git -C $repository rev-parse --show-toplevel)
     if ($LASTEXITCODE -ne 0 -or $actual.Count -ne 1 -or
         -not [string]::Equals([IO.Path]::GetFullPath($actual[0]), $repository, [StringComparison]::OrdinalIgnoreCase)) {
@@ -38,9 +48,57 @@ function Get-G09SourceIdentity {
         $digest = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($status -join "`n")))
         $statusHash = ([BitConverter]::ToString($digest)).Replace('-', '').ToLowerInvariant()
     } finally { $sha.Dispose() }
+    # Git 的 clean 过滤会掩盖 CRLF 等实际字节差异，必须绕过过滤独立核验固定输入。
+    $files = @(foreach ($relative in (Get-G09SourcePaths)) {
+        $path = Join-Path $repository $relative
+        $null = Assert-G09LocalDirectory ([IO.Path]::GetDirectoryName($path))
+        $item = Get-Item -LiteralPath $path -Force
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            $item.Length -le 0 -or $item.Length -gt 67108864) {
+            throw '固定源码不是边界内的普通文件'
+        }
+        $headBlob = @(& git -C $repository rev-parse --verify ($commit[0] + ':' + $relative))
+        if ($LASTEXITCODE -ne 0 -or $headBlob.Count -ne 1 -or $headBlob[0] -cnotmatch '^[a-f0-9]{40}$') {
+            throw '固定源码缺少提交原件'
+        }
+        $actualBlob = @(& git -C $repository hash-object --no-filters -- $path)
+        if ($LASTEXITCODE -ne 0 -or $actualBlob.Count -ne 1 -or $actualBlob[0] -cnotmatch '^[a-f0-9]{40}$') {
+            throw '无法读取固定源码的原始字节身份'
+        }
+        [ordered]@{
+            path = $relative; head_blob = $headBlob[0]; actual_blob = $actualBlob[0]
+            exact_to_head = $actualBlob[0] -ceq $headBlob[0]
+        }
+    })
+    $commitAfter = @(& git -C $repository rev-parse --verify HEAD)
+    if ($LASTEXITCODE -ne 0 -or $commitAfter.Count -ne 1 -or $commitAfter[0] -cne $commit[0]) {
+        throw '源码提交在身份核验期间发生变化'
+    }
+    $mismatches = @($files | Where-Object { -not $_.exact_to_head }).Count
     return [ordered]@{
-        commit = $commit[0]; dirty = $status.Count -ne 0
+        commit = $commit[0]; dirty = $status.Count -ne 0 -or $mismatches -ne 0
+        git_status_dirty = $status.Count -ne 0; byte_mismatch_count = $mismatches
         changed_entries = $status.Count; status_sha256 = $statusHash
+        files_exact_to_head = $mismatches -eq 0; files = $files
+    }
+}
+
+function Assert-G09SourceIdentity([bool]$Local, $Identity, [string]$ExpectedCommit) {
+    if (-not $Local -and ($Identity.commit -cne $ExpectedCommit -or -not $Identity.files_exact_to_head)) {
+        throw 'runner 源码 HEAD 或固定输入原始字节不匹配，禁止使用过滤后的 clean 状态代替同源证明'
+    }
+}
+
+function Assert-G09SourceUnchanged($Before, $After) {
+    if ($Before.commit -cne $After.commit -or @($Before.files).Count -ne @($After.files).Count) {
+        throw '源码提交或固定输入集合在准备期间发生变化'
+    }
+    for ($i = 0; $i -lt $Before.files.Count; $i++) {
+        if ($Before.files[$i].path -cne $After.files[$i].path -or
+            $Before.files[$i].head_blob -cne $After.files[$i].head_blob -or
+            $Before.files[$i].actual_blob -cne $After.files[$i].actual_blob) {
+            throw '固定输入原始字节在准备期间发生变化'
+        }
     }
 }
 
@@ -75,9 +133,6 @@ function New-G09PreparationContext([bool]$Local, [string]$LocalRoot, [string]$Lo
         $attempt = $env:GITHUB_RUN_ATTEMPT
     }
     $sourceIdentity = Get-G09SourceIdentity
-    if (-not $Local -and $sourceIdentity.commit -cne $env:GITHUB_SHA) {
-        throw 'runner 声明的提交与真实源码 HEAD 不同'
-    }
     $root = [IO.Path]::GetFullPath((Join-Path $base ('g09-clr-' + $Kind + '-' + $suffix)))
     if (-not [string]::Equals([IO.Path]::GetDirectoryName($root), $base.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase) -or
         (Test-Path -LiteralPath $root)) {

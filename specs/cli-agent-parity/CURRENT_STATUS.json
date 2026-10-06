@@ -1,7 +1,69 @@
 {
   "schema": 1,
   "status": "windows_g09_in_progress_pr_draft",
-  "status_zh": "G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。Windows本机及原runner固定能力55普通及唯一native通过；原runner绑定e4e690dd且CLR/DAC字节与原失败相同。真实PS分类接入进行中；原PS退出1/零输出而Node/Codex随后退出0的首因仍未证实，最终同源双平台门禁未完成。新增关闭0项。",
+  "status_zh": "G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。真实PS运行37352397472在Node创建前被诊断器RF读回校验中止，原退出1/零输出首因仍未知；本机修复后60普通、唯一原生夹具、36应用诊断特性及21准备入口测试通过，原runner复核待完成。正常五场景/三次冷恢复及最终同源双平台门禁未完成，新增关闭0项。",
+  "g09_ps_pre_node_rf_readback_20261006": {
+    "failed_commit": "7f6d9d6e38da72072b3e294b13a19ad5fd9aea1c",
+    "failed_run": 37352397472,
+    "status": "diagnostic_failure_preserved_local_fixed_capability_passed_original_runner_pending",
+    "audit_sha256": "e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f",
+    "artifact_sha256": "f41f5a2688d59af0a9caf52a8045b175212a7f3533b49d2732f016e0d2fcfd42",
+    "actual_failure": "PS generation e51fcad7-1872-4e7b-a209-fa9610dc7020，root26752、thread18072在NodeCREATE前seq177发生自有RF读回校验失败；EFlags期望0x10202、实际0x10200，仅固定bit1不同。分类entry/return及operation3均未取得，不解释原PS退出1/零输出。",
+    "remote_ordinary": {
+      "warp_pass": 1146,
+      "command_pass": 91,
+      "witness_groups_pass": 109,
+      "observed_nextest_fail_retry_flaky_leak": 0
+    },
+    "module_boundary": "PowerShell/Node清单FileID、大小、SHA与原失败相同；本代CLR/DAC/SMA实际加载身份未取得，不用同runner或旧夹具代证。",
+    "cleanup_boundary": "26线程DR恢复、原root退出、helper双0、Job空、桌面/DeviceMap关闭已证；station_absent=true、logon_absent=false，整体RecoveryRequired、cleanup_confirmed=false。",
+    "source_boundary": "67来源中65与7f6逐字节相等；两准备PS仅CRLF转LF后相等。原件保留；失败后全套二次来源核验未执行。",
+    "fixes": [
+      "execution_equal保持原样；仅确实修改自有RF的CONTROL即时读回，接受清固定bit1的第二完整期望视图，其他标志及执行寄存器全等，拒反向变化和纯DR写差异。",
+      "唯一固定夹具加入真实preNode分类调用，要求OwnedSkipped早于NodeCREATE且同worker，RF写入和固定bitAPI视图都有实际计数；保留后续唯一返回、同停点CLR及四固定异常。",
+      "保留完整原生RAX及兼容low32；CLR入口核两者一致，不将原生值解释成已执行的托管bool。",
+      "全部原退出、Continue及reader回收确认后，分类观察器保存摘要并释放进程/线程句柄，再清理登录会话；真实PS清理效果仍待验证。",
+      "准备脚本独立核13项原始Git blob，runner要求与HEAD/GITHUB_SHA一致，Local如实允许dirty；准备前后重核且失败写收据，不自动归一化后冒称来源一致。"
+    ],
+    "local_fixed_native": {
+      "run": "rf-a1",
+      "result": "passed",
+      "ordinary_pass": 60,
+      "native_seconds": 1.297,
+      "pre_node_skipped_sequence": 71,
+      "node_create_sequence": 73,
+      "entry_sequence": 148,
+      "return_sequence": 150,
+      "raw_return_u64": 17744,
+      "caller_token": 100663299,
+      "caller_il": 179,
+      "continued_events": 164,
+      "cleanup": "reader/root/Node及Job回收已证，7线程DR恢复；不覆盖真实PS登录会话清理",
+      "source_scope": "7f6基础上的明确dirty源码，不能标为7f6冻结源码执行",
+      "independent_audit_sha256": "c4bc5e4d6d31e2cfd98b4e860b909da998c2955c615ba8c403e3a9b9d08f9ee0"
+    },
+    "local_app_feature_pass": 36,
+    "local_preparation_tests": {
+      "passed": 21,
+      "receipt_sha256": "fea96d60045d5cdbfe011cdecea760c877367018719a2de640323291e6d0649f",
+      "expected_failure_receipt_sha256": "01075d95fdd3cb21544ae80392f6b721ceafdbd2bb460ededc8b08620d1e6341",
+      "earlier_test_failures_preserved": true
+    },
+    "native_cause_proven": false,
+    "G09_closed": false,
+    "newly_closed": [],
+    "remaining": "原runner复核最新固定能力，再采真实PS分类返回和同停点CLR栈；精准修复后完成正常witness=false五场景/三次独立冷恢复及最终同源Linux/Windows门禁。",
+    "localization": "无需本地化变更；仅诊断、固定夹具、准备来源与句柄回收，无用户文案或布局变化。",
+    "local_gates": {
+      "receipt": "C:/Coding/InfiniShell-Evidence/g09-20261006-a/rf-fix-local-integration-gates.safe.json",
+      "sha256": "ba62b52df0145f5effef0bc3191de53391ad3550d5f383d8203e02313fee0e9e",
+      "cargo_check_warp": "passed",
+      "i18n_pass": 11,
+      "app_feature_pass": 36,
+      "ordinary_command_pass": 60,
+      "preparation_pass": 21
+    }
+  },
   "g09_ps_mapped_path_binding_20261006": {
     "base_commit": "b1150f4a4aeb9c2f5b4f847716d2470d67f3114f",
     "cancelled_run": 37349685626,

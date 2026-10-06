@@ -36,6 +36,8 @@ internal static class ClrFixture
         string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
                                    "fixture-node.exe");
         if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) path = path.Substring(4);
+        // 原 Node CREATE 前先命中同一路径，实际验证跳过入口、自有 RF 写入及完整读回。
+        SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
         ProcessStartInfo start = new ProcessStartInfo(path, "--bound-node-child");
         start.UseShellExecute = false;
         start.CreateNoWindow = true;
@@ -44,9 +46,9 @@ internal static class ClrFixture
             if (child == null || !child.WaitForExit(5000) || child.ExitCode != 0)
                 throw new InvalidOperationException("fixed child failed");
         }
-        // 唯一固定本地路径；只记录 API 返回低 32 位，不输出路径或环境。
+        // 唯一固定本地路径；记录完整 API 返回标量，不输出路径或环境。
         UIntPtr value = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
-        Console.WriteLine(unchecked((uint)value.ToUInt64()).ToString(CultureInfo.InvariantCulture));
+        Console.WriteLine(value.ToUInt64().ToString(CultureInfo.InvariantCulture));
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
