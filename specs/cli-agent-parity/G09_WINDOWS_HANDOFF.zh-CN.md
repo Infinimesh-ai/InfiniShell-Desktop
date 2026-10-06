@@ -1,5 +1,33 @@
 # G09：转 Windows 继续开发
 
+## 当前接续状态（2026-10-06）
+
+G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。f3b原runner固定77普通及唯一native通过；真实PS37455611629仍ProbeFailed：pre173→174返回完整17744/0x4550并取得同停点SMA局部栈，Node179后post返回仍未知。PS12406ms零输出退出1，Node/Codex随后0，原CLR/DAC身份和退出清理已核。当前工作树新增单次postNode原worker首异常诊断；command普通88、command特性check、warp check、i18n11、应用诊断54与唯一native全部通过，原runner当前增量仍待验证。八源码/测试exe前后绑定不代表全仓冻结，不继承f3b真实候选通过。新增关闭0项，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。
+
+当前工作树已实现单次postNode原worker首EXCEPTION诊断：core独立一次性票据在原停点核身份并撤下全部自有DR，合法CLR首事件复用operation1，reader与精确Job回收后在同停点复核原完整上下文与期限再恢复观察；非CLR或不合法首事件记unknown并消费该槽，不追逐后续异常。pre/post分类各一次及原选择/成功条件不变；应用三槽共用原deadline，至多启动三个reader，不重采原26异常。唯一固定夹具改为pre→Node→原Win32(1234)异常→post→原其余三异常，沿用四异常而不扩矩阵。本轮command普通/特性check、warp check、i18n、应用诊断特性测试及唯一native全部通过；原runner当前增量仍待验证，这些本地限定门禁不作为产品修复或缺口关闭。无需本地化变更：仅内部诊断、夹具和证据，无用户文案、语义或布局变化。
+
+同一历史验证提交 `f3b7476a4df2bf4b3c32f5867073cd51c1e0638f` 的[固定能力37454947662](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37454947662)在原runner22通过77普通及唯一native（1.338秒），独审SHA `80292e174f9edf4cf1aa9d70f1bfa1069dfb59c58394a7a9e7cc3f90193de361`。随后[真实PS37455611629](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37455611629)在同一runner/HEAD终态failure；本次固定能力不代证真实候选成功，更不代证当前未提交诊断增量。真实终审 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/ps-classification-37455611629/independent-terminal-audit.safe.json` 为141703字节，SHA `c98724e210ee0e240b851a57393e18db353d4130ff31e24fa49767c0d7197fb5`。
+
+PS generation `e7631c2c-a9fc-43c6-9fed-dab864b39bf5`，root30224/birth134357632352062392、原worker12004/birth134357632408728120。pre entry173→return174，flags0x2000、路径匹配，完整u64及low32均17744（0x4550）；原执行上下文不变、寄存器恢复确认。174同停点reader真实加载配对DAC、核原身份；读取3893484字节/3331次、未耗预算，结果为partial/S_FALSE、32帧，不能称完整栈。SMA MVID `0a210000-3870-4dec-b53e-175f62acb623` 下实际token/IL为 `0x06001275/8`、`0x0600127b/172`、`0x06001270/0`；同MVID/token与原独立静态合同解析为IsWindowsApplication、CalculateIORedirection、Complete。首PInvoke stub保留E_FAIL及空IL，其余31元数据帧映射成功；方法名称不是reader当场读取，静态SMA文件SHA不冒充本次加载字节SHA。
+
+Node4204/birth134357632456878607在seq179创建；seq180仅证明原worker当时DR地址和配置相符（DR6=4294905840、DR7=1025），不证明其他线程或整段执行期间持续有效。post selected/returned均0、entry/return均null；first_skipped_entry为null、skip/RF计数均0，本次pre已被独立选择，不能要求出现固定夹具的故意第二次pre。没有post分类返回、同停点post CLR或Complete未来JIT分支命中，结果仍unknown；不能从Node创建推Process.Start正常返回，不能从未命中推UseShellExecute或原PS首因。
+
+真实时序为Node11377ms创建，PS12406ms零输出退出1，Codex15537ms创建/17276ms退出0，Node17680ms退出0；无取消。PS405、CMD200个调试事件received=validated=continued，pending为空，CMD输出codex-cli 0.156.1。两代manifest/launch/exit摘要闭合，原进程/后代/Job、reader、desktop、DeviceMap、station及LSA清理通过；pre前累计25次live DR恢复，最终26线程以原进程退出确认、dirty0，不能称26次live读回恢复。原26异常仅保留16条摘要及10条省略计数，未重新逐项采集。
+
+实际原LOAD与174 reader的CLR/DAC、PowerShell/Node清单身份均与原失败相同；CLR/DAC版本4.8.9310.0，CLR SHA `8aa62b9be054d79b6575bef1dcedcb2a707741e0245ec876af4fa0dab71594ff`、DAC SHA `b53550c6288be21fe6e485b17de71b191e7cd756635763b696db3d11b38180ef`，FileID、大小和摘要逐项相符。67来源与f3b原始Git blob逐字节一致；reader构建13来源前后一致、11份归档源已核，reader实际174摘要与构建工件相符。失败后末尾source/binary/manager复核未运行、summary.safe缺失，不称执行后全源码冻结。未归档worker/supervisor/node/npm原件，不冒称离线复算其二进制。
+
+原npm ZIP SHA `926d2f9c2716fa641bdc0dcbac8bf339021280f1de03f44de6db4b931bdfe34b`，82成员全部CRC/SHA通过；其余工件与日志摘要见验证报告。所有旧失败、原26异常和本轮唯一原件保留；本轮本地门禁已完成，下一步由主代理决定原runner固定能力及真实取证，不能据代码接线关闭G09。
+
+本轮已核本地command普通a2共88项通过/114跳过、正确 `native-probe-witness` 特性check a2、`cargo check -p warp` a1及i18n a1共11项通过；八源码与唯一native使用来源逐份相同、各门禁前后摘要不变。应用诊断特性测试a1已54/54通过、8305筛除、4.734秒、exit0，八来源前后不变；本轮全部本地门禁通过。原runner当前增量的固定能力及真实PS仍待后续验证。
+
+综合本地门禁收据 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/post-node-exception-local-integration-gates.safe.json` 为8166字节，SHA `424f90b2387074c042f8acb4f5382cbaac96460c4e5379df2a76856563260f20`；逐份日志、收据和八源码当前值一致。应用诊断完成收据SHA `6d0baae244bee0fba1f6d026db2939ab735ceee65ce92103abcdab6db66e983e`。这些本地结果不回填后续提交SHA，不代表全仓冻结、原runner或真实PS通过。
+
+唯一native a1实际执行一次，1.206秒通过/201跳过、无native重试。真实链为pre entry71→return73（完整0x4550、caller IL70）→RF skip74→Node75→原worker首异常151（operation1、Win32 native code1234）→reader回收并同停点rearm→post entry152→return153（完整0x4550、IL243）→原其余三异常154/155/156。四CLR异常全部DBG_EXCEPTION_NOT_HANDLED，166事件全部继续，21次累计live DR恢复、dirty0、原root/三后代/reader及Jobs回收。独审 `post-node-exception-a1-audit.safe.json` 为139520字节，SHA `623c405eaca8d2a1f7c5f5d17dfe68499f32bf6bec33ae265bbb23369868ad6d`；精确测试exe SHA `ae23a9696a3b3fa7199f4210bdae18070e097279dbff62748525549283b6ecf7`。13准备来源中只有Fixture.cs相对f3b不同，本机CLR/DAC4.8.9345.0不代原runner4.8.9310.0或真实PS；八源码/测试exe绑定不代表全仓冻结。
+
+普通a1六处union访问E0133已修，错误command特性名的check a1在命令层exit101；两份失败原件保留、不计通过。当前源码没有新冻结提交SHA；正常witness=false五场景、三次独立冷恢复、精准产品修复及最终同源双平台门禁仍未完成，G09开放、新增关闭0项，无需本地化变更。
+
+以下为此前阶段按各自提交保留的历史记录；其中“下一步”“待验”不覆盖以上当前状态。
+
 本增量已接入独立一次启动前分类返回及同停点CLR；先恢复全部自有DR、回收reader，再以一次性原停点票据核身份/完整上下文及期限后重新布点。启动后选择条件、一次预算和验收字段保持，新增采样只证明首次受支持root活停点的当前事件线程。唯一夹具扩展同一条执行链，不增加原生用例矩阵。本机77普通、command特性check、warp check、i18n11和应用诊断45项通过，八份修改来源在每项门禁前后相同，综合收据SHA `80d693dc1a242955a6959ddee40f87e1262de540d9f44d7f1abe0a82a949c81b`。
 
 唯一native实际执行一次，1.615秒通过：pre entry71→return73（完整0x4550/IL56）→reader回收后rearm→RF skip74→Node75→原worker DR采样/entry150→post return152（完整0x4550/IL198）→原四异常153–156；166事件全部继续，14次live DR恢复，原进程/后代/reader及Job回收。执行文件与八源码前后摘要一致，独审SHA `b10413dd0ef38b22973d1074548f763461f2dfc0cb5ffd04f1bb3f80a176e79b`。本机准备a1因继承模块路径缺WinPS Utility而在任何native启动前失败；原件保留，a2仅在受控子进程绑定已核系统模块后准备成功。13份准备来源中修改的Fixture.cs与02fb不同，明确记为本机dirty工作树；本机CLR/DAC4.8.9345.0不能代证原runner4.8.9310.0或真实PS。

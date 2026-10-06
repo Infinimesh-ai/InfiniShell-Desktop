@@ -46,6 +46,7 @@ const MAX_FILE: usize = 64 * 1024 * 1024;
 const MAX_THREADS: usize = 64;
 const MAX_PATH_UNITS: usize = 1024;
 const MAX_CALLS: u32 = 1;
+const CLR_EXCEPTION: u32 = 0xe0434352;
 const MAX_USER: u64 = 0x0000_7fff_ffff_ffff;
 const OWN_STATUS: u64 = 15;
 // x64 DR6 非活动状态及 DR7 固定置一位；不把内核初始零视图作为硬件命中后的期望值。
@@ -235,6 +236,24 @@ pub struct PreNodeReturnReceipt {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct PostNodeExceptionReceipt {
+    pub generation: [u8; 16],
+    pub identity: ObjectIdentity,
+    pub pre_return_sequence: u64,
+    pub node_create_sequence: u64,
+    pub node_process_id: u32,
+    pub node_process_birth: u64,
+    pub event_sequence: u64,
+    pub exception_code: u32,
+    pub first_chance: u32,
+    pub parameter_count: u32,
+    pub event_hresult: Option<u32>,
+    pub reader_eligible: bool,
+    pub registers_restored: bool,
+    pub execution_context_unchanged: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct PostNodeDrSample {
     pub generation: [u8; 16],
     pub identity: ObjectIdentity,
@@ -280,6 +299,9 @@ pub struct Summary {
     pub pre_node_returned_calls: u32,
     pub post_node_root_stop_attempted: bool,
     pub post_node_root_stop: Option<PostNodeDrSample>,
+    pub post_node_exception_selected_calls: u32,
+    pub post_node_exception_resumed_calls: u32,
+    pub post_node_exception: Option<PostNodeExceptionReceipt>,
     pub skipped_entries: u64,
     pub first_skipped_entry: Option<SkippedEntryReceipt>,
     pub dirty_threads: usize,
@@ -729,6 +751,52 @@ struct PreNodeResume {
     identity: ObjectIdentity,
     context: CONTEXT,
 }
+
+struct OriginalExceptionStop {
+    event: DEBUG_EVENT,
+    sequence: u64,
+}
+struct PostNodeExceptionResume {
+    stop: OriginalExceptionStop,
+    identity: ObjectIdentity,
+    context: CONTEXT,
+}
+fn same_exception_stop(event: &DEBUG_EVENT, sequence: u64, stop: &OriginalExceptionStop) -> bool {
+    if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
+        || stop.event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
+        || event.dwProcessId != stop.event.dwProcessId
+        || event.dwThreadId != stop.event.dwThreadId
+        || sequence != stop.sequence
+    {
+        return false;
+    }
+    let actual = unsafe { event.u.Exception };
+    let expected = unsafe { stop.event.u.Exception };
+    actual.dwFirstChance == expected.dwFirstChance
+        && actual.ExceptionRecord.ExceptionCode == expected.ExceptionRecord.ExceptionCode
+        && actual.ExceptionRecord.ExceptionFlags == expected.ExceptionRecord.ExceptionFlags
+        && actual.ExceptionRecord.ExceptionRecord == expected.ExceptionRecord.ExceptionRecord
+        && actual.ExceptionRecord.ExceptionAddress == expected.ExceptionRecord.ExceptionAddress
+        && actual.ExceptionRecord.NumberParameters == expected.ExceptionRecord.NumberParameters
+        && actual.ExceptionRecord.ExceptionInformation
+            == expected.ExceptionRecord.ExceptionInformation
+}
+fn exception_metadata(event: &DEBUG_EVENT) -> (u32, u32, u32, Option<u32>, bool) {
+    let exception = unsafe { event.u.Exception };
+    let record = exception.ExceptionRecord;
+    let code = record.ExceptionCode.0 as u32;
+    let parameters = record.NumberParameters;
+    let hresult = (1..=record.ExceptionInformation.len() as u32)
+        .contains(&parameters)
+        .then_some(record.ExceptionInformation[0] as u32);
+    (
+        code,
+        exception.dwFirstChance,
+        parameters,
+        hresult,
+        code == CLR_EXCEPTION && exception.dwFirstChance == 1 && hresult.is_some(),
+    )
+}
 fn resume_event_matches(event: &DEBUG_EVENT, sequence: u64, ticket: &PreNodeResume) -> bool {
     if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
         || event.dwProcessId != ticket.identity.process_id
@@ -914,6 +982,12 @@ pub struct ShellClassificationWitness {
     pre_selected: u32,
     pre_returned: u32,
     pre_resume: Option<PreNodeResume>,
+    pre_return_binding: Option<(ObjectIdentity, u64)>,
+    post_exception_candidate: Option<OriginalExceptionStop>,
+    post_exception_resume: Option<PostNodeExceptionResume>,
+    post_exception_selected: u32,
+    post_exception_resumed: u32,
+    post_exception: Option<PostNodeExceptionReceipt>,
     post_node_sample_attempted: bool,
     post_node_root_stop: Option<PostNodeDrSample>,
     skipped: u64,
@@ -933,6 +1007,11 @@ impl std::fmt::Debug for ShellClassificationWitness {
     }
 }
 impl ShellClassificationWitness {
+    fn invalidate_stop_tickets(&mut self) {
+        self.pre_resume = None;
+        self.post_exception_candidate = None;
+        self.post_exception_resume = None;
+    }
     pub fn new(
         event: &DEBUG_EVENT,
         process_birth: u64,
@@ -984,6 +1063,12 @@ impl ShellClassificationWitness {
             pre_selected: 0,
             pre_returned: 0,
             pre_resume: None,
+            pre_return_binding: None,
+            post_exception_candidate: None,
+            post_exception_resume: None,
+            post_exception_selected: 0,
+            post_exception_resumed: 0,
+            post_exception: None,
             post_node_sample_attempted: false,
             post_node_root_stop: None,
             skipped: 0,
@@ -1051,7 +1136,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn retain_thread(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         self.stopped(event)?;
         require(
             event.dwDebugEventCode == CREATE_THREAD_DEBUG_EVENT,
@@ -1065,7 +1150,7 @@ impl ShellClassificationWitness {
         file: &File,
         expected_sha256: [u8; 32],
     ) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         self.stopped(event)?;
         require(
             event.dwDebugEventCode == LOAD_DLL_DEBUG_EVENT && self.image.is_none() && !self.stopped,
@@ -1077,7 +1162,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn arm_all(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         self.stopped(event)?;
         if self.stopped || self.selected >= MAX_CALLS {
             return Ok(());
@@ -1108,6 +1193,8 @@ impl ShellClassificationWitness {
         event: &DEBUG_EVENT,
         sequence: u64,
     ) -> io::Result<()> {
+        self.post_exception_candidate = None;
+        self.post_exception_resume = None;
         // 先消耗一次性票据；任一核验失败都不能通过重试清除停止状态。
         let ticket = self
             .pre_resume
@@ -1148,13 +1235,180 @@ impl ShellClassificationWitness {
         }
         result
     }
+    /// 仅承接 observe 对同一原异常返回 NotOwned 的结果；不改变原异常继续语义。
+    pub fn observe_post_node_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<Option<PostNodeExceptionReceipt>> {
+        let candidate = self.post_exception_candidate.take();
+        self.pre_resume = None;
+        self.post_exception_resume = None;
+        let result = self.observe_post_node_exception_at_stop(event, sequence, candidate);
+        if result.is_err() {
+            self.stopped = true;
+            self.invalidate_stop_tickets();
+        }
+        result
+    }
+    fn observe_post_node_exception_at_stop(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+        candidate: Option<OriginalExceptionStop>,
+    ) -> io::Result<Option<PostNodeExceptionReceipt>> {
+        let Some((pre_identity, pre_sequence)) = self.pre_return_binding else {
+            return Ok(None);
+        };
+        let Some(node) = self.node else {
+            return Ok(None);
+        };
+        if self.stopped
+            || self.post_exception_selected != 0
+            || self.pre_returned != 1
+            || self.selected != 0
+            || self.threads.values().any(|thread| thread.pending.is_some())
+            || event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
+            || event.dwProcessId != pre_identity.process_id
+            || event.dwThreadId != pre_identity.thread_id
+        {
+            return Ok(None);
+        }
+        let stop = candidate.ok_or_else(|| invalid("启动后异常未经过同停点原观察"))?;
+        require(
+            pre_sequence < node.0
+                && node.0 < sequence
+                && sequence == self.last_sequence
+                && same_exception_stop(event, sequence, &stop),
+            "启动后异常原事件或顺序不符",
+        )?;
+        // 首次选中即消耗独立预算；类型不支持、身份失败和读取失败均不能追逐后续异常。
+        self.post_exception_selected = 1;
+        self.stopped(event)?;
+        confirm_live(raw(&self.process))?;
+        let thread = self
+            .threads
+            .get(&event.dwThreadId)
+            .ok_or_else(|| invalid("启动后异常原工作线程缺失"))?;
+        thread.verify(raw(&self.process))?;
+        confirm_live(raw(&thread.handle))?;
+        require(
+            thread.identity == pre_identity,
+            "启动后异常与启动前返回不是同一原工作线程",
+        )?;
+        let (exception_code, first_chance, parameter_count, event_hresult, reader_eligible) =
+            exception_metadata(event);
+        let mut receipt = PostNodeExceptionReceipt {
+            generation: self.generation,
+            identity: thread.identity,
+            pre_return_sequence: pre_sequence,
+            node_create_sequence: node.0,
+            node_process_id: node.1,
+            node_process_birth: node.2,
+            event_sequence: sequence,
+            exception_code,
+            first_chance,
+            parameter_count,
+            event_hresult,
+            reader_eligible,
+            registers_restored: false,
+            execution_context_unchanged: false,
+        };
+        self.post_exception = Some(receipt.clone());
+        if !reader_eligible {
+            return Ok(Some(receipt));
+        }
+        let current = context(raw(&thread.handle))?;
+        self.stopped = true;
+        self.withdraw_all(event)?;
+        let after = context(raw(&self.threads[&event.dwThreadId].handle))?;
+        require(
+            !self.requires_restoration() && execution_equal(&current.0, &after.0),
+            "恢复 DR 后原异常执行上下文改变",
+        )?;
+        receipt.registers_restored = true;
+        receipt.execution_context_unchanged = true;
+        self.post_exception = Some(receipt.clone());
+        self.post_exception_resume = Some(PostNodeExceptionResume {
+            stop,
+            identity: receipt.identity,
+            context: after.0,
+        });
+        Ok(Some(receipt))
+    }
+    /// 调用方先回收本次异常 reader；仅此独立票据可在原异常停点重新布置入口 DR。
+    pub fn resume_after_post_node_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<()> {
+        self.pre_resume = None;
+        self.post_exception_candidate = None;
+        let ticket = self
+            .post_exception_resume
+            .take()
+            .ok_or_else(|| invalid("没有可恢复的启动后异常停点"))?;
+        self.stopped(event)?;
+        let receipt = self
+            .post_exception
+            .as_ref()
+            .ok_or_else(|| invalid("启动后异常收据缺失"))?;
+        require(
+            self.stopped
+                && self.post_exception_selected == 1
+                && self.post_exception_resumed == 0
+                && self.pre_returned == 1
+                && self.selected == 0
+                && self.returned == 0
+                && self.last_sequence == sequence
+                && !self.requires_restoration()
+                && self.threads.values().all(|thread| thread.pending.is_none())
+                && receipt.reader_eligible
+                && receipt.registers_restored
+                && receipt.execution_context_unchanged
+                && receipt.event_sequence == sequence
+                && receipt.identity == ticket.identity
+                && self.pre_return_binding == Some((receipt.identity, receipt.pre_return_sequence))
+                && self.node
+                    == Some((
+                        receipt.node_create_sequence,
+                        receipt.node_process_id,
+                        receipt.node_process_birth,
+                    ))
+                && same_exception_stop(event, sequence, &ticket.stop),
+            "启动后异常恢复事件或阶段不符",
+        )?;
+        confirm_live(raw(&self.process))?;
+        let thread = self
+            .threads
+            .get(&event.dwThreadId)
+            .ok_or_else(|| invalid("启动后异常原线程缺失"))?;
+        thread.verify(raw(&self.process))?;
+        confirm_live(raw(&thread.handle))?;
+        let current = context(raw(&thread.handle))?;
+        require(
+            thread.identity == ticket.identity
+                && execution_equal(&ticket.context, &current.0)
+                && Registers::read(&ticket.context) == Registers::read(&current.0),
+            "启动后异常恢复上下文改变",
+        )?;
+        require(self.image.is_some(), "启动后异常 Shell32 租约缺失")?;
+        self.stopped = false;
+        let result = self.arm_all(event);
+        if result.is_ok() {
+            self.post_exception_resumed = 1;
+        } else {
+            self.stopped = true;
+        }
+        result
+    }
     /// 仅覆盖此调试停点的原 root 事件线程，不代表其他线程或后续期间的 DR 状态。
     pub fn sample_post_node_root_stop(
         &mut self,
         event: &DEBUG_EVENT,
         sequence: u64,
     ) -> io::Result<bool> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         require(
             live_root_sample_event(event, self.root_pid),
             "DR 采样必须使用原 root 活线程停点",
@@ -1208,7 +1462,7 @@ impl ShellClassificationWitness {
     }
     /// 必须在原 UNLOAD 停点撤销后停止，不能对同基址的新映像自动重新安装。
     pub fn unload(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         self.stopped(event)?;
         require(
             event.dwDebugEventCode == UNLOAD_DLL_DEBUG_EVENT
@@ -1221,7 +1475,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn finish_observation(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         self.stopped(event)?;
         self.stopped = true;
         self.withdraw_all(event)
@@ -1233,7 +1487,7 @@ impl ShellClassificationWitness {
         sequence: u64,
         node_birth: u64,
     ) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         require(
             !self.exited
                 && unsafe { GetCurrentThreadId() } == self.debugger_tid
@@ -1256,11 +1510,21 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn observe(&mut self, event: &DEBUG_EVENT, sequence: u64) -> io::Result<Observation> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         let result = self.observe_event(event, sequence);
         if result.is_err() {
             self.stopped = true;
-            self.pre_resume = None;
+            self.invalidate_stop_tickets();
+        } else if matches!(&result, Ok(Observation::NotOwned))
+            && !self.stopped
+            && event.dwProcessId == self.root_pid
+            && event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT
+            && sequence == self.last_sequence
+        {
+            self.post_exception_candidate = Some(OriginalExceptionStop {
+                event: *event,
+                sequence,
+            });
         }
         result
     }
@@ -1451,6 +1715,7 @@ impl ShellClassificationWitness {
         match phase {
             CallPhase::PreNode => {
                 self.pre_returned += 1;
+                self.pre_return_binding = Some((identity, sequence));
                 self.pre_resume = Some(PreNodeResume {
                     sequence,
                     identity,
@@ -1470,7 +1735,7 @@ impl ShellClassificationWitness {
         Ok(Observation::NotOwned)
     }
     pub fn withdraw_all(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         self.stopped(event)?;
         let mut failure = None;
         for thread in self.threads.values_mut() {
@@ -1494,7 +1759,7 @@ impl ShellClassificationWitness {
     }
     /// EXIT_THREAD 已由原事件拥有者继续后调用；退出不冒充恢复读回。
     pub fn thread_exited(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         require(
             event.dwProcessId == self.root_pid
                 && event.dwDebugEventCode == EXIT_THREAD_DEBUG_EVENT
@@ -1514,7 +1779,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn confirm_process_exit(&mut self) -> io::Result<()> {
-        self.pre_resume = None;
+        self.invalidate_stop_tickets();
         require(
             unsafe { GetCurrentThreadId() } == self.debugger_tid,
             "必须由原调试线程确认退出",
@@ -1552,6 +1817,9 @@ impl ShellClassificationWitness {
             pre_node_returned_calls: self.pre_returned,
             post_node_root_stop_attempted: self.post_node_sample_attempted,
             post_node_root_stop: self.post_node_root_stop.clone(),
+            post_node_exception_selected_calls: self.post_exception_selected,
+            post_node_exception_resumed_calls: self.post_exception_resumed,
+            post_node_exception: self.post_exception.clone(),
             skipped_entries: self.skipped,
             first_skipped_entry: self.first_skipped_entry.clone(),
             dirty_threads: self.threads.values().filter(|thread| thread.dirty).count(),

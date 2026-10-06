@@ -31,26 +31,32 @@ internal static class ClrFixture
                                                uint informationSize, uint flags);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ClassifyBoundNode()
+    private static void ClassifyBoundNode(bool beforeStart)
     {
         string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
                                    "fixture-node.exe");
         if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) path = path.Substring(4);
-        // 首次启动前调用独立取返回；读取器回收并恢复观察后，第二次验证预算外跳过和 RF。
-        UIntPtr before = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
-        SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
-        ProcessStartInfo start = new ProcessStartInfo(path, "--bound-node-child");
-        start.UseShellExecute = false;
-        start.CreateNoWindow = true;
-        using (Process child = Process.Start(start))
+        if (beforeStart)
         {
-            if (child == null || !child.WaitForExit(5000) || child.ExitCode != 0)
-                throw new InvalidOperationException("fixed child failed");
+            // 首次启动前调用独立取返回；读取器回收并恢复观察后，第二次验证预算外跳过和 RF。
+            UIntPtr before = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
+            SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
+            ProcessStartInfo start = new ProcessStartInfo(path, "--bound-node-child");
+            start.UseShellExecute = false;
+            start.CreateNoWindow = true;
+            using (Process child = Process.Start(start))
+            {
+                if (child == null || !child.WaitForExit(5000) || child.ExitCode != 0)
+                    throw new InvalidOperationException("fixed child failed");
+            }
+            Console.WriteLine(before.ToUInt64().ToString(CultureInfo.InvariantCulture));
         }
-        // 唯一固定本地路径；记录完整 API 返回标量，不输出路径或环境。
-        UIntPtr value = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
-        Console.WriteLine(before.ToUInt64().ToString(CultureInfo.InvariantCulture));
-        Console.WriteLine(value.ToUInt64().ToString(CultureInfo.InvariantCulture));
+        else
+        {
+            // 首个固定异常的读取器回收后，仍须取得真实启动后分类返回。
+            UIntPtr value = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
+            Console.WriteLine(value.ToUInt64().ToString(CultureInfo.InvariantCulture));
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -72,6 +78,7 @@ internal static class ClrFixture
         try { ThrowNative(); }
         catch (Win32Exception)
         {
+            ClassifyBoundNode(false);
             try { ThrowSecondNative(); }
             catch (Win32Exception exception)
             {
@@ -92,7 +99,7 @@ internal static class ClrFixture
 
     private static void Exercise()
     {
-        ClassifyBoundNode();
+        ClassifyBoundNode(true);
         try { WrapOperation(); }
         catch (ApplicationException exception)
         {

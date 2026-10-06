@@ -1,13 +1,16 @@
-//! 仅授权的首个 PowerShell 候选读取分类返回同停点 CLR 栈；不参与候选成功判定。
+//! 仅授权的首个 PowerShell 候选读取分类返回及一次原 worker 异常同停点 CLR；不参与候选成功判定。
 
 use std::io::Write as _;
 
-use command::windows::{ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding};
+use command::windows::{
+    ClrExceptionStop, ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding,
+};
 
 use super::native_snapshot::{Identity, identity};
 use super::*;
 
 const SINGLE_STEP: u32 = 0x80000004;
+const CLR_EXCEPTION: u32 = 0xe0434352;
 const READ_BUDGET_BYTES: u32 = 24 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug)]
@@ -36,11 +39,17 @@ impl ReturnStage {
 struct ReturnBudget {
     pre_node: Option<u64>,
     post_node: Option<u64>,
+    post_node_exception: Option<u64>,
 }
 
 impl ReturnBudget {
     fn last_sequence(&self) -> u64 {
-        self.post_node.or(self.pre_node).unwrap_or(0)
+        self.post_node
+            .into_iter()
+            .chain(self.pre_node)
+            .chain(self.post_node_exception)
+            .max()
+            .unwrap_or(0)
     }
 
     fn reserve(&mut self, stage: ReturnStage, sequence: u64, expired: bool) -> io::Result<()> {
@@ -56,6 +65,20 @@ impl ReturnBudget {
             ReturnStage::PreNode => self.pre_node = Some(sequence),
             ReturnStage::PostNode => self.post_node = Some(sequence),
         }
+        Ok(())
+    }
+
+    fn reserve_exception(&mut self, sequence: u64, expired: bool) -> io::Result<()> {
+        if self.pre_node.is_none()
+            || self.post_node.is_some()
+            || self.post_node_exception.is_some()
+            || sequence <= self.last_sequence()
+            || expired
+        {
+            return Err(error("native_clr.post_node_exception_sequence_or_deadline"));
+        }
+        // 非 CLR 首事件也消费唯一选择预算，不追逐后续异常。
+        self.post_node_exception = Some(sequence);
         Ok(())
     }
 }
@@ -78,6 +101,8 @@ pub(super) struct NativeClr {
     budget: ReturnBudget,
     completed: u64,
     pre_node_completed: u64,
+    post_node_exception_completed: u64,
+    post_node_exception_eligible: bool,
     phase: &'static str,
     identity_failure: Option<serde_json::Value>,
     reader_cleanup: Option<serde_json::Value>,
@@ -175,6 +200,71 @@ fn validate_pre_node_return_binding(
     Ok(())
 }
 
+fn validate_post_node_exception_binding(
+    event: &DEBUG_EVENT,
+    root_pid: u32,
+    sequence: u64,
+    generation: Uuid,
+    receipt: &serde_json::Value,
+    pre_return: &serde_json::Value,
+    node: &serde_json::Value,
+) -> io::Result<Option<u32>> {
+    if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
+        || event.dwProcessId != root_pid
+        || root_pid == 0
+        || event.dwThreadId == 0
+    {
+        return Err(error("native_clr.post_node_exception_event"));
+    }
+    let information = unsafe { event.u.Exception };
+    let record = information.ExceptionRecord;
+    let parameter_valid = record.NumberParameters > 0
+        && record.NumberParameters as usize <= record.ExceptionInformation.len();
+    let hresult = parameter_valid.then_some(record.ExceptionInformation[0] as u32);
+    let code = record.ExceptionCode.0 as u32;
+    let eligible = code == CLR_EXCEPTION && information.dwFirstChance == 1 && parameter_valid;
+    let pre_sequence = pre_return["return_sequence"].as_u64();
+    let node_sequence = node["sequence"].as_u64();
+    if receipt["generation"] != serde_json::json!(generation.as_bytes())
+        || pre_return["generation"] != receipt["generation"]
+        || receipt["identity"] != pre_return["identity"]
+        || receipt["identity"]["process_id"] != root_pid
+        || receipt["identity"]["thread_id"] != event.dwThreadId
+        || receipt["identity"]["process_birth"]
+            .as_u64()
+            .is_none_or(|birth| birth == 0)
+        || receipt["identity"]["thread_birth"]
+            .as_u64()
+            .is_none_or(|birth| birth == 0)
+        || !pre_sequence
+            .zip(node_sequence)
+            .is_some_and(|(pre, node)| pre != 0 && pre < node && node < sequence)
+        || receipt["pre_return_sequence"] != pre_return["return_sequence"]
+        || receipt["node_create_sequence"] != node["sequence"]
+        || receipt["node_process_id"] != node["process_id"]
+        || node["process_id"]
+            .as_u64()
+            .is_none_or(|pid| pid == 0 || pid == u64::from(root_pid) || pid > u32::MAX as u64)
+        || receipt["node_process_birth"] != node["process_birth"]
+        || node["process_birth"]
+            .as_u64()
+            .is_none_or(|birth| birth == 0)
+        || node["original_create_bound"] != true
+        || receipt["event_sequence"] != sequence
+        || receipt["exception_code"] != code
+        || receipt["first_chance"] != information.dwFirstChance
+        || receipt["parameter_count"] != record.NumberParameters
+        || receipt["event_hresult"] != serde_json::json!(hresult)
+        || receipt["reader_eligible"] != eligible
+        || (eligible
+            && (receipt["registers_restored"] != true
+                || receipt["execution_context_unchanged"] != true))
+    {
+        return Err(error("native_clr.post_node_exception_binding"));
+    }
+    if eligible { Ok(hresult) } else { Ok(None) }
+}
+
 fn write_receipt(path: &Path, receipt: &serde_json::Value) -> io::Result<()> {
     let mut output = OpenOptions::new().write(true).create_new(true).open(path)?;
     serde_json::to_writer(&mut output, receipt)?;
@@ -203,6 +293,8 @@ impl NativeClr {
             budget: ReturnBudget::default(),
             completed: 0,
             pre_node_completed: 0,
+            post_node_exception_completed: 0,
+            post_node_exception_eligible: false,
             phase: "bound",
             identity_failure: None,
             reader_cleanup: None,
@@ -351,6 +443,139 @@ impl NativeClr {
         )
     }
 
+    pub(super) fn observe_post_node_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        process: &OwnedHandle,
+        process_created: u64,
+        root_pid: u32,
+        sequence: u64,
+        exception: &serde_json::Value,
+        pre_return: &serde_json::Value,
+        node: &serde_json::Value,
+        deadline: Instant,
+        cancellation: Option<&AtomicBool>,
+    ) -> io::Result<()> {
+        let hresult = validate_post_node_exception_binding(
+            event,
+            root_pid,
+            sequence,
+            self.generation,
+            exception,
+            pre_return,
+            node,
+        )?;
+        self.ensure_reaped()?;
+        if cancellation.is_some_and(|value| value.load(Ordering::Acquire)) {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "native_clr.cancelled",
+            ));
+        }
+        self.budget
+            .reserve_exception(sequence, Instant::now() >= deadline)?;
+        self.post_node_exception_eligible = hresult.is_some();
+        let prefix = "native-clr-post-node-exception";
+        let scope = "post_node_first_worker_exception_only";
+        // 原首事件先保全；不能以读取失败或非 CLR 为由选择下一条异常。
+        write_receipt(
+            &self
+                .directory
+                .join(format!("{prefix}-{sequence}.pending.json")),
+            &serde_json::json!({"generation":self.generation,"process_id":root_pid,
+                "thread_id":event.dwThreadId,"event_sequence":sequence,"operation":1,
+                "scope":scope,"exception":exception,"phase":"pending_not_read",
+                "candidate_success_inferred":false}),
+        )?;
+        let thread = self
+            .threads
+            .get(&event.dwThreadId)
+            .ok_or_else(|| error("native_clr.original_thread_missing"))?;
+        let (current, _) = identity(
+            HANDLE(process.as_raw_handle()),
+            HANDLE(thread.handle.as_raw_handle()),
+            process_created,
+        )
+        .map_err(|failure| {
+            self.identity_failure = Some(serde_json::json!(failure));
+            error("native_clr.post_node_exception_identity")
+        })?;
+        let current_identity = serde_json::to_value(current)?;
+        if current != thread.identity
+            || current.process_id != root_pid
+            || exception["identity"]["process_birth"] != current_identity["process_created"]
+            || exception["identity"]["thread_birth"] != current_identity["thread_created"]
+        {
+            return Err(error("native_clr.post_node_exception_identity_changed"));
+        }
+        let Some(hresult) = hresult else {
+            write_receipt(
+                &self.directory.join(format!("{prefix}-{sequence}.json")),
+                &serde_json::json!({"schema":1,"generation":self.generation,"event_sequence":sequence,
+                    "operation":1,"scope":scope,"exception":exception,"identity":current,
+                    "reader_started":false,"result":"unknown","reason":"first_event_not_eligible",
+                    "candidate_success_inferred":false}),
+            )?;
+            self.phase = "post_node_exception_not_eligible";
+            return Ok(());
+        };
+        let (_, runtime) = self
+            .runtime
+            .as_mut()
+            .ok_or_else(|| error("native_clr.runtime_missing"))?;
+        self.phase = "post_node_exception_reader_start";
+        self.active_reader = Some(ClrReader::start(
+            &mut self.image,
+            &self.directory,
+            sequence,
+            deadline,
+        )?);
+        let reader = self.active_reader.as_mut().unwrap();
+        self.phase = "post_node_exception_reader_bind_and_send";
+        let information = unsafe { event.u.Exception };
+        reader.bind_and_send(
+            &mut self.image,
+            runtime,
+            ClrExceptionStop {
+                process: process.as_handle(),
+                thread: thread.handle.as_handle(),
+                process_id: root_pid,
+                thread_id: event.dwThreadId,
+                event_sequence: sequence,
+                exception_code: information.ExceptionRecord.ExceptionCode.0 as u32,
+                first_chance: information.dwFirstChance,
+                hresult,
+                read_budget_bytes: READ_BUDGET_BYTES,
+            },
+        )?;
+        self.phase = "post_node_exception_reader_poll";
+        let result = loop {
+            if let Some(result) =
+                reader.poll(|| cancellation.is_some_and(|value| value.load(Ordering::Acquire)))?
+            {
+                break result;
+            }
+        };
+        if !reader.is_reaped() {
+            return Err(error("native_clr.reader_not_reaped"));
+        }
+        // op1 对象链仅是 last-thrown 候选；同停点栈不把该对象提升为当前异常首因。
+        write_receipt(
+            &self.directory.join(format!("{prefix}-{sequence}.json")),
+            &serde_json::json!({"schema":1,"generation":self.generation,"mode":"powershell",
+                "event_sequence":sequence,"process_id":root_pid,"thread_id":event.dwThreadId,
+                "identity":current,"operation":1,"scope":scope,"exception":exception,
+                "live_threads_restored_before_reader":true,"binding":reader.binding(),
+                "reader":self.image.receipt(),"runtime":runtime.receipt(),"result":result,
+                "reader_reaped":true,"reader_job_empty":true,"reader_started":true,
+                "exception_object_current_inferred":false,"candidate_success_inferred":false}),
+        )?;
+        self.active_reader = None;
+        self.post_node_exception_completed += 1;
+        self.phase = "post_node_exception_recorded";
+        Ok(())
+    }
+
     fn observe_return(
         &mut self,
         stage: ReturnStage,
@@ -489,8 +714,13 @@ impl NativeClr {
             "pre_node":{"recorded_events":self.pre_node_completed,
                 "last_sequence":self.budget.pre_node.unwrap_or(0),
                 "scope":"pre_node_classification_return_only","candidate_success_inferred":false},
-            "total_recorded_events":self.completed + self.pre_node_completed,
-            "last_reader_sequence":self.budget.last_sequence(),
+            "post_node_exception":{"attempted":self.budget.post_node_exception.is_some(),
+                "reader_eligible":self.post_node_exception_eligible,"recorded_events":self.post_node_exception_completed,
+                "event_sequence":self.budget.post_node_exception,"operation":1,
+                "scope":"post_node_first_worker_exception_only","candidate_success_inferred":false},
+            "total_recorded_events":self.completed + self.pre_node_completed + self.post_node_exception_completed,
+            "last_reader_sequence":if self.post_node_exception_eligible {self.budget.last_sequence()}
+                else {self.budget.post_node.or(self.budget.pre_node).unwrap_or(0)},
             "phase":self.phase,"identity_failure":self.identity_failure,"reader_cleanup":self.reader_cleanup,
             "runtime_binding_at_load":self.runtime_binding_at_load,
             "runtime_still_held":self.runtime.is_some(),

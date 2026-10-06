@@ -178,6 +178,7 @@ pub(super) struct NativeWitness {
     classification_return: Option<serde_json::Value>,
     pre_node_classification_entry: Option<serde_json::Value>,
     pre_node_classification_return: Option<serde_json::Value>,
+    post_node_exception: Option<serde_json::Value>,
     pending_event: Option<OriginalDebugEvent>,
     continuation_failed: bool,
     expected_temp_environment: [Vec<u16>; 3],
@@ -407,6 +408,7 @@ impl WindowsImageDebugSession {
                 classification_return: None,
                 pre_node_classification_entry: None,
                 pre_node_classification_return: None,
+                post_node_exception: None,
                 pending_event: None,
                 continuation_failed: false,
                 expected_temp_environment,
@@ -785,6 +787,7 @@ impl WindowsImageDebugSession {
         if let Some(status) = self.native_classification_exception(event, deadline)? {
             return Ok(Some(status));
         }
+        self.native_post_node_exception(event, deadline)?;
         let at_ms = self
             .npm_diagnostics
             .as_ref()
@@ -983,6 +986,102 @@ impl WindowsImageDebugSession {
         {
             clr.abort_after_target_termination(deadline)?;
         }
+        Ok(())
+    }
+
+    fn native_post_node_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        if event.dwProcessId != self.root_process_id || self.native_witness.is_none() {
+            return Ok(());
+        }
+        let sequence = self.native_sequence()?;
+        let witness = self.native_witness.as_mut().unwrap();
+        let Some(shell) = &mut witness.classification else {
+            return Ok(());
+        };
+        let exception = match shell.observe_post_node_exception(event, sequence) {
+            Ok(Some(receipt)) => receipt,
+            Ok(None) => return Ok(()),
+            Err(failure) => {
+                return Err(self.native_failure(
+                    "post_node_exception_select",
+                    classification_failure("post_node_exception_select", &failure),
+                ));
+            }
+        };
+        if witness.post_node_exception.is_some() || witness.classification_entry.is_some() {
+            return Err(error("native_witness.post_node_exception_phase"));
+        }
+        let eligible = exception.reader_eligible;
+        let exception = serde_json::to_value(exception)?;
+        witness.post_node_exception = Some(exception.clone());
+        if eligible && shell.requires_restoration() {
+            return Err(error(
+                "native_witness.post_node_exception_restore_unconfirmed",
+            ));
+        }
+        let pre_return = witness
+            .pre_node_classification_return
+            .as_ref()
+            .ok_or_else(|| error("native_witness.post_node_exception_pre_return_missing"))?;
+        let node = witness
+            .node_create
+            .as_ref()
+            .ok_or_else(|| error("native_witness.post_node_exception_node_missing"))?;
+        let root = witness
+            .root_thread
+            .as_ref()
+            .ok_or_else(|| error("native_clr.root_missing"))?;
+        let clr = witness
+            .clr
+            .as_mut()
+            .ok_or_else(|| error("native_clr.reader_missing"))?;
+        if let Err(failure) = clr.observe_post_node_exception(
+            event,
+            &root.process,
+            root.process_created,
+            self.root_process_id,
+            sequence,
+            &exception,
+            pre_return,
+            node,
+            deadline,
+            self.cancellation.as_deref(),
+        ) {
+            return Err(self.native_failure(
+                "clr_post_node_exception",
+                safe_failure("clr_post_node_exception", &failure),
+            ));
+        }
+        if !eligible {
+            return Ok(());
+        }
+        if let Err(failure) = clr.ensure_reaped() {
+            return Err(self.native_failure(
+                "clr_post_node_exception_reap",
+                safe_failure("clr_post_node_exception_reap", &failure),
+            ));
+        }
+        if Instant::now() >= deadline
+            || self
+                .cancellation
+                .as_ref()
+                .is_some_and(|value| value.load(Ordering::Acquire))
+        {
+            return Err(error(
+                "native_witness.post_node_exception_resume_cancelled_or_expired",
+            ));
+        }
+        if let Err(failure) = shell.resume_after_post_node_exception(event, sequence) {
+            return Err(self.native_failure(
+                "post_node_exception_resume",
+                classification_failure("post_node_exception_resume", &failure),
+            ));
+        }
+        // 不认领此异常；外层仍以原 DBG_EXCEPTION_NOT_HANDLED 交给 CLR。
         Ok(())
     }
 
@@ -1653,6 +1752,7 @@ impl WindowsImageDebugSession {
                 serde_json::json!(witness.pre_node_classification_entry);
             summary["pre_node_classification_return"] =
                 serde_json::json!(witness.pre_node_classification_return);
+            summary["post_node_exception"] = serde_json::json!(witness.post_node_exception);
             // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

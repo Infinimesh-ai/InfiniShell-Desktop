@@ -447,6 +447,12 @@ fn stopped_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
             pre_selected: 1,
             pre_returned: 1,
             pre_resume: Some(ticket),
+            pre_return_binding: None,
+            post_exception_candidate: None,
+            post_exception_resume: None,
+            post_exception_selected: 0,
+            post_exception_resumed: 0,
+            post_exception: None,
             post_node_sample_attempted: false,
             post_node_root_stop: None,
             skipped: 0,
@@ -542,6 +548,316 @@ fn confirmed_root_exit_cannot_be_sampled_as_a_live_stop() {
     assert!(witness.post_node_sample_attempted);
     assert!(witness.post_node_root_stop.is_none());
     assert_eq!(witness.last_sequence, 4);
+}
+
+#[test]
+fn exception_metadata_preserves_unsupported_events_without_promoting_them_to_clr() {
+    let (mut event, _) = resume_test_event();
+    event.u.Exception.ExceptionRecord.ExceptionCode =
+        windows::Win32::Foundation::NTSTATUS(CLR_EXCEPTION as i32);
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    unsafe {
+        event.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0xffff_ffff_8007_0005;
+    }
+    assert_eq!(
+        exception_metadata(&event),
+        (CLR_EXCEPTION, 1, 1, Some(0x80070005), true)
+    );
+    event.u.Exception.dwFirstChance = 0;
+    assert_eq!(
+        exception_metadata(&event),
+        (CLR_EXCEPTION, 0, 1, Some(0x80070005), false)
+    );
+    event.u.Exception.dwFirstChance = 1;
+    event.u.Exception.ExceptionRecord.ExceptionCode = EXCEPTION_SINGLE_STEP;
+    assert_eq!(
+        exception_metadata(&event),
+        (
+            EXCEPTION_SINGLE_STEP.0 as u32,
+            1,
+            1,
+            Some(0x80070005),
+            false
+        )
+    );
+    event.u.Exception.ExceptionRecord.ExceptionCode =
+        windows::Win32::Foundation::NTSTATUS(CLR_EXCEPTION as i32);
+    for count in [0, 16, u32::MAX] {
+        event.u.Exception.ExceptionRecord.NumberParameters = count;
+        assert_eq!(
+            exception_metadata(&event),
+            (CLR_EXCEPTION, 1, count, None, false)
+        );
+    }
+}
+
+#[test]
+fn exception_stop_ticket_rejects_changed_original_exception_fields() {
+    let (mut event, _) = resume_test_event();
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    unsafe {
+        event.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0x80070005;
+    }
+    let stop = OriginalExceptionStop { event, sequence: 7 };
+    assert!(same_exception_stop(&event, 7, &stop));
+    assert!(!same_exception_stop(&event, 8, &stop));
+    let mut changed = event;
+    changed.dwThreadId += 1;
+    assert!(!same_exception_stop(&changed, 7, &stop));
+    changed = event;
+    changed.u.Exception.dwFirstChance = 0;
+    assert!(!same_exception_stop(&changed, 7, &stop));
+    changed = event;
+    changed.u.Exception.ExceptionRecord.ExceptionFlags = 1;
+    assert!(!same_exception_stop(&changed, 7, &stop));
+    changed = event;
+    changed.u.Exception.ExceptionRecord.ExceptionAddress = 0x30000 as *mut c_void;
+    assert!(!same_exception_stop(&changed, 7, &stop));
+    changed = event;
+    changed.u.Exception.ExceptionRecord.NumberParameters = 2;
+    assert!(!same_exception_stop(&changed, 7, &stop));
+    changed = event;
+    unsafe {
+        changed.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0x80070006;
+    }
+    assert!(!same_exception_stop(&changed, 7, &stop));
+}
+
+fn post_exception_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
+    let (mut witness, mut event) = stopped_resume_witness();
+    witness.invalidate_stop_tickets();
+    witness.stopped = false;
+    let tid = unsafe { GetCurrentThreadId() };
+    witness
+        .insert_thread(tid, unsafe {
+            windows::Win32::System::Threading::GetCurrentThread()
+        })
+        .unwrap();
+    event.dwThreadId = tid;
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    unsafe {
+        event.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0x80070005;
+    }
+    witness.pre_return_binding = Some((witness.threads[&tid].identity, 4));
+    witness.node = Some((5, witness.root_pid + 1, 6));
+    witness.last_sequence = 6;
+    witness.post_exception_candidate = Some(OriginalExceptionStop { event, sequence: 6 });
+    (witness, event)
+}
+
+#[test]
+fn unsupported_first_post_node_exception_consumes_budget_without_restoring_or_stopping() {
+    let (mut witness, event) = post_exception_witness();
+    let restored = witness.restored;
+    let receipt = witness
+        .observe_post_node_exception(&event, 6)
+        .unwrap()
+        .unwrap();
+    assert_eq!(receipt.exception_code, EXCEPTION_SINGLE_STEP.0 as u32);
+    assert_eq!(receipt.event_hresult, Some(0x80070005));
+    assert!(!receipt.reader_eligible);
+    assert!(!receipt.registers_restored);
+    assert!(!receipt.execution_context_unchanged);
+    assert!(!witness.stopped);
+    assert_eq!(witness.restored, restored);
+    assert_eq!(witness.post_exception_selected, 1);
+    assert_eq!(witness.selected, 0);
+    assert_eq!(witness.returned, 0);
+    assert_eq!(witness.summary().result, "unknown");
+    assert!(witness.resume_after_post_node_exception(&event, 6).is_err());
+    let mut next = event;
+    next.u.Exception.ExceptionRecord.ExceptionCode =
+        windows::Win32::Foundation::NTSTATUS(CLR_EXCEPTION as i32);
+    witness.last_sequence = 7;
+    witness.post_exception_candidate = Some(OriginalExceptionStop {
+        event: next,
+        sequence: 7,
+    });
+    assert!(
+        witness
+            .observe_post_node_exception(&next, 7)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.post_exception.as_ref().unwrap().event_sequence, 6);
+    assert_eq!(witness.post_exception_resumed, 0);
+}
+
+#[test]
+fn post_node_exception_requires_the_exact_prior_unowned_event_and_order() {
+    let (mut witness, event) = post_exception_witness();
+    witness.post_exception_candidate = None;
+    assert!(witness.observe_post_node_exception(&event, 6).is_err());
+    assert!(witness.stopped);
+    let (mut witness, mut event) = post_exception_witness();
+    unsafe {
+        event.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0x80070006;
+    }
+    assert!(witness.observe_post_node_exception(&event, 6).is_err());
+    assert!(witness.stopped);
+    let (mut witness, event) = post_exception_witness();
+    witness.node.as_mut().unwrap().0 = 6;
+    assert!(witness.observe_post_node_exception(&event, 6).is_err());
+    assert_eq!(witness.post_exception_selected, 0);
+}
+
+#[test]
+fn post_node_exception_requires_pre_return_original_worker_and_unused_post_budget() {
+    let (mut witness, mut event) = post_exception_witness();
+    event.dwThreadId += 1;
+    assert!(
+        witness
+            .observe_post_node_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.post_exception_selected, 0);
+    let (mut witness, event) = post_exception_witness();
+    witness.pre_return_binding = None;
+    assert!(
+        witness
+            .observe_post_node_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    let (mut witness, event) = post_exception_witness();
+    witness.selected = 1;
+    assert!(
+        witness
+            .observe_post_node_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.post_exception_selected, 0);
+    let (mut witness, event) = post_exception_witness();
+    witness.pre_return_binding.as_mut().unwrap().0.thread_birth += 1;
+    assert!(witness.observe_post_node_exception(&event, 6).is_err());
+    assert!(witness.stopped);
+    assert_eq!(witness.post_exception_selected, 1);
+    assert!(witness.post_exception_resume.is_none());
+}
+
+#[test]
+fn pending_classification_unwind_cannot_create_an_exception_resume_ticket() {
+    let (mut witness, mut event) = post_exception_witness();
+    event.u.Exception.ExceptionRecord.ExceptionCode =
+        windows::Win32::Foundation::NTSTATUS(CLR_EXCEPTION as i32);
+    witness.threads.get_mut(&event.dwThreadId).unwrap().pending = Some(Pending {
+        stack: 0x100008,
+        returned_to: 0x200000,
+        region: ReturnRegion {
+            allocation: 0x200000,
+            base: 0x200000,
+            length: 4096,
+            kind: MEM_PRIVATE.0,
+            protect: PAGE_EXECUTE_READ.0,
+            bytes: vec![0x90],
+        },
+        sequence: 6,
+        nonce: [1; 16],
+        phase: CallPhase::PostNode {
+            node_create_sequence: 5,
+        },
+    });
+    assert!(
+        witness
+            .observe_post_node_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.post_exception_selected, 0);
+    assert!(matches!(
+        witness.observe(&event, 7).unwrap(),
+        Observation::NotOwned
+    ));
+    assert!(witness.stopped);
+    assert!(
+        witness
+            .observe_post_node_exception(&event, 7)
+            .unwrap()
+            .is_none()
+    );
+    assert!(witness.resume_after_post_node_exception(&event, 7).is_err());
+    assert_eq!(witness.post_exception_selected, 0);
+    assert_eq!(witness.post_exception_resumed, 0);
+}
+
+fn exception_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
+    let (mut witness, mut event) = post_exception_witness();
+    event.u.Exception.ExceptionRecord.ExceptionCode =
+        windows::Win32::Foundation::NTSTATUS(CLR_EXCEPTION as i32);
+    let (identity, pre_return_sequence) = witness.pre_return_binding.unwrap();
+    let node = witness.node.unwrap();
+    witness.stopped = true;
+    witness.post_exception_selected = 1;
+    witness.post_exception_candidate = None;
+    witness.post_exception = Some(PostNodeExceptionReceipt {
+        generation: witness.generation,
+        identity,
+        pre_return_sequence,
+        node_create_sequence: node.0,
+        node_process_id: node.1,
+        node_process_birth: node.2,
+        event_sequence: 6,
+        exception_code: CLR_EXCEPTION,
+        first_chance: 1,
+        parameter_count: 1,
+        event_hresult: Some(0x80070005),
+        reader_eligible: true,
+        registers_restored: true,
+        execution_context_unchanged: true,
+    });
+    witness.post_exception_resume = Some(PostNodeExceptionResume {
+        stop: OriginalExceptionStop { event, sequence: 6 },
+        identity,
+        context: CONTEXT::default(),
+    });
+    (witness, event)
+}
+
+#[test]
+fn post_node_exception_resume_rejects_changed_event_and_consumes_the_ticket() {
+    let (mut witness, event) = exception_resume_witness();
+    let mut changed = event;
+    unsafe {
+        changed.u.Exception.ExceptionRecord.ExceptionInformation[0] = 0x80070006;
+    }
+    assert!(
+        witness
+            .resume_after_post_node_exception(&changed, 6)
+            .is_err()
+    );
+    assert!(witness.post_exception_resume.is_none());
+    assert!(witness.stopped);
+    assert!(witness.resume_after_post_node_exception(&event, 6).is_err());
+    assert_eq!(witness.post_exception_resumed, 0);
+}
+
+#[test]
+fn post_node_exception_resume_cannot_reuse_pre_ticket_or_survive_finish() {
+    let (mut witness, event) = exception_resume_witness();
+    assert!(witness.resume_after_pre_node_return(&event, 6).is_err());
+    assert!(witness.post_exception_resume.is_none());
+    assert!(witness.resume_after_post_node_exception(&event, 6).is_err());
+    assert!(witness.stopped);
+    let (mut witness, event) = exception_resume_witness();
+    witness.finish_observation(&event).unwrap();
+    assert!(witness.resume_after_post_node_exception(&event, 6).is_err());
+    assert!(witness.stopped);
+}
+
+#[test]
+fn post_node_exception_resume_rejects_changed_identity_or_node_generation() {
+    let (mut witness, event) = exception_resume_witness();
+    witness.process_birth += 1;
+    assert!(witness.resume_after_post_node_exception(&event, 6).is_err());
+    assert!(witness.post_exception_resume.is_none());
+    assert!(witness.stopped);
+    let (mut witness, event) = exception_resume_witness();
+    witness.node.as_mut().unwrap().2 += 1;
+    assert!(witness.resume_after_post_node_exception(&event, 6).is_err());
+    assert!(witness.post_exception_resume.is_none());
+    assert!(witness.stopped);
 }
 
 #[test]

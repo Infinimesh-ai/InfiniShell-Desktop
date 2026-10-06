@@ -72,6 +72,7 @@ struct Fixture {
     shell_observation: Option<Value>,
     pre_node_shell_entries: Vec<Value>,
     pre_node_shell_observation: Option<Value>,
+    post_node_exception: Option<Value>,
     initial_breakpoints: HashSet<u32>,
     handling_stage: &'static str,
     continuation_stage: &'static str,
@@ -135,6 +136,7 @@ impl Fixture {
             shell_observation: None,
             pre_node_shell_entries: vec![],
             pre_node_shell_observation: None,
+            post_node_exception: None,
             initial_breakpoints: HashSet::new(),
             handling_stage: "not_started",
             continuation_stage: "not_started",
@@ -225,6 +227,48 @@ impl Fixture {
             reader.abort_and_reap(self.cleanup_deadline)?;
         }
         self.active_reader.take();
+        Ok(())
+    }
+
+    fn capture_post_node_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        receipt: Value,
+        image: &mut ClrReaderImage,
+        root: &Path,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        require(self.post_node_exception.is_none(), "启动后异常停点不唯一")?;
+        self.post_node_exception = Some(json!({"event":receipt}));
+        require(
+            receipt["reader_eligible"] == true
+                && self
+                    .shell
+                    .as_ref()
+                    .is_some_and(|shell| !shell.requires_restoration()),
+            "首个启动后异常不是已恢复 DR 的固定 CLR 停点",
+        )?;
+        self.capture(event, image, root, deadline)?;
+        let observation = self
+            .observations
+            .last()
+            .ok_or_else(|| io::Error::other("启动后异常缺少原读取结果"))?;
+        require(
+            self.active_reader.is_none()
+                && observation["reader_reaped"] == true
+                && observation["reader_job_empty"] == true,
+            "启动后异常读取器尚未完全回收",
+        )?;
+        self.post_node_exception = Some(json!({"event":receipt,"observation":observation,
+            "live_threads_restored_before_reader":true,"rearmed_after_reader_reaped":false}));
+        remaining(deadline)?;
+        self.shell
+            .as_mut()
+            .expect("原分类观察器必须保留")
+            .resume_after_post_node_exception(event, self.sequence)?;
+        self.post_node_exception
+            .as_mut()
+            .expect("原启动后异常收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
         Ok(())
     }
 
@@ -754,6 +798,23 @@ impl Fixture {
                             event,
                             serde_json::to_value(receipt)?,
                             false,
+                            image,
+                            root,
+                            deadline,
+                        );
+                    }
+                }
+                if !cleanup {
+                    let receipt = self
+                        .shell
+                        .as_mut()
+                        .expect("原分类观察器必须保留")
+                        .observe_post_node_exception(event, self.sequence)?;
+                    if let Some(receipt) = receipt {
+                        self.handling_stage = "post_node_exception_reader";
+                        return self.capture_post_node_exception(
+                            event,
+                            serde_json::to_value(receipt)?,
                             image,
                             root,
                             deadline,
@@ -1458,6 +1519,100 @@ fn validate_pre_node_return(report: &Value, prepared: &Value) -> io::Result<()> 
     )
 }
 
+fn validate_post_node_exception(report: &Value, prepared: &Value) -> io::Result<()> {
+    let record = &report["post_node_exception"];
+    let receipt = &record["event"];
+    let observation = &record["observation"];
+    let pre = &report["pre_node_shell_observation"]["classification"];
+    let node = &report["node_created"];
+    let post = &report["shell_observation"]["classification"];
+    let summary = &report["shell_classification"];
+    let observations = report["observations"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("固定四异常收据缺失"))?;
+    validate_binding(observation)?;
+    validate_fixture_thread(observation)?;
+    validate_observations(observations, prepared)?;
+    let ordered = [
+        pre["return_sequence"].as_u64(),
+        node["sequence"].as_u64(),
+        receipt["event_sequence"].as_u64(),
+        post["entry_sequence"].as_u64(),
+        post["return_sequence"].as_u64(),
+        observations[1]["event_sequence"].as_u64(),
+    ];
+    require(
+        ordered
+            .iter()
+            .all(|value| value.is_some_and(|value| value != 0))
+            && ordered.windows(2).all(|pair| pair[0] < pair[1])
+            && observations.first() == Some(observation)
+            && receipt["event_sequence"] == observation["event_sequence"]
+            && receipt["pre_return_sequence"] == pre["return_sequence"]
+            && receipt["node_create_sequence"] == node["sequence"]
+            && receipt["node_process_id"] == node["pid"]
+            && receipt["node_process_birth"] == node["birth"],
+        "首个启动后异常未处于原 Node 创建与分类入口之间",
+    )?;
+    require(
+        receipt["generation"] == pre["generation"]
+            && receipt["identity"] == pre["identity"]
+            && receipt["identity"] == post["identity"]
+            && receipt["identity"]["process_id"] == observation["pid"]
+            && receipt["identity"]["thread_id"] == observation["tid"]
+            && receipt["identity"]["process_birth"] == observation["process_birth"]
+            && receipt["identity"]["thread_birth"] == observation["thread_birth"]
+            && receipt["exception_code"] == CLR_EXCEPTION
+            && receipt["first_chance"] == 1
+            && receipt["parameter_count"]
+                .as_u64()
+                .is_some_and(|count| (1..=15).contains(&count))
+            && receipt["event_hresult"] == 0x80004005_u32
+            && receipt["event_hresult"] == observation["event_hresult"]
+            && receipt["event_hresult"] == observation["reader"]["event_hresult"]
+            && receipt["reader_eligible"] == true
+            && receipt["registers_restored"] == true
+            && receipt["execution_context_unchanged"] == true
+            && record["live_threads_restored_before_reader"] == true
+            && record["rearmed_after_reader_reaped"] == true
+            && summary["post_node_exception_selected_calls"] == 1
+            && summary["post_node_exception_resumed_calls"] == 1
+            && summary["post_node_exception"] == *receipt,
+        "启动后异常原身份、独立预算或恢复证据不符",
+    )?;
+    let events = report["events"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("原调试事件记录缺失"))?;
+    let selected = events
+        .iter()
+        .filter(|event| event["sequence"] == receipt["event_sequence"])
+        .collect::<Vec<_>>();
+    require(
+        selected.len() == 1
+            && events
+                .iter()
+                .find(|event| {
+                    event["code"] == EXCEPTION_DEBUG_EVENT.0
+                        && event["pid"] == observation["pid"]
+                        && event["tid"] == observation["tid"]
+                        && event["sequence"]
+                            .as_u64()
+                            .zip(node["sequence"].as_u64())
+                            .is_some_and(|(sequence, node)| sequence > node)
+                })
+                .is_some_and(|event| event["sequence"] == receipt["event_sequence"])
+            && selected[0]["code"] == EXCEPTION_DEBUG_EVENT.0
+            && selected[0]["pid"] == observation["pid"]
+            && selected[0]["tid"] == observation["tid"]
+            && selected[0]["exception_code"] == CLR_EXCEPTION
+            && selected[0]["first_chance"] == 1
+            && selected[0]["continue_status"] == DBG_EXCEPTION_NOT_HANDLED.0 as u32
+            && selected[0]["handled"] == true
+            && selected[0]["continued"] == true,
+        "读取器改变了原 CLR 异常的继续语义",
+    )
+}
+
 fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["stage"] = json!("input_binding");
     let prepared: Value = serde_json::from_slice(&fs::read(root.join("preparation.safe.json"))?)?;
@@ -1563,6 +1718,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["shell_observation"] = json!(fixture.shell_observation);
     report["pre_node_shell_entries"] = json!(fixture.pre_node_shell_entries);
     report["pre_node_shell_observation"] = json!(fixture.pre_node_shell_observation);
+    report["post_node_exception"] = json!(fixture.post_node_exception);
     report["node_created"] = json!(fixture.node_created);
     report["descendant_creates"] = json!(fixture.descendant_creates);
     report["descendant_exits"] = json!(fixture.descendant_exits);
@@ -1658,6 +1814,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["fixture_pre_node_return_u64"] = json!(before);
     validate_native_return(report, &prepared)?;
     validate_pre_node_return(report, &prepared)?;
+    validate_post_node_exception(report, &prepared)?;
     reader.verify()?;
     fixture_image.verify()?;
     fixture.node_image.verify()?;
@@ -1882,6 +2039,101 @@ fn fixed_native_return_with_stub_receipt() -> (Value, Value) {
                 "il_offsets":[],"il_offsets_needed":0}),
         );
     (report, prepared)
+}
+
+fn fixed_post_node_exception_receipt() -> (Value, Value) {
+    let (mut report, mut prepared) = fixed_pre_node_return_receipt();
+    let (mut observations, exception_prepared) = ordered_fixed_exception_receipts();
+    for (index, observation) in observations.iter_mut().enumerate() {
+        let sequence = if index == 0 { 9 } else { index + 11 };
+        observation["event_sequence"] = json!(sequence);
+        observation["reader"]["event_sequence"] = json!(sequence);
+        observation["reader"]["event_hresult"] = observation["event_hresult"].clone();
+    }
+    prepared["fixture_method_tokens"] = exception_prepared["fixture_method_tokens"].clone();
+    let receipt = json!({"generation":report["shell_classification"]["generation"],
+        "identity":report["shell_observation"]["classification"]["identity"],
+        "pre_return_sequence":5,"node_create_sequence":8,"node_process_id":51,"node_process_birth":300,
+        "event_sequence":9,"exception_code":CLR_EXCEPTION,"first_chance":1,"parameter_count":1,
+        "event_hresult":0x80004005_u32,"reader_eligible":true,"registers_restored":true,
+        "execution_context_unchanged":true});
+    report["post_node_exception"] = json!({"event":receipt,"observation":observations[0],
+        "live_threads_restored_before_reader":true,"rearmed_after_reader_reaped":true});
+    report["observations"] = json!(observations);
+    report["shell_classification"]["post_node_exception_selected_calls"] = json!(1);
+    report["shell_classification"]["post_node_exception_resumed_calls"] = json!(1);
+    report["shell_classification"]["post_node_exception"] = receipt;
+    report["events"] = json!([{"sequence":9,"code":EXCEPTION_DEBUG_EVENT.0,"pid":41,"tid":42,
+        "exception_code":CLR_EXCEPTION,"first_chance":1,"handled":true,"continued":true,
+        "continue_status":DBG_EXCEPTION_NOT_HANDLED.0 as u32}]);
+    (report, prepared)
+}
+
+#[test]
+fn post_node_exception_requires_original_worker_stage_and_unchanged_exception_continuation() {
+    let (report, prepared) = fixed_post_node_exception_receipt();
+    assert!(validate_post_node_exception(&report, &prepared).is_ok());
+    for (field, value) in [
+        ("pre_return_sequence", json!(8)),
+        ("node_create_sequence", json!(9)),
+        ("node_process_birth", json!(301)),
+        ("event_sequence", json!(10)),
+        ("exception_code", json!(0x80000004_u32)),
+        ("first_chance", json!(0)),
+        ("parameter_count", json!(0)),
+        ("event_hresult", json!(0)),
+        ("reader_eligible", json!(false)),
+    ] {
+        let mut changed = report.clone();
+        changed["post_node_exception"]["event"][field] = value;
+        assert!(validate_post_node_exception(&changed, &prepared).is_err());
+    }
+    let mut changed_identity = report.clone();
+    changed_identity["post_node_exception"]["event"]["identity"]["thread_birth"] = json!(201);
+    assert!(validate_post_node_exception(&changed_identity, &prepared).is_err());
+    let mut swallowed = report.clone();
+    swallowed["events"][0]["continue_status"] = json!(DBG_CONTINUE.0 as u32);
+    assert!(validate_post_node_exception(&swallowed, &prepared).is_err());
+    let mut skipped_first = report;
+    let mut earlier = skipped_first["events"][0].clone();
+    earlier["sequence"] = json!(8);
+    skipped_first["node_created"]["sequence"] = json!(7);
+    skipped_first["post_node_exception"]["event"]["node_create_sequence"] = json!(7);
+    skipped_first["shell_classification"]["post_node_exception"]["node_create_sequence"] = json!(7);
+    skipped_first["events"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, earlier);
+    assert!(validate_post_node_exception(&skipped_first, &prepared).is_err());
+}
+
+#[test]
+fn post_node_exception_requires_reader_cleanup_independent_budget_and_original_op1() {
+    let (report, prepared) = fixed_post_node_exception_receipt();
+    for field in [
+        "live_threads_restored_before_reader",
+        "rearmed_after_reader_reaped",
+    ] {
+        let mut changed = report.clone();
+        changed["post_node_exception"][field] = json!(false);
+        assert!(validate_post_node_exception(&changed, &prepared).is_err());
+    }
+    for field in ["reader_reaped", "reader_job_empty"] {
+        let mut changed = report.clone();
+        changed["post_node_exception"]["observation"][field] = json!(false);
+        assert!(validate_post_node_exception(&changed, &prepared).is_err());
+    }
+    for field in [
+        "post_node_exception_selected_calls",
+        "post_node_exception_resumed_calls",
+    ] {
+        let mut changed = report.clone();
+        changed["shell_classification"][field] = json!(2);
+        assert!(validate_post_node_exception(&changed, &prepared).is_err());
+    }
+    let mut native = report;
+    native["post_node_exception"]["observation"] = native["shell_observation"].clone();
+    assert!(validate_post_node_exception(&native, &prepared).is_err());
 }
 
 fn fixed_pre_node_return_receipt() -> (Value, Value) {
