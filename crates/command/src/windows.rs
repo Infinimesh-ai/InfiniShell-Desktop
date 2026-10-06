@@ -320,8 +320,9 @@ mod tests;
 mod clr_reader;
 #[cfg(any(test, feature = "native-probe-witness"))]
 pub use clr_reader::{
-    ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodSpec, ClrNativeReturnStop,
-    ClrReader, ClrReaderImage, ClrRuntimeBinding, ManagedContinuationTarget,
+    ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodPairSpec, ClrManagedMethodSpec,
+    ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, ManagedContinuationPair,
+    ManagedContinuationTarget,
 };
 
 #[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
@@ -329,7 +330,8 @@ pub use clr_reader::{
 mod shell_classification;
 #[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
 pub use shell_classification::{
-    Observation as ShellClassificationObservation, ShellClassificationWitness,
+    ManagedInitialReceipt, Observation as ShellClassificationObservation, PreStartExceptionReceipt,
+    ShellClassificationWitness,
 };
 
 #[cfg(all(test, target_arch = "x86_64"))]

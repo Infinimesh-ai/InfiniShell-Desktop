@@ -1,4 +1,8 @@
 use super::*;
+use windows::Win32::System::Memory::{
+    MEM_RELEASE, MEM_RESERVE, VirtualAlloc, VirtualFree, VirtualProtect,
+};
+use windows::Win32::System::SystemInformation::{GetSystemInfo, SYSTEM_INFO};
 
 #[test]
 fn exit_confirmation_preserves_original_wait_failure_code() {
@@ -105,6 +109,64 @@ fn continuation_test_target() -> ManagedContinuationTarget {
         code_sha256: [3; 32],
         spec,
     }
+}
+
+fn continuation_test_pair() -> ManagedContinuationPair {
+    let continuation = continuation_test_target();
+    let mut initial = continuation.clone();
+    initial.il_offset = 10;
+    initial.address -= 8;
+    initial.spec.approved_il_offsets = vec![10];
+    ManagedContinuationPair {
+        initial,
+        continuation,
+    }
+}
+
+#[test]
+fn pair_lease_rejects_mixed_frames_requests_or_code_maps() {
+    let pair = continuation_test_pair();
+    let identity = continuation_identity(&pair.initial);
+    assert!(continuation_pair_matches(&pair, identity, 4));
+    assert!(!continuation_pair_matches(&pair, identity, 5));
+    let mut variants = Vec::new();
+    let mut changed = pair.clone();
+    changed.initial.frame_rsp += 8;
+    variants.push(changed);
+    let mut changed = pair.clone();
+    changed.initial.pre_nonce[0] += 1;
+    variants.push(changed);
+    let mut changed = pair.clone();
+    changed.initial.enc_version += 1;
+    variants.push(changed);
+    let mut changed = pair.clone();
+    changed.initial.map_sha256[0] += 1;
+    variants.push(changed);
+    let mut changed = pair.clone();
+    changed.initial.code_sha256[0] += 1;
+    variants.push(changed);
+    let mut changed = pair.clone();
+    changed.initial.thread_birth += 1;
+    variants.push(changed);
+    for changed in variants {
+        assert!(!continuation_pair_matches(&changed, identity, 4));
+    }
+}
+
+#[test]
+fn pair_lease_cannot_alias_initial_and_later_points() {
+    let mut pair = continuation_test_pair();
+    let identity = continuation_identity(&pair.initial);
+    pair.initial.address = pair.continuation.address;
+    assert!(!continuation_pair_matches(&pair, identity, 4));
+    let mut pair = continuation_test_pair();
+    pair.initial
+        .spec
+        .approved_il_offsets
+        .push(pair.continuation.il_offset);
+    assert!(!continuation_pair_matches(&pair, identity, 4));
+    pair.initial = pair.continuation.clone();
+    assert!(!continuation_pair_matches(&pair, identity, 4));
 }
 
 #[test]
@@ -247,6 +309,69 @@ fn managed_extent_is_rechecked_against_live_executable_pages_and_full_code_hash(
     lease.target.code_sha256[31] ^= 1;
     lease.regions[0].protect ^= PAGE_GUARD.0;
     assert!(lease.verify(process).is_err());
+}
+
+#[test]
+fn managed_extent_ignores_only_growth_beyond_the_method_and_rejects_internal_changes() {
+    let mut info = SYSTEM_INFO::default();
+    unsafe {
+        GetSystemInfo(&mut info);
+    }
+    let page = info.dwPageSize as usize;
+    let allocation = unsafe { VirtualAlloc(None, page * 2, MEM_RESERVE, PAGE_EXECUTE_READWRITE) };
+    assert!(!allocation.is_null());
+    let result = (|| -> io::Result<()> {
+        let first =
+            unsafe { VirtualAlloc(Some(allocation), page, MEM_COMMIT, PAGE_EXECUTE_READWRITE) };
+        require(first == allocation, "测试首个执行页提交失败")?;
+        let process = unsafe { GetCurrentProcess() };
+        // 方法停在首个页末尾前八字节；其后内容不应进入样本或映射合同。
+        let start = allocation as u64 + page as u64 - 16;
+        let mut target = ManagedContinuationTarget {
+            extent_start: start,
+            extent_end: start + 8,
+            address: start,
+            ..continuation_test_target()
+        };
+        target.code_sha256 = Sha256::digest(memory(process, start, 8)?).into();
+        let before = return_region(process, start)?;
+        let regions = continuation_regions(process, &target)?;
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].base, start);
+        assert_eq!(regions[0].length, 8);
+        assert_eq!(regions[0].bytes.len(), 8);
+        let lease = ManagedContinuationLease { target, regions };
+        let second = unsafe {
+            VirtualAlloc(
+                Some((allocation as usize + page) as *const c_void),
+                page,
+                MEM_COMMIT,
+                PAGE_EXECUTE_READWRITE,
+            )
+        };
+        require(!second.is_null(), "测试相邻执行页提交失败")?;
+        let after = return_region(process, start)?;
+        assert_eq!(before.length + page as u64, after.length);
+        assert!(lease.verify(process).is_ok());
+        unsafe {
+            *((start + 8) as *mut u8) = 1;
+        }
+        assert!(lease.verify(process).is_ok());
+        unsafe {
+            *(start as *mut u8) = 1;
+        }
+        assert!(lease.verify(process).is_err());
+        unsafe {
+            *(start as *mut u8) = 0;
+        }
+        let mut old = PAGE_EXECUTE_READWRITE;
+        unsafe { VirtualProtect(allocation, page, PAGE_EXECUTE_READ, &mut old) }
+            .map_err(io::Error::from)?;
+        assert!(lease.verify(process).is_err());
+        Ok(())
+    })();
+    unsafe { VirtualFree(allocation, 0, MEM_RELEASE) }.unwrap();
+    result.unwrap();
 }
 
 #[test]
@@ -671,6 +796,16 @@ fn stopped_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
             post_exception_selected: 0,
             post_exception_resumed: 0,
             post_exception: None,
+            pre_exception_resume: None,
+            pre_exception_selected: 0,
+            pre_exception_resumed: 0,
+            pre_exception: None,
+            initial: None,
+            initial_bound: false,
+            initial_selected: 0,
+            initial_resumed: 0,
+            initial_receipt: None,
+            initial_resume: None,
             managed: None,
             managed_bound: false,
             managed_selected: 0,
@@ -736,6 +871,88 @@ fn managed_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
         context: pre.context,
     });
     (witness, event)
+}
+
+fn initial_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
+    let (mut witness, event) = managed_resume_witness();
+    let late = witness.managed_receipt.take().unwrap();
+    witness.node = None;
+    witness.initial_bound = true;
+    witness.initial_selected = 1;
+    witness.initial = Some(ManagedContinuationLease {
+        target: witness.managed.as_ref().unwrap().target.clone(),
+        regions: Vec::new(),
+    });
+    witness.initial_resume = witness.managed_resume.take();
+    witness.managed_selected = 0;
+    witness.initial_receipt = Some(ManagedInitialReceipt {
+        generation: late.generation,
+        identity: late.identity,
+        pre_return_sequence: late.pre_return_sequence,
+        event_sequence: late.event_sequence,
+        registers_restored: true,
+        execution_context_unchanged: true,
+        managed_initial_clr_stack_required: true,
+        mapping: late.mapping,
+    });
+    (witness, event)
+}
+
+#[test]
+fn initial_stop_is_readable_without_node_and_never_uses_late_resume_ticket() {
+    let (mut witness, event) = initial_resume_witness();
+    assert!(witness.managed_initial_target().is_ok());
+    assert!(witness.managed_continuation_target().is_err());
+    assert!(
+        witness
+            .resume_after_managed_continuation(&event, 8)
+            .is_err()
+    );
+    assert!(witness.managed_initial_target().is_err());
+    assert!(witness.initial.is_none());
+    assert!(witness.managed.is_none());
+    assert_eq!(witness.initial_resumed, 0);
+    assert!(witness.managed_deferred.is_none());
+}
+
+#[test]
+fn initial_resume_rejects_replayed_event_and_retires_both_points() {
+    let (mut witness, event) = initial_resume_witness();
+    assert!(witness.resume_after_managed_initial(&event, 9).is_err());
+    assert!(witness.resume_after_managed_initial(&event, 8).is_err());
+    assert!(witness.managed_invalidated);
+    assert_eq!(witness.initial_selected, 1);
+    assert_eq!(witness.initial_resumed, 0);
+    assert_eq!(witness.managed_selected, 0);
+    assert!(witness.managed_deferred.is_none());
+}
+
+#[test]
+fn initial_lease_is_not_resurrected_by_an_intervening_observation() {
+    let (mut witness, mut event) = initial_resume_witness();
+    event.dwProcessId += 1;
+    assert!(matches!(
+        witness.observe(&event, 9).unwrap(),
+        Observation::NotOwned
+    ));
+    assert!(witness.managed_initial_target().is_err());
+    assert!(witness.initial.is_none());
+    assert!(witness.managed.is_none());
+    assert!(witness.managed_invalidated);
+}
+
+#[test]
+fn initial_pending_stage_does_not_arm_later_point_or_wait_for_node() {
+    let (mut witness, _) = initial_resume_witness();
+    witness.initial_selected = 0;
+    assert!(witness.active_continuation().is_some());
+    witness.initial_selected = 1;
+    assert!(witness.active_continuation().is_none());
+    witness.initial_resumed = 1;
+    assert!(witness.active_continuation().is_some());
+    witness.managed_invalidated = true;
+    assert!(witness.active_continuation().is_none());
+    assert!(witness.managed_deferred.is_none());
 }
 
 fn deferred_test_stop() -> DeferredManagedContinuation {
@@ -1181,6 +1398,122 @@ fn post_exception_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
     witness.last_sequence = 6;
     witness.post_exception_candidate = Some(OriginalExceptionStop { event, sequence: 6 });
     (witness, event)
+}
+
+fn pre_exception_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
+    let (mut witness, mut event) = post_exception_witness();
+    let (identity, pre_return_sequence) = witness.pre_return_binding.unwrap();
+    witness.node = None;
+    witness.initial_bound = true;
+    witness.initial_selected = 1;
+    witness.initial_resumed = 1;
+    witness.initial_receipt = Some(ManagedInitialReceipt {
+        generation: witness.generation,
+        identity,
+        pre_return_sequence,
+        event_sequence: 5,
+        registers_restored: true,
+        execution_context_unchanged: true,
+        managed_initial_clr_stack_required: true,
+        mapping: serde_json::json!({}),
+    });
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(CLR_EXCEPTION as i32);
+    event.u.Exception.dwFirstChance = 0;
+    witness.post_exception_candidate = Some(OriginalExceptionStop { event, sequence: 6 });
+    (witness, event)
+}
+
+#[test]
+fn first_pre_start_clr_consumes_only_its_budget_even_when_unsupported() {
+    let (mut witness, event) = pre_exception_witness();
+    let receipt = witness
+        .observe_pre_start_exception(&event, 6)
+        .unwrap()
+        .unwrap();
+    assert_eq!(receipt.initial_sequence, 5);
+    assert_eq!(receipt.event_sequence, 6);
+    assert!(!receipt.reader_eligible && !receipt.registers_restored);
+    assert_eq!(witness.pre_exception_selected, 1);
+    assert_eq!(witness.post_exception_selected, 0);
+    assert_eq!(witness.managed_selected, 0);
+    assert!(!witness.stopped);
+    witness.last_sequence = 7;
+    witness.post_exception_candidate = Some(OriginalExceptionStop { event, sequence: 7 });
+    assert!(
+        witness
+            .observe_pre_start_exception(&event, 7)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.pre_exception.as_ref().unwrap().event_sequence, 6);
+}
+
+#[test]
+fn pre_start_clr_window_requires_initial_resume_original_worker_and_no_node() {
+    let (mut witness, event) = pre_exception_witness();
+    witness.initial_resumed = 0;
+    assert!(
+        witness
+            .observe_pre_start_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert!(witness.post_exception_candidate.is_some());
+    let (mut witness, event) = pre_exception_witness();
+    witness.node = Some((5, witness.root_pid + 1, 6));
+    assert!(
+        witness
+            .observe_pre_start_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert!(witness.post_exception_candidate.is_some());
+    assert!(
+        witness
+            .observe_post_node_exception(&event, 6)
+            .unwrap()
+            .is_some()
+    );
+    let (mut witness, mut event) = pre_exception_witness();
+    event.dwThreadId += 1;
+    assert!(
+        witness
+            .observe_pre_start_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.pre_exception_selected, 0);
+}
+
+#[test]
+fn native_exception_does_not_consume_pre_start_clr_budget() {
+    let (mut witness, mut event) = pre_exception_witness();
+    event.u.Exception.ExceptionRecord.ExceptionCode = EXCEPTION_SINGLE_STEP;
+    assert!(
+        witness
+            .observe_pre_start_exception(&event, 6)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(witness.pre_exception_selected, 0);
+    assert!(witness.post_exception_candidate.is_some());
+}
+
+#[test]
+fn pre_start_clr_requires_exact_observed_exception_and_initial_order() {
+    let (mut witness, event) = pre_exception_witness();
+    witness.post_exception_candidate = None;
+    assert!(witness.observe_pre_start_exception(&event, 6).is_err());
+    assert!(witness.stopped);
+    let (mut witness, mut event) = pre_exception_witness();
+    unsafe {
+        event.u.Exception.ExceptionRecord.ExceptionInformation[0] += 1;
+    }
+    assert!(witness.observe_pre_start_exception(&event, 6).is_err());
+    let (mut witness, event) = pre_exception_witness();
+    witness.initial_receipt.as_mut().unwrap().event_sequence = 6;
+    assert!(witness.observe_pre_start_exception(&event, 6).is_err());
+    assert_eq!(witness.pre_exception_selected, 0);
 }
 
 #[test]

@@ -183,7 +183,8 @@ pub(super) struct NativeWitness {
     classification_return: Option<serde_json::Value>,
     pre_node_classification_entry: Option<serde_json::Value>,
     pre_node_classification_return: Option<serde_json::Value>,
-    post_node_exception: Option<serde_json::Value>,
+    pre_start_exception: Option<serde_json::Value>,
+    managed_initial: Option<serde_json::Value>,
     managed_continuation_deferred: Option<serde_json::Value>,
     managed_continuation: Option<serde_json::Value>,
     pending_event: Option<OriginalDebugEvent>,
@@ -445,7 +446,8 @@ impl WindowsImageDebugSession {
                 classification_return: None,
                 pre_node_classification_entry: None,
                 pre_node_classification_return: None,
-                post_node_exception: None,
+                pre_start_exception: None,
+                managed_initial: None,
                 managed_continuation_deferred: None,
                 managed_continuation: None,
                 pending_event: None,
@@ -838,7 +840,7 @@ impl WindowsImageDebugSession {
         if let Some(status) = self.native_classification_exception(event, deadline)? {
             return Ok(Some(status));
         }
-        self.native_post_node_exception(event, deadline)?;
+        self.native_pre_start_exception(event, deadline)?;
         let at_ms = self
             .npm_diagnostics
             .as_ref()
@@ -1055,7 +1057,7 @@ impl WindowsImageDebugSession {
         Ok(())
     }
 
-    fn native_post_node_exception(
+    fn native_pre_start_exception(
         &mut self,
         event: &DEBUG_EVENT,
         deadline: Instant,
@@ -1065,38 +1067,41 @@ impl WindowsImageDebugSession {
         }
         let sequence = self.native_sequence()?;
         let witness = self.native_witness.as_mut().unwrap();
+        if witness.node_create.is_some() || witness.managed_initial.is_none() {
+            return Ok(());
+        }
         let Some(shell) = &mut witness.classification else {
             return Ok(());
         };
-        let exception = match shell.observe_post_node_exception(event, sequence) {
+        let exception = match shell.observe_pre_start_exception(event, sequence) {
             Ok(Some(receipt)) => receipt,
             Ok(None) => return Ok(()),
             Err(failure) => {
                 return Err(self.native_failure(
-                    "post_node_exception_select",
-                    classification_failure("post_node_exception_select", &failure),
+                    "pre_start_exception_select",
+                    classification_failure("pre_start_exception_select", &failure),
                 ));
             }
         };
-        if witness.post_node_exception.is_some() || witness.classification_entry.is_some() {
-            return Err(error("native_witness.post_node_exception_phase"));
+        if witness.pre_start_exception.is_some() || witness.classification_entry.is_some() {
+            return Err(error("native_witness.pre_start_exception_phase"));
         }
         let eligible = exception.reader_eligible;
         let exception = serde_json::to_value(exception)?;
-        witness.post_node_exception = Some(exception.clone());
+        witness.pre_start_exception = Some(exception.clone());
         if eligible && shell.requires_restoration() {
             return Err(error(
-                "native_witness.post_node_exception_restore_unconfirmed",
+                "native_witness.pre_start_exception_restore_unconfirmed",
             ));
         }
         let pre_return = witness
             .pre_node_classification_return
             .as_ref()
-            .ok_or_else(|| error("native_witness.post_node_exception_pre_return_missing"))?;
-        let node = witness
-            .node_create
+            .ok_or_else(|| error("native_witness.pre_start_exception_pre_return_missing"))?;
+        let initial = witness
+            .managed_initial
             .as_ref()
-            .ok_or_else(|| error("native_witness.post_node_exception_node_missing"))?;
+            .ok_or_else(|| error("native_witness.pre_start_exception_initial_missing"))?;
         let root = witness
             .root_thread
             .as_ref()
@@ -1105,7 +1110,7 @@ impl WindowsImageDebugSession {
             .clr
             .as_mut()
             .ok_or_else(|| error("native_clr.reader_missing"))?;
-        if let Err(failure) = clr.observe_post_node_exception(
+        if let Err(failure) = clr.observe_pre_start_exception(
             event,
             &root.process,
             root.process_created,
@@ -1113,13 +1118,13 @@ impl WindowsImageDebugSession {
             sequence,
             &exception,
             pre_return,
-            node,
+            initial,
             deadline,
             self.cancellation.as_deref(),
         ) {
             return Err(self.native_failure(
-                "clr_post_node_exception",
-                safe_failure("clr_post_node_exception", &failure),
+                "clr_pre_start_exception",
+                safe_failure("clr_pre_start_exception", &failure),
             ));
         }
         if !eligible {
@@ -1127,8 +1132,8 @@ impl WindowsImageDebugSession {
         }
         if let Err(failure) = clr.ensure_reaped() {
             return Err(self.native_failure(
-                "clr_post_node_exception_reap",
-                safe_failure("clr_post_node_exception_reap", &failure),
+                "clr_pre_start_exception_reap",
+                safe_failure("clr_pre_start_exception_reap", &failure),
             ));
         }
         if Instant::now() >= deadline
@@ -1138,13 +1143,13 @@ impl WindowsImageDebugSession {
                 .is_some_and(|value| value.load(Ordering::Acquire))
         {
             return Err(error(
-                "native_witness.post_node_exception_resume_cancelled_or_expired",
+                "native_witness.pre_start_exception_resume_cancelled_or_expired",
             ));
         }
-        if let Err(failure) = shell.resume_after_post_node_exception(event, sequence) {
+        if let Err(failure) = shell.resume_after_pre_start_exception(event, sequence) {
             return Err(self.native_failure(
-                "post_node_exception_resume",
-                classification_failure("post_node_exception_resume", &failure),
+                "pre_start_exception_resume",
+                classification_failure("pre_start_exception_resume", &failure),
             ));
         }
         // 不认领此异常；外层仍以原 DBG_EXCEPTION_NOT_HANDLED 交给 CLR。
@@ -1242,13 +1247,77 @@ impl WindowsImageDebugSession {
                 }
                 let resumed = match target {
                     Some(target) => shell
-                        .resume_after_pre_node_return_with_continuation(event, sequence, target),
+                        .resume_after_pre_node_return_with_managed_pair(event, sequence, target),
                     None => shell.resume_after_pre_node_return(event, sequence),
                 };
                 if let Err(failure) = resumed {
                     return Err(self.native_failure(
                         "classification_pre_node_resume",
                         classification_failure("classification_pre_node_resume", &failure),
+                    ));
+                }
+                return Ok(Some(DBG_CONTINUE));
+            }
+            Ok(ShellClassificationObservation::OwnedManagedInitial(receipt)) => {
+                if witness.node_create.is_some()
+                    || witness.managed_initial.is_some()
+                    || witness.managed_continuation.is_some()
+                {
+                    return Err(error("native_witness.initial_phase"));
+                }
+                let receipt = serde_json::to_value(receipt)?;
+                witness.managed_initial = Some(receipt.clone());
+                if shell.requires_restoration() {
+                    return Err(error("native_witness.initial_restore_unconfirmed"));
+                }
+                let pre_return = witness
+                    .pre_node_classification_return
+                    .as_ref()
+                    .ok_or_else(|| error("native_witness.initial_pre_return_missing"))?;
+                let root = witness
+                    .root_thread
+                    .as_ref()
+                    .ok_or_else(|| error("native_clr.root_missing"))?;
+                let clr = witness
+                    .clr
+                    .as_mut()
+                    .ok_or_else(|| error("native_clr.reader_missing"))?;
+                if let Err(failure) = clr.observe_managed_initial(
+                    event,
+                    &root.process,
+                    root.process_created,
+                    self.root_process_id,
+                    sequence,
+                    &receipt,
+                    pre_return,
+                    shell.managed_initial_target()?,
+                    deadline,
+                    self.cancellation.as_deref(),
+                ) {
+                    return Err(self.native_failure(
+                        "clr_managed_initial",
+                        safe_failure("clr_managed_initial", &failure),
+                    ));
+                }
+                if let Err(failure) = clr.ensure_reaped() {
+                    return Err(self.native_failure(
+                        "clr_initial_reap",
+                        safe_failure("clr_initial_reap", &failure),
+                    ));
+                }
+                if Instant::now() >= deadline
+                    || self
+                        .cancellation
+                        .as_ref()
+                        .is_some_and(|value| value.load(Ordering::Acquire))
+                {
+                    return Err(error("native_witness.initial_resume_cancelled_or_expired"));
+                }
+                // 早期原 worker 尚未 Start；先换装晚期 DR1，正常继续，绝不等 Node。
+                if let Err(failure) = shell.resume_after_managed_initial(event, sequence) {
+                    return Err(self.native_failure(
+                        "initial_resume",
+                        classification_failure("initial_resume", &failure),
                     ));
                 }
                 return Ok(Some(DBG_CONTINUE));
@@ -1950,7 +2019,8 @@ impl WindowsImageDebugSession {
                 serde_json::json!(witness.pre_node_classification_entry);
             summary["pre_node_classification_return"] =
                 serde_json::json!(witness.pre_node_classification_return);
-            summary["post_node_exception"] = serde_json::json!(witness.post_node_exception);
+            summary["pre_start_exception"] = serde_json::json!(witness.pre_start_exception);
+            summary["managed_initial"] = serde_json::json!(witness.managed_initial);
             summary["managed_continuation_first_delivery"] =
                 serde_json::json!(witness.managed_continuation_deferred);
             summary["managed_continuation"] = serde_json::json!(witness.managed_continuation);

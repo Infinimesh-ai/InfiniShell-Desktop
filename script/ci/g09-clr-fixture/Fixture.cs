@@ -45,6 +45,9 @@ internal static class ClrFixture
             ProcessStartInfo start = new ProcessStartInfo(path, "--bound-node-child");
             start.UseShellExecute = false;
             start.CreateNoWindow = true;
+            bool initialReady = true;
+            InitialBoundary(initialReady, start);
+            if (!initialReady) throw new InvalidOperationException("fixed initial state failed");
             using (Process child = Process.Start(start))
             {
                 // 准备阶段核对唯一调用及其返回后的布尔读取，保证续点在赋值和边界调用之后。
@@ -61,6 +64,13 @@ internal static class ClrFixture
             UIntPtr value = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
             Console.WriteLine(value.ToUInt64().ToString(CultureInfo.InvariantCulture));
         }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InitialBoundary(bool initialReady, ProcessStartInfo start)
+    {
+        if (!initialReady || start.UseShellExecute)
+            throw new InvalidOperationException("fixed initial boundary failed");
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

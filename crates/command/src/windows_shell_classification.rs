@@ -43,7 +43,7 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::BOOL;
 
-use super::clr_reader::ManagedContinuationTarget;
+use super::clr_reader::{ManagedContinuationPair, ManagedContinuationTarget};
 
 const MAX_FILE: usize = 64 * 1024 * 1024;
 const MAX_THREADS: usize = 64;
@@ -257,6 +257,34 @@ pub struct PostNodeExceptionReceipt {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct PreStartExceptionReceipt {
+    pub generation: [u8; 16],
+    pub identity: ObjectIdentity,
+    pub pre_return_sequence: u64,
+    pub initial_sequence: u64,
+    pub event_sequence: u64,
+    pub exception_code: u32,
+    pub first_chance: u32,
+    pub parameter_count: u32,
+    pub event_hresult: Option<u32>,
+    pub reader_eligible: bool,
+    pub registers_restored: bool,
+    pub execution_context_unchanged: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ManagedInitialReceipt {
+    pub generation: [u8; 16],
+    pub identity: ObjectIdentity,
+    pub pre_return_sequence: u64,
+    pub event_sequence: u64,
+    pub registers_restored: bool,
+    pub execution_context_unchanged: bool,
+    pub managed_initial_clr_stack_required: bool,
+    pub mapping: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct ManagedContinuationReceipt {
     pub generation: [u8; 16],
     pub identity: ObjectIdentity,
@@ -338,6 +366,13 @@ pub struct Summary {
     pub post_node_exception_selected_calls: u32,
     pub post_node_exception_resumed_calls: u32,
     pub post_node_exception: Option<PostNodeExceptionReceipt>,
+    pub pre_start_exception_selected_calls: u32,
+    pub pre_start_exception_resumed_calls: u32,
+    pub pre_start_exception: Option<PreStartExceptionReceipt>,
+    pub managed_initial_bound: bool,
+    pub managed_initial_selected_calls: u32,
+    pub managed_initial_resumed_calls: u32,
+    pub managed_initial: Option<ManagedInitialReceipt>,
     pub managed_continuation_bound: bool,
     pub managed_continuation_selected_calls: u32,
     pub managed_continuation_resumed_calls: u32,
@@ -367,6 +402,7 @@ pub enum Observation {
     OwnedPreNodeReturn(PreNodeReturnReceipt),
     OwnedEntry,
     OwnedReturn(ReturnReceipt),
+    OwnedManagedInitial(ManagedInitialReceipt),
     OwnedManagedContinuation(ManagedContinuationReceipt),
     OwnedManagedContinuationDeferred(ManagedContinuationDeferredReceipt),
 }
@@ -516,6 +552,13 @@ struct ReturnRegion {
     bytes: Vec<u8>,
 }
 fn return_region(process: HANDLE, address: u64) -> io::Result<ReturnRegion> {
+    return_region_with_sample_limit(process, address, 32)
+}
+fn return_region_with_sample_limit(
+    process: HANDLE,
+    address: u64,
+    sample_limit: usize,
+) -> io::Result<ReturnRegion> {
     require(user_range(address, 1), "返回地址无效")?;
     let mut info = MEMORY_BASIC_INFORMATION::default();
     let size = unsafe {
@@ -539,7 +582,11 @@ fn return_region(process: HANDLE, address: u64) -> io::Result<ReturnRegion> {
         .checked_add(info.RegionSize as u64)
         .ok_or_else(|| invalid("返回地址映射溢出"))?;
     require(base <= address && address < end, "返回地址不在查询范围")?;
-    let bytes = memory(process, address, (end - address).min(32) as usize)?;
+    let bytes = memory(
+        process,
+        address,
+        (end - address).min(sample_limit as u64) as usize,
+    )?;
     Ok(ReturnRegion {
         allocation: info.AllocationBase as u64,
         base,
@@ -586,6 +633,33 @@ fn continuation_binding_matches(
         && target.extent_start <= target.address
         && target.address < target.extent_end
 }
+fn continuation_pair_matches(
+    pair: &ManagedContinuationPair,
+    identity: ObjectIdentity,
+    sequence: u64,
+) -> bool {
+    let initial = &pair.initial;
+    let continuation = &pair.continuation;
+    continuation_binding_matches(initial, identity, sequence)
+        && continuation_binding_matches(continuation, identity, sequence)
+        && initial.pre_nonce == continuation.pre_nonce
+        && initial.module_mvid == continuation.module_mvid
+        && initial.method_token == continuation.method_token
+        && initial.enc_version == continuation.enc_version
+        && initial.frame_rsp == continuation.frame_rsp
+        && initial.extent_start == continuation.extent_start
+        && initial.extent_end == continuation.extent_end
+        && initial.map_count == continuation.map_count
+        && initial.map_sha256 == continuation.map_sha256
+        && initial.code_sha256 == continuation.code_sha256
+        && initial.il_offset != continuation.il_offset
+        && initial.address != continuation.address
+        && initial
+            .spec
+            .approved_il_offsets
+            .iter()
+            .all(|offset| !continuation.spec.approved_il_offsets.contains(offset))
+}
 fn continuation_regions(
     process: HANDLE,
     target: &ManagedContinuationTarget,
@@ -598,12 +672,21 @@ fn continuation_regions(
     let mut cursor = target.extent_start;
     while cursor < target.extent_end {
         require(regions.len() < 256, "托管续点可执行页数量超限")?;
-        let region = return_region(process, cursor)?;
-        cursor = region
+        let mut region = return_region_with_sample_limit(
+            process,
+            cursor,
+            (target.extent_end - cursor).min(32) as usize,
+        )?;
+        let next = region
             .base
             .checked_add(region.length)
             .ok_or_else(|| invalid("托管续点可执行页范围溢出"))?
             .min(target.extent_end);
+        // VirtualQueryEx 的相邻同属性页可能随 JIT 提交而增长；只绑定原方法的完整范围。
+        // 分配身份、类型、全部保护位及完整代码摘要仍严格核对，不接受范围内变化。
+        region.base = cursor;
+        region.length = next - cursor;
+        cursor = next;
         regions.push(region);
     }
     let bytes = memory(
@@ -642,10 +725,22 @@ struct ManagedContinuationLease {
 }
 impl ManagedContinuationLease {
     fn verify(&self, process: HANDLE) -> io::Result<()> {
-        require(
-            continuation_regions(process, &self.target)? == self.regions,
-            "托管续点可执行映射改变",
-        )
+        let current = continuation_regions(process, &self.target)?;
+        if current != self.regions {
+            // 仅报告映射等价性与长度，不泄露进程地址或读取的指令字节。
+            let differences = self.regions.iter().zip(&current).enumerate()
+                .filter(|(_, (expected, actual))| expected != actual)
+                .map(|(index, (expected, actual))| serde_json::json!({
+                    "index":index,"allocation_equal":expected.allocation==actual.allocation,
+                    "base_equal":expected.base==actual.base,"expected_length":expected.length,
+                    "actual_length":actual.length,"kind_equal":expected.kind==actual.kind,
+                    "protect_equal":expected.protect==actual.protect,"bytes_equal":expected.bytes==actual.bytes,
+                })).collect::<Vec<_>>();
+            let safe = serde_json::json!({"expected_regions":self.regions.len(),
+                "actual_regions":current.len(),"differences":differences});
+            return Err(io::Error::other(format!("托管续点可执行映射改变：{safe}")));
+        }
+        Ok(())
     }
 }
 
@@ -1190,6 +1285,16 @@ pub struct ShellClassificationWitness {
     post_exception_selected: u32,
     post_exception_resumed: u32,
     post_exception: Option<PostNodeExceptionReceipt>,
+    pre_exception_resume: Option<PostNodeExceptionResume>,
+    pre_exception_selected: u32,
+    pre_exception_resumed: u32,
+    pre_exception: Option<PreStartExceptionReceipt>,
+    initial: Option<ManagedContinuationLease>,
+    initial_bound: bool,
+    initial_selected: u32,
+    initial_resumed: u32,
+    initial_receipt: Option<ManagedInitialReceipt>,
+    initial_resume: Option<PostNodeExceptionResume>,
     managed: Option<ManagedContinuationLease>,
     managed_bound: bool,
     managed_selected: u32,
@@ -1224,20 +1329,31 @@ impl ShellClassificationWitness {
         self.post_exception_resume = None;
         // 读后恢复之外的操作越过了原停点，不能留下可在其他停点复活的租约。
         let abandoned_managed = self.managed_resume.take().is_some();
+        let abandoned_initial = self.initial_resume.take().is_some();
+        let abandoned_pre_exception = self.pre_exception_resume.take().is_some();
         let abandoned_post = self.post_return_resume.take().is_some();
-        if abandoned_managed || abandoned_post {
+        if abandoned_managed || abandoned_post || abandoned_initial || abandoned_pre_exception {
             self.retire_continuation();
         }
     }
     fn retire_continuation(&mut self) {
         let had_lease = self.managed.take().is_some();
-        if had_lease || (self.managed_bound && self.managed_resumed == 0) {
+        let had_initial = self.initial.take().is_some();
+        if had_lease || had_initial || (self.managed_bound && self.managed_resumed == 0) {
             self.managed_invalidated = true;
         }
         self.managed_resume = None;
+        self.initial_resume = None;
+        self.pre_exception_resume = None;
         self.post_return_resume = None;
     }
     fn active_continuation(&self) -> Option<&ManagedContinuationLease> {
+        if self.initial_bound && self.initial_resumed == 0 {
+            return self
+                .initial
+                .as_ref()
+                .filter(|_| self.initial_selected == 0 && !self.managed_invalidated);
+        }
         self.managed
             .as_ref()
             .filter(|_| self.managed_selected == 0 && !self.managed_invalidated)
@@ -1439,6 +1555,16 @@ impl ShellClassificationWitness {
             post_exception_selected: 0,
             post_exception_resumed: 0,
             post_exception: None,
+            pre_exception_resume: None,
+            pre_exception_selected: 0,
+            pre_exception_resumed: 0,
+            pre_exception: None,
+            initial: None,
+            initial_bound: false,
+            initial_selected: 0,
+            initial_resumed: 0,
+            initial_receipt: None,
+            initial_resume: None,
             managed: None,
             managed_bound: false,
             managed_selected: 0,
@@ -1606,7 +1732,7 @@ impl ShellClassificationWitness {
         event: &DEBUG_EVENT,
         sequence: u64,
     ) -> io::Result<()> {
-        self.resume_pre_node_return(event, sequence, None)
+        self.resume_pre_node_return(event, sequence, None, None)
     }
     /// 私有地址票据只能在产生它的 pre 返回停点、reader 完全回收后移交。
     pub fn resume_after_pre_node_return_with_continuation(
@@ -1615,21 +1741,49 @@ impl ShellClassificationWitness {
         sequence: u64,
         target: ManagedContinuationTarget,
     ) -> io::Result<()> {
-        self.resume_pre_node_return(event, sequence, Some(target))
+        self.resume_pre_node_return(event, sequence, Some(target), None)
+    }
+    /// 同一 pre reader 产生两张同帧票据；先安装首次启动前的点，不等待 Node。
+    pub fn resume_after_pre_node_return_with_managed_pair(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+        pair: ManagedContinuationPair,
+    ) -> io::Result<()> {
+        let result = (|| {
+            let ticket = self
+                .pre_resume
+                .as_ref()
+                .ok_or_else(|| invalid("双点绑定缺少原 pre 停点"))?;
+            require(
+                continuation_pair_matches(&pair, ticket.identity, sequence),
+                "双点票据必须来自同一原帧、代码映射及 pre 请求",
+            )?;
+            self.resume_pre_node_return(
+                event,
+                sequence,
+                Some(pair.continuation),
+                Some(pair.initial),
+            )
+        })();
+        if result.is_err() {
+            self.stopped = true;
+            self.invalidate_stop_tickets();
+            self.retire_continuation();
+        }
+        result
     }
     fn resume_pre_node_return(
         &mut self,
         event: &DEBUG_EVENT,
         sequence: u64,
         target: Option<ManagedContinuationTarget>,
+        initial: Option<ManagedContinuationTarget>,
     ) -> io::Result<()> {
-        self.post_exception_candidate = None;
-        self.post_exception_resume = None;
         // 先消耗一次性票据；任一核验失败都不能通过重试清除停止状态。
-        let ticket = self
-            .pre_resume
-            .take()
-            .ok_or_else(|| invalid("没有可恢复的启动前返回停点"))?;
+        let ticket = self.pre_resume.take();
+        self.invalidate_stop_tickets();
+        let ticket = ticket.ok_or_else(|| invalid("没有可恢复的启动前返回停点"))?;
         self.stopped(event)?;
         require(
             self.stopped
@@ -1658,6 +1812,10 @@ impl ShellClassificationWitness {
             "启动前返回恢复上下文改变",
         )?;
         require(self.image.is_some(), "启动前返回 Shell32 租约缺失")?;
+        require(
+            !self.initial_bound && self.initial.is_none(),
+            "首次托管点不可重复绑定",
+        )?;
         if let Some(target) = target {
             require(
                 !self.managed_bound
@@ -1670,6 +1828,12 @@ impl ShellClassificationWitness {
             let regions = continuation_regions(raw(&self.process), &target)?;
             self.managed = Some(ManagedContinuationLease { target, regions });
             self.managed_bound = true;
+        }
+        if let Some(target) = initial {
+            require(self.managed_bound, "首次托管点必须同时绑定后续点")?;
+            let regions = continuation_regions(raw(&self.process), &target)?;
+            self.initial = Some(ManagedContinuationLease { target, regions });
+            self.initial_bound = true;
         }
         self.stopped = false;
         let result = self.arm_all(event);
@@ -1685,8 +1849,7 @@ impl ShellClassificationWitness {
         sequence: u64,
     ) -> io::Result<Option<PostNodeExceptionReceipt>> {
         let candidate = self.post_exception_candidate.take();
-        self.pre_resume = None;
-        self.post_exception_resume = None;
+        self.invalidate_stop_tickets();
         let result = self.observe_post_node_exception_at_stop(event, sequence, candidate);
         if result.is_err() {
             self.stopped = true;
@@ -1859,12 +2022,246 @@ impl ShellClassificationWitness {
         }
         result
     }
+    /// 首次点恢复全部 DR 后立即读；它没有 Node 身份，也不会触发延后重放。
+    pub fn managed_initial_target(&self) -> io::Result<&ManagedContinuationTarget> {
+        require(
+            self.stopped
+                && self.node.is_none()
+                && self.initial_selected == 1
+                && self.initial_resumed == 0
+                && !self.managed_invalidated
+                && !self.requires_restoration()
+                && self
+                    .initial_resume
+                    .as_ref()
+                    .is_some_and(|ticket| ticket.stop.sequence == self.last_sequence),
+            "当前不是可读取的首次启动前托管停点",
+        )?;
+        self.initial
+            .as_ref()
+            .map(|lease| &lease.target)
+            .ok_or_else(|| invalid("首次托管点私有租约缺失"))
+    }
+    /// 初始 op4 reader 完全回收后，撤销初始点并布置同帧后续点，正常继续原事件。
+    pub fn resume_after_managed_initial(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<()> {
+        let previously_resumed = self.initial_resumed;
+        let ticket = self.initial_resume.take();
+        self.invalidate_stop_tickets();
+        let result = (|| {
+            let ticket = ticket.ok_or_else(|| invalid("没有可恢复的首次托管停点"))?;
+            self.verify_restored_stop(event, sequence, &ticket)?;
+            let receipt = self
+                .initial_receipt
+                .as_ref()
+                .ok_or_else(|| invalid("首次托管点收据缺失"))?;
+            let initial = self
+                .initial
+                .as_ref()
+                .ok_or_else(|| invalid("首次托管点租约缺失"))?;
+            let continuation = self
+                .managed
+                .as_ref()
+                .ok_or_else(|| invalid("同帧后续点租约缺失"))?;
+            require(
+                self.initial_selected == 1
+                    && self.initial_resumed == 0
+                    && self.managed_selected == 0
+                    && self.managed_resumed == 0
+                    && !self.managed_invalidated
+                    && self.node.is_none()
+                    && receipt.event_sequence == sequence
+                    && receipt.identity == ticket.identity
+                    && receipt.registers_restored
+                    && receipt.execution_context_unchanged
+                    && self.pre_return_binding
+                        == Some((ticket.identity, receipt.pre_return_sequence))
+                    && continuation_binding_matches(
+                        &initial.target,
+                        ticket.identity,
+                        receipt.pre_return_sequence,
+                    )
+                    && continuation_binding_matches(
+                        &continuation.target,
+                        ticket.identity,
+                        receipt.pre_return_sequence,
+                    ),
+                "首次托管点恢复顺序、身份或独立预算不符",
+            )?;
+            initial.verify(raw(&self.process))?;
+            continuation.verify(raw(&self.process))?;
+            require(self.image.is_some(), "首次托管点恢复 Shell32 租约缺失")?;
+            self.initial = None;
+            self.initial_resumed = 1;
+            self.stopped = false;
+            self.arm_all(event)
+        })();
+        if result.is_err() {
+            self.initial_resumed = previously_resumed;
+            self.stopped = true;
+            self.retire_continuation();
+        }
+        result
+    }
+    /// 仅选择初始读取恢复后、Node 创建前同一原工作线程的首个 CLR 异常。
+    pub fn observe_pre_start_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<Option<PreStartExceptionReceipt>> {
+        let result = (|| {
+            let Some(initial) = self.initial_receipt.as_ref() else {
+                return Ok(None);
+            };
+            if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT {
+                return Ok(None);
+            }
+            let (exception_code, first_chance, parameter_count, event_hresult, reader_eligible) =
+                exception_metadata(event);
+            if self.stopped
+                || self.node.is_some()
+                || self.initial_resumed != 1
+                || self.pre_exception_selected != 0
+                || self.pre_returned != 1
+                || self.selected != 0
+                || self.threads.values().any(|thread| thread.pending.is_some())
+                || event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
+                || event.dwProcessId != initial.identity.process_id
+                || event.dwThreadId != initial.identity.thread_id
+                || exception_code != CLR_EXCEPTION
+            {
+                return Ok(None);
+            }
+            let stop = self
+                .post_exception_candidate
+                .take()
+                .ok_or_else(|| invalid("启动前异常未经过同停点原观察"))?;
+            require(
+                initial.pre_return_sequence < initial.event_sequence
+                    && initial.event_sequence < sequence
+                    && sequence == self.last_sequence
+                    && self.pre_return_binding
+                        == Some((initial.identity, initial.pre_return_sequence))
+                    && same_exception_stop(event, sequence, &stop),
+                "启动前异常原事件或初始读取顺序不符",
+            )?;
+            // 首个 CLR 事件即消费预算；即使元数据不支持也不能追逐另一个异常。
+            self.pre_exception_selected = 1;
+            self.stopped(event)?;
+            confirm_live(raw(&self.process))?;
+            let thread = self
+                .threads
+                .get(&event.dwThreadId)
+                .ok_or_else(|| invalid("启动前异常原线程缺失"))?;
+            thread.verify(raw(&self.process))?;
+            confirm_live(raw(&thread.handle))?;
+            require(
+                thread.identity == initial.identity,
+                "启动前异常线程出生身份改变",
+            )?;
+            let mut receipt = PreStartExceptionReceipt {
+                generation: self.generation,
+                identity: thread.identity,
+                pre_return_sequence: initial.pre_return_sequence,
+                initial_sequence: initial.event_sequence,
+                event_sequence: sequence,
+                exception_code,
+                first_chance,
+                parameter_count,
+                event_hresult,
+                reader_eligible,
+                registers_restored: false,
+                execution_context_unchanged: false,
+            };
+            self.pre_exception = Some(receipt.clone());
+            if !reader_eligible {
+                return Ok(Some(receipt));
+            }
+            let current = context(raw(&thread.handle))?;
+            self.stopped = true;
+            self.withdraw_for_reader(event)?;
+            let after = context(raw(&self.threads[&event.dwThreadId].handle))?;
+            require(
+                !self.requires_restoration() && execution_equal(&current.0, &after.0),
+                "恢复 DR 后启动前原异常执行上下文改变",
+            )?;
+            receipt.registers_restored = true;
+            receipt.execution_context_unchanged = true;
+            self.pre_exception = Some(receipt.clone());
+            self.pre_exception_resume = Some(PostNodeExceptionResume {
+                stop,
+                identity: receipt.identity,
+                context: after.0,
+            });
+            Ok(Some(receipt))
+        })();
+        if result.is_err() {
+            self.stopped = true;
+            self.invalidate_stop_tickets();
+            self.retire_continuation();
+        }
+        result
+    }
+    /// 回收异常 reader 后恢复原后续点；不吞掉或重新投递目标异常。
+    pub fn resume_after_pre_start_exception(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<()> {
+        let ticket = self.pre_exception_resume.take();
+        self.invalidate_stop_tickets();
+        let result = (|| {
+            let ticket = ticket.ok_or_else(|| invalid("没有可恢复的启动前异常停点"))?;
+            self.verify_restored_stop(event, sequence, &ticket)?;
+            let receipt = self
+                .pre_exception
+                .as_ref()
+                .ok_or_else(|| invalid("启动前异常收据缺失"))?;
+            require(
+                self.node.is_none()
+                    && self.initial_resumed == 1
+                    && self.pre_exception_selected == 1
+                    && self.pre_exception_resumed == 0
+                    && receipt.reader_eligible
+                    && receipt.registers_restored
+                    && receipt.execution_context_unchanged
+                    && receipt.event_sequence == sequence
+                    && receipt.identity == ticket.identity
+                    && self.pre_return_binding
+                        == Some((receipt.identity, receipt.pre_return_sequence))
+                    && self.initial_receipt.as_ref().is_some_and(|initial| {
+                        initial.identity == receipt.identity
+                            && initial.event_sequence == receipt.initial_sequence
+                    })
+                    && !self.managed_invalidated
+                    && self.managed_selected == 0,
+                "启动前异常恢复身份、阶段或预算不符",
+            )?;
+            self.managed
+                .as_ref()
+                .ok_or_else(|| invalid("启动前异常后续点租约缺失"))?
+                .verify(raw(&self.process))?;
+            self.stopped = false;
+            self.arm_all(event)?;
+            self.pre_exception_resumed = 1;
+            Ok(())
+        })();
+        if result.is_err() {
+            self.stopped = true;
+            self.retire_continuation();
+        }
+        result
+    }
     /// 只在已撤销全部自有 DR 的独立续点停点提供 opaque 票据。
     pub fn managed_continuation_target(&self) -> io::Result<&ManagedContinuationTarget> {
         require(
             self.stopped
                 && self.managed_selected == 1
                 && self.managed_resumed == 0
+                && (!self.initial_bound || self.initial_resumed == 1)
                 && !self.managed_invalidated
                 && !self.requires_restoration()
                 && self
@@ -2097,6 +2494,7 @@ impl ShellClassificationWitness {
             !self.exited
                 && unsafe { GetCurrentThreadId() } == self.debugger_tid
                 && self.node.is_none()
+                && (!self.initial_bound || self.initial_resumed == 1)
                 && sequence > self.last_sequence
                 && event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT
                 && event.dwProcessId != self.root_pid
@@ -2194,6 +2592,9 @@ impl ShellClassificationWitness {
             return self.unowned_exception(event);
         };
         if slot == 1 {
+            if self.initial_bound && self.initial_resumed == 0 {
+                return self.observe_managed_initial(event, sequence, current);
+            }
             return self.observe_managed_continuation(event, sequence, current);
         }
         if slot == 0 {
@@ -2362,6 +2763,61 @@ impl ShellClassificationWitness {
             }
         }
         Ok(observation)
+    }
+    fn observe_managed_initial(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+        current: AlignedContext,
+    ) -> io::Result<Observation> {
+        let lease = self
+            .active_continuation()
+            .ok_or_else(|| invalid("首次托管点命中缺少有效租约"))?;
+        let identity = self.threads[&event.dwThreadId].identity;
+        let target = &lease.target;
+        require(
+            self.node.is_none()
+                && self.initial_selected == 0
+                && self.initial_resumed == 0
+                && self.pre_returned == 1
+                && self.managed_selected == 0
+                && self.pre_return_binding == Some((identity, target.pre_sequence))
+                && target.pre_sequence < sequence
+                && continuation_frame_matches(target, identity, &current.0)
+                && self.threads.values().all(|thread| thread.pending.is_none()),
+            "首次托管点必须位于原 pre 后、Node 创建前的同一帧",
+        )?;
+        lease.verify(raw(&self.process))?;
+        let mut receipt = ManagedInitialReceipt {
+            generation: self.generation,
+            identity,
+            pre_return_sequence: target.pre_sequence,
+            event_sequence: sequence,
+            registers_restored: false,
+            execution_context_unchanged: false,
+            managed_initial_clr_stack_required: true,
+            mapping: target.safe_evidence(),
+        };
+        self.initial_selected = 1;
+        self.stopped = true;
+        self.withdraw_for_reader(event)?;
+        let after = context(raw(&self.threads[&event.dwThreadId].handle))?;
+        require(
+            !self.requires_restoration() && execution_equal(&current.0, &after.0),
+            "恢复 DR 后首次托管点执行上下文改变",
+        )?;
+        receipt.registers_restored = true;
+        receipt.execution_context_unchanged = true;
+        self.initial_receipt = Some(receipt.clone());
+        self.initial_resume = Some(PostNodeExceptionResume {
+            stop: OriginalExceptionStop {
+                event: *event,
+                sequence,
+            },
+            identity,
+            context: after.0,
+        });
+        Ok(Observation::OwnedManagedInitial(receipt))
     }
     fn observe_managed_continuation(
         &mut self,
@@ -2629,6 +3085,13 @@ impl ShellClassificationWitness {
             post_node_exception_selected_calls: self.post_exception_selected,
             post_node_exception_resumed_calls: self.post_exception_resumed,
             post_node_exception: self.post_exception.clone(),
+            pre_start_exception_selected_calls: self.pre_exception_selected,
+            pre_start_exception_resumed_calls: self.pre_exception_resumed,
+            pre_start_exception: self.pre_exception.clone(),
+            managed_initial_bound: self.initial_bound,
+            managed_initial_selected_calls: self.initial_selected,
+            managed_initial_resumed_calls: self.initial_resumed,
+            managed_initial: self.initial_receipt.clone(),
             managed_continuation_bound: self.managed_bound,
             managed_continuation_selected_calls: self.managed_selected,
             managed_continuation_resumed_calls: self.managed_resumed,

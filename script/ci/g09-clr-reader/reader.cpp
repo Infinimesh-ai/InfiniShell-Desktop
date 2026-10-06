@@ -130,6 +130,9 @@ struct Result {
   std::string managed_continuation;
   std::string private_target;
   std::string managed_map_notes = "null";
+  std::string paired_mapping;
+  std::string paired_private_target;
+  std::string paired_map_notes = "null";
   ULONG32 managed_matches = 0;
   HRESULT managed_error = E_PENDING;
   bool managed_bound = false;
@@ -899,6 +902,17 @@ std::string private_managed(const G09ClrRequest &r,const G09ManagedRequest &m) {
   return out.str();
 }
 
+bool same_managed_frame(const G09ManagedRequest &initial, const G09ManagedRequest &continuation) {
+  return std::memcmp(initial.module_mvid,continuation.module_mvid,36)==0 &&
+      initial.method_token==continuation.method_token && initial.pre_sequence==continuation.pre_sequence &&
+      std::memcmp(initial.pre_nonce,continuation.pre_nonce,16)==0 && initial.enc_version==continuation.enc_version &&
+      initial.frame_rsp==continuation.frame_rsp && initial.extent_start==continuation.extent_start &&
+      initial.extent_end==continuation.extent_end && initial.map_count==continuation.map_count &&
+      std::memcmp(initial.map_sha256,continuation.map_sha256,32)==0 &&
+      std::memcmp(initial.code_sha256,continuation.code_sha256,32)==0 &&
+      initial.il_offset!=continuation.il_offset && initial.address!=continuation.address;
+}
+
 struct LocalRead {
   HRESULT get_local_hr=E_PENDING;
   HRESULT api=E_PENDING,locations_hr=E_PENDING,type_hr=E_PENDING,name_hr=E_PENDING,flags_hr=E_PENDING,size_hr=E_PENDING,bytes_hr=E_PENDING;
@@ -1004,7 +1018,8 @@ std::string managed_values(IXCLRDataProcess *clr,IXCLRDataFrame *frame,const G09
 }
 
 HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return, Target &target, Result &result,
-                      const G09ClrRequest &request, const G09ManagedRequest *managed, IXCLRDataProcess *clr) {
+                      const G09ClrRequest &request, const G09ManagedRequest *managed,
+                      const G09ManagedRequest *continuation, IXCLRDataProcess *clr) {
   Com<IXCLRDataStackWalk> walk;
   HRESULT hr =
       task->CreateStackWalk(CLRDATA_SIMPFRAME_MANAGED_METHOD | CLRDATA_SIMPFRAME_RUNTIME_MANAGED_CODE |
@@ -1056,11 +1071,17 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return
     if(managed && token==managed->method_token && guid(mvid)==std::string(managed->module_mvid,36)) {
       ++result.managed_matches;
       G09ManagedRequest bound{};
+      G09ManagedRequest paired{};
       HRESULT managed_hr=context_hr;
       if(result.managed_matches!=1) managed_hr=E_UNEXPECTED;
       else if(context_hr==S_OK && context_size<=sizeof(context) && context_size>=offsetof(CONTEXT,Rip)+sizeof(context.Rip))
         managed_hr=managed_map(method.value,context,request,*managed,target,bound,result.managed_map_notes);
       else if(context_hr==S_OK) managed_hr=E_UNEXPECTED;
+      if(continuation && managed_hr==S_OK) {
+        // 同一次取到的原 Frame/MethodInstance 构造两份票据；不重新枚举或求值目标。
+        managed_hr=managed_map(method.value,context,request,*continuation,target,paired,result.paired_map_notes);
+        if(managed_hr==S_OK && !same_managed_frame(bound,paired)) managed_hr=E_UNEXPECTED;
+      }
       if(request.operation==4 && managed_hr==S_OK) {
         if(!result.frames.empty() || context.Rip!=managed->address || stopped_context.Rip!=managed->address ||
             std::memcmp(reinterpret_cast<const BYTE *>(&bound)+68,reinterpret_cast<const BYTE *>(managed)+68,sizeof(bound)-68)!=0)
@@ -1070,12 +1091,21 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return
       result.managed_error=managed_hr;
       if(managed_hr==S_OK) {
         result.managed_mapping=managed_safe(bound);
-        if(request.operation==3) result.private_target=private_managed(request,bound);
+        if(request.operation==3) {
+          result.private_target=private_managed(request,bound);
+          if(continuation) {
+            result.paired_mapping=managed_safe(paired);
+            result.paired_private_target=private_managed(request,paired);
+          }
+        }
         else {
           result.managed_bound=true;
           result.managed_continuation=managed_values(clr,frame.value,bound,target,result.managed_values);
         }
-      } else { result.private_target.clear(); result.managed_bound=false; result.managed_mapping.clear(); }
+      } else {
+        result.private_target.clear(); result.managed_bound=false; result.managed_mapping.clear();
+        result.paired_private_target.clear(); result.paired_mapping.clear();
+      }
     }
     HRESULT mapping = context_hr;
     HRESULT mapping_hr = E_PENDING;
@@ -1172,7 +1202,8 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return
   return S_FALSE;
 }
 
-void observe(const G09ClrRequest &r, const std::wstring &supplied, const G09ManagedRequest *managed, Result &result) {
+void observe(const G09ClrRequest &r, const std::wstring &supplied, const G09ManagedRequest *managed,
+             const G09ManagedRequest *continuation, Result &result) {
   Handle process(reinterpret_cast<HANDLE>(r.process_handle));
   Handle thread(reinterpret_cast<HANDLE>(r.thread_handle));
   Target target(r, result);
@@ -1268,7 +1299,7 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, const G09Mana
   // operation 3 是调用方自有的原生返回单步，只读当前 CLR 栈，不查询异常对象。
   result.stack_error = target.expired()   ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
                        : result.exhausted ? HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_QUOTA)
-                                          : collect_stack(task.value, r.thread_id, r.operation == 3, target, result,r,managed,clr.value);
+                                          : collect_stack(task.value, r.thread_id, r.operation == 3, target, result,r,managed,continuation,clr.value);
   if(managed && !result.managed_matches) result.managed_error=E_NOINTERFACE;
   result.status = (r.operation != 1 ? !result.frames.empty() : result.object_chain_complete) &&
                            result.stack_error == S_OK && !result.exhausted && !target.expired()
@@ -1279,8 +1310,9 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, const G09Mana
 }
 
 bool valid_request(const G09ClrRequest &r) {
-  if (std::memcmp(r.magic, magic, 8) != 0 || (r.version != 1 && r.version != 2) ||
-      (r.version==2 && r.operation!=3 && r.operation!=4) || (r.version==1 && r.operation==4) || !nonzero(r.nonce, 16) ||
+  if (std::memcmp(r.magic, magic, 8) != 0 || (r.version != 1 && r.version != 2 && r.version != 3) ||
+      (r.version==2 && r.operation!=3 && r.operation!=4) || (r.version==1 && r.operation==4) ||
+      (r.version==3 && r.operation!=3) || !nonzero(r.nonce, 16) ||
       r.deadline_tick_ms <= GetTickCount64())
     return false;
   if (r.operation == 2) {
@@ -1306,7 +1338,7 @@ bool valid_request(const G09ClrRequest &r) {
          r.dac_path_units <= G09_CLR_MAX_PATH_UNITS && r.first_chance == 1;
 }
 bool valid_managed_request(const G09ClrRequest &r,const G09ManagedRequest &m) {
-  if(r.version!=2 || !m.approved_count || m.approved_count>4 ||
+  if((r.version!=2 && r.version!=3) || !m.approved_count || m.approved_count>4 ||
       (m.method_token & 0xff000000)!=0x06000000 || !(m.method_token & 0x00ffffff) ||
       m.bool_local_index>=256 || (m.start_info_local_index!=UINT32_MAX &&
           (m.start_info_local_index>=256 || m.start_info_local_index==m.bool_local_index))) return false;
@@ -1334,6 +1366,17 @@ bool valid_managed_request(const G09ClrRequest &r,const G09ManagedRequest &m) {
       m.extent_end<=0x0000800000000000ULL && m.address>=m.extent_start && m.address<m.extent_end &&
       m.map_count && m.map_count<=256 && nonzero(m.map_sha256,32) && nonzero(m.code_sha256,32);
 }
+
+bool valid_managed_pair_request(const G09ClrRequest &r,const G09ManagedPairRequest &pair) {
+  if(r.version!=3 || r.operation!=3 || !valid_managed_request(r,pair.initial) ||
+      !valid_managed_request(r,pair.continuation) || pair.initial.method_token!=pair.continuation.method_token ||
+      std::memcmp(pair.initial.module_mvid,pair.continuation.module_mvid,36)!=0) return false;
+  for(ULONG32 i=0;i<pair.initial.approved_count;++i)
+    for(ULONG32 j=0;j<pair.continuation.approved_count;++j)
+      if(pair.initial.approved_il[i]==pair.continuation.approved_il[j]) return false;
+  return true;
+}
+
 std::string output(const G09ClrRequest &r, const Result &result) {
   std::ostringstream text;
   text << "{\"schema\":1,\"operation\":" << r.operation << ",\"nonce\":\"" << hex(r.nonce, 16)
@@ -1371,6 +1414,19 @@ std::string output(const G09ClrRequest &r, const Result &result) {
          << (bound ? result.managed_mapping : "null") << ",\"map_notes\":" << result.managed_map_notes << "}";
     if(bound) text << ",\"private_target\":" << result.private_target;
   }
+  if(r.version==3 && r.operation==3) {
+    const bool bound=result.managed_error==S_OK && result.managed_matches==1 &&
+        !result.private_target.empty() && !result.paired_private_target.empty() && !result.exhausted;
+    text << ",\"managed_mapping_pair\":{\"status\":\"" << (bound ? "bound" : "unknown") << "\",\"api_hresult\":"
+         << static_cast<std::uint32_t>(result.managed_error) << ",\"matched_frames\":" << result.managed_matches
+         << ",\"scan_frame_count\":" << result.scanned_frames << ",\"stack_api_hresult\":" << static_cast<std::uint32_t>(result.stack_error)
+         << ",\"scan_complete\":" << (result.stack_error==S_OK ? "true" : "false") << ",\"mapping\":";
+    if(bound) text << "{\"initial\":" << result.managed_mapping << ",\"continuation\":" << result.paired_mapping << '}';
+    else text << "null";
+    text << ",\"map_notes\":{\"initial\":" << result.managed_map_notes << ",\"continuation\":" << result.paired_map_notes << "}}";
+    if(bound) text << ",\"private_target_pair\":{\"initial\":" << result.private_target
+                   << ",\"continuation\":" << result.paired_private_target << '}';
+  }
   if(r.version==2 && r.operation==4) {
     text << ",\"managed_continuation\":{\"bound\":" << (result.managed_bound ? "true" : "false")
          << ",\"api_hresult\":" << static_cast<std::uint32_t>(result.managed_error) << ",\"mapping\":"
@@ -1386,13 +1442,14 @@ std::string output(const G09ClrRequest &r, const Result &result) {
 
 int main(int argc, char **) {
   G09ClrRequest request{};
-  G09ManagedRequest managed{};
+  G09ManagedPairRequest managed{};
   Result result;
   int exit_code = 2;
   try {
     const HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
     if (argc == 1 && read_exact(input, &request, sizeof(request)) && valid_request(request) &&
-        (request.version==1 || (read_exact(input,&managed,sizeof(managed)) && valid_managed_request(request,managed)))) {
+        (request.version==1 || (read_exact(input,&managed.initial,sizeof(managed.initial)) && valid_managed_request(request,managed.initial) &&
+            (request.version!=3 || (read_exact(input,&managed.continuation,sizeof(managed.continuation)) && valid_managed_pair_request(request,managed)))))) {
       std::wstring path(request.dac_path_units, L'\0');
       if ((path.empty() || read_exact(input, path.data(), request.dac_path_units * 2)) &&
           path.find(L'\0') == std::wstring::npos) {
@@ -1402,7 +1459,8 @@ int main(int argc, char **) {
         const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
         if (got == 0 && (ok || error == ERROR_BROKEN_PIPE) && valid_request(request)) {
           if (request.operation == 2) Sleep(INFINITE);
-          observe(request, path, request.version==2 ? &managed : nullptr, result);
+          observe(request, path, request.version!=1 ? &managed.initial : nullptr,
+                  request.version==3 ? &managed.continuation : nullptr, result);
           exit_code = result.identity && result.dac_loaded ? 0 : 3;
         }
       }

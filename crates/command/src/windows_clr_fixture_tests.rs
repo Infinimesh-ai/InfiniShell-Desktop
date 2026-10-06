@@ -26,10 +26,10 @@ use windows::Win32::System::Threading::{
 use windows::core::HRESULT;
 
 use super::clr_reader::{
-    BoundFile, ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodSpec,
-    ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, Job, birth, duplicate,
-    empty_environment, file_identity, hex, image_path, information, put64, raw, remaining, request,
-    require,
+    BoundFile, ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodPairSpec,
+    ClrManagedMethodSpec, ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, Job,
+    birth, duplicate, empty_environment, file_identity, hex, image_path, information, put64, raw,
+    remaining, request, require,
 };
 use super::{ShellClassificationObservation, ShellClassificationWitness};
 use crate::blocking::Command;
@@ -74,8 +74,11 @@ struct Fixture {
     pre_node_shell_entries: Vec<Value>,
     pre_node_shell_observation: Option<Value>,
     post_node_exception: Option<Value>,
-    managed_spec: ClrManagedMethodSpec,
+    pre_start_exception: Option<Value>,
+    managed_spec: ClrManagedMethodPairSpec,
+    managed_initial: Option<Value>,
     managed_continuation: Option<Value>,
+    diagnostic_slots: Vec<&'static str>,
     initial_breakpoints: HashSet<u32>,
     handling_stage: &'static str,
     continuation_stage: &'static str,
@@ -87,7 +90,7 @@ impl Fixture {
         mut node_image: BoundFile,
         root: &Path,
         cleanup_deadline: Instant,
-        managed_spec: ClrManagedMethodSpec,
+        managed_spec: ClrManagedMethodPairSpec,
     ) -> io::Result<Self> {
         image.verify()?;
         node_image.verify()?;
@@ -141,8 +144,11 @@ impl Fixture {
             pre_node_shell_entries: vec![],
             pre_node_shell_observation: None,
             post_node_exception: None,
+            pre_start_exception: None,
             managed_spec,
+            managed_initial: None,
             managed_continuation: None,
+            diagnostic_slots: vec![],
             initial_breakpoints: HashSet::new(),
             handling_stage: "not_started",
             continuation_stage: "not_started",
@@ -287,6 +293,7 @@ impl Fixture {
         root: &Path,
         deadline: Instant,
     ) -> io::Result<()> {
+        self.reserve_diagnostic_slot(if pre_node { "pre" } else { "post" })?;
         let observation = if pre_node {
             &mut self.pre_node_shell_observation
         } else {
@@ -332,7 +339,7 @@ impl Fixture {
             read_budget_bytes: 16 * 1024 * 1024,
         };
         if pre_node {
-            reader.bind_native_return_with_managed_spec_and_send(
+            reader.bind_native_return_with_managed_pair_spec_and_send(
                 image,
                 clr,
                 stop,
@@ -361,12 +368,8 @@ impl Fixture {
             reader.is_reaped() && reader.job_empty_fixture()?,
             "分类读取器尚未完全回收",
         )?;
-        let managed_target = if pre_node {
-            Some(
-                reader
-                    .take_managed_continuation_target()?
-                    .ok_or_else(|| io::Error::other("固定启动前栈没有唯一续点映射"))?,
-            )
+        let managed_pair = if pre_node {
+            Some(reader.take_managed_continuation_pair()?)
         } else {
             None
         };
@@ -376,12 +379,12 @@ impl Fixture {
             self.shell_observation = Some(observation);
         }
         self.active_reader.take();
-        if let Some(target) = managed_target {
+        if let Some(pair) = managed_pair {
             remaining(deadline)?;
             self.shell
                 .as_mut()
                 .expect("原分类观察器必须保留")
-                .resume_after_pre_node_return_with_continuation(event, self.sequence, target)?;
+                .resume_after_pre_node_return_with_managed_pair(event, self.sequence, pair)?;
             self.pre_node_shell_observation
                 .as_mut()
                 .expect("启动前收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
@@ -398,7 +401,7 @@ impl Fixture {
         Ok(())
     }
 
-    fn capture_managed_continuation(
+    fn capture_pre_start_exception(
         &mut self,
         event: &DEBUG_EVENT,
         receipt: Value,
@@ -406,11 +409,73 @@ impl Fixture {
         root: &Path,
         deadline: Instant,
     ) -> io::Result<()> {
+        self.reserve_diagnostic_slot("pre_exception")?;
+        require(self.pre_start_exception.is_none(), "启动前异常停点不唯一")?;
+        self.pre_start_exception = Some(json!({"event":receipt}));
         require(
-            self.managed_continuation.is_none() && self.active_reader.is_none(),
+            receipt["reader_eligible"] == true
+                && self
+                    .shell
+                    .as_ref()
+                    .is_some_and(|shell| !shell.requires_restoration()),
+            "启动前异常不是已恢复 DR 的原 CLR 停点",
+        )?;
+        self.capture(event, image, root, deadline)?;
+        let observation = self
+            .observations
+            .last()
+            .ok_or_else(|| io::Error::other("启动前异常缺少读取结果"))?;
+        require(
+            self.active_reader.is_none()
+                && observation["reader_reaped"] == true
+                && observation["reader_job_empty"] == true,
+            "启动前异常读取器尚未完全回收",
+        )?;
+        self.pre_start_exception = Some(json!({"event":receipt,"observation":observation,
+            "live_threads_restored_before_reader":true,"rearmed_after_reader_reaped":false}));
+        remaining(deadline)?;
+        self.shell
+            .as_mut()
+            .expect("原分类观察器必须保留")
+            .resume_after_pre_start_exception(event, self.sequence)?;
+        self.pre_start_exception
+            .as_mut()
+            .expect("启动前异常收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
+        Ok(())
+    }
+
+    fn reserve_diagnostic_slot(&mut self, slot: &'static str) -> io::Result<()> {
+        require(
+            self.diagnostic_slots.len() < 4
+                && !self.diagnostic_slots.contains(&slot)
+                && !((slot == "post" && self.diagnostic_slots.contains(&"pre_exception"))
+                    || (slot == "pre_exception" && self.diagnostic_slots.contains(&"post"))),
+            "固定两阶段诊断四槽超限、重复或第四槽同时读取异常与分类",
+        )?;
+        self.diagnostic_slots.push(slot);
+        Ok(())
+    }
+
+    fn capture_managed_stop(
+        &mut self,
+        event: &DEBUG_EVENT,
+        receipt: Value,
+        initial: bool,
+        image: &mut ClrReaderImage,
+        root: &Path,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        self.reserve_diagnostic_slot(if initial { "initial" } else { "continuation" })?;
+        let record = if initial {
+            &mut self.managed_initial
+        } else {
+            &mut self.managed_continuation
+        };
+        require(
+            record.is_none() && self.active_reader.is_none(),
             "固定续点或读取器重复",
         )?;
-        self.managed_continuation = Some(json!({"event":receipt}));
+        *record = Some(json!({"event":receipt}));
         let shell = self
             .shell
             .as_ref()
@@ -442,7 +507,11 @@ impl Fixture {
                 hresult: 0,
                 read_budget_bytes: 16 * 1024 * 1024,
             },
-            shell.managed_continuation_target()?,
+            if initial {
+                shell.managed_initial_target()?
+            } else {
+                shell.managed_continuation_target()?
+            },
         )?;
         let result = loop {
             if let Some(result) = reader.poll(|| false)? {
@@ -459,17 +528,22 @@ impl Fixture {
         observation["main_tid"] = json!(self.main_thread);
         observation["reader_reaped"] = json!(true);
         observation["reader_job_empty"] = json!(true);
-        self.managed_continuation = Some(json!({"event":receipt,"observation":observation,
+        let record = if initial {
+            &mut self.managed_initial
+        } else {
+            &mut self.managed_continuation
+        };
+        *record = Some(json!({"event":receipt,"observation":observation,
             "live_threads_restored_before_reader":true,"rearmed_after_reader_reaped":false}));
         self.active_reader.take();
         remaining(deadline)?;
-        self.shell
-            .as_mut()
-            .expect("原续点观察器必须保留")
-            .resume_after_managed_continuation(event, self.sequence)?;
-        self.managed_continuation
-            .as_mut()
-            .expect("原续点收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
+        let shell = self.shell.as_mut().expect("原续点观察器必须保留");
+        if initial {
+            shell.resume_after_managed_initial(event, self.sequence)?;
+        } else {
+            shell.resume_after_managed_continuation(event, self.sequence)?;
+        }
+        record.as_mut().expect("原续点收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
         Ok(())
     }
 
@@ -927,9 +1001,22 @@ impl Fixture {
                     ShellClassificationObservation::OwnedManagedContinuation(receipt) => {
                         self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
                         self.handling_stage = "managed_continuation_reader";
-                        return self.capture_managed_continuation(
+                        return self.capture_managed_stop(
                             event,
                             serde_json::to_value(receipt)?,
+                            false,
+                            image,
+                            root,
+                            deadline,
+                        );
+                    }
+                    ShellClassificationObservation::OwnedManagedInitial(receipt) => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        self.handling_stage = "managed_initial_reader";
+                        return self.capture_managed_stop(
+                            event,
+                            serde_json::to_value(receipt)?,
+                            true,
                             image,
                             root,
                             deadline,
@@ -937,6 +1024,21 @@ impl Fixture {
                     }
                 }
                 if !cleanup {
+                    let receipt = self
+                        .shell
+                        .as_mut()
+                        .expect("原分类观察器必须保留")
+                        .observe_pre_start_exception(event, self.sequence)?;
+                    if let Some(receipt) = receipt {
+                        self.handling_stage = "pre_start_exception_reader";
+                        return self.capture_pre_start_exception(
+                            event,
+                            serde_json::to_value(receipt)?,
+                            image,
+                            root,
+                            deadline,
+                        );
+                    }
                     let receipt = self
                         .shell
                         .as_mut()
@@ -1747,14 +1849,246 @@ fn validate_post_node_exception(report: &Value, prepared: &Value) -> io::Result<
     )
 }
 
+fn validate_managed_initial(report: &Value, prepared: &Value) -> io::Result<()> {
+    let record = &report["managed_initial"];
+    let receipt = &record["event"];
+    let observation = &record["observation"];
+    let reader = &observation["reader"];
+    let managed = &reader["managed_continuation"];
+    let pre = &report["pre_node_shell_observation"];
+    let late = &report["managed_continuation"]["event"];
+    let pair = &pre["reader"]["managed_mapping_pair"];
+    let mapping = &receipt["mapping"];
+    let specification = &prepared["fixture_initial"];
+    let summary = &report["shell_classification"];
+    validate_fixture_thread(observation)?;
+    let ordered = [
+        pre["classification"]["return_sequence"].as_u64(),
+        receipt["event_sequence"].as_u64(),
+        report["node_created"]["sequence"].as_u64(),
+    ];
+    require(
+        ordered
+            .iter()
+            .all(|value| value.is_some_and(|value| value != 0))
+            && ordered.windows(2).all(|pair| pair[0] < pair[1])
+            && receipt["event_sequence"].as_u64() < late["first_delivery_sequence"].as_u64()
+            && receipt["generation"] == pre["classification"]["generation"]
+            && receipt["identity"] == pre["classification"]["identity"]
+            && receipt["pre_return_sequence"] == pre["classification"]["return_sequence"]
+            && receipt["event_sequence"] == observation["event_sequence"]
+            && [
+                "node_create_sequence",
+                "node_process_id",
+                "node_process_birth",
+                "deferred_for_node",
+                "first_delivery_sequence",
+            ]
+            .iter()
+            .all(|key| receipt.get(key).is_none()),
+        "固定初始停点没有绑定启动前原线程，或错误借用 Node 与延后身份",
+    )?;
+    for (identity, binding) in [
+        ("process_id", "pid"),
+        ("thread_id", "tid"),
+        ("process_birth", "process_birth"),
+        ("thread_birth", "thread_birth"),
+    ] {
+        require(
+            !receipt["identity"][identity].is_null()
+                && receipt["identity"][identity] == observation[binding],
+            "固定初始停点与原读取进线程身份不符",
+        )?;
+    }
+    for key in [
+        "event_sequence",
+        "nonce",
+        "pid",
+        "tid",
+        "process_birth",
+        "thread_birth",
+    ] {
+        require(
+            !observation[key].is_null() && observation[key] == reader[key],
+            "固定初始停点回复未绑定请求",
+        )?;
+    }
+    require(
+        reader["schema"] == 1
+            && reader["operation"] == 4
+            && observation["operation"] == 4
+            && reader["target_identity_verified"] == true
+            && reader["dac_sha256_verified"] == true
+            && reader["dac_loaded"] == true
+            && reader["budget_exhausted"] == false
+            && reader["exception_source"] == "none"
+            && reader["chain"].as_array().is_some_and(Vec::is_empty)
+            && managed["bound"] == true
+            && managed["api_hresult"] == 0
+            && receipt["registers_restored"] == true
+            && receipt["execution_context_unchanged"] == true
+            && receipt["managed_initial_clr_stack_required"] == true
+            && record["live_threads_restored_before_reader"] == true
+            && record["rearmed_after_reader_reaped"] == true
+            && observation["reader_reaped"] == true
+            && observation["reader_job_empty"] == true
+            && summary["managed_initial_bound"] == true
+            && summary["managed_initial_selected_calls"] == 1
+            && summary["managed_initial_resumed_calls"] == 1
+            && summary["managed_initial"] == *receipt,
+        "固定初始停点实际读取、独立一次预算、撤销与回收后恢复未获证明",
+    )?;
+    require(
+        pair["status"] == "bound"
+            && pair["api_hresult"] == 0
+            && pair["matched_frames"] == 1
+            && pair["mapping"]["initial"] == *mapping
+            && pair["mapping"]["continuation"] == late["mapping"]
+            && managed["mapping"] == *mapping
+            && mapping["module_mvid"] == prepared["fixture_mvid"]
+            && mapping["method_token"] == specification["method_token"]
+            && mapping["pre_sequence"] == receipt["pre_return_sequence"]
+            && specification["approved_il_offsets"]
+                .as_array()
+                .is_some_and(|offsets| offsets.contains(&mapping["il_offset"]))
+            && mapping["il_offset"] != late["mapping"]["il_offset"]
+            && [
+                "module_mvid",
+                "method_token",
+                "enc_version",
+                "map_count",
+                "map_sha256",
+                "code_sha256",
+                "extent_length",
+                "pre_sequence",
+            ]
+            .iter()
+            .all(|key| !mapping[key].is_null() && mapping[key] == late["mapping"][key])
+            && reader["frames"]
+                .as_array()
+                .and_then(|frames| {
+                    frames
+                        .iter()
+                        .find(|frame| frame["frame_kind"] == "metadata_method")
+                })
+                .is_some_and(|frame| {
+                    frame["module_mvid"] == mapping["module_mvid"]
+                        && frame["method_token"] == mapping["method_token"]
+                        && frame["il_status"] == 0
+                        && frame["il_offsets"].as_array().is_some_and(|offsets| {
+                            offsets.len() == 1 && offsets[0] == mapping["il_offset"]
+                        })
+                }),
+        "固定两阶段并非同一实际方法映射，或初始停点偏离批准 IL",
+    )?;
+    validate_managed_values(
+        managed,
+        specification,
+        &prepared["process_start_info_contract"],
+    )?;
+    require(
+        report["diagnostic_slots"] == json!(["pre", "initial", "continuation", "post"])
+            && report["pre_start_exception"].is_null()
+            && summary["pre_start_exception_selected_calls"] == 0
+            && summary["pre_start_exception_resumed_calls"] == 0
+            && summary["pre_start_exception"].is_null(),
+        "固定正常路径未证明四诊断槽及启动前异常槽空缺",
+    )?;
+    let events = report["events"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("固定初始停点事件缺失"))?;
+    let selected = events
+        .iter()
+        .filter(|event| event["sequence"] == receipt["event_sequence"])
+        .collect::<Vec<_>>();
+    require(
+        selected.len() == 1
+            && selected[0]["code"] == EXCEPTION_DEBUG_EVENT.0
+            && selected[0]["pid"] == observation["pid"]
+            && selected[0]["tid"] == observation["tid"]
+            && selected[0]["exception_code"] == 0x80000004_u32
+            && selected[0]["first_chance"] == 1
+            && selected[0]["continue_status"] == DBG_CONTINUE.0 as u32
+            && selected[0]["handled"] == true
+            && selected[0]["continued"] == true,
+        "固定初始停点未直接继续或被错误延后",
+    )
+}
+
+fn validate_managed_values(
+    managed: &Value,
+    specification: &Value,
+    contract: &Value,
+) -> io::Result<()> {
+    let boolean = &managed["boolean_local"];
+    let start_info = &managed["start_info_field"];
+    require(
+        boolean["index"] == specification["bool_local_index"]
+            && [
+                "api_hresult",
+                "get_local_hresult",
+                "locations_hresult",
+                "type_hresult",
+                "type_name_hresult",
+                "flags_hresult",
+                "size_hresult",
+                "bytes_hresult",
+            ]
+            .iter()
+            .all(|field| boolean[field] == 0)
+            && boolean["locations"]
+                .as_u64()
+                .is_some_and(|count| (1..=8).contains(&count))
+            && boolean["type_name"] == "System.Boolean"
+            && boolean["size"] == 1
+            && boolean["bytes_read"] == 1
+            && boolean["value"] == true
+            && specification["expected_boolean"] == true,
+        "固定等待决策没有可读的实际布尔局部值",
+    )?;
+    require(
+        start_info["requested"] == true
+            && start_info["index"] == specification["start_info_local_index"]
+            && [
+                "api_hresult",
+                "local_api_hresult",
+                "local_get_local_hresult",
+                "local_locations_hresult",
+                "local_flags_hresult",
+                "local_size_hresult",
+                "local_bytes_hresult",
+                "field_read_hresult",
+            ]
+            .iter()
+            .all(|field| start_info[field] == 0)
+            && start_info["local_type_hresult"] == 0x8000000a_u32
+            && start_info["local_type_name_hresult"] == 0x8000000a_u32
+            && start_info["local_locations"]
+                .as_u64()
+                .is_some_and(|count| (1..=8).contains(&count))
+            && start_info["local_size"] == 8
+            && start_info["local_bytes_read"] == 8
+            && start_info["module_mvid"] == contract["module_mvid"]
+            && start_info["type_token"] == contract["type_token"]
+            && start_info["field_token"] == contract["field_token"]
+            && start_info["field_name"] == "useShellExecute"
+            && start_info["field_type"] == 2
+            && start_info["field_sig_type"] == 2
+            && start_info["value"] == false
+            && specification["expected_use_shell_execute"] == false
+            && contract["getter_invoked"] == false
+            && contract["target_value_observed"] == false,
+        "固定 ProcessStartInfo 字段未绑定实际对象与 getter 元数据合同",
+    )?;
+    Ok(())
+}
+
 fn validate_managed_continuation(report: &Value, prepared: &Value) -> io::Result<()> {
     let record = &report["managed_continuation"];
     let receipt = &record["event"];
     let observation = &record["observation"];
     let reader = &observation["reader"];
     let managed = &reader["managed_continuation"];
-    let boolean = &managed["boolean_local"];
-    let start_info = &managed["start_info_field"];
     let pre = &report["pre_node_shell_observation"];
     let node = &report["node_created"];
     let summary = &report["shell_classification"];
@@ -1832,12 +2166,22 @@ fn validate_managed_continuation(report: &Value, prepared: &Value) -> io::Result
         "固定续点独立读取、一次预算、撤销或恢复未获证明",
     )?;
     let mapping = &receipt["mapping"];
+    let pre_mapping = if prepared["fixture_initial"].is_object() {
+        &pre["reader"]["managed_mapping_pair"]["mapping"]["continuation"]
+    } else {
+        &pre["reader"]["managed_mapping"]["mapping"]
+    };
+    let mapping_result = if prepared["fixture_initial"].is_object() {
+        &pre["reader"]["managed_mapping_pair"]
+    } else {
+        &pre["reader"]["managed_mapping"]
+    };
     require(
         mapping.is_object()
             && managed["mapping"] == *mapping
-            && pre["reader"]["managed_mapping"]["mapping"] == *mapping
-            && pre["reader"]["managed_mapping"]["status"] == "bound"
-            && pre["reader"]["managed_mapping"]["matched_frames"] == 1
+            && *pre_mapping == *mapping
+            && mapping_result["status"] == "bound"
+            && mapping_result["matched_frames"] == 1
             && mapping["module_mvid"] == prepared["fixture_mvid"]
             && mapping["method_token"] == specification["method_token"]
             && mapping["pre_sequence"] == pre["classification"]["return_sequence"]
@@ -1869,64 +2213,7 @@ fn validate_managed_continuation(report: &Value, prepared: &Value) -> io::Result
                 }),
         "固定续点实际方法与批准 IL 或映射摘要不符",
     )?;
-    require(
-        boolean["index"] == specification["bool_local_index"]
-            && [
-                "api_hresult",
-                "get_local_hresult",
-                "locations_hresult",
-                "type_hresult",
-                "type_name_hresult",
-                "flags_hresult",
-                "size_hresult",
-                "bytes_hresult",
-            ]
-            .iter()
-            .all(|field| boolean[field] == 0)
-            && boolean["locations"]
-                .as_u64()
-                .is_some_and(|count| (1..=8).contains(&count))
-            && boolean["type_name"] == "System.Boolean"
-            && boolean["size"] == 1
-            && boolean["bytes_read"] == 1
-            && boolean["value"] == true
-            && specification["expected_boolean"] == true,
-        "固定等待决策没有可读的实际布尔局部值",
-    )?;
-    require(
-        start_info["requested"] == true
-            && start_info["index"] == specification["start_info_local_index"]
-            && [
-                "api_hresult",
-                "local_api_hresult",
-                "local_get_local_hresult",
-                "local_locations_hresult",
-                "local_flags_hresult",
-                "local_size_hresult",
-                "local_bytes_hresult",
-                "field_read_hresult",
-            ]
-            .iter()
-            .all(|field| start_info[field] == 0)
-            && start_info["local_type_hresult"] == 0x8000000a_u32
-            && start_info["local_type_name_hresult"] == 0x8000000a_u32
-            && start_info["local_locations"]
-                .as_u64()
-                .is_some_and(|count| (1..=8).contains(&count))
-            && start_info["local_size"] == 8
-            && start_info["local_bytes_read"] == 8
-            && start_info["module_mvid"] == contract["module_mvid"]
-            && start_info["type_token"] == contract["type_token"]
-            && start_info["field_token"] == contract["field_token"]
-            && start_info["field_name"] == "useShellExecute"
-            && start_info["field_type"] == 2
-            && start_info["field_sig_type"] == 2
-            && start_info["value"] == false
-            && specification["expected_use_shell_execute"] == false
-            && contract["getter_invoked"] == false
-            && contract["target_value_observed"] == false,
-        "固定 ProcessStartInfo 字段未绑定实际对象与 getter 元数据合同",
-    )?;
+    validate_managed_values(managed, specification, contract)?;
     let events = report["events"]
         .as_array()
         .ok_or_else(|| io::Error::other("续点事件记录缺失"))?;
@@ -2070,33 +2357,38 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     drop(blocked);
 
     report["stage"] = json!("native_exception_capture");
-    let continuation = &prepared["fixture_continuation"];
-    let integer = |key: &str| {
-        continuation[key]
-            .as_u64()
-            .and_then(|value| u32::try_from(value).ok())
-            .ok_or_else(|| io::Error::other("固定续点元数据整数缺失"))
-    };
-    let approved_il_offsets = continuation["approved_il_offsets"]
-        .as_array()
-        .ok_or_else(|| io::Error::other("固定续点 IL 清单缺失"))?
-        .iter()
-        .map(|value| {
-            value
+    let method_spec = |continuation: &Value| -> io::Result<ClrManagedMethodSpec> {
+        let integer = |key: &str| {
+            continuation[key]
                 .as_u64()
-                .and_then(|offset| u32::try_from(offset).ok())
-                .ok_or_else(|| io::Error::other("固定续点 IL 无效"))
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| io::Error::other("固定续点元数据整数缺失"))
+        };
+        let approved_il_offsets = continuation["approved_il_offsets"]
+            .as_array()
+            .ok_or_else(|| io::Error::other("固定续点 IL 清单缺失"))?
+            .iter()
+            .map(|value| {
+                value
+                    .as_u64()
+                    .and_then(|offset| u32::try_from(offset).ok())
+                    .ok_or_else(|| io::Error::other("固定续点 IL 无效"))
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        Ok(ClrManagedMethodSpec {
+            module_mvid: prepared["fixture_mvid"]
+                .as_str()
+                .ok_or_else(|| io::Error::other("固定续点模块缺失"))?
+                .to_owned(),
+            method_token: integer("method_token")?,
+            approved_il_offsets,
+            bool_local_index: integer("bool_local_index")?,
+            start_info_local_index: Some(integer("start_info_local_index")?),
         })
-        .collect::<io::Result<Vec<_>>>()?;
-    let managed_spec = ClrManagedMethodSpec {
-        module_mvid: prepared["fixture_mvid"]
-            .as_str()
-            .ok_or_else(|| io::Error::other("固定续点模块缺失"))?
-            .to_owned(),
-        method_token: integer("method_token")?,
-        approved_il_offsets,
-        bool_local_index: integer("bool_local_index")?,
-        start_info_local_index: Some(integer("start_info_local_index")?),
+    };
+    let managed_spec = ClrManagedMethodPairSpec {
+        initial: method_spec(&prepared["fixture_initial"])?,
+        continuation: method_spec(&prepared["fixture_continuation"])?,
     };
     let mut fixture = Fixture::start(&mut fixture_image, node_image, root, deadline, managed_spec)?;
     let result = fixture.pump(&mut reader, root, active_deadline, false);
@@ -2125,6 +2417,9 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["pre_node_shell_entries"] = json!(fixture.pre_node_shell_entries);
     report["pre_node_shell_observation"] = json!(fixture.pre_node_shell_observation);
     report["post_node_exception"] = json!(fixture.post_node_exception);
+    report["pre_start_exception"] = json!(fixture.pre_start_exception);
+    report["managed_initial"] = json!(fixture.managed_initial);
+    report["diagnostic_slots"] = json!(fixture.diagnostic_slots);
     report["managed_continuation"] = json!(fixture.managed_continuation);
     report["node_created"] = json!(fixture.node_created);
     report["descendant_creates"] = json!(fixture.descendant_creates);
@@ -2223,6 +2518,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     validate_pre_node_return(report, &prepared)?;
     validate_post_node_exception(report, &prepared)?;
     validate_managed_continuation(report, &prepared)?;
+    validate_managed_initial(report, &prepared)?;
     reader.verify()?;
     fixture_image.verify()?;
     fixture.node_image.verify()?;
@@ -2594,6 +2890,124 @@ fn managed_continuation_requires_live_values_even_when_local_lookup_succeeds() {
         changed["managed_continuation"]["observation"]["reader"]["managed_continuation"][local]
             [field] = value;
         assert!(validate_managed_continuation(&changed, &prepared).is_err());
+    }
+}
+
+fn fixed_managed_initial_receipt() -> (Value, Value) {
+    let (mut report, mut prepared) = fixed_managed_continuation_receipt();
+    let late = report["managed_continuation"].clone();
+    let mut mapping = late["event"]["mapping"].clone();
+    mapping["il_offset"] = json!(24);
+    let mut initial = late;
+    let receipt = initial["event"].as_object_mut().expect("固定事件对象");
+    for key in [
+        "node_create_sequence",
+        "node_process_id",
+        "node_process_birth",
+        "deferred_for_node",
+        "first_delivery_sequence",
+        "managed_continuation_clr_stack_required",
+    ] {
+        receipt.remove(key);
+    }
+    receipt.insert("event_sequence".into(), json!(7));
+    receipt.insert("managed_initial_clr_stack_required".into(), json!(true));
+    receipt.insert("mapping".into(), mapping.clone());
+    initial["observation"]["event_sequence"] = json!(7);
+    initial["observation"]["nonce"] = json!("fixed-initial");
+    initial["observation"]["reader"]["event_sequence"] = json!(7);
+    initial["observation"]["reader"]["nonce"] = json!("fixed-initial");
+    initial["observation"]["reader"]["frames"][0]["il_offsets"] = json!([24]);
+    initial["observation"]["reader"]["managed_continuation"]["mapping"] = mapping.clone();
+    report["managed_initial"] = initial;
+    prepared["fixture_initial"] = prepared["fixture_continuation"].clone();
+    prepared["fixture_initial"]["approved_il_offsets"] = json!([24]);
+    report["pre_node_shell_observation"]["reader"]["managed_mapping_pair"] = json!({
+        "status":"bound","api_hresult":0,"matched_frames":1,"mapping":{
+            "initial":mapping,"continuation":report["managed_continuation"]["event"]["mapping"]}});
+    report["shell_classification"]["managed_initial_bound"] = json!(true);
+    report["shell_classification"]["managed_initial_selected_calls"] = json!(1);
+    report["shell_classification"]["managed_initial_resumed_calls"] = json!(1);
+    report["shell_classification"]["managed_initial"] = report["managed_initial"]["event"].clone();
+    report["shell_classification"]["pre_start_exception_selected_calls"] = json!(0);
+    report["shell_classification"]["pre_start_exception_resumed_calls"] = json!(0);
+    report["diagnostic_slots"] = json!(["pre", "initial", "continuation", "post"]);
+    report["events"]
+        .as_array_mut()
+        .expect("固定事件清单")
+        .insert(
+            0,
+            json!({
+        "sequence":7,"code":EXCEPTION_DEBUG_EVENT.0,"pid":41,"tid":42,
+        "exception_code":0x80000004_u32,"first_chance":1,"handled":true,"continued":true,
+        "continue_status":DBG_CONTINUE.0 as u32}),
+        );
+    (report, prepared)
+}
+
+#[test]
+fn managed_initial_requires_a_complete_pair_and_its_own_pre_node_identity() {
+    let (report, prepared) = fixed_managed_initial_receipt();
+    assert!(validate_managed_initial(&report, &prepared).is_ok());
+    assert!(validate_managed_continuation(&report, &prepared).is_ok());
+    for (pointer, replacement) in [
+        (
+            "/pre_node_shell_observation/reader/managed_mapping_pair/mapping/continuation",
+            Value::Null,
+        ),
+        ("/managed_initial/event/event_sequence", json!(8)),
+        ("/managed_initial/event/identity/thread_birth", json!(201)),
+        (
+            "/managed_initial/event/mapping/code_sha256",
+            json!("c".repeat(64)),
+        ),
+        (
+            "/managed_initial/observation/reader/frames/0/il_offsets",
+            json!([42]),
+        ),
+        (
+            "/managed_initial/observation/reader/managed_continuation/start_info_field/value",
+            Value::Null,
+        ),
+    ] {
+        let mut changed = report.clone();
+        *changed.pointer_mut(pointer).expect("固定受测字段") = replacement;
+        assert!(
+            validate_managed_initial(&changed, &prepared).is_err(),
+            "{pointer}"
+        );
+    }
+    let mut borrowed_node = report;
+    borrowed_node["managed_initial"]["event"]["node_create_sequence"] = Value::Null;
+    assert!(validate_managed_initial(&borrowed_node, &prepared).is_err());
+}
+
+#[test]
+fn managed_initial_requires_direct_continue_reaping_and_exclusive_fourth_slot() {
+    let (report, prepared) = fixed_managed_initial_receipt();
+    for (pointer, replacement) in [
+        ("/managed_initial/observation/reader_reaped", json!(false)),
+        ("/managed_initial/rearmed_after_reader_reaped", json!(false)),
+        ("/events/0/continue_status", json!(DBG_REPLY_LATER.0 as u32)),
+        (
+            "/shell_classification/managed_initial_selected_calls",
+            json!(2),
+        ),
+        (
+            "/shell_classification/pre_start_exception_selected_calls",
+            json!(1),
+        ),
+        (
+            "/diagnostic_slots",
+            json!(["pre", "initial", "continuation", "pre_exception", "post"]),
+        ),
+    ] {
+        let mut changed = report.clone();
+        *changed.pointer_mut(pointer).expect("固定受测字段") = replacement;
+        assert!(
+            validate_managed_initial(&changed, &prepared).is_err(),
+            "{pointer}"
+        );
     }
 }
 

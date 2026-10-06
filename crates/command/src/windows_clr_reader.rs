@@ -12,31 +12,29 @@ use std::process::{Child, ExitStatus, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
-use windows::core::{w, BOOL, PCWSTR};
 use windows::Win32::Foundation::{
-    DuplicateHandle, DUPLICATE_HANDLE_OPTIONS, FILETIME, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    DUPLICATE_HANDLE_OPTIONS, DuplicateHandle, FILETIME, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Storage::FileSystem::{
-    GetFileInformationByHandle, GetFileVersionInfoSizeW, GetFileVersionInfoW,
-    GetFinalPathNameByHandleW, VerQueryValueW, BY_HANDLE_FILE_INFORMATION,
-    FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT, FILE_NAME_NORMALIZED,
-    FILE_SHARE_READ, VS_FIXEDFILEINFO,
+    BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT,
+    FILE_NAME_NORMALIZED, FILE_SHARE_READ, GetFileInformationByHandle, GetFileVersionInfoSizeW,
+    GetFileVersionInfoW, GetFinalPathNameByHandleW, VS_FIXEDFILEINFO, VerQueryValueW,
 };
 use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
+    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
     JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
-    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 use windows::Win32::System::SystemInformation::{GetTickCount64, GetWindowsDirectoryW};
 use windows::Win32::System::Threading::{
     GetCurrentProcess, GetProcessId, GetProcessIdOfThread, GetProcessTimes, GetThreadId,
-    GetThreadTimes, WaitForSingleObject, PROCESS_QUERY_INFORMATION, PROCESS_SYNCHRONIZE,
-    PROCESS_VM_READ, THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION,
+    GetThreadTimes, PROCESS_QUERY_INFORMATION, PROCESS_SYNCHRONIZE, PROCESS_VM_READ,
+    THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION, WaitForSingleObject,
 };
+use windows::core::{BOOL, PCWSTR, w};
 
 use crate::blocking::Command;
 
@@ -86,6 +84,30 @@ impl ClrManagedMethodSpec {
     }
 }
 
+/// 同一原帧的两个独立续点；每组规格保留原有上界，不允许候选 IL 重叠。
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ClrManagedMethodPairSpec {
+    pub initial: ClrManagedMethodSpec,
+    pub continuation: ClrManagedMethodSpec,
+}
+
+impl ClrManagedMethodPairSpec {
+    fn validate(&self) -> io::Result<()> {
+        self.initial.validate()?;
+        self.continuation.validate()?;
+        require(
+            self.initial.module_mvid == self.continuation.module_mvid
+                && self.initial.method_token == self.continuation.method_token
+                && self
+                    .initial
+                    .approved_il_offsets
+                    .iter()
+                    .all(|il| !self.continuation.approved_il_offsets.contains(il)),
+            "CLR 双续点必须属于同一方法且候选 IL 不重叠",
+        )
+    }
+}
+
 /// 只由已回收 reader 的私有回复构造；应用层不能制造地址票据。
 #[derive(Clone)]
 pub struct ManagedContinuationTarget {
@@ -122,6 +144,13 @@ impl ManagedContinuationTarget {
             "map_sha256":hex(&self.map_sha256),"code_sha256":hex(&self.code_sha256),
             "extent_length":self.extent_end-self.extent_start,"pre_sequence":self.pre_sequence})
     }
+}
+
+/// 仅在同一原停点完整绑定两份票据后交付；私有地址仍由各票据封装。
+#[derive(Clone, Debug)]
+pub struct ManagedContinuationPair {
+    pub initial: ManagedContinuationTarget,
+    pub continuation: ManagedContinuationTarget,
 }
 
 fn fixed_hex<const N: usize>(value: &Value) -> io::Result<[u8; N]> {
@@ -242,6 +271,83 @@ fn managed_extension(
         bytes[168..200].copy_from_slice(&target.code_sha256);
     }
     Ok(bytes)
+}
+
+fn managed_pair_extension(spec: &ClrManagedMethodPairSpec) -> io::Result<Vec<u8>> {
+    spec.validate()?;
+    let mut bytes = managed_extension(&spec.initial, None)?;
+    bytes.extend(managed_extension(&spec.continuation, None)?);
+    Ok(bytes)
+}
+
+fn managed_pair(
+    value: &Value,
+    binding: &Value,
+    spec: &ClrManagedMethodPairSpec,
+) -> io::Result<ManagedContinuationPair> {
+    spec.validate()?;
+    require(
+        value.as_object().is_some_and(|fields| {
+            fields.len() == 2
+                && fields.contains_key("initial")
+                && fields.contains_key("continuation")
+        }),
+        "CLR 私有双续点必须恰好包含两个票据",
+    )?;
+    let initial = managed_target(&value["initial"], binding, &spec.initial)?;
+    let continuation = managed_target(&value["continuation"], binding, &spec.continuation)?;
+    require(
+        initial.process_id == continuation.process_id
+            && initial.thread_id == continuation.thread_id
+            && initial.process_birth == continuation.process_birth
+            && initial.thread_birth == continuation.thread_birth
+            && initial.pre_sequence == continuation.pre_sequence
+            && initial.pre_nonce == continuation.pre_nonce
+            && initial.module_mvid == continuation.module_mvid
+            && initial.method_token == continuation.method_token
+            && initial.enc_version == continuation.enc_version
+            && initial.frame_rsp == continuation.frame_rsp
+            && initial.extent_start == continuation.extent_start
+            && initial.extent_end == continuation.extent_end
+            && initial.map_count == continuation.map_count
+            && initial.map_sha256 == continuation.map_sha256
+            && initial.code_sha256 == continuation.code_sha256
+            && initial.il_offset != continuation.il_offset
+            && initial.address != continuation.address,
+        "CLR 双续点没有共享原帧、方法版本或完整代码映射",
+    )?;
+    Ok(ManagedContinuationPair {
+        initial,
+        continuation,
+    })
+}
+
+fn managed_pair_response(
+    mapping: &Value,
+    private: Option<&Value>,
+    binding: &Value,
+    spec: &ClrManagedMethodPairSpec,
+) -> io::Result<ManagedContinuationPair> {
+    require(
+        mapping["status"] == "bound"
+            && mapping["api_hresult"] == 0
+            && mapping["matched_frames"] == 1,
+        "CLR 双续点未知或没有唯一原帧，不能交付半对票据",
+    )?;
+    let pair = managed_pair(
+        private.ok_or_else(|| io::Error::other("CLR 私有双续点缺失"))?,
+        binding,
+        spec,
+    )?;
+    require(
+        mapping["mapping"]
+            == json!({
+                "initial": pair.initial.safe_evidence(),
+                "continuation": pair.continuation.safe_evidence(),
+            }),
+        "CLR 双续点公开映射与私有票据不一致",
+    )?;
+    Ok(pair)
 }
 
 fn validate_managed_observation(
@@ -989,8 +1095,10 @@ pub struct ClrReader {
     reaped: bool,
     delivered: bool,
     managed_spec: Option<ClrManagedMethodSpec>,
+    managed_pair_spec: Option<ClrManagedMethodPairSpec>,
     managed_request_target: Option<ManagedContinuationTarget>,
     managed_response_target: Option<ManagedContinuationTarget>,
+    managed_response_pair: Option<ManagedContinuationPair>,
     managed_target_taken: bool,
 }
 
@@ -1092,8 +1200,10 @@ impl ClrReader {
             reaped: false,
             delivered: false,
             managed_spec: None,
+            managed_pair_spec: None,
             managed_request_target: None,
             managed_response_target: None,
+            managed_response_pair: None,
             managed_target_taken: false,
         })
     }
@@ -1139,11 +1249,33 @@ impl ClrReader {
         spec: &ClrManagedMethodSpec,
     ) -> io::Result<()> {
         require(
-            self.operation == 3 && self.managed_spec.is_none() && !self.initialization_attempted,
+            self.operation == 3
+                && self.managed_spec.is_none()
+                && self.managed_pair_spec.is_none()
+                && !self.initialization_attempted,
             "CLR 托管规格请求不能重放",
         )?;
         spec.validate()?;
         self.managed_spec = Some(spec.clone());
+        self.bind_stop_and_send(image, runtime, stop.into())
+    }
+
+    pub fn bind_native_return_with_managed_pair_spec_and_send(
+        &mut self,
+        image: &mut ClrReaderImage,
+        runtime: &mut ClrRuntimeBinding,
+        stop: ClrNativeReturnStop<'_>,
+        spec: &ClrManagedMethodPairSpec,
+    ) -> io::Result<()> {
+        require(
+            self.operation == 3
+                && self.managed_spec.is_none()
+                && self.managed_pair_spec.is_none()
+                && !self.initialization_attempted,
+            "CLR 双续点规格请求不能重放或混入单票据请求",
+        )?;
+        spec.validate()?;
+        self.managed_pair_spec = Some(spec.clone());
         self.bind_stop_and_send(image, runtime, stop.into())
     }
 
@@ -1157,6 +1289,7 @@ impl ClrReader {
         require(
             self.operation == 4
                 && self.managed_spec.is_none()
+                && self.managed_pair_spec.is_none()
                 && !self.initialization_attempted
                 && target.pre_sequence < stop.event_sequence
                 && target.process_id == stop.process_id
@@ -1229,7 +1362,10 @@ impl ClrReader {
         put32(&mut bytes, 156, stop.hresult);
         put32(&mut bytes, 160, stop.first_chance);
         put32(&mut bytes, 164, stop.exception_code);
-        if let Some(spec) = self.managed_spec.as_ref() {
+        if let Some(spec) = self.managed_pair_spec.as_ref() {
+            put32(&mut bytes, 8, 3);
+            bytes.extend(managed_pair_extension(spec)?);
+        } else if let Some(spec) = self.managed_spec.as_ref() {
             put32(&mut bytes, 8, 2);
             bytes.extend(managed_extension(
                 spec,
@@ -1343,7 +1479,30 @@ impl ClrReader {
             .as_object_mut()
             .ok_or_else(|| io::Error::other("CLR 回复不是对象"))?
             .remove("private_target");
-        if let Some(spec) = self.managed_spec.as_ref() {
+        let private_pair = value
+            .as_object_mut()
+            .expect("已核对回复对象")
+            .remove("private_target_pair");
+        if let Some(spec) = self.managed_pair_spec.as_ref() {
+            require(
+                self.operation == 3
+                    && private.is_none()
+                    && value.get("managed_mapping").is_none()
+                    && value.get("managed_continuation").is_none()
+                    && value["budget_exhausted"] == false,
+                "CLR 双续点回复混入其它操作或超过读取预算",
+            )?;
+            self.managed_response_pair = Some(managed_pair_response(
+                &value["managed_mapping_pair"],
+                private_pair.as_ref(),
+                self.binding.as_ref().expect("已核对原请求绑定"),
+                spec,
+            )?);
+        } else if let Some(spec) = self.managed_spec.as_ref() {
+            require(
+                private_pair.is_none() && value.get("managed_mapping_pair").is_none(),
+                "CLR 单票据回复混入双续点",
+            )?;
             if self.operation == 3 {
                 let mapping = &value["managed_mapping"];
                 require(
@@ -1383,7 +1542,9 @@ impl ClrReader {
         } else {
             require(
                 private.is_none()
+                    && private_pair.is_none()
                     && value.get("managed_mapping").is_none()
+                    && value.get("managed_mapping_pair").is_none()
                     && value.get("managed_continuation").is_none(),
                 "CLR 旧协议回复混入托管票据",
             )?;
@@ -1405,6 +1566,21 @@ impl ClrReader {
         )?;
         self.managed_target_taken = true;
         Ok(self.managed_response_target.take())
+    }
+
+    pub fn take_managed_continuation_pair(&mut self) -> io::Result<ManagedContinuationPair> {
+        require(
+            self.operation == 3
+                && self.managed_pair_spec.is_some()
+                && self.reaped
+                && self.delivered
+                && !self.managed_target_taken,
+            "CLR 私有双续点尚未回收交付或已取走",
+        )?;
+        self.managed_target_taken = true;
+        self.managed_response_pair
+            .take()
+            .ok_or_else(|| io::Error::other("CLR 私有双续点没有完整票据"))
     }
 
     pub fn abort_and_reap(&mut self, cleanup_deadline: Instant) -> io::Result<()> {

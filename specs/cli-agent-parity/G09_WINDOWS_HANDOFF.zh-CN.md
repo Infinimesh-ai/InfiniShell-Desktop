@@ -1,6 +1,16 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：PATHEXT单键修复未解决原故障
+## 当前接续状态（2026-10-07）：双阶段读取本机固定能力通过，原环境待验
+
+基于 `6fe81afb56ec4453ab1d9ab637e92d49c505d119` 的本轮增量已实现同一 Complete 方法首次 Start 前及后续返回点的实际读取。pre-op3 使用固定400B双规格一次交付同帧、同方法版本、同代码/map摘要的两张私有票据；initial op4 在 IL0x46读取已初始化的 local4（soloCommand）与 PSI local5，回收reader并恢复原上下文后换装晚期DR1、正常继续，不等待尚未创建的Node。后续点沿用原批准集合。四reader硬上限不变：pre、initial、late各一次，第四槽由early恢复后Node前首个原worker CLR与post分类互斥使用；后者未读时仍保存原生raw，明确CLR未满足，unknown不折成false。
+
+本机a4通过222项command普通测试（9显式忽略、28过滤）和唯一原生夹具一次（1.37秒、258过滤）。实际顺序为pre73→initial75→late首次76→Node77→late重放78→post156，两个op4的固定Boolean均true、PSI均false；四诊断槽与原四异常链分别核验，169原事件全部继续，目标、后代、readers与精确Jobs回收，无pending。独审SHA `fa4b1d70590f25cb362544a1d6222929c8841b6d27f350f76e55e23beb099d52`；详细源码与日志绑定见CURRENT_STATUS.json的 `g09_two_stage_managed_local_20261007`。这些是本机当前CLR的固定能力，不替代原runner与PowerShell验收。
+
+a2、a3失败原件保留。a3实际证明完整方法代码SHA、allocation/base/type/protection/样本字节相同，仅VirtualQueryEx连续页范围从4096增至8192；已仅在托管映射复核中投影到原方法extent，读取前截断样本，继续严格核allocation、类型、保护、完整覆盖和代码摘要，原生分类返回合同不变。新增真实内存页回归验证方法外增长可继续、方法内代码/权限变化拒绝。受控Local准备入口保持，外部启动器只避免WinPS继承PS7模块，未伪造CI环境。应用测试旧字段编译失败也已保留并修正；带特性诊断回归、i18n与cargo check通过。本机缺nextest的失败另存，定向普通回归采用cargo test，远端仍用已有nextest流程。
+
+**新增关闭0项；G09仍开放，PR22保持草稿。** `67089b6`原runner的PATHEXT单键修复反证不变。下一步先验原runner同提交固定能力，再接真实PS核初始与终态及同停点证据；精准修复、正常witness=false五场景、三次独立冷恢复、最终同一冻结源码Linux/Windows门禁仍欠。V01/V02/V05移交不计通过。无需本地化变更：仅内部诊断、固定夹具和证据，无用户文案或布局变化。仓外原件保留，cleanup_ready=false。
+
+## 历史记录：PATHEXT单键修复未解决原故障
 
 `67089b6098915c85f5d6947a613f15d391b67134`的[原runner22运行37525407224](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37525407224)已正式失败，只有真实npm步骤62失败。编译检查、1146项warp及93项command普通回归、其中i18n11项和142项诊断普通回归通过，不能替代产品验收。唯一产品变化为PS候选PATHEXT=.EXE；本轮仍为updated/ProbeFailed，libtest退出101。
 

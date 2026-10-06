@@ -138,8 +138,6 @@ try {
     if (($methodFlags -band 72) -ne 72) { throw '固定方法缺少 NoInlining 与 NoOptimization 标志' }
     $receipt.fixture_shell_method_implementation_flags = $methodFlags
     # 仅解码刚编译的方法体，按唯一边界调用确定实际局部索引；不搜索字节子串或执行方法。
-    $boundary = $type.GetMethod('ContinuationBoundary', $flags)
-    if ($null -eq $boundary) { throw '固定续点边界方法缺失' }
     $body = $shellMethod.GetMethodBody()
     $il = $body.GetILAsByteArray()
     $opcodes = @{}
@@ -172,40 +170,60 @@ try {
         $instructions += [pscustomobject]@{ offset = $startOffset; opcode = $opcode.Name; operand = $operand }
         $offset += $size
     }
-    $boundaryCalls = @(for ($i = 2; $i -lt $instructions.Count; $i++) {
-        if ($instructions[$i].opcode -ceq 'call' -and $instructions[$i].operand -eq $boundary.MetadataToken) { $i }
+    $readBoundary = {
+        param($boundaryName)
+        $boundary = $type.GetMethod($boundaryName, $flags)
+        if ($null -eq $boundary) { throw '固定阶段边界方法缺失' }
+        $boundaryCalls = @(for ($i = 2; $i -lt $instructions.Count; $i++) {
+            if ($instructions[$i].opcode -ceq 'call' -and $instructions[$i].operand -eq $boundary.MetadataToken) { $i }
+        })
+        if ($boundaryCalls.Count -ne 1) { throw '固定续点调用不唯一' }
+        $callIndex = $boundaryCalls[0]
+        $booleanLoad = $instructions[$callIndex - 2]
+        $startInfoLoad = $instructions[$callIndex - 1]
+        $booleanIndex = if ($booleanLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
+            elseif ($booleanLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$booleanLoad.operand }
+            else { throw '固定布尔参数不是按值读取的局部变量' }
+        $startInfoIndex = if ($startInfoLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
+            elseif ($startInfoLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$startInfoLoad.operand }
+            else { throw '固定 ProcessStartInfo 不是局部变量' }
+        if ($booleanIndex -ge $body.LocalVariables.Count -or $startInfoIndex -ge $body.LocalVariables.Count -or
+            $body.LocalVariables[$booleanIndex].LocalType.FullName -cne 'System.Boolean' -or
+            $body.LocalVariables[$startInfoIndex].LocalType.FullName -cne 'System.Diagnostics.ProcessStartInfo') {
+            throw '固定续点局部变量类型不符'
+        }
+        $decisionIndex = $callIndex + 1
+        while ($decisionIndex -lt $instructions.Count -and $instructions[$decisionIndex].opcode -ceq 'nop') { $decisionIndex++ }
+        if ($decisionIndex -ge $instructions.Count) { throw '固定边界调用后缺少布尔读取' }
+        $decisionLoad = $instructions[$decisionIndex]
+        $decisionLocal = if ($decisionLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
+            elseif ($decisionLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$decisionLoad.operand }
+            else { throw '固定边界调用后不是布尔局部读取' }
+        if ($decisionLocal -ne $booleanIndex) { throw '固定调用前后布尔局部不同' }
+        [ordered]@{
+            method_token = $shellMethod.MetadataToken; boundary_method_token = $boundary.MetadataToken
+            approved_il_offsets = @($decisionLoad.offset)
+            boundary_bool_load_offset = $booleanLoad.offset; boundary_call_offset = $instructions[$callIndex].offset
+            bool_local_index = $booleanIndex; start_info_local_index = $startInfoIndex
+            il_base64 = [Convert]::ToBase64String($il)
+            expected_boolean = $true; expected_use_shell_execute = $false
+        }
+    }
+    $receipt.fixture_initial = & $readBoundary 'InitialBoundary'
+    $receipt.fixture_continuation = & $readBoundary 'ContinuationBoundary'
+    $starts = @($instructions | Where-Object {
+        if ($_.opcode -cne 'call') { return $false }
+        $called = $shellMethod.Module.ResolveMethod($_.operand)
+        $called.DeclaringType.FullName -ceq 'System.Diagnostics.Process' -and $called.Name -ceq 'Start'
     })
-    if ($boundaryCalls.Count -ne 1) { throw '固定续点调用不唯一' }
-    $callIndex = $boundaryCalls[0]
-    $booleanLoad = $instructions[$callIndex - 2]
-    $startInfoLoad = $instructions[$callIndex - 1]
-    $booleanIndex = if ($booleanLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
-        elseif ($booleanLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$booleanLoad.operand }
-        else { throw '固定布尔参数不是按值读取的局部变量' }
-    $startInfoIndex = if ($startInfoLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
-        elseif ($startInfoLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$startInfoLoad.operand }
-        else { throw '固定 ProcessStartInfo 不是局部变量' }
-    if ($booleanIndex -ge $body.LocalVariables.Count -or $startInfoIndex -ge $body.LocalVariables.Count -or
-        $body.LocalVariables[$booleanIndex].LocalType.FullName -cne 'System.Boolean' -or
-        $body.LocalVariables[$startInfoIndex].LocalType.FullName -cne 'System.Diagnostics.ProcessStartInfo') {
-        throw '固定续点局部变量类型不符'
+    if ($starts.Count -ne 1) { throw '固定方法的 Process.Start 调用不唯一' }
+    if ($receipt.fixture_initial.approved_il_offsets[0] -ge $receipt.fixture_continuation.approved_il_offsets[0] -or
+        $receipt.fixture_initial.approved_il_offsets[0] -ge $starts[0].offset -or
+        $starts[0].offset -ge $receipt.fixture_continuation.approved_il_offsets[0] -or
+        $receipt.fixture_initial.start_info_local_index -ne $receipt.fixture_continuation.start_info_local_index) {
+        throw '固定初始与等待阶段没有绑定同方法的有序续点及同一 ProcessStartInfo 局部'
     }
-    $decisionIndex = $callIndex + 1
-    while ($decisionIndex -lt $instructions.Count -and $instructions[$decisionIndex].opcode -ceq 'nop') { $decisionIndex++ }
-    if ($decisionIndex -ge $instructions.Count) { throw '固定边界调用后缺少布尔读取' }
-    $decisionLoad = $instructions[$decisionIndex]
-    $decisionLocal = if ($decisionLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
-        elseif ($decisionLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$decisionLoad.operand }
-        else { throw '固定边界调用后不是布尔局部读取' }
-    if ($decisionLocal -ne $booleanIndex) { throw '固定调用前后布尔局部不同' }
-    $receipt.fixture_continuation = [ordered]@{
-        method_token = $shellMethod.MetadataToken; boundary_method_token = $boundary.MetadataToken
-        approved_il_offsets = @($decisionLoad.offset)
-        boundary_bool_load_offset = $booleanLoad.offset; boundary_call_offset = $instructions[$callIndex].offset
-        bool_local_index = $booleanIndex; start_info_local_index = $startInfoIndex
-        il_base64 = [Convert]::ToBase64String($il)
-        expected_boolean = $true; expected_use_shell_execute = $false
-    }
+    $receipt.fixture_process_start_il = $starts[0].offset
     $receipt.fixture_method_tokens = @('ThrowNative', 'ThrowSecondNative', 'WrapNative', 'WrapOperation', 'Exercise') | ForEach-Object {
         $method = $type.GetMethod($_, $flags)
         if ($null -eq $method) { throw '固定夹具方法元数据缺失' }

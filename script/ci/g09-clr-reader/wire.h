@@ -63,6 +63,17 @@ static_assert(sizeof(G09ManagedRequest) == 200);
 static_assert(offsetof(G09ManagedRequest, pre_sequence) == 68);
 static_assert(offsetof(G09ManagedRequest, map_sha256) == 136);
 
+// v3 仅用于 op3；同一原帧绑定两个独立续点，两个规格的 target 区域必须为零。
+// op4 仍逐次消费原 v2 单票据，不增加任何返回地址能力。
+#pragma pack(push, 1)
+struct G09ManagedPairRequest {
+  G09ManagedRequest initial;
+  G09ManagedRequest continuation;
+};
+#pragma pack(pop)
+static_assert(sizeof(G09ManagedPairRequest) == 400);
+static_assert(offsetof(G09ManagedPairRequest, continuation) == 200);
+
 constexpr std::uint32_t G09_CLR_FIXTURE_READ_BYTES = 16 * 1024 * 1024;
 constexpr std::uint32_t G09_CLR_POWERSHELL_READ_BYTES = 24 * 1024 * 1024;
 constexpr std::uint32_t G09_CLR_MAX_READ_CALLS = 8192;

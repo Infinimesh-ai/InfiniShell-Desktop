@@ -103,6 +103,10 @@ Windows x64 本地固定夹具在 `0x4550` 返回停点实际读到 Framework �
 
 旧 v1 的 op1/2/3 请求布局与用途不变。显式 v2 在 168 字节原头与 DAC 路径之间增加固定 200 字节方法合同；op3 可请求当前真实栈中一个 MVID/MethodDef 的有界映射，op4 是独立托管续点类型，不能把它冒充 SHGetFileInfoW 返回或 CLR 异常。
 
+显式 v3 仅用于 op3，在原头与 DAC 路径之间传两个固定 200 字节规格。两组 IL 不重叠且属于同一 MVID/MethodDef；reader 在同一原帧与 MethodInstance 取得两点，核同 pre nonce、出生身份、RSP、EnC、extent、完整 map/代码摘要及不同 IL/地址后整对交付。公开 `managed_mapping_pair` 与私有 `private_target_pair` 必须一致，缺半对、重复地址或 unknown 均拒绝；私有原件从公开 Value 移除。v1/v2 和单票据 op4 布局不变，读取/输出预算不增加。
+
+当前双点规格的首次点为 Complete IL `0046`、Boolean local4（soloCommand）及 PSI local5，位于第一次 Process.Start 前；local0 此时不具备后续等待决策语义。core 撤回全部自有 DR，读取并回收 initial op4 后将 DR1 换成原 pair 的后续点，正常继续原事件，不能等待尚未创建的 Node。后续点沿用下列规格与 Node 竞态处理。真实候选最多四个 reader：pre-op3、initial-op4、continuation-op4 各一次；第四槽由 initial 恢复后至 Node 创建前原 worker 首个 CLR 异常与 post 分类读取互斥使用。异常占槽后仍保留 post 原生返回，但明确其 CLR 栈未读。首个不支持的 CLR 事件也耗槽，不追逐后续异常；旧固定四异常能力验与此候选预算分开记录。
+
 方法规格最多四个预批准 IL、一个 Boolean local 索引和一个可选 ProcessStartInfo local 索引；不搜索名称、不枚举所有方法、不触发 JIT。原 PowerShell Complete 的批准集合为 `0230/0232/0293/0294`，local0 已赋值且未再变，local5 是 ProcessStartInfo。`0314/0315` 属于 finally，不能当作等价正常续点。实际命中只解释对应停点的状态，不把未命中当作分支值。
 
 pre 只使用实际栈帧持有的 MethodInstance，读取完整最多 256 项 IL map、唯一原生 extent、EnC version 和同帧 RSP；扫描范围内第二个匹配即 unknown。公开记录扫描帧数、原 stack HRESULT 和 scan_complete，不能把 32 帧截断前缀的唯一匹配宣称为全栈唯一。只选择规格中有一个原始合法非空范围、逆向映射也唯一的精确 IL，不选最近项。完整原始 map 的 IL、相对起止、source type 逐项以四个小端 u64 串接后计算 SHA256。旧 DAC 任意位置 EPILOG 的 `end=entry` 及末项普通 IL 的同类开放标记，仅作为从该起点到 extent 末尾的保守排除区；不会把补出的长度当作批准地址，也不会从后续 funclet 序言猜测终点。
@@ -110,6 +114,8 @@ pre 只使用实际栈帧持有的 MethodInstance，读取完整最多 256 项 I
 `map_notes` 在失败时也保留固定 stage、API 报告的 map_count、完整返回时最多 256 个原始 IL 整数和最多四个批准点的匹配数、闭范围状态及实际逆向 HRESULT/数量/单个 IL；未调用或未取得为 null。边界拒绝保留实际条目索引、IL、相对起止与 extent 长度，开放排除项也记录相对边界。extent 内零长项记录索引、IL 和相对位置，保留在完整 map 摘要中，但不占有半开范围、不可作为候选。stage 区分 EnC/extent/map API、完整性、范围重叠、批准点缺失和逆向验证，不输出原生地址，不为了补诊断追加 DAC 调用。
 
 映射票据绑定 pre 序号/nonce、原进线程创建时间、方法版本、帧 RSP、完整代码/map 摘要及地址。地址仅在私有 reader stdout 原件和 opaque Rust target 内存在；poll 核验后从公开 Value 移除 private_target，target 一次领取，Debug 只输出遮蔽文本。core 负责 DR1 归属、Node 时序、执行页/代码复核、全撤 DR、reader 回收与原上下文恢复；reader 没有目标写入或 Continue 权限。
+
+执行页复核仅投影到票据的完整原方法 extent；VirtualQueryEx 的方法外连续页增长不构成方法映射变化。每段仍必须已提交、可执行且无 guard/noaccess，原 allocation、类型、完整保护位、连续覆盖及完整代码摘要都须相同；样本读取前即截在方法末端，分段、身份、保护或代码不符仍拒绝。原生 SHGetFileInfoW 返回配对的映射比较不变。
 
 父进程的续点可能先于子进程 CREATE 事件递送。[Windows 调试事件契约](https://learn.microsoft.com/en-us/windows/win32/debug/debugging-events)只保证 CREATE 先于该子进程自身的执行与其他事件。此时 core 先核验自有 DR1、原帧与映射，仅给原工作线程增加一次显式暂停，调用方用 [DBG_REPLY_LATER](https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-continuedebugevent)延后同一事件。原 Continue 成功后才确认延期；实际 Node CREATE 的映像及创建身份完整绑定后，核对原暂停线程上下文、平衡该次暂停，再等待同一异常重放。helper 两端仅为原始首机会单步事件接受此状态，不改变 CLR 异常的 NOT_HANDLED 语义。
 

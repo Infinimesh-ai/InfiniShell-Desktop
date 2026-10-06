@@ -1,4 +1,274 @@
 {
+  "g09_two_stage_managed_local_20261007": {
+    "base_commit": "6fe81afb56ec4453ab1d9ab637e92d49c505d119",
+    "scope": "本机未提交增量的固定观察能力；不是原runner或真实PowerShell验收",
+    "g09_closed": false,
+    "closed_items_count": 10,
+    "newly_closed_items": 0,
+    "pr_draft": true,
+    "implementation": [
+      "v3/op3固定400B双规格，从同一原Frame/MethodInstance交付initial与continuation私有票据；v1/v2及op4布局不变",
+      "首次Complete IL0x46读取soloCommand local4与PSI local5，恢复后正常继续并换装晚期DR1；不在early等待Node",
+      "pre/initial/late各一次；第四reader槽由early恢复后Node前首CLR与post分类互斥；unknown不转false",
+      "只将托管方法范围内映射作为复核边界；保持allocation/type/protect/连续覆盖/完整代码摘要；原生分类返回比较不变"
+    ],
+    "native_fixture": {
+      "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\g09-clr-fixture-local-two-stage-a4\\fixture.safe.json",
+      "bytes": 932769,
+      "sha256": "0175823f82b71b04d7d4e5370a2514496b66cf4e37bc3cb8f825b949bb87f53a"
+    },
+    "independent_audit": {
+      "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-a4-independent-audit.safe.json",
+      "bytes": 46641,
+      "sha256": "fa4b1d70590f25cb362544a1d6222929c8841b6d27f350f76e55e23beb099d52"
+    },
+    "native_sequence": {
+      "pre_return": 73,
+      "initial": 75,
+      "continuation_first_delivery": 76,
+      "node_create": 77,
+      "continuation_replay": 78,
+      "post_return": 156
+    },
+    "independent_checks": 216,
+    "native_pre_start_exception_observed": false,
+    "native_events": 169,
+    "diagnostic_slots": [
+      "pre",
+      "initial",
+      "continuation",
+      "post"
+    ],
+    "gates": {
+      "two-stage-command-ordinary-a4": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-command-ordinary-a4.safe.json",
+          "bytes": 7603,
+          "sha256": "1b09531cf14013a268b013fa99bb00c0328d18c7136937f43b32eb4777c83e30"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-command-ordinary-a4.log",
+          "bytes": 26577,
+          "sha256": "990fb726300512e2fccb8d67ceed7afdd78cf1d262cead379625548017d2ba41"
+        },
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "command",
+          "--lib",
+          "windows::",
+          "--",
+          "--skip",
+          "fixed_framework_clr"
+        ]
+      },
+      "two-stage-reader-build-a4": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-reader-build-a4.safe.json",
+          "bytes": 8341,
+          "sha256": "9184dd4bf86e921a839e6a48062a1efd3349fdd279eec3b9843973cdd8a58f9b"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-reader-build-a4.log",
+          "bytes": 221,
+          "sha256": "b837bfc8f3db032772e11a9346d99180c8c0e59c9b9f62ee1b5d67edc7090362"
+        },
+        "command": [
+          "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "script/ci/g09-clr-fixture/build-reader.ps1",
+          "-Local",
+          "-LocalRoot",
+          "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a",
+          "-LocalRunId",
+          "two-stage-a4"
+        ]
+      },
+      "two-stage-fixture-prepare-a4": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-fixture-prepare-a4.safe.json",
+          "bytes": 8461,
+          "sha256": "54f7a420e9a4427404da65e3cc2c1fa0406c0a9e8b975dcd0ee092cf33b85356"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-fixture-prepare-a4.log",
+          "bytes": 111,
+          "sha256": "512d6242455a358a291687b9678de4c3b3652c4eaa17c2babc76ccc7cda74e2d"
+        },
+        "command": [
+          "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "script/ci/g09-clr-fixture/prepare.ps1",
+          "-Reader",
+          "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\g09-clr-build-local-two-stage-a4\\reader.exe",
+          "-Local",
+          "-LocalRoot",
+          "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a",
+          "-LocalRunId",
+          "two-stage-a4"
+        ]
+      },
+      "two-stage-fixture-native-a4": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-fixture-native-a4.safe.json",
+          "bytes": 8118,
+          "sha256": "fd2b93f0af91d1f8efa4e0f19d617e90ade4dda7a41ef265c03a4459ccf10367"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-fixture-native-a4.log",
+          "bytes": 380,
+          "sha256": "3b34eb8eb78866949e156544ca482f5fc3e711b215af7da8dd881109429b807d"
+        },
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "command",
+          "--lib",
+          "windows::clr_fixture_tests::framework_exception_chain_uses_original_event_thread_and_reaps_reader",
+          "--",
+          "--ignored",
+          "--exact",
+          "--nocapture"
+        ]
+      },
+      "two-stage-app-focused-a3": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-app-focused-a3.safe.json",
+          "bytes": 8532,
+          "sha256": "c596397b69f4ee14e4f04cf9da377218f0f78bd276cdb4a92ccbf3b0525cd18e"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-app-focused-a3.log",
+          "bytes": 26199,
+          "sha256": "619b8c95c27c6289e24c1df81116a6dc32ded9c87805e2ac22bcf16917c466cd"
+        },
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "warp",
+          "--lib",
+          "--features",
+          "cli-agent-native-witness",
+          "atomic_windows::native_"
+        ]
+      },
+      "two-stage-i18n-a1": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-i18n-a1.safe.json",
+          "bytes": 8506,
+          "sha256": "9877b2c0f64b7df08e5aa5dec3132f37d33c1ec0f97c7935e76edc57d202febc"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-i18n-a1.log",
+          "bytes": 10040,
+          "sha256": "db04e1b78950ebd5d7bf277d90e3fff902fbf18753bd380293c2ee6cdae2c3a3"
+        },
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "warp",
+          "--lib",
+          "--features",
+          "cli-agent-native-witness",
+          "i18n::tests"
+        ]
+      },
+      "two-stage-app-check-a2": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-app-check-a2.safe.json",
+          "bytes": 8483,
+          "sha256": "02074e37a889d00a201dd9f49f88a08d8309015e121eb9736862ae7d1089b79a"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-app-check-a2.log",
+          "bytes": 10631,
+          "sha256": "eb05a0e5219c2e46dcf31625dff4c2716a319e3180849f8fbeb79d5d5b52c3b0"
+        },
+        "command": [
+          "cargo",
+          "check",
+          "--locked",
+          "-p",
+          "warp",
+          "--features",
+          "cli-agent-native-witness"
+        ]
+      }
+    },
+    "passed_test_counts": {
+      "command_ordinary": 222,
+      "application_diagnostics": 110,
+      "i18n": 11,
+      "unique_native_fixture": 1
+    },
+    "negative_evidence_preserved": [
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-reader-build-a1.safe.json",
+        "bytes": 7798,
+        "sha256": "1024f9ac391934c30404def19422999ba35e9187a1df7af606c1cef056a7931a"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-fixture-native-a2.safe.json",
+        "bytes": 7698,
+        "sha256": "fb79ba51b08bc0d74b11c79e352e95aeec845433eaf525d524f6ad1afb3c3e46"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-fixture-native-a3.safe.json",
+        "bytes": 7699,
+        "sha256": "790a44c5f863aceed3c8e286d2acc1e7681653bf29df605df8a9aea566dd0d04"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-app-focused-a1.safe.json",
+        "bytes": 8113,
+        "sha256": "75cb3c2bbe557dab14a5d802a16aa5edc7d07ae3b45e98aeaf9de6da1343df39"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\two-stage-app-focused-a2.safe.json",
+        "bytes": 8025,
+        "sha256": "1c42d5603dfffde2159159a3c160fa13f29df94dd8d4614f6444a9d282288f0c"
+      }
+    ],
+    "a3_mapping_difference": {
+      "expected_regions": 1,
+      "actual_regions": 1,
+      "expected_length": 4096,
+      "actual_length": 8192,
+      "allocation_equal": true,
+      "base_equal": true,
+      "kind_equal": true,
+      "protect_equal": true,
+      "bytes_equal": true,
+      "full_code_hash_equal": true
+    },
+    "local_launcher": "显式Local入口；WinPS只使用自身系统PSModulePath，避免继承PowerShell7二进制模块；未伪造GITHUB_ACTIONS",
+    "local_nextest": "本机未安装cargo-nextest，保存失败后使用cargo test执行定向普通测试；原runner仍使用已有nextest门禁",
+    "localization": "无需本地化变更：仅内部诊断、固定夹具和证据，无产品用户文案或布局变更",
+    "cleanup_ready": false,
+    "next": [
+      "提交后先跑原runner同提交固定能力",
+      "再接同提交真实PowerShell，核早晚PSI与同停点异常实际证据",
+      "精准修复后正常witness=false五场景和三次独立冷恢复",
+      "最终同一冻结源码Linux/Windows门禁后才ready并合并"
+    ]
+  },
   "g09_pathext_original_counterexample_20261007": {
     "source_commit": "67089b6098915c85f5d6947a613f15d391b67134",
     "run_id": 37525407224,
@@ -1129,7 +1399,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过。67089b6只为PS候选增加PATHEXT=.EXE后，原runner22/run37525407224仍ProbeFailed；pre182实际0x4550、Node190后op4191仍实读local0=true及PSI.useShellExecute=true，原预测被否定。PS12924ms零输出退出1，Codex/Node随后0。原模块身份、67项执行前源码和清理已核；失败后driver末尾全套复核未执行。新增2条CLR只有总计数，不能认定回退。下一步区分首次Start前的初始PSI与终态值；精准修复、正常五场景/三冷恢复及最终同源双平台门禁仍欠，PR保持草稿，不合并。",
+  "status_zh": "G01–G08、G10、V03共10项关闭，G09开放；V01/V02/V05移交不计通过。双阶段托管读取已实现，本机222项command普通及唯一native通过，early75→Node77→late78、四诊断槽与原四异常链已核。a2/a3映射失败保留，a3实际仅方法外RegionSize4096→8192；已限制到原方法extent并保持代码/身份/权限严格核验。应用带特性回归、i18n及cargo check已通过，原runner同提交固定能力与真实PS待验。67089原机ProbeFailed反证不变，不把本机能力当原机首因。正常五场景/三冷恢复及最终同源双平台门禁仍欠，PR保持草稿、禁止合并。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,

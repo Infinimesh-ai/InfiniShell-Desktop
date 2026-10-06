@@ -34,7 +34,7 @@ fn pre_node_receipt() -> serde_json::Value {
         "pre_node_clr_stack_required":true})
 }
 
-fn post_node_exception_event() -> DEBUG_EVENT {
+fn pre_start_exception_event() -> DEBUG_EVENT {
     let mut event = return_event(7, 1, CLR_EXCEPTION);
     let mut information = unsafe { event.u.Exception };
     information.ExceptionRecord.NumberParameters = 1;
@@ -43,13 +43,26 @@ fn post_node_exception_event() -> DEBUG_EVENT {
     event
 }
 
-fn post_node_exception_receipt() -> serde_json::Value {
+fn pre_start_exception_receipt() -> serde_json::Value {
     serde_json::json!({"generation":Uuid::from_bytes([1;16]).as_bytes(),
         "identity":{"process_id":7,"thread_id":8,"process_birth":100,"thread_birth":101},
-        "pre_return_sequence":4,"node_create_sequence":5,"node_process_id":9,"node_process_birth":102,
+        "pre_return_sequence":4,"initial_sequence":5,
         "event_sequence":6,"exception_code":CLR_EXCEPTION,"first_chance":1,"parameter_count":1,
         "event_hresult":0x80070005u32,"reader_eligible":true,"registers_restored":true,
         "execution_context_unchanged":true})
+}
+
+fn initial_mapping() -> serde_json::Value {
+    serde_json::json!({"module_mvid":"0a210000-3870-4dec-b53e-175f62acb623",
+        "method_token":100668016,"il_offset":0x46,"pre_sequence":4})
+}
+
+fn initial_receipt() -> serde_json::Value {
+    serde_json::json!({"generation":Uuid::from_bytes([1;16]).as_bytes(),
+        "identity":{"process_id":7,"thread_id":8,"process_birth":100,"thread_birth":101},
+        "pre_return_sequence":4,"event_sequence":5,"registers_restored":true,
+        "execution_context_unchanged":true,"managed_initial_clr_stack_required":true,
+        "mapping":initial_mapping()})
 }
 
 fn node_create_receipt() -> serde_json::Value {
@@ -68,6 +81,241 @@ fn continuation_receipt() -> serde_json::Value {
         "event_sequence":6,"first_delivery_sequence":6,"deferred_for_node":false,
         "registers_restored":true,"execution_context_unchanged":true,
         "managed_continuation_clr_stack_required":true,"mapping":continuation_mapping()})
+}
+
+#[test]
+fn initial_stop_reads_before_node_without_satisfying_the_late_gate() {
+    let event = return_event(7, 1, SINGLE_STEP);
+    let receipt = initial_receipt();
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_ok()
+    );
+    assert!(
+        validate_managed_continuation_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &node_create_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn initial_stop_rejects_a_self_consistent_late_mapping() {
+    let event = return_event(7, 1, SINGLE_STEP);
+    let mut receipt = initial_receipt();
+    receipt["mapping"] = continuation_mapping();
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &continuation_mapping(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn initial_stop_rejects_stale_generation_worker_and_pre_sequence() {
+    let event = return_event(7, 1, SINGLE_STEP);
+    let receipt = initial_receipt();
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([2; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+    let mut pre = pre_node_receipt();
+    pre["identity"]["thread_birth"] = serde_json::json!(102);
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre,
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+    let mut pre = pre_node_receipt();
+    pre["return_sequence"] = serde_json::json!(5);
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre,
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn initial_stop_rejects_synthetic_node_bindings_and_unrestored_context() {
+    let event = return_event(7, 1, SINGLE_STEP);
+    let mut receipt = initial_receipt();
+    receipt["node_create_sequence"] = serde_json::Value::Null;
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+    let mut receipt = initial_receipt();
+    receipt["registers_restored"] = serde_json::json!(false);
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+    receipt["registers_restored"] = serde_json::json!(true);
+    receipt["execution_context_unchanged"] = serde_json::json!(false);
+    assert!(
+        validate_managed_initial_binding(
+            &event,
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn initial_stop_rejects_foreign_events_and_original_clr_exceptions() {
+    assert!(
+        validate_managed_initial_binding(
+            &return_event(9, 1, SINGLE_STEP),
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &initial_receipt(),
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+    assert!(
+        validate_managed_initial_binding(
+            &pre_start_exception_event(),
+            7,
+            5,
+            Uuid::from_bytes([1; 16]),
+            &initial_receipt(),
+            &pre_node_receipt(),
+            &initial_mapping(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn initial_budget_is_once_after_pre_and_before_post_with_no_deadline_retry() {
+    let mut budget = ReturnBudget::default();
+    assert!(budget.reserve_initial(5, false).is_err());
+    assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
+    assert!(budget.reserve_exception(6, false).is_err());
+    assert!(budget.reserve_initial(4, false).is_err());
+    assert!(budget.reserve_initial(5, true).is_err());
+    assert!(budget.reserve_initial(5, false).is_ok());
+    assert!(budget.reserve_initial(6, false).is_err());
+    assert_eq!(budget.managed_initial, Some(5));
+}
+
+#[test]
+fn skipped_post_cannot_create_a_reader_slot_or_relax_event_order() {
+    let mut budget = ReturnBudget::default();
+    assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
+    assert!(budget.reserve_initial(5, false).is_ok());
+    assert!(budget.skip_post_after_exception(6, false).is_err());
+    assert!(budget.reserve_exception(6, false).is_ok());
+    assert!(budget.skip_post_after_exception(6, false).is_err());
+    assert!(budget.skip_post_after_exception(8, true).is_err());
+    assert!(budget.reserve_continuation(7, false).is_ok());
+    assert!(budget.skip_post_after_exception(8, false).is_ok());
+    assert!(budget.reserve(ReturnStage::PostNode, 9, false).is_err());
+    assert!(budget.reserve_exception(9, false).is_err());
+    assert!(budget.reserve_continuation(9, false).is_err());
+    assert_eq!(budget.post_node, None);
+    assert_eq!(budget.post_node_skipped, Some(8));
+}
+
+#[test]
+fn pre_start_exception_rejects_even_null_node_fields_and_changed_initial_identity() {
+    let event = pre_start_exception_event();
+    let mut receipt = pre_start_exception_receipt();
+    receipt["node_create_sequence"] = serde_json::Value::Null;
+    assert!(
+        validate_pre_start_exception_binding(
+            &event,
+            7,
+            6,
+            Uuid::from_bytes([1; 16]),
+            &receipt,
+            &pre_node_receipt(),
+            &initial_receipt(),
+        )
+        .is_err()
+    );
+    let mut initial = initial_receipt();
+    initial["identity"]["thread_birth"] = serde_json::json!(102);
+    assert!(
+        validate_pre_start_exception_binding(
+            &event,
+            7,
+            6,
+            Uuid::from_bytes([1; 16]),
+            &pre_start_exception_receipt(),
+            &pre_node_receipt(),
+            &initial,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -287,7 +535,7 @@ fn continuation_rejects_a_mapping_from_another_pre_stop() {
 fn continuation_rejects_clr_exceptions_and_child_events() {
     assert!(
         validate_managed_continuation_binding(
-            &post_node_exception_event(),
+            &pre_start_exception_event(),
             7,
             6,
             Uuid::from_bytes([1; 16]),
@@ -317,25 +565,27 @@ fn continuation_rejects_clr_exceptions_and_child_events() {
 fn continuation_budget_allows_post_classification_first_without_reusing_any_slot() {
     let mut budget = ReturnBudget::default();
     assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
-    assert!(budget.reserve_exception(6, false).is_ok());
+    assert!(budget.reserve_initial(5, false).is_ok());
     assert!(budget.reserve(ReturnStage::PostNode, 8, false).is_ok());
     assert!(budget.reserve_continuation(10, false).is_ok());
     assert!(budget.reserve_continuation(11, false).is_err());
     assert!(budget.reserve_exception(12, false).is_err());
     assert!(budget.reserve(ReturnStage::PostNode, 13, false).is_err());
     assert_eq!(budget.pre_node, Some(4));
-    assert_eq!(budget.post_node_exception, Some(6));
+    assert_eq!(budget.pre_start_exception, None);
+    assert_eq!(budget.managed_initial, Some(5));
     assert_eq!(budget.post_node, Some(8));
     assert_eq!(budget.managed_continuation, Some(10));
     assert_eq!(budget.last_sequence(), 10);
 }
 
 #[test]
-fn continuation_budget_can_precede_exception_and_post_classification() {
+fn continuation_budget_can_precede_post_classification_but_closes_pre_exception_window() {
     let mut budget = ReturnBudget::default();
     assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
+    assert!(budget.reserve_initial(5, false).is_ok());
     assert!(budget.reserve_continuation(6, false).is_ok());
-    assert!(budget.reserve_exception(8, false).is_ok());
+    assert!(budget.reserve_exception(8, false).is_err());
     assert!(budget.reserve(ReturnStage::PostNode, 10, false).is_ok());
     assert_eq!(budget.managed_continuation, Some(6));
     assert_eq!(budget.last_sequence(), 10);
@@ -346,25 +596,27 @@ fn continuation_budget_requires_pre_return_and_the_original_deadline() {
     let mut budget = ReturnBudget::default();
     assert!(budget.reserve_continuation(6, false).is_err());
     assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
+    assert!(budget.reserve_continuation(6, false).is_err());
+    assert!(budget.reserve_initial(5, false).is_ok());
     assert!(budget.reserve_continuation(4, false).is_err());
     assert!(budget.reserve_continuation(6, true).is_err());
     assert_eq!(budget.managed_continuation, None);
-    assert_eq!(budget.last_sequence(), 4);
+    assert_eq!(budget.last_sequence(), 5);
 }
 
 #[test]
-fn post_node_exception_preserves_the_original_hresult_without_satisfying_return_gates() {
-    let event = post_node_exception_event();
-    let receipt = post_node_exception_receipt();
+fn pre_start_exception_preserves_the_original_hresult_without_satisfying_return_gates() {
+    let event = pre_start_exception_event();
+    let receipt = pre_start_exception_receipt();
     assert_eq!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .unwrap(),
         Some(0x80070005)
@@ -377,192 +629,191 @@ fn post_node_exception_preserves_the_original_hresult_without_satisfying_return_
 }
 
 #[test]
-fn post_node_exception_rejects_a_different_generation_or_pre_worker_identity() {
-    let event = post_node_exception_event();
-    let receipt = post_node_exception_receipt();
+fn pre_start_exception_rejects_a_different_generation_or_pre_worker_identity() {
+    let event = pre_start_exception_event();
+    let receipt = pre_start_exception_receipt();
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([2; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
     let mut wrong_worker = pre_node_receipt();
     wrong_worker["identity"]["thread_birth"] = serde_json::json!(103);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &wrong_worker,
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
     wrong_worker["identity"]["thread_birth"] = serde_json::json!(101);
     wrong_worker["identity"]["thread_id"] = serde_json::json!(10);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &wrong_worker,
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
 }
 
 #[test]
-fn post_node_exception_requires_pre_return_then_real_node_then_original_event() {
-    let event = post_node_exception_event();
-    let receipt = post_node_exception_receipt();
-    let mut node = node_create_receipt();
-    node["sequence"] = serde_json::json!(4);
+fn pre_start_exception_requires_pre_return_then_initial_then_original_event() {
+    let event = pre_start_exception_event();
+    let receipt = pre_start_exception_receipt();
+    let mut initial = initial_receipt();
+    initial["event_sequence"] = serde_json::json!(4);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node,
+            &initial,
         )
         .is_err()
     );
-    node["sequence"] = serde_json::json!(6);
+    initial["event_sequence"] = serde_json::json!(6);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node,
+            &initial,
         )
         .is_err()
     );
-    node["sequence"] = serde_json::json!(5);
-    node["original_create_bound"] = serde_json::json!(false);
+    initial["event_sequence"] = serde_json::json!(5);
+    initial["registers_restored"] = serde_json::json!(false);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node,
+            &initial,
         )
         .is_err()
     );
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             7,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
 }
 
 #[test]
-fn post_node_exception_rejects_child_events_and_unrestored_registers() {
-    let mut event = post_node_exception_event();
+fn pre_start_exception_rejects_child_events_and_unrestored_registers() {
+    let mut event = pre_start_exception_event();
     event.dwProcessId = 9;
-    let mut receipt = post_node_exception_receipt();
+    let mut receipt = pre_start_exception_receipt();
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
     event.dwProcessId = 7;
     receipt["registers_restored"] = serde_json::json!(false);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
     receipt["registers_restored"] = serde_json::json!(true);
     receipt["execution_context_unchanged"] = serde_json::json!(false);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
 }
 
 #[test]
-fn first_non_clr_exception_remains_unread_even_with_a_valid_hresult_parameter() {
-    let mut event = post_node_exception_event();
+fn non_clr_exception_cannot_consume_the_pre_start_clr_selection() {
+    let mut event = pre_start_exception_event();
     let mut information = unsafe { event.u.Exception };
     information.ExceptionRecord.ExceptionCode =
         windows::Win32::Foundation::NTSTATUS(0x80000003u32 as i32);
     event.u.Exception = information;
-    let mut receipt = post_node_exception_receipt();
+    let mut receipt = pre_start_exception_receipt();
     receipt["exception_code"] = serde_json::json!(0x80000003u32);
     receipt["reader_eligible"] = serde_json::json!(false);
     receipt["registers_restored"] = serde_json::json!(false);
     receipt["execution_context_unchanged"] = serde_json::json!(false);
-    assert_eq!(
-        validate_post_node_exception_binding(
+    assert!(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
-        .unwrap(),
-        None
+        .is_err()
     );
     receipt["reader_eligible"] = serde_json::json!(true);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
@@ -570,37 +821,37 @@ fn first_non_clr_exception_remains_unread_even_with_a_valid_hresult_parameter() 
 
 #[test]
 fn malformed_clr_parameters_cannot_be_replaced_with_a_synthetic_zero_hresult() {
-    let mut event = post_node_exception_event();
+    let mut event = pre_start_exception_event();
     let mut information = unsafe { event.u.Exception };
     information.ExceptionRecord.NumberParameters = 16;
     event.u.Exception = information;
-    let mut receipt = post_node_exception_receipt();
+    let mut receipt = pre_start_exception_receipt();
     receipt["parameter_count"] = serde_json::json!(16);
     receipt["reader_eligible"] = serde_json::json!(false);
     receipt["event_hresult"] = serde_json::Value::Null;
     assert_eq!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .unwrap(),
         None
     );
     receipt["event_hresult"] = serde_json::json!(0);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
@@ -609,14 +860,14 @@ fn malformed_clr_parameters_cannot_be_replaced_with_a_synthetic_zero_hresult() {
     receipt["parameter_count"] = serde_json::json!(0);
     receipt["event_hresult"] = serde_json::Value::Null;
     assert_eq!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .unwrap(),
         None
@@ -624,54 +875,61 @@ fn malformed_clr_parameters_cannot_be_replaced_with_a_synthetic_zero_hresult() {
 }
 
 #[test]
-fn second_chance_clr_exception_is_preserved_without_becoming_reader_eligible() {
-    let mut event = post_node_exception_event();
+fn second_chance_clr_exception_is_preserved_without_starting_a_reader() {
+    let mut event = pre_start_exception_event();
     let mut information = unsafe { event.u.Exception };
     information.dwFirstChance = 0;
     event.u.Exception = information;
-    let mut receipt = post_node_exception_receipt();
+    let mut receipt = pre_start_exception_receipt();
     receipt["first_chance"] = serde_json::json!(0);
     receipt["reader_eligible"] = serde_json::json!(false);
     assert_eq!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .unwrap(),
         None
     );
     receipt["event_hresult"] = serde_json::json!(0x80070006u32);
     assert!(
-        validate_post_node_exception_binding(
+        validate_pre_start_exception_binding(
             &event,
             7,
             6,
             Uuid::from_bytes([1; 16]),
             &receipt,
             &pre_node_receipt(),
-            &node_create_receipt(),
+            &initial_receipt(),
         )
         .is_err()
     );
 }
 
 #[test]
-fn exception_budget_consumes_one_selection_without_consuming_post_classification() {
+fn exception_budget_consumes_the_shared_slot_and_preserves_a_skipped_post_event() {
     let mut budget = ReturnBudget::default();
     assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
+    assert!(budget.reserve_initial(5, false).is_ok());
     assert!(budget.reserve_exception(6, false).is_ok());
     assert!(budget.reserve_exception(7, false).is_err());
-    assert!(budget.reserve(ReturnStage::PostNode, 8, false).is_ok());
+    assert!(budget.reserve(ReturnStage::PostNode, 8, false).is_err());
+    assert!(budget.skip_post_after_exception(8, false).is_ok());
+    assert!(budget.skip_post_after_exception(9, false).is_err());
     assert!(budget.reserve(ReturnStage::PostNode, 9, false).is_err());
     assert_eq!(budget.pre_node, Some(4));
-    assert_eq!(budget.post_node_exception, Some(6));
-    assert_eq!(budget.post_node, Some(8));
-    assert_eq!(budget.last_sequence(), 8);
+    assert_eq!(budget.pre_start_exception, Some(6));
+    assert_eq!(budget.post_node, None);
+    assert_eq!(budget.post_node_skipped, Some(8));
+    assert!(budget.reserve_continuation(10, false).is_ok());
+    assert!(budget.reserve_initial(11, false).is_err());
+    assert!(budget.reserve_continuation(12, false).is_err());
+    assert_eq!(budget.last_sequence(), 10);
 }
 
 #[test]
@@ -679,12 +937,13 @@ fn exception_budget_requires_pre_return_and_precedes_post_classification() {
     let mut budget = ReturnBudget::default();
     assert!(budget.reserve_exception(6, false).is_err());
     assert!(budget.reserve(ReturnStage::PreNode, 4, false).is_ok());
+    assert!(budget.reserve_initial(5, false).is_ok());
     assert!(budget.reserve_exception(4, false).is_err());
     assert!(budget.reserve_exception(6, true).is_err());
-    assert_eq!(budget.post_node_exception, None);
+    assert_eq!(budget.pre_start_exception, None);
     assert!(budget.reserve(ReturnStage::PostNode, 8, false).is_ok());
     assert!(budget.reserve_exception(9, false).is_err());
-    assert_eq!(budget.post_node_exception, None);
+    assert_eq!(budget.pre_start_exception, None);
 }
 
 #[test]

@@ -432,3 +432,202 @@ fn managed_stop_without_exact_mapping_cannot_publish_any_local_value() {
     let unknown = json!({"bound":false,"api_hresult":0x80004002_u32,"mapping":null,"boolean_local":null,"start_info_field":null});
     assert!(validate_managed_observation(&unknown, &target).is_ok());
 }
+
+fn managed_pair_spec() -> ClrManagedMethodPairSpec {
+    ClrManagedMethodPairSpec {
+        initial: ClrManagedMethodSpec {
+            approved_il_offsets: vec![0x100, 0x102],
+            bool_local_index: 4,
+            ..managed_spec()
+        },
+        continuation: managed_spec(),
+    }
+}
+
+fn private_managed_pair() -> Value {
+    let mut initial = private_managed_target();
+    initial["il_offset"] = json!(0x100);
+    initial["address"] = json!(0x10100);
+    json!({"initial":initial,"continuation":private_managed_target()})
+}
+
+fn managed_pair_mapping() -> Value {
+    let pair = managed_pair(
+        &private_managed_pair(),
+        &native_return_binding(),
+        &managed_pair_spec(),
+    )
+    .unwrap();
+    json!({"status":"bound","api_hresult":0,"matched_frames":1,
+        "mapping":{"initial":pair.initial.safe_evidence(),"continuation":pair.continuation.safe_evidence()}})
+}
+
+#[test]
+fn managed_pair_specs_reject_different_methods() {
+    let mut spec = managed_pair_spec();
+    spec.continuation.method_token = 0x06001271;
+    assert!(managed_pair_extension(&spec).is_err());
+    spec = managed_pair_spec();
+    spec.continuation.module_mvid = "11223344-4455-6677-8899-aabbccddeeff".into();
+    assert!(managed_pair_extension(&spec).is_err());
+}
+
+#[test]
+fn managed_pair_specs_reject_shared_or_unbounded_candidates() {
+    let mut spec = managed_pair_spec();
+    spec.continuation.approved_il_offsets = vec![0x100];
+    assert!(managed_pair_extension(&spec).is_err());
+    spec = managed_pair_spec();
+    spec.initial.approved_il_offsets = vec![1, 2, 3, 4, 5];
+    assert!(managed_pair_extension(&spec).is_err());
+    spec = managed_pair_spec();
+    spec.continuation.approved_il_offsets = vec![];
+    assert!(managed_pair_extension(&spec).is_err());
+}
+
+#[test]
+fn managed_pair_wire_keeps_separate_local_specs_and_zero_targets() {
+    let bytes = managed_pair_extension(&managed_pair_spec()).unwrap();
+    assert_eq!(bytes.len(), 400);
+    assert_eq!(&bytes[40..44], &2_u32.to_le_bytes());
+    assert_eq!(&bytes[60..64], &4_u32.to_le_bytes());
+    assert_eq!(&bytes[64..68], &5_u32.to_le_bytes());
+    assert_eq!(&bytes[68..200], &[0; 132]);
+    assert_eq!(&bytes[240..244], &4_u32.to_le_bytes());
+    assert_eq!(&bytes[260..264], &0_u32.to_le_bytes());
+    assert_eq!(&bytes[264..268], &5_u32.to_le_bytes());
+    assert_eq!(&bytes[268..], &[0; 132]);
+}
+
+#[test]
+fn managed_pair_requires_both_original_target_tickets() {
+    let mut value = private_managed_pair();
+    value.as_object_mut().unwrap().remove("continuation");
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+    value = private_managed_pair();
+    value["extra"] = private_managed_target();
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+    value = private_managed_pair();
+    value["continuation"]["thread_birth"] = json!(102);
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_rejects_duplicate_target_address() {
+    let mut value = private_managed_pair();
+    value["continuation"]["address"] = json!(0x10100);
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_rejects_replaced_frame() {
+    let mut value = private_managed_pair();
+    value["continuation"]["frame_rsp"] = json!(0x80008);
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_rejects_changed_method_version() {
+    let mut value = private_managed_pair();
+    value["continuation"]["enc_version"] = json!(2);
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_rejects_changed_code_extent() {
+    let mut value = private_managed_pair();
+    value["continuation"]["extent_end"] = json!(0x11008);
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_rejects_changed_map_digest() {
+    let mut value = private_managed_pair();
+    value["continuation"]["map_sha256"] =
+        json!("0303030303030303030303030303030303030303030303030303030303030303");
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_rejects_changed_code_digest() {
+    let mut value = private_managed_pair();
+    value["continuation"]["code_sha256"] =
+        json!("0303030303030303030303030303030303030303030303030303030303030303");
+    assert!(managed_pair(&value, &native_return_binding(), &managed_pair_spec()).is_err());
+}
+
+#[test]
+fn managed_pair_unknown_cannot_deliver_partial_tickets() {
+    let mapping =
+        json!({"status":"unknown","api_hresult":0x80004002_u32,"matched_frames":1,"mapping":null});
+    assert!(
+        managed_pair_response(
+            &mapping,
+            Some(&private_managed_pair()),
+            &native_return_binding(),
+            &managed_pair_spec(),
+        )
+        .is_err()
+    );
+    assert!(
+        managed_pair_response(
+            &managed_pair_mapping(),
+            None,
+            &native_return_binding(),
+            &managed_pair_spec(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn managed_pair_duplicate_frames_cannot_deliver_tickets() {
+    let mut mapping = managed_pair_mapping();
+    mapping["matched_frames"] = json!(2);
+    assert!(
+        managed_pair_response(
+            &mapping,
+            Some(&private_managed_pair()),
+            &native_return_binding(),
+            &managed_pair_spec(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn managed_pair_public_mapping_must_match_both_private_targets() {
+    let mut mapping = managed_pair_mapping();
+    mapping["mapping"]["continuation"]["il_offset"] = json!(0x232);
+    assert!(
+        managed_pair_response(
+            &mapping,
+            Some(&private_managed_pair()),
+            &native_return_binding(),
+            &managed_pair_spec(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn managed_pair_preserves_separate_specs_without_disclosing_addresses() {
+    let mapping = managed_pair_mapping();
+    let pair = managed_pair_response(
+        &mapping,
+        Some(&private_managed_pair()),
+        &native_return_binding(),
+        &managed_pair_spec(),
+    )
+    .unwrap();
+    assert_eq!(pair.initial.spec.bool_local_index, 4);
+    assert_eq!(pair.continuation.spec.bool_local_index, 0);
+    assert_eq!(pair.initial.safe_evidence()["il_offset"], 0x100);
+    assert_eq!(pair.continuation.safe_evidence()["il_offset"], 0x230);
+    assert!(mapping["mapping"]["initial"].get("frame_rsp").is_none());
+    assert!(mapping["mapping"]["continuation"].get("address").is_none());
+    assert_eq!(
+        format!("{pair:?}"),
+        "ManagedContinuationPair { initial: ManagedContinuationTarget { 私有地址已隐藏 }, continuation: ManagedContinuationTarget { 私有地址已隐藏 } }"
+    );
+}
