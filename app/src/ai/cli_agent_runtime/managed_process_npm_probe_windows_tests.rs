@@ -95,11 +95,24 @@ fn cmd_candidate_uses_standard_heap_without_changing_shared_environment() {
 }
 
 #[test]
-fn powershell_candidate_preserves_shared_environment_without_heap_override() {
+fn powershell_candidate_classifies_the_bound_node_as_an_executable() {
     let root = Path::new("private-candidate");
     let baseline = super::super::version_probe::resolved_environment(root).unwrap();
     let candidate = candidate_environment("powershell", root).unwrap();
-    assert_eq!(candidate, baseline);
+    let extensions = candidate
+        .iter()
+        .filter(|(name, _)| name.to_string_lossy().eq_ignore_ascii_case("PATHEXT"))
+        .collect::<Vec<_>>();
+    assert_eq!(extensions.len(), 1);
+    assert_eq!(extensions[0].1, ".EXE");
+    assert_eq!(
+        candidate
+            .iter()
+            .filter(|(name, _)| !name.to_string_lossy().eq_ignore_ascii_case("PATHEXT"))
+            .cloned()
+            .collect::<Vec<_>>(),
+        baseline
+    );
     assert!(candidate.iter().all(|(name, _)| {
         !name
             .to_string_lossy()

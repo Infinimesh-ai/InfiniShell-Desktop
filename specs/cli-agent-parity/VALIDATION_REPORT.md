@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 当前接续状态（2026-10-07）：取得真实等待分支，PATHEXT最小修复待原机验证
+
+G01–G08、G10、V03共10项关闭；G09开放，新增关闭0项；V01/V02/V05仍移交后续实机、不计通过。PR #22保持草稿，当前不满足合并条件。
+
+同一提交d7610c5在原runner22先完成固定能力37499069138（124普通、唯一native一次通过），再执行真实PS37517610154。真实产品仍ProbeFailed，但pre180实际返回17744/0x4550，Node185后的op4 186在原Complete方法IL0x293成功读取Boolean local0=true及PSI local5.useShellExecute=true，全部所需读取HRESULT=0。实际分支跳过输出读取、WaitForExit及LASTEXITCODE更新，PS13111ms零输出退出1，Node/Codex随后0；不能再把它表述成没有运行时分支证据。op4仍是32帧partial，首CLR188的28帧完整栈及LastThrown候选不证明异常freshness。
+
+414个PS事件全部继续，三个reader/Jobs和进程、desktop、DeviceMap、station、LSA清理已核；累计78次live恢复与28个先退出线程分开记录。执行前67来源逐字节绑定，失败后末尾复核未运行，不称全仓冻结。独立op4审计SHA 52b33ca3946e5d4bcceca537435087fd3e6031dafbd60d3cc10ac186618d151d；生命周期终审SHA 21d42ccf0a509d46b62e6076aef77b570a99cd9a4bf907b5101eca4b8f65b656，均位于仓外ps-classification-37517610154。
+
+本轮只给Codex npm PowerShell候选的空环境显式加入PATHEXT=.EXE，不继承宿主值。官方PowerShell实现会把缺失/空PATHEXT补成.CPL，使.EXE不在原生可执行扩展列表；[官方代码](https://github.com/PowerShell/PowerShell/pull/9828/files)与本机独立实验支持此机制，但本机SMA不同、原目标PATHEXT未直接读取，不能提前宣称首因完整关闭。官方shim、命令、权限、超时和诊断实现均未改。修复前回归实际失败（扩展列表0项，期望1项），修复后该模块8项及i18n11项通过，cargo check -p warp通过；各原件与摘要见CURRENT_STATUS.json的g09_pathext_fix_candidate_20261007。
+
+下一步在原runner验证该最小修复：应实际观察UseShellExecute=false、local0=false及正常输出、等待和退出码；若不符即否定完整原因假设。随后仍须正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁。无需本地化变更：环境键为稳定协议值，无新增或变动用户文案、语义说明或布局。原失败、原26异常和本轮全部仓外证据保留，cleanup_ready=false。
+
+## 历史记录：托管续点本地固定能力阶段
+
+以下内容保留当时状态；最新结论以上文为准。
+
 ## 当前接续状态（2026-10-07）：本机托管续点固定能力通过，原环境待验
 
 G01–G08、G10、V03共10项关闭；G09仍开放，新增关闭0项；V01/V02/V05移交后续实机、不计通过，PR #22保持草稿。当前基于374642b的未提交增量已实现Complete原方法的有界托管续点；本机固定能力通过，原runner和真实PowerShell尚未运行本增量，不改变37469893834的ProbeFailed及首因未知结论。

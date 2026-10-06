@@ -117,6 +117,11 @@ fn candidate_environment(mode: &str, root: &Path) -> io::Result<Vec<(OsString, O
         // 仅本次受管 CMD 候选使用标准堆，调试事件与隔离约束保持原样。
         environment.push(("_NO_DEBUG_HEAP".into(), "1".into()));
     }
+    if mode == "powershell" {
+        // 空 PATHEXT 会被 Windows PowerShell 补成仅 .CPL，令 Node 走 ShellExecute。
+        // 封闭入口只需固定的 node.exe；显式保留可执行分类，不继承宿主扩展列表。
+        environment.push(("PATHEXT".into(), ".EXE".into()));
+    }
     Ok(environment)
 }
 

@@ -1,6 +1,147 @@
 {
   "schema": 1,
   "status": "windows_g09_in_progress_pr_draft",
+  "g09_pathext_fix_candidate_20261007": {
+    "base_head": "d7610c5b8bd3af67322e2f8301e273c7a727888e",
+    "status": "minimal_pathext_fix_local_gates_passed_original_runner_pending",
+    "g09_closed": false,
+    "closed_items_added": 0,
+    "pr_must_remain_draft": true,
+    "fixed_capability": {
+      "run_id": 37499069138,
+      "ordinary_passed": 124,
+      "native_passed": 1,
+      "independent_audit": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\fixture-37499069138\\independent-fixed-audit.safe.json",
+        "bytes": 139253,
+        "sha256": "14335661d9056d72ce40f64b624bc81ba4dec8cd1c531411b39d74cc00648b08"
+      },
+      "scope": "原runner22同CLR-DAC，诊断源码本轮未变；不代本轮产品修复验收。"
+    },
+    "actual_powershell": {
+      "run_id": 37517610154,
+      "runner_id": 22,
+      "source_commit": "d7610c5b8bd3af67322e2f8301e273c7a727888e",
+      "conclusion": "failure",
+      "error": "ProbeFailed",
+      "lifecycle_audit": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\ps-classification-37517610154\\lifecycle-terminal-independent-audit.safe.json",
+        "bytes": 108912,
+        "sha256": "21d42ccf0a509d46b62e6076aef77b570a99cd9a4bf907b5101eca4b8f65b656"
+      },
+      "op4_audit": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\ps-classification-37517610154\\independent-op4-chain-audit.safe.json",
+        "bytes": 19025,
+        "sha256": "52b33ca3946e5d4bcceca537435087fd3e6031dafbd60d3cc10ac186618d151d"
+      },
+      "pre_return": {
+        "sequence": 180,
+        "raw_u64": 17744
+      },
+      "node_sequence": 185,
+      "continuation_sequence": 186,
+      "first_worker_clr_sequence": 188,
+      "module_mvid": "0a210000-3870-4dec-b53e-175f62acb623",
+      "method_token": 100668016,
+      "il_offset": 659,
+      "boolean_local_0": true,
+      "psi_local_5_use_shell_execute": true,
+      "stack_boundary": "op4为32帧partial；所需局部/字段读取HRESULT全0；原首CLR28帧完整，LastThrown仍不证明freshness。",
+      "failure_chain": "实际true/true对应跳过输出读取、等待和LASTEXITCODE更新；PS13111ms零输出退出1，Node18160ms退出0。",
+      "event_cleanup": {
+        "received_validated_continued": 414,
+        "reader_jobs_reaped": 3,
+        "dirty_threads": 0,
+        "live_restorations_cumulative": 78,
+        "threads_exit_confirmed_before_restore": 28
+      },
+      "source_boundary": "执行前67源码逐字节匹配；失败后末尾来源复核未运行，不称全仓冻结。"
+    },
+    "fix": {
+      "scope": "仅Codex npm PowerShell候选环境",
+      "pathext": ".EXE",
+      "host_environment_inherited": false,
+      "unchanged": [
+        "官方shim",
+        "mapped_command",
+        "超时",
+        "权限",
+        "调试器",
+        "CLR读取器",
+        "其他探针环境"
+      ],
+      "hypothesis": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\ps-classification-37517610154\\pathext-causal-hypothesis.safe.md",
+        "bytes": 4053,
+        "sha256": "6940ea92ef95b8c9c46f4194b3e86f1101ddbd8258c6dd79cd5d5b09fdeca2c7"
+      },
+      "local_mechanism": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-local-mechanism-a1\\result.safe.json",
+        "bytes": 1450,
+        "sha256": "9879e999391ebc0337ee1460a011401fb8a7b0fa81811c5bc7a92cfe4d0d7c33"
+      },
+      "boundary": "原目标PATHEXT未直接读值；官方机制与本机补证不是原机等价证明。以原runner同一最小环境修复的真实分支false/false、输出与退出时序验证因果。"
+    },
+    "local_gates": {
+      "regression-red": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-regression-red-a1.safe.json",
+          "bytes": 1927,
+          "sha256": "8aa464a9d3789850e339904f2332233ed5786e5387ed9311c08eee6264efba00"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-regression-red-a1.log",
+          "bytes": 10018,
+          "sha256": "909cf69676aca8a626b6752fad63bd6f754e11067b3a29e17ecd272fce2ea11d"
+        },
+        "exit_code": 101
+      },
+      "regression-green": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-regression-green-a1.safe.json",
+          "bytes": 1894,
+          "sha256": "d87f6a56cbd1adbc0015a223913b38b7cff1ee1380ed5481207d9e93655b358e"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-regression-green-a1.log",
+          "bytes": 10447,
+          "sha256": "0d19e3ac75e433ed476d5629ce4ba8fbb4c7be28cae0daf33247c175625c2791"
+        },
+        "exit_code": 0
+      },
+      "i18n": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-i18n-a1.safe.json",
+          "bytes": 1822,
+          "sha256": "c665db147941ef1b08bce362ee96f75b54603a49b919af887a9b945c127bdb97"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-i18n-a1.log",
+          "bytes": 10040,
+          "sha256": "1228af2963c1c29e34a960af57d16d35ca0a2675c95577409bd3cf69017d6d3f"
+        },
+        "exit_code": 0
+      },
+      "warp-check": {
+        "receipt": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-warp-check-a1.safe.json",
+          "bytes": 1748,
+          "sha256": "81c504e0ca80cc20031f066c330c44f2a37d4280a187c355d6a0992fd46e24f1"
+        },
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\pathext-warp-check-a1.log",
+          "bytes": 6397,
+          "sha256": "a998b5fa7ba6f26e882a12a4fead8972c841869340795ac3f32e98cdd09f27d8"
+        },
+        "exit_code": 0
+      }
+    },
+    "localization": "无需本地化变更：仅修复原生入口环境分类，环境键为稳定协议值，无新增或变动用户文案及布局。",
+    "normal_witness_false_five_cases_completed": false,
+    "independent_cold_recoveries": 0,
+    "final_same_source_dual_platform_gate": false,
+    "cleanup_ready": false
+  },
   "g09_managed_continuation_local_20261007": {
     "base_head": "374642b149c9f38e13d9ea6702a965ab4be0885b",
     "status": "local_fixed_capability_passed_original_runner_and_real_powershell_pending",
