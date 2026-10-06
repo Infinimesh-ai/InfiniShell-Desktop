@@ -940,8 +940,6 @@ impl WindowsImageDebugSession {
             }
         };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
-        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-        self.native_witness_received(&event);
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             let exit_code = (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
                 .then(|| unsafe { event.u.ExitProcess.dwExitCode });
@@ -955,6 +953,8 @@ impl WindowsImageDebugSession {
                 );
             }
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_received(&event)?;
         #[cfg(test)]
         if let Some(mut trace) = self.loader_trace.take() {
             // 仅固定版本对照显式启用；观察失败不改变事件所有权、授权或继续状态。
@@ -997,6 +997,9 @@ impl WindowsImageDebugSession {
                 result.as_ref().map_or(status.0, |actual| actual.0),
             );
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        let actual_status = result?;
+        #[cfg(not(all(feature = "cli-agent-native-witness", target_arch = "x86_64")))]
         result.map(|_| ())?;
         self.pending_event = None;
         // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
@@ -1055,7 +1058,7 @@ impl WindowsImageDebugSession {
             }
         }
         #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-        self.native_witness_continued(process_id, thread_id, code)?;
+        self.native_witness_continued(process_id, thread_id, code, actual_status)?;
         Ok(())
     }
 

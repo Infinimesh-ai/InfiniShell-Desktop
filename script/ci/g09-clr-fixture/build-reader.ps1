@@ -40,6 +40,31 @@ $receipt = [ordered]@{
 try {
     Assert-G09SourceIdentity $Local $context.SourceIdentity $env:GITHUB_SHA
     $receipt.source_identity_accepted = $true
+    # 仅记录本机原 System 模块 getter 与字段的元数据关系，供实际停点的同 MVID 字段对照。
+    # 不调用 getter、不创建 ProcessStartInfo，也不把准备主机的值当成目标进程值。
+    $startInfoType = [Diagnostics.ProcessStartInfo]
+    $useShellGetter = $startInfoType.GetProperty('UseShellExecute').GetGetMethod()
+    $systemModule = $useShellGetter.Module
+    $systemPath = $systemModule.FullyQualifiedName
+    $systemHash = Get-RegularFileHash $systemPath
+    $getterIl = $useShellGetter.GetMethodBody().GetILAsByteArray()
+    if ($getterIl.Length -ne 7 -or $getterIl[0] -ne 2 -or $getterIl[1] -ne 0x7b -or $getterIl[6] -ne 0x2a) {
+        throw 'UseShellExecute getter 不是已批准的单字段读取形式'
+    }
+    $useShellField = $systemModule.ResolveField([BitConverter]::ToInt32($getterIl, 2))
+    if ($useShellField.IsStatic -or $useShellField.DeclaringType -ne $startInfoType -or
+        $useShellField.FieldType -ne [bool] -or $useShellField.Name -cne 'useShellExecute') {
+        throw 'UseShellExecute getter 的实际布尔字段身份不符'
+    }
+    $receipt.process_start_info_contract = [ordered]@{
+        module_mvid = $systemModule.ModuleVersionId.ToString('D')
+        module_sha256 = $systemHash; module_bytes = (Get-Item -LiteralPath $systemPath).Length
+        type_token = $startInfoType.MetadataToken; getter_token = $useShellGetter.MetadataToken
+        getter_il_base64 = [Convert]::ToBase64String($getterIl)
+        field_token = $useShellField.MetadataToken; field_name = $useShellField.Name
+        field_type = 'System.Boolean'; getter_invoked = $false; target_value_observed = $false
+    }
+    if ((Get-RegularFileHash $systemPath) -cne $systemHash) { throw 'System 元数据读取期间原件变化' }
     New-Item -ItemType Directory -Path $snapshot | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $snapshot 'vendor') | Out-Null
 

@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use windows::Win32::Foundation::{
-    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, HANDLE,
-    NTSTATUS, WAIT_FAILED, WAIT_OBJECT_0,
+    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DBG_REPLY_LATER, ERROR_SEM_TIMEOUT,
+    EXCEPTION_BREAKPOINT, HANDLE, NTSTATUS, WAIT_FAILED, WAIT_OBJECT_0,
 };
 use windows::Win32::System::Diagnostics::Debug::{
     CREATE_PROCESS_DEBUG_EVENT, CREATE_THREAD_DEBUG_EVENT, ContinueDebugEvent, DEBUG_EVENT,
@@ -26,9 +26,10 @@ use windows::Win32::System::Threading::{
 use windows::core::HRESULT;
 
 use super::clr_reader::{
-    BoundFile, ClrExceptionStop, ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding,
-    Job, birth, duplicate, empty_environment, file_identity, hex, image_path, information, put64,
-    raw, remaining, request, require,
+    BoundFile, ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodSpec,
+    ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, Job, birth, duplicate,
+    empty_environment, file_identity, hex, image_path, information, put64, raw, remaining, request,
+    require,
 };
 use super::{ShellClassificationObservation, ShellClassificationWitness};
 use crate::blocking::Command;
@@ -73,6 +74,8 @@ struct Fixture {
     pre_node_shell_entries: Vec<Value>,
     pre_node_shell_observation: Option<Value>,
     post_node_exception: Option<Value>,
+    managed_spec: ClrManagedMethodSpec,
+    managed_continuation: Option<Value>,
     initial_breakpoints: HashSet<u32>,
     handling_stage: &'static str,
     continuation_stage: &'static str,
@@ -84,6 +87,7 @@ impl Fixture {
         mut node_image: BoundFile,
         root: &Path,
         cleanup_deadline: Instant,
+        managed_spec: ClrManagedMethodSpec,
     ) -> io::Result<Self> {
         image.verify()?;
         node_image.verify()?;
@@ -137,6 +141,8 @@ impl Fixture {
             pre_node_shell_entries: vec![],
             pre_node_shell_observation: None,
             post_node_exception: None,
+            managed_spec,
+            managed_continuation: None,
             initial_breakpoints: HashSet::new(),
             handling_stage: "not_started",
             continuation_stage: "not_started",
@@ -314,21 +320,27 @@ impl Fixture {
             .as_mut()
             .expect("刚创建的 reader 必须存在");
         let exception = unsafe { event.u.Exception };
-        reader.bind_native_return_and_send(
-            image,
-            clr,
-            ClrNativeReturnStop {
-                process: shell.process_handle(),
-                thread: shell.thread_handle(event.dwThreadId)?,
-                process_id: event.dwProcessId,
-                thread_id: event.dwThreadId,
-                event_sequence: self.sequence,
-                exception_code: exception.ExceptionRecord.ExceptionCode.0 as u32,
-                first_chance: exception.dwFirstChance,
-                hresult: 0,
-                read_budget_bytes: 16 * 1024 * 1024,
-            },
-        )?;
+        let stop = ClrNativeReturnStop {
+            process: shell.process_handle(),
+            thread: shell.thread_handle(event.dwThreadId)?,
+            process_id: event.dwProcessId,
+            thread_id: event.dwThreadId,
+            event_sequence: self.sequence,
+            exception_code: exception.ExceptionRecord.ExceptionCode.0 as u32,
+            first_chance: exception.dwFirstChance,
+            hresult: 0,
+            read_budget_bytes: 16 * 1024 * 1024,
+        };
+        if pre_node {
+            reader.bind_native_return_with_managed_spec_and_send(
+                image,
+                clr,
+                stop,
+                &self.managed_spec,
+            )?;
+        } else {
+            reader.bind_native_return_and_send(image, clr, stop)?;
+        }
         let result = loop {
             if let Some(result) = reader.poll(|| false)? {
                 break result;
@@ -349,22 +361,115 @@ impl Fixture {
             reader.is_reaped() && reader.job_empty_fixture()?,
             "分类读取器尚未完全回收",
         )?;
+        let managed_target = if pre_node {
+            Some(
+                reader
+                    .take_managed_continuation_target()?
+                    .ok_or_else(|| io::Error::other("固定启动前栈没有唯一续点映射"))?,
+            )
+        } else {
+            None
+        };
         if pre_node {
             self.pre_node_shell_observation = Some(observation);
         } else {
             self.shell_observation = Some(observation);
         }
         self.active_reader.take();
-        if pre_node {
+        if let Some(target) = managed_target {
             remaining(deadline)?;
             self.shell
                 .as_mut()
                 .expect("原分类观察器必须保留")
-                .resume_after_pre_node_return(event, self.sequence)?;
+                .resume_after_pre_node_return_with_continuation(event, self.sequence, target)?;
             self.pre_node_shell_observation
                 .as_mut()
                 .expect("启动前收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
+        } else {
+            remaining(deadline)?;
+            let resumed = self
+                .shell
+                .as_mut()
+                .expect("原分类观察器必须保留")
+                .resume_after_post_node_return_for_continuation(event, self.sequence)?;
+            self.shell_observation.as_mut().expect("启动后收据必须保留")["rearmed_for_managed_continuation"] =
+                json!(resumed);
         }
+        Ok(())
+    }
+
+    fn capture_managed_continuation(
+        &mut self,
+        event: &DEBUG_EVENT,
+        receipt: Value,
+        image: &mut ClrReaderImage,
+        root: &Path,
+        deadline: Instant,
+    ) -> io::Result<()> {
+        require(
+            self.managed_continuation.is_none() && self.active_reader.is_none(),
+            "固定续点或读取器重复",
+        )?;
+        self.managed_continuation = Some(json!({"event":receipt}));
+        let shell = self
+            .shell
+            .as_ref()
+            .ok_or_else(|| io::Error::other("固定续点缺少原观察器"))?;
+        require(!shell.requires_restoration(), "固定续点仍有未恢复 DR")?;
+        let clr = self
+            .clr
+            .as_mut()
+            .ok_or_else(|| io::Error::other("固定续点缺少原 CLR"))?;
+        self.active_reader = Some(ClrReader::start_managed_continuation(
+            image,
+            root,
+            self.sequence,
+            deadline,
+        )?);
+        let reader = self.active_reader.as_mut().expect("续点读取器已创建");
+        let exception = unsafe { event.u.Exception };
+        reader.bind_managed_continuation_and_send(
+            image,
+            clr,
+            ClrManagedContinuationStop {
+                process: shell.process_handle(),
+                thread: shell.thread_handle(event.dwThreadId)?,
+                process_id: event.dwProcessId,
+                thread_id: event.dwThreadId,
+                event_sequence: self.sequence,
+                exception_code: exception.ExceptionRecord.ExceptionCode.0 as u32,
+                first_chance: exception.dwFirstChance,
+                hresult: 0,
+                read_budget_bytes: 16 * 1024 * 1024,
+            },
+            shell.managed_continuation_target()?,
+        )?;
+        let result = loop {
+            if let Some(result) = reader.poll(|| false)? {
+                break result;
+            }
+        };
+        clr.verify()?;
+        require(
+            reader.is_reaped() && reader.job_empty_fixture()?,
+            "固定续点读取器未完全回收",
+        )?;
+        let mut observation = reader.binding().expect("续点原绑定已核").clone();
+        observation["reader"] = result;
+        observation["main_tid"] = json!(self.main_thread);
+        observation["reader_reaped"] = json!(true);
+        observation["reader_job_empty"] = json!(true);
+        self.managed_continuation = Some(json!({"event":receipt,"observation":observation,
+            "live_threads_restored_before_reader":true,"rearmed_after_reader_reaped":false}));
+        self.active_reader.take();
+        remaining(deadline)?;
+        self.shell
+            .as_mut()
+            .expect("原续点观察器必须保留")
+            .resume_after_managed_continuation(event, self.sequence)?;
+        self.managed_continuation
+            .as_mut()
+            .expect("原续点收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
         Ok(())
     }
 
@@ -495,6 +600,9 @@ impl Fixture {
             }
         }
         self.termination_requested = true;
+        if let Some(shell) = self.shell.as_mut() {
+            shell.cancel_deferred_after_target_termination()?;
+        }
         Ok(())
     }
 
@@ -513,6 +621,10 @@ impl Fixture {
                 if let Some(last) = self.events.last_mut() {
                     last["continued"] = json!(true);
                     last["continue_status"] = json!(status.0 as u32);
+                }
+                if let Some(shell) = self.shell.as_mut() {
+                    self.continuation_stage = "managed_deferred_continue_confirmation";
+                    shell.on_event_continued(&event, self.sequence, status)?;
                 }
                 if event.dwProcessId == self.child.id() {
                     if event.dwDebugEventCode == EXIT_THREAD_DEBUG_EVENT {
@@ -798,6 +910,26 @@ impl Fixture {
                             event,
                             serde_json::to_value(receipt)?,
                             false,
+                            image,
+                            root,
+                            deadline,
+                        );
+                    }
+                    ShellClassificationObservation::OwnedManagedContinuationDeferred(receipt) => {
+                        self.handling_stage = "managed_continuation_deferred";
+                        require(
+                            receipt.first_delivery_sequence == self.sequence,
+                            "延后续点没有绑定当前原事件",
+                        )?;
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_REPLY_LATER;
+                        return Ok(());
+                    }
+                    ShellClassificationObservation::OwnedManagedContinuation(receipt) => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        self.handling_stage = "managed_continuation_reader";
+                        return self.capture_managed_continuation(
+                            event,
+                            serde_json::to_value(receipt)?,
                             image,
                             root,
                             deadline,
@@ -1596,6 +1728,8 @@ fn validate_post_node_exception(report: &Value, prepared: &Value) -> io::Result<
                         && event["pid"] == observation["pid"]
                         && event["tid"] == observation["tid"]
                         && event["sequence"]
+                            != report["managed_continuation"]["event"]["event_sequence"]
+                        && event["sequence"]
                             .as_u64()
                             .zip(node["sequence"].as_u64())
                             .is_some_and(|(sequence, node)| sequence > node)
@@ -1610,6 +1744,250 @@ fn validate_post_node_exception(report: &Value, prepared: &Value) -> io::Result<
             && selected[0]["handled"] == true
             && selected[0]["continued"] == true,
         "读取器改变了原 CLR 异常的继续语义",
+    )
+}
+
+fn validate_managed_continuation(report: &Value, prepared: &Value) -> io::Result<()> {
+    let record = &report["managed_continuation"];
+    let receipt = &record["event"];
+    let observation = &record["observation"];
+    let reader = &observation["reader"];
+    let managed = &reader["managed_continuation"];
+    let boolean = &managed["boolean_local"];
+    let start_info = &managed["start_info_field"];
+    let pre = &report["pre_node_shell_observation"];
+    let node = &report["node_created"];
+    let summary = &report["shell_classification"];
+    let specification = &prepared["fixture_continuation"];
+    let contract = &prepared["process_start_info_contract"];
+    validate_fixture_thread(observation)?;
+    let ordered = [
+        pre["classification"]["return_sequence"].as_u64(),
+        node["sequence"].as_u64(),
+        receipt["event_sequence"].as_u64(),
+        report["post_node_exception"]["event"]["event_sequence"].as_u64(),
+    ];
+    require(
+        ordered
+            .iter()
+            .all(|value| value.is_some_and(|value| value != 0))
+            && ordered.windows(2).all(|pair| pair[0] < pair[1])
+            && receipt["generation"] == pre["classification"]["generation"]
+            && receipt["identity"] == pre["classification"]["identity"]
+            && receipt["pre_return_sequence"] == pre["classification"]["return_sequence"]
+            && receipt["node_create_sequence"] == node["sequence"]
+            && receipt["node_process_id"] == node["pid"]
+            && receipt["node_process_birth"] == node["birth"]
+            && receipt["event_sequence"] == observation["event_sequence"],
+        "固定续点没有绑定原启动前帧、Node 及工作线程时序",
+    )?;
+    for (identity, binding) in [
+        ("process_id", "pid"),
+        ("thread_id", "tid"),
+        ("process_birth", "process_birth"),
+        ("thread_birth", "thread_birth"),
+    ] {
+        require(
+            !receipt["identity"][identity].is_null()
+                && receipt["identity"][identity] == observation[binding],
+            "固定续点原进线程身份与读取请求不符",
+        )?;
+    }
+    for field in [
+        "event_sequence",
+        "nonce",
+        "pid",
+        "tid",
+        "process_birth",
+        "thread_birth",
+    ] {
+        require(
+            !observation[field].is_null() && reader[field] == observation[field],
+            "固定续点读取回复没有绑定原请求",
+        )?;
+    }
+    require(
+        reader["schema"] == 1
+            && reader["operation"] == 4
+            && observation["operation"] == 4
+            && reader["target_identity_verified"] == true
+            && reader["dac_sha256_verified"] == true
+            && reader["dac_loaded"] == true
+            && reader["budget_exhausted"] == false
+            && reader["exception_source"] == "none"
+            && reader["chain"].as_array().is_some_and(Vec::is_empty)
+            && managed["bound"] == true
+            && managed["api_hresult"] == 0
+            && observation["reader_reaped"] == true
+            && observation["reader_job_empty"] == true
+            && receipt["registers_restored"] == true
+            && receipt["execution_context_unchanged"] == true
+            && receipt["managed_continuation_clr_stack_required"] == true
+            && record["live_threads_restored_before_reader"] == true
+            && record["rearmed_after_reader_reaped"] == true
+            && summary["managed_continuation_bound"] == true
+            && summary["managed_continuation_selected_calls"] == 1
+            && summary["managed_continuation_resumed_calls"] == 1
+            && summary["managed_continuation"] == *receipt,
+        "固定续点独立读取、一次预算、撤销或恢复未获证明",
+    )?;
+    let mapping = &receipt["mapping"];
+    require(
+        mapping.is_object()
+            && managed["mapping"] == *mapping
+            && pre["reader"]["managed_mapping"]["mapping"] == *mapping
+            && pre["reader"]["managed_mapping"]["status"] == "bound"
+            && pre["reader"]["managed_mapping"]["matched_frames"] == 1
+            && mapping["module_mvid"] == prepared["fixture_mvid"]
+            && mapping["method_token"] == specification["method_token"]
+            && mapping["pre_sequence"] == pre["classification"]["return_sequence"]
+            && specification["approved_il_offsets"]
+                .as_array()
+                .is_some_and(|offsets| offsets.contains(&mapping["il_offset"]))
+            && mapping["map_count"]
+                .as_u64()
+                .is_some_and(|count| (1..=256).contains(&count))
+            && ["map_sha256", "code_sha256"].iter().all(|field| {
+                mapping[field].as_str().is_some_and(|hash| {
+                    hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+                })
+            })
+            && reader["frames"]
+                .as_array()
+                .and_then(|frames| {
+                    frames
+                        .iter()
+                        .find(|frame| frame["frame_kind"] == "metadata_method")
+                })
+                .is_some_and(|frame| {
+                    frame["module_mvid"] == mapping["module_mvid"]
+                        && frame["method_token"] == mapping["method_token"]
+                        && frame["il_status"] == 0
+                        && frame["il_offsets"].as_array().is_some_and(|offsets| {
+                            offsets.len() == 1 && offsets[0] == mapping["il_offset"]
+                        })
+                }),
+        "固定续点实际方法与批准 IL 或映射摘要不符",
+    )?;
+    require(
+        boolean["index"] == specification["bool_local_index"]
+            && [
+                "api_hresult",
+                "get_local_hresult",
+                "locations_hresult",
+                "type_hresult",
+                "type_name_hresult",
+                "flags_hresult",
+                "size_hresult",
+                "bytes_hresult",
+            ]
+            .iter()
+            .all(|field| boolean[field] == 0)
+            && boolean["locations"]
+                .as_u64()
+                .is_some_and(|count| (1..=8).contains(&count))
+            && boolean["type_name"] == "System.Boolean"
+            && boolean["size"] == 1
+            && boolean["bytes_read"] == 1
+            && boolean["value"] == true
+            && specification["expected_boolean"] == true,
+        "固定等待决策没有可读的实际布尔局部值",
+    )?;
+    require(
+        start_info["requested"] == true
+            && start_info["index"] == specification["start_info_local_index"]
+            && [
+                "api_hresult",
+                "local_api_hresult",
+                "local_get_local_hresult",
+                "local_locations_hresult",
+                "local_flags_hresult",
+                "local_size_hresult",
+                "local_bytes_hresult",
+                "field_read_hresult",
+            ]
+            .iter()
+            .all(|field| start_info[field] == 0)
+            && start_info["local_type_hresult"] == 0x8000000a_u32
+            && start_info["local_type_name_hresult"] == 0x8000000a_u32
+            && start_info["local_locations"]
+                .as_u64()
+                .is_some_and(|count| (1..=8).contains(&count))
+            && start_info["local_size"] == 8
+            && start_info["local_bytes_read"] == 8
+            && start_info["module_mvid"] == contract["module_mvid"]
+            && start_info["type_token"] == contract["type_token"]
+            && start_info["field_token"] == contract["field_token"]
+            && start_info["field_name"] == "useShellExecute"
+            && start_info["field_type"] == 2
+            && start_info["field_sig_type"] == 2
+            && start_info["value"] == false
+            && specification["expected_use_shell_execute"] == false
+            && contract["getter_invoked"] == false
+            && contract["target_value_observed"] == false,
+        "固定 ProcessStartInfo 字段未绑定实际对象与 getter 元数据合同",
+    )?;
+    let events = report["events"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("续点事件记录缺失"))?;
+    let selected = events
+        .iter()
+        .filter(|event| event["sequence"] == receipt["event_sequence"])
+        .collect::<Vec<_>>();
+    let first = receipt["first_delivery_sequence"].as_u64();
+    let deferred = &summary["managed_continuation_deferred"];
+    if receipt["deferred_for_node"] == true {
+        let deliveries = events
+            .iter()
+            .filter(|event| event["sequence"].as_u64() == first)
+            .collect::<Vec<_>>();
+        require(
+            first.is_some_and(|first| {
+                pre["classification"]["return_sequence"]
+                    .as_u64()
+                    .is_some_and(|pre| pre < first)
+                    && node["sequence"].as_u64().is_some_and(|node| first < node)
+            }) && deferred["first_delivery_sequence"] == receipt["first_delivery_sequence"]
+                && deferred["generation"] == receipt["generation"]
+                && deferred["identity"] == receipt["identity"]
+                && deferred["pre_return_sequence"] == receipt["pre_return_sequence"]
+                && deferred["node_create_sequence"] == receipt["node_create_sequence"]
+                && deferred["replay_sequence"] == receipt["event_sequence"]
+                && deferred["phase"] == "replayed"
+                && deferred["suspend_previous_count"] == 0
+                && deferred["resume_previous_count"] == 1
+                && deferred["reply_later_confirmed"] == true
+                && deferred["suspend_owned"] == false
+                && deliveries.len() == 1
+                && deliveries[0]["code"] == EXCEPTION_DEBUG_EVENT.0
+                && deliveries[0]["pid"] == observation["pid"]
+                && deliveries[0]["tid"] == observation["tid"]
+                && deliveries[0]["exception_code"] == 0x80000004_u32
+                && deliveries[0]["first_chance"] == 1
+                && deliveries[0]["continue_status"] == DBG_REPLY_LATER.0 as u32
+                && deliveries[0]["handled"] == true
+                && deliveries[0]["continued"] == true,
+            "原续点首次递送、Node 绑定和同事件重放或自有暂停平衡未获证明",
+        )?;
+    } else {
+        require(
+            receipt["deferred_for_node"] == false
+                && first == receipt["event_sequence"].as_u64()
+                && deferred.is_null(),
+            "未延后的续点错误引用重放记录",
+        )?;
+    }
+    require(
+        selected.len() == 1
+            && selected[0]["code"] == EXCEPTION_DEBUG_EVENT.0
+            && selected[0]["pid"] == observation["pid"]
+            && selected[0]["tid"] == observation["tid"]
+            && selected[0]["exception_code"] == 0x80000004_u32
+            && selected[0]["first_chance"] == 1
+            && selected[0]["continue_status"] == DBG_CONTINUE.0 as u32
+            && selected[0]["handled"] == true
+            && selected[0]["continued"] == true,
+        "固定自有续点没有以原单步事件正确继续",
     )
 }
 
@@ -1692,7 +2070,35 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     drop(blocked);
 
     report["stage"] = json!("native_exception_capture");
-    let mut fixture = Fixture::start(&mut fixture_image, node_image, root, deadline)?;
+    let continuation = &prepared["fixture_continuation"];
+    let integer = |key: &str| {
+        continuation[key]
+            .as_u64()
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| io::Error::other("固定续点元数据整数缺失"))
+    };
+    let approved_il_offsets = continuation["approved_il_offsets"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("固定续点 IL 清单缺失"))?
+        .iter()
+        .map(|value| {
+            value
+                .as_u64()
+                .and_then(|offset| u32::try_from(offset).ok())
+                .ok_or_else(|| io::Error::other("固定续点 IL 无效"))
+        })
+        .collect::<io::Result<Vec<_>>>()?;
+    let managed_spec = ClrManagedMethodSpec {
+        module_mvid: prepared["fixture_mvid"]
+            .as_str()
+            .ok_or_else(|| io::Error::other("固定续点模块缺失"))?
+            .to_owned(),
+        method_token: integer("method_token")?,
+        approved_il_offsets,
+        bool_local_index: integer("bool_local_index")?,
+        start_info_local_index: Some(integer("start_info_local_index")?),
+    };
+    let mut fixture = Fixture::start(&mut fixture_image, node_image, root, deadline, managed_spec)?;
     let result = fixture.pump(&mut reader, root, active_deadline, false);
     if let Err(error) = &result {
         report["native_result_error"] = json!({"stage":fixture.handling_stage,"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error()});
@@ -1719,6 +2125,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["pre_node_shell_entries"] = json!(fixture.pre_node_shell_entries);
     report["pre_node_shell_observation"] = json!(fixture.pre_node_shell_observation);
     report["post_node_exception"] = json!(fixture.post_node_exception);
+    report["managed_continuation"] = json!(fixture.managed_continuation);
     report["node_created"] = json!(fixture.node_created);
     report["descendant_creates"] = json!(fixture.descendant_creates);
     report["descendant_exits"] = json!(fixture.descendant_exits);
@@ -1815,6 +2222,7 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     validate_native_return(report, &prepared)?;
     validate_pre_node_return(report, &prepared)?;
     validate_post_node_exception(report, &prepared)?;
+    validate_managed_continuation(report, &prepared)?;
     reader.verify()?;
     fixture_image.verify()?;
     fixture.node_image.verify()?;
@@ -2105,6 +2513,182 @@ fn post_node_exception_requires_original_worker_stage_and_unchanged_exception_co
         .unwrap()
         .insert(0, earlier);
     assert!(validate_post_node_exception(&skipped_first, &prepared).is_err());
+}
+
+fn fixed_managed_continuation_receipt() -> (Value, Value) {
+    let (mut report, mut prepared) = fixed_pre_node_return_receipt();
+    let mapping = json!({"module_mvid":"fixture-mvid","method_token":0x06000006_u32,
+        "il_offset":42,"pre_sequence":5,"map_count":12,"map_sha256":"a".repeat(64),
+        "code_sha256":"b".repeat(64),"enc_version":0,"extent_length":256});
+    let receipt = json!({"generation":report["shell_classification"]["generation"],
+        "identity":report["shell_observation"]["classification"]["identity"],
+        "pre_return_sequence":5,"node_create_sequence":8,"node_process_id":51,"node_process_birth":300,
+        "event_sequence":9,"first_delivery_sequence":9,"deferred_for_node":false,
+        "registers_restored":true,"execution_context_unchanged":true,
+        "managed_continuation_clr_stack_required":true,"mapping":mapping});
+    let boolean = json!({"index":0,"api_hresult":0,"get_local_hresult":0,"locations_hresult":0,"locations":1,
+        "type_hresult":0,"type_name_hresult":0,"type_name":"System.Boolean","flags_hresult":0,
+        "size_hresult":0,"size":1,"bytes_hresult":0,"bytes_read":1,"value":true});
+    let start_info = json!({"requested":true,"index":5,"api_hresult":0,"local_api_hresult":0,"local_get_local_hresult":0,
+        "local_locations_hresult":0,"local_locations":1,"local_type_hresult":0x8000000a_u32,
+        "local_type_name_hresult":0x8000000a_u32,"local_flags_hresult":0,"local_size_hresult":0,"local_size":8,
+        "local_bytes_hresult":0,"local_bytes_read":8,"field_read_hresult":0,
+        "module_mvid":"system-mvid","type_token":0x02000001_u32,"field_token":0x04000001_u32,
+        "field_name":"useShellExecute","field_type":2,"field_sig_type":2,"value":false});
+    let mut observation = json!({"operation":4,"event_sequence":9,"nonce":"fixed-continuation",
+        "pid":41,"tid":42,"main_tid":40,"process_birth":100,"thread_birth":200,
+        "reader_reaped":true,"reader_job_empty":true});
+    let mut reader = observation.clone();
+    reader["schema"] = json!(1);
+    for field in [
+        "target_identity_verified",
+        "dac_sha256_verified",
+        "dac_loaded",
+    ] {
+        reader[field] = json!(true);
+    }
+    reader["budget_exhausted"] = json!(false);
+    reader["exception_source"] = json!("none");
+    reader["chain"] = json!([]);
+    reader["frames"] = json!([{"frame_kind":"metadata_method","module_mvid":"fixture-mvid",
+        "method_token":0x06000006_u32,"il_status":0,"il_offsets":[42]}]);
+    reader["managed_continuation"] = json!({"bound":true,"api_hresult":0,"mapping":mapping,
+        "boolean_local":boolean,"start_info_field":start_info});
+    observation["reader"] = reader;
+    report["managed_continuation"] = json!({"event":receipt,"observation":observation,
+        "live_threads_restored_before_reader":true,"rearmed_after_reader_reaped":true});
+    report["pre_node_shell_observation"]["reader"]["managed_mapping"] =
+        json!({"status":"bound","matched_frames":1,"mapping":mapping});
+    report["post_node_exception"] = json!({"event":{"event_sequence":12}});
+    report["shell_classification"]["managed_continuation_bound"] = json!(true);
+    report["shell_classification"]["managed_continuation_selected_calls"] = json!(1);
+    report["shell_classification"]["managed_continuation_resumed_calls"] = json!(1);
+    report["shell_classification"]["managed_continuation"] = receipt;
+    report["events"] = json!([{"sequence":9,"code":EXCEPTION_DEBUG_EVENT.0,"pid":41,"tid":42,
+        "exception_code":0x80000004_u32,"first_chance":1,"handled":true,"continued":true,
+        "continue_status":DBG_CONTINUE.0 as u32}]);
+    prepared["fixture_continuation"] = json!({"method_token":0x06000006_u32,"approved_il_offsets":[42],
+        "bool_local_index":0,"start_info_local_index":5,"expected_boolean":true,"expected_use_shell_execute":false});
+    prepared["process_start_info_contract"] = json!({"module_mvid":"system-mvid","type_token":0x02000001_u32,
+        "field_token":0x04000001_u32,"getter_invoked":false,"target_value_observed":false});
+    (report, prepared)
+}
+
+#[test]
+fn managed_continuation_requires_live_values_even_when_local_lookup_succeeds() {
+    let (report, prepared) = fixed_managed_continuation_receipt();
+    assert!(validate_managed_continuation(&report, &prepared).is_ok());
+    for (local, field, value) in [
+        ("boolean_local", "locations", json!(0)),
+        ("boolean_local", "bytes_read", json!(0)),
+        ("boolean_local", "value", Value::Null),
+        ("start_info_field", "local_locations", json!(0)),
+        (
+            "start_info_field",
+            "field_read_hresult",
+            json!(0x80004002_u32),
+        ),
+        ("start_info_field", "value", Value::Null),
+    ] {
+        let mut changed = report.clone();
+        changed["managed_continuation"]["observation"]["reader"]["managed_continuation"][local]
+            [field] = value;
+        assert!(validate_managed_continuation(&changed, &prepared).is_err());
+    }
+}
+
+#[test]
+fn managed_continuation_replay_preserves_first_delivery_and_balances_its_suspend() {
+    let (mut report, prepared) = fixed_managed_continuation_receipt();
+    report["managed_continuation"]["event"]["first_delivery_sequence"] = json!(7);
+    report["managed_continuation"]["event"]["deferred_for_node"] = json!(true);
+    let receipt = report["managed_continuation"]["event"].clone();
+    report["shell_classification"]["managed_continuation"] = receipt.clone();
+    report["shell_classification"]["managed_continuation_deferred"] = json!({
+        "generation":receipt["generation"],"identity":receipt["identity"],"pre_return_sequence":5,
+        "first_delivery_sequence":7,"node_create_sequence":8,"replay_sequence":9,"phase":"replayed",
+        "suspend_previous_count":0,"resume_previous_count":1,"reply_later_confirmed":true,"suspend_owned":false
+    });
+    let mut delivery = report["events"][0].clone();
+    delivery["sequence"] = json!(7);
+    delivery["continue_status"] = json!(DBG_REPLY_LATER.0 as u32);
+    report["events"].as_array_mut().unwrap().insert(0, delivery);
+    assert!(validate_managed_continuation(&report, &prepared).is_ok());
+    for (pointer, value) in [
+        (
+            "/managed_continuation/event/first_delivery_sequence",
+            json!(9),
+        ),
+        (
+            "/shell_classification/managed_continuation_deferred/suspend_previous_count",
+            json!(1),
+        ),
+        (
+            "/shell_classification/managed_continuation_deferred/resume_previous_count",
+            json!(2),
+        ),
+        (
+            "/shell_classification/managed_continuation_deferred/reply_later_confirmed",
+            json!(false),
+        ),
+        (
+            "/shell_classification/managed_continuation_deferred/suspend_owned",
+            json!(true),
+        ),
+        (
+            "/shell_classification/managed_continuation_deferred/replay_sequence",
+            json!(10),
+        ),
+        ("/events/0/continue_status", json!(DBG_CONTINUE.0 as u32)),
+        ("/events/0/exception_code", json!(CLR_EXCEPTION)),
+    ] {
+        let mut changed = report.clone();
+        *changed.pointer_mut(pointer).unwrap() = value;
+        assert!(
+            validate_managed_continuation(&changed, &prepared).is_err(),
+            "{pointer}"
+        );
+    }
+}
+
+#[test]
+fn managed_continuation_requires_original_method_field_contract_and_one_owned_stop() {
+    let (report, prepared) = fixed_managed_continuation_receipt();
+    for (pointer, value) in [
+        (
+            "/managed_continuation/event/identity/thread_birth",
+            json!(201),
+        ),
+        ("/managed_continuation/event/node_create_sequence", json!(9)),
+        (
+            "/managed_continuation/observation/reader/operation",
+            json!(3),
+        ),
+        (
+            "/managed_continuation/observation/reader/managed_continuation/start_info_field/field_token",
+            json!(0x04000002_u32),
+        ),
+        (
+            "/managed_continuation/observation/reader/managed_continuation/mapping/il_offset",
+            json!(43),
+        ),
+        (
+            "/managed_continuation/rearmed_after_reader_reaped",
+            json!(false),
+        ),
+        (
+            "/shell_classification/managed_continuation_selected_calls",
+            json!(2),
+        ),
+        (
+            "/events/0/continue_status",
+            json!(DBG_EXCEPTION_NOT_HANDLED.0 as u32),
+        ),
+    ] {
+        let mut changed = report.clone();
+        *changed.pointer_mut(pointer).expect("固定负例字段必须存在") = value;
+        assert!(validate_managed_continuation(&changed, &prepared).is_err());
+    }
 }
 
 #[test]

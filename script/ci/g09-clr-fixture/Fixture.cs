@@ -30,7 +30,8 @@ internal static class ClrFixture
     private static extern UIntPtr SHGetFileInfoW(string path, uint attributes, IntPtr information,
                                                uint informationSize, uint flags);
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    // 固定能力测试显式保留此方法的局部变量；真实 PowerShell 不使用该编译设置。
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
     private static void ClassifyBoundNode(bool beforeStart)
     {
         string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
@@ -46,7 +47,10 @@ internal static class ClrFixture
             start.CreateNoWindow = true;
             using (Process child = Process.Start(start))
             {
-                if (child == null || !child.WaitForExit(5000) || child.ExitCode != 0)
+                // 准备阶段核对唯一调用及其返回后的布尔读取，保证续点在赋值和边界调用之后。
+                bool shouldWait = child != null;
+                ContinuationBoundary(shouldWait, start);
+                if (!shouldWait || !child.WaitForExit(5000) || child.ExitCode != 0)
                     throw new InvalidOperationException("fixed child failed");
             }
             Console.WriteLine(before.ToUInt64().ToString(CultureInfo.InvariantCulture));
@@ -57,6 +61,13 @@ internal static class ClrFixture
             UIntPtr value = SHGetFileInfoW(path, 0, IntPtr.Zero, 0, 0x2000);
             Console.WriteLine(value.ToUInt64().ToString(CultureInfo.InvariantCulture));
         }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ContinuationBoundary(bool shouldWait, ProcessStartInfo start)
+    {
+        if (!shouldWait || start.UseShellExecute)
+            throw new InvalidOperationException("fixed continuation failed");
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

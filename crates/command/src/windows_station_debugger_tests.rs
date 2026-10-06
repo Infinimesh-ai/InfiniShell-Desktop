@@ -72,12 +72,52 @@ fn continue_must_match_original_event_generation_and_process_thread() {
         pid: 10,
         tid: 11,
         code: LOAD_DLL_DEBUG_EVENT.0,
+        reply_later_allowed: false,
     };
     assert!(!pending.matches(4, 10, 11, LOAD_DLL_DEBUG_EVENT.0));
     assert!(!pending.matches(5, 20, 11, LOAD_DLL_DEBUG_EVENT.0));
     assert!(!pending.matches(5, 10, 12, LOAD_DLL_DEBUG_EVENT.0));
     assert!(!pending.matches(5, 10, 11, CREATE_PROCESS_DEBUG_EVENT.0));
     assert!(pending.matches(5, 10, 11, LOAD_DLL_DEBUG_EVENT.0));
+}
+
+#[test]
+fn reply_later_requires_original_first_chance_single_step() {
+    let mut event = DEBUG_EVENT::default();
+    event.dwDebugEventCode = EXCEPTION_DEBUG_EVENT;
+    event.u.Exception.dwFirstChance = 1;
+    event.u.Exception.ExceptionRecord.ExceptionCode = EXCEPTION_SINGLE_STEP;
+    assert!(reply_later_allowed(&event));
+    for (code, chance) in [
+        (EXCEPTION_SINGLE_STEP, 0),
+        (NTSTATUS(0xe0434352_u32 as i32), 1),
+    ] {
+        event.u.Exception.dwFirstChance = chance;
+        event.u.Exception.ExceptionRecord.ExceptionCode = code;
+        assert!(!reply_later_allowed(&event));
+    }
+    event.dwDebugEventCode = CREATE_PROCESS_DEBUG_EVENT;
+    assert!(!reply_later_allowed(&event));
+}
+
+#[test]
+fn continue_reply_later_cannot_be_authorized_by_request_identity_alone() {
+    let mut pending = Pending {
+        sequence: 5,
+        pid: 10,
+        tid: 11,
+        code: EXCEPTION_DEBUG_EVENT.0,
+        reply_later_allowed: false,
+    };
+    assert!(pending.matches(5, 10, 11, EXCEPTION_DEBUG_EVENT.0));
+    assert!(!pending.accepts_status(DBG_REPLY_LATER));
+    assert!(pending.accepts_status(DBG_CONTINUE));
+    assert!(pending.accepts_status(DBG_EXCEPTION_NOT_HANDLED));
+    pending.reply_later_allowed = true;
+    assert!(pending.accepts_status(DBG_REPLY_LATER));
+    assert!(!pending.accepts_status(NTSTATUS(0)));
+    pending.code = CREATE_PROCESS_DEBUG_EVENT.0;
+    assert!(!pending.accepts_status(DBG_REPLY_LATER));
 }
 
 #[test]

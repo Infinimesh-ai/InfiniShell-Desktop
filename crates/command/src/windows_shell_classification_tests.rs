@@ -32,6 +32,224 @@ fn empty_registers() -> Registers {
 }
 
 #[test]
+fn managed_slot_survives_classification_entry_return_and_post_budget_completion() {
+    let original = empty_registers();
+    let entry = original.combined(Some((0x12000, false)), Some(0x24000));
+    assert_eq!(entry.address, [0x12000, 0x24000, 0, 0]);
+    assert_eq!(entry.control, 0x405);
+    let returning = original.combined(Some((0x36000, true)), Some(0x24000));
+    assert_eq!(returning.address, [0, 0x24000, 0, 0x36000]);
+    assert_eq!(returning.control, 0x444);
+    let continuation_only = original.combined(None, Some(0x24000));
+    assert_eq!(continuation_only.address, [0, 0x24000, 0, 0]);
+    assert_eq!(continuation_only.control, 0x404);
+    assert_eq!(
+        original.combined(Some((0x12000, false)), None),
+        original.armed(0x12000, false)
+    );
+    assert_eq!(original.combined(None, None), original);
+}
+
+#[test]
+fn managed_slot_requires_a_single_owned_hit_and_exact_combined_configuration() {
+    let expected = empty_registers().combined(Some((0x12000, false)), Some(0x24000));
+    let mut current = CONTEXT {
+        Rip: 0x24000,
+        EFlags: 0x202,
+        ..CONTEXT::default()
+    };
+    expected.write(&mut current);
+    current.Dr6 |= 2;
+    assert_eq!(owned_slot(expected, &current, 0x24000), Some(1));
+    assert!(restorable(
+        Registers::read(&current),
+        empty_registers(),
+        Some(expected),
+        None
+    ));
+    current.Dr6 |= 1;
+    assert_eq!(owned_slot(expected, &current, 0x24000), None);
+    current.Dr6 &= !1;
+    current.Dr1 += 1;
+    assert_eq!(owned_slot(expected, &current, 0x24000), None);
+    current.Dr1 -= 1;
+    current.Dr7 |= 8;
+    assert_eq!(owned_slot(expected, &current, 0x24000), None);
+}
+
+fn continuation_test_target() -> ManagedContinuationTarget {
+    let spec = super::super::clr_reader::ClrManagedMethodSpec {
+        module_mvid: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee".into(),
+        method_token: 0x06000001,
+        approved_il_offsets: vec![20],
+        bool_local_index: 0,
+        start_info_local_index: None,
+    };
+    ManagedContinuationTarget {
+        process_id: 1,
+        thread_id: 2,
+        process_birth: 3,
+        thread_birth: 4,
+        pre_sequence: 4,
+        pre_nonce: [1; 16],
+        module_mvid: spec.module_mvid.clone(),
+        method_token: spec.method_token,
+        il_offset: 20,
+        enc_version: 1,
+        frame_rsp: 0x40000,
+        extent_start: 0x20000,
+        extent_end: 0x20100,
+        address: 0x20020,
+        map_count: 3,
+        map_sha256: [2; 32],
+        code_sha256: [3; 32],
+        spec,
+    }
+}
+
+#[test]
+fn managed_target_rejects_changed_pre_identity_sequence_and_unapproved_mapping() {
+    let target = continuation_test_target();
+    let identity = continuation_identity(&target);
+    assert!(continuation_binding_matches(&target, identity, 4));
+    assert!(!continuation_binding_matches(&target, identity, 5));
+    assert!(!continuation_binding_matches(
+        &target,
+        ObjectIdentity {
+            thread_birth: 5,
+            ..identity
+        },
+        4
+    ));
+    for changed in [
+        ManagedContinuationTarget {
+            pre_nonce: [0; 16],
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            module_mvid: "other".into(),
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            method_token: 0x06000002,
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            il_offset: 21,
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            map_count: 257,
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            map_sha256: [0; 32],
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            code_sha256: [0; 32],
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            extent_end: target.extent_start,
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            extent_end: target.extent_start + 65537,
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            address: target.extent_end,
+            ..target.clone()
+        },
+        ManagedContinuationTarget {
+            frame_rsp: 0x40001,
+            ..target.clone()
+        },
+    ] {
+        assert!(!continuation_binding_matches(&changed, identity, 4));
+    }
+}
+
+#[test]
+fn managed_hit_requires_node_order_and_the_same_original_frame() {
+    let target = continuation_test_target();
+    let identity = continuation_identity(&target);
+    let current = CONTEXT {
+        Rip: target.address,
+        Rsp: target.frame_rsp,
+        ..CONTEXT::default()
+    };
+    assert!(continuation_hit_matches(
+        &target,
+        identity,
+        Some((5, 6, 7)),
+        8,
+        &current
+    ));
+    for node in [
+        None,
+        Some((0, 6, 7)),
+        Some((4, 6, 7)),
+        Some((8, 6, 7)),
+        Some((5, 0, 7)),
+        Some((5, 6, 0)),
+    ] {
+        assert!(!continuation_hit_matches(
+            &target, identity, node, 8, &current
+        ));
+    }
+    let other_frame = CONTEXT {
+        Rsp: current.Rsp + 8,
+        ..current
+    };
+    assert!(!continuation_hit_matches(
+        &target,
+        identity,
+        Some((5, 6, 7)),
+        8,
+        &other_frame
+    ));
+    let other_ip = CONTEXT {
+        Rip: current.Rip + 1,
+        ..current
+    };
+    assert!(!continuation_hit_matches(
+        &target,
+        identity,
+        Some((5, 6, 7)),
+        8,
+        &other_ip
+    ));
+}
+
+#[inline(never)]
+fn continuation_code_fixture() -> u64 {
+    0x1234
+}
+
+#[test]
+fn managed_extent_is_rechecked_against_live_executable_pages_and_full_code_hash() {
+    let process = unsafe { GetCurrentProcess() };
+    let address = continuation_code_fixture as *const () as u64;
+    let mut target = ManagedContinuationTarget {
+        extent_start: address,
+        extent_end: address + 16,
+        address,
+        ..continuation_test_target()
+    };
+    target.code_sha256 = Sha256::digest(memory(process, address, 16).unwrap()).into();
+    let regions = continuation_regions(process, &target).unwrap();
+    let mut lease = ManagedContinuationLease { target, regions };
+    assert!(lease.verify(process).is_ok());
+    lease.target.code_sha256[31] ^= 1;
+    assert!(lease.verify(process).is_err());
+    lease.target.code_sha256[31] ^= 1;
+    lease.regions[0].protect ^= PAGE_GUARD.0;
+    assert!(lease.verify(process).is_err());
+}
+
+#[test]
 fn initially_zero_debug_view_arms_the_architectural_inactive_status() {
     let original = Registers {
         address: [0; 4],
@@ -453,6 +671,15 @@ fn stopped_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
             post_exception_selected: 0,
             post_exception_resumed: 0,
             post_exception: None,
+            managed: None,
+            managed_bound: false,
+            managed_selected: 0,
+            managed_resumed: 0,
+            managed_invalidated: false,
+            managed_receipt: None,
+            managed_resume: None,
+            post_return_resume: None,
+            managed_deferred: None,
             post_node_sample_attempted: false,
             post_node_root_stop: None,
             skipped: 0,
@@ -468,6 +695,317 @@ fn stopped_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
         },
         event,
     )
+}
+
+fn managed_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
+    let (mut witness, mut event) = stopped_resume_witness();
+    let pre = witness.pre_resume.take().unwrap();
+    let target = ManagedContinuationTarget {
+        process_id: pre.identity.process_id,
+        process_birth: pre.identity.process_birth,
+        ..continuation_test_target()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionAddress = target.address as *mut c_void;
+    witness.pre_return_binding = Some((pre.identity, 4));
+    witness.node = Some((5, 6, 7));
+    witness.last_sequence = 8;
+    witness.managed_bound = true;
+    witness.managed_selected = 1;
+    witness.managed_receipt = Some(ManagedContinuationReceipt {
+        generation: witness.generation,
+        identity: pre.identity,
+        pre_return_sequence: 4,
+        node_create_sequence: 5,
+        node_process_id: 6,
+        node_process_birth: 7,
+        event_sequence: 8,
+        first_delivery_sequence: 8,
+        deferred_for_node: false,
+        registers_restored: true,
+        execution_context_unchanged: true,
+        managed_continuation_clr_stack_required: true,
+        mapping: target.safe_evidence(),
+    });
+    witness.managed = Some(ManagedContinuationLease {
+        target,
+        regions: Vec::new(),
+    });
+    witness.managed_resume = Some(PostNodeExceptionResume {
+        stop: OriginalExceptionStop { event, sequence: 8 },
+        identity: pre.identity,
+        context: pre.context,
+    });
+    (witness, event)
+}
+
+fn deferred_test_stop() -> DeferredManagedContinuation {
+    let (event, pre) = resume_test_event();
+    DeferredManagedContinuation {
+        stop: OriginalExceptionStop { event, sequence: 8 },
+        context: pre.context,
+        receipt: ManagedContinuationDeferredReceipt {
+            generation: [1; 16],
+            identity: pre.identity,
+            pre_return_sequence: 4,
+            first_delivery_sequence: 8,
+            phase: "suspended_before_continue",
+            suspend_previous_count: 0,
+            reply_later_confirmed: false,
+            node_create_sequence: None,
+            resume_previous_count: None,
+            replay_sequence: None,
+            suspend_owned: true,
+            original_thread_exit_confirmed: false,
+        },
+    }
+}
+
+#[test]
+fn deferred_continue_ack_requires_original_event_sequence_and_actual_reply_later() {
+    let mut deferred = deferred_test_stop();
+    let event = deferred.stop.event;
+    assert!(deferred_ack_matches(&event, 8, DBG_REPLY_LATER, &deferred));
+    assert!(!deferred_ack_matches(&event, 9, DBG_REPLY_LATER, &deferred));
+    assert!(!deferred_ack_matches(
+        &event,
+        8,
+        NTSTATUS(0x10002),
+        &deferred
+    ));
+    let mut changed = event;
+    changed.dwThreadId += 1;
+    assert!(!deferred_ack_matches(
+        &changed,
+        8,
+        DBG_REPLY_LATER,
+        &deferred
+    ));
+    changed = event;
+    changed.u.Exception.ExceptionRecord.NumberParameters = 1;
+    assert!(!deferred_ack_matches(
+        &changed,
+        8,
+        DBG_REPLY_LATER,
+        &deferred
+    ));
+    deferred.receipt.suspend_previous_count = 1;
+    assert!(!deferred_ack_matches(&event, 8, DBG_REPLY_LATER, &deferred));
+    deferred.receipt.suspend_previous_count = 0;
+    deferred.receipt.reply_later_confirmed = true;
+    assert!(!deferred_ack_matches(&event, 8, DBG_REPLY_LATER, &deferred));
+}
+
+#[test]
+fn deferred_replay_requires_original_context_and_node_between_both_deliveries() {
+    let mut deferred = deferred_test_stop();
+    deferred.receipt.phase = "awaiting_replay";
+    deferred.receipt.reply_later_confirmed = true;
+    deferred.receipt.node_create_sequence = Some(9);
+    record_deferred_resume(&mut deferred.receipt, 1).unwrap();
+    let event = deferred.stop.event;
+    let current = deferred.context;
+    assert!(deferred_replay_matches(&event, 10, 9, &current, &deferred));
+    for (sequence, node) in [(8, 9), (9, 9), (10, 0), (10, 8), (10, 10)] {
+        assert!(!deferred_replay_matches(
+            &event, sequence, node, &current, &deferred
+        ));
+    }
+    let changed = CONTEXT {
+        Rsp: current.Rsp + 8,
+        ..current
+    };
+    assert!(!deferred_replay_matches(&event, 10, 9, &changed, &deferred));
+    let changed = CONTEXT {
+        Dr6: current.Dr6 ^ 2,
+        ..current
+    };
+    assert!(!deferred_replay_matches(&event, 10, 9, &changed, &deferred));
+    deferred.receipt.suspend_owned = true;
+    assert!(!deferred_replay_matches(&event, 10, 9, &current, &deferred));
+    deferred.receipt.suspend_owned = false;
+    deferred.receipt.replay_sequence = Some(10);
+    assert!(!deferred_replay_matches(&event, 10, 9, &current, &deferred));
+}
+
+#[test]
+fn a_bound_frame_before_child_delivery_is_deferable_but_not_a_post_node_read() {
+    let target = continuation_test_target();
+    let identity = continuation_identity(&target);
+    let current = CONTEXT {
+        Rip: target.address,
+        Rsp: target.frame_rsp,
+        ..CONTEXT::default()
+    };
+    assert!(continuation_frame_matches(&target, identity, &current));
+    assert!(!continuation_hit_matches(
+        &target, identity, None, 8, &current
+    ));
+    assert!(continuation_hit_matches(
+        &target,
+        identity,
+        Some((9, 10, 11)),
+        12,
+        &current
+    ));
+}
+
+#[test]
+fn any_completed_resume_consumes_only_our_increment_even_if_the_count_is_unexpected() {
+    for previous in [0_u32, 1, 2, 3] {
+        let mut deferred = deferred_test_stop();
+        deferred.receipt.suspend_previous_count = previous.saturating_sub(1);
+        let original = deferred.receipt.suspend_previous_count;
+        let result = record_deferred_resume(&mut deferred.receipt, previous);
+        assert_eq!(result.is_ok(), previous == 1);
+        assert!(!deferred.receipt.suspend_owned);
+        assert_eq!(deferred.receipt.resume_previous_count, Some(previous));
+        assert_eq!(deferred.receipt.suspend_previous_count, original);
+    }
+    let mut deferred = deferred_test_stop();
+    assert!(record_deferred_resume(&mut deferred.receipt, u32::MAX).is_err());
+    assert!(deferred.receipt.suspend_owned);
+    assert!(deferred.receipt.resume_previous_count.is_none());
+}
+
+#[test]
+fn wrong_deferred_continue_status_keeps_the_suspend_owned_for_cleanup() {
+    let (mut witness, event) = managed_resume_witness();
+    let mut deferred = deferred_test_stop();
+    deferred.stop.event = event;
+    deferred.receipt.identity = witness.pre_return_binding.unwrap().0;
+    witness.managed_resume = None;
+    witness.managed_selected = 0;
+    witness.managed_deferred = Some(deferred);
+    assert!(
+        witness
+            .on_event_continued(&event, 8, NTSTATUS(0x10002))
+            .is_err()
+    );
+    assert!(witness.stopped);
+    assert!(witness.managed_invalidated);
+    assert!(
+        witness
+            .managed_deferred
+            .as_ref()
+            .unwrap()
+            .receipt
+            .suspend_owned
+    );
+    assert!(witness.requires_restoration());
+}
+
+#[test]
+fn root_sampling_preserves_the_independent_awaiting_replay_ticket() {
+    let (mut witness, event) = managed_resume_witness();
+    let mut deferred = deferred_test_stop();
+    deferred.receipt.phase = "awaiting_replay";
+    deferred.receipt.suspend_owned = false;
+    witness.managed_resume = None;
+    witness.managed_selected = 0;
+    witness.managed_deferred = Some(deferred);
+    assert!(witness.sample_post_node_root_stop(&event, 8).is_err());
+    assert_eq!(
+        witness.managed_deferred.as_ref().unwrap().receipt.phase,
+        "awaiting_replay"
+    );
+    assert!(witness.managed.is_some());
+}
+
+#[test]
+fn cancellation_after_suspend_release_is_idempotent_and_preserves_a_completed_replay() {
+    let (mut witness, _) = managed_resume_witness();
+    let mut deferred = deferred_test_stop();
+    deferred.receipt.phase = "replayed";
+    deferred.receipt.replay_sequence = Some(10);
+    record_deferred_resume(&mut deferred.receipt, 1).unwrap();
+    witness.managed_deferred = Some(deferred);
+    witness.cancel_deferred_after_target_termination().unwrap();
+    witness.cancel_deferred_after_target_termination().unwrap();
+    let receipt = witness.summary().managed_continuation_deferred.unwrap();
+    assert_eq!(receipt.phase, "replayed");
+    assert_eq!(receipt.resume_previous_count, Some(1));
+    assert_eq!(receipt.replay_sequence, Some(10));
+    assert!(!receipt.suspend_owned);
+}
+
+#[test]
+fn managed_resume_rejects_replay_without_promoting_any_classification_budget() {
+    let (mut witness, event) = managed_resume_witness();
+    assert!(witness.managed_continuation_target().is_ok());
+    assert!(
+        witness
+            .resume_after_managed_continuation(&event, 9)
+            .is_err()
+    );
+    assert!(
+        witness
+            .resume_after_managed_continuation(&event, 8)
+            .is_err()
+    );
+    assert!(witness.managed_continuation_target().is_err());
+    let summary = witness.summary();
+    assert!(summary.stopped && summary.managed_continuation_invalidated);
+    assert_eq!(summary.managed_continuation_selected_calls, 1);
+    assert_eq!(summary.managed_continuation_resumed_calls, 0);
+    assert_eq!(summary.pre_node_returned_calls, 1);
+    assert_eq!(summary.selected_calls, 0);
+    assert_eq!(summary.returned_calls, 0);
+    assert_eq!(summary.post_node_exception_selected_calls, 0);
+    assert_eq!(summary.result, "unknown");
+}
+
+#[test]
+fn an_intervening_operation_retires_the_managed_stop_lease() {
+    let (mut witness, event) = managed_resume_witness();
+    assert!(witness.sample_post_node_root_stop(&event, 8).is_err());
+    assert!(witness.managed_continuation_target().is_err());
+    assert!(
+        witness
+            .resume_after_managed_continuation(&event, 8)
+            .is_err()
+    );
+    assert!(witness.summary().managed_continuation_invalidated);
+    assert!(witness.stopped);
+}
+
+#[test]
+fn post_return_cannot_revive_a_spent_managed_lease() {
+    let (mut witness, event) = managed_resume_witness();
+    witness.selected = 1;
+    witness.returned = 1;
+    assert!(
+        !witness
+            .resume_after_post_node_return_for_continuation(&event, 8)
+            .unwrap()
+    );
+    assert!(witness.stopped);
+    assert!(witness.managed.is_none());
+    assert_eq!(witness.summary().managed_continuation_resumed_calls, 0);
+    assert_eq!(witness.summary().returned_calls, 1);
+}
+
+#[test]
+fn post_return_resume_requires_its_own_exact_event_ticket() {
+    let (mut witness, mut event) = managed_resume_witness();
+    witness.selected = 1;
+    witness.returned = 1;
+    witness.managed_selected = 0;
+    witness.managed_receipt = None;
+    witness.post_return_resume = witness.managed_resume.take();
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    assert!(
+        witness
+            .resume_after_post_node_return_for_continuation(&event, 8)
+            .is_err()
+    );
+    assert!(witness.stopped);
+    assert!(witness.summary().managed_continuation_invalidated);
+    assert!(
+        !witness
+            .resume_after_post_node_return_for_continuation(&event, 8)
+            .unwrap()
+    );
+    assert_eq!(witness.summary().returned_calls, 1);
 }
 
 #[test]

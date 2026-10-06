@@ -76,6 +76,24 @@ try {
         }
         $receipt.reader_build_receipt_sha256 = (Get-FileHash -LiteralPath $buildReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
     }
+    if (-not $Local) {
+        $buildReceiptPath = Join-Path ([IO.Path]::GetDirectoryName($inputReader)) 'build.safe.json'
+        $buildReceiptFile = Get-Item -LiteralPath $buildReceiptPath
+        if ($buildReceiptFile.PSIsContainer -or ($buildReceiptFile.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            $buildReceiptFile.Length -le 0 -or $buildReceiptFile.Length -gt 1048576) {
+            throw 'reader 元数据合同收据不是有界普通文件'
+        }
+        $buildReceipt = [IO.File]::ReadAllText($buildReceiptPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+        $receipt.reader_build_receipt_sha256 = (Get-FileHash -LiteralPath $buildReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    if ($buildReceipt.status -cne 'compiled' -or $buildReceipt.executable.sha256 -cne $readerHash -or
+        $buildReceipt.process_start_info_contract.getter_invoked -or
+        $buildReceipt.process_start_info_contract.target_value_observed -or
+        $buildReceipt.process_start_info_contract.field_name -cne 'useShellExecute' -or
+        $buildReceipt.process_start_info_contract.field_type -cne 'System.Boolean') {
+        throw '原 reader 的 ProcessStartInfo 元数据合同不匹配'
+    }
+    $receipt.process_start_info_contract = $buildReceipt.process_start_info_contract
     Copy-Item -LiteralPath $inputReader -Destination $copiedReader
     if ((Get-FileHash -LiteralPath $copiedReader -Algorithm SHA256).Hash.ToLowerInvariant() -ne $readerHash) {
         throw 'reader 副本摘要不匹配'
@@ -108,6 +126,7 @@ try {
         throw '固定无害子模式副本摘要不匹配'
     }
     # 只读取刚编译原件的元数据；不调用 Main、类型初始化器或异常方法。
+    $null = [Reflection.Assembly]::ReflectionOnlyLoadFrom([Diagnostics.ProcessStartInfo].Assembly.Location)
     $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($fixture)
     $receipt.fixture_mvid = $assembly.ManifestModule.ModuleVersionId.ToString('D')
     $type = $assembly.GetType('ClrFixture', $true)
@@ -115,6 +134,78 @@ try {
     $shellMethod = $type.GetMethod('ClassifyBoundNode', $flags)
     if ($null -eq $shellMethod) { throw '固定映像分类方法元数据缺失' }
     $receipt.fixture_shell_method_token = $shellMethod.MetadataToken
+    $methodFlags = [int]$shellMethod.GetMethodImplementationFlags()
+    if (($methodFlags -band 72) -ne 72) { throw '固定方法缺少 NoInlining 与 NoOptimization 标志' }
+    $receipt.fixture_shell_method_implementation_flags = $methodFlags
+    # 仅解码刚编译的方法体，按唯一边界调用确定实际局部索引；不搜索字节子串或执行方法。
+    $boundary = $type.GetMethod('ContinuationBoundary', $flags)
+    if ($null -eq $boundary) { throw '固定续点边界方法缺失' }
+    $body = $shellMethod.GetMethodBody()
+    $il = $body.GetILAsByteArray()
+    $opcodes = @{}
+    foreach ($opcodeField in [Reflection.Emit.OpCodes].GetFields([Reflection.BindingFlags]'Public, Static')) {
+        $opcode = $opcodeField.GetValue($null)
+        $opcodes[[int]$opcode.Value -band 65535] = $opcode
+    }
+    $instructions = @()
+    for ($offset = 0; $offset -lt $il.Length;) {
+        $startOffset = $offset
+        $code = [int]$il[$offset++]
+        if ($code -eq 254) {
+            if ($offset -ge $il.Length) { throw '固定 IL 操作码被截断' }
+            $code = 0xfe00 -bor [int]$il[$offset++]
+        }
+        if (-not $opcodes.ContainsKey($code)) { throw '固定 IL 操作码未知' }
+        $opcode = $opcodes[$code]
+        $size = switch ($opcode.OperandType.ToString()) {
+            'InlineNone' { 0 }
+            { $_ -in @('ShortInlineBrTarget', 'ShortInlineI', 'ShortInlineVar') } { 1 }
+            'InlineVar' { 2 }
+            { $_ -in @('InlineBrTarget', 'InlineField', 'InlineI', 'InlineMethod', 'InlineSig', 'InlineString', 'InlineTok', 'InlineType', 'ShortInlineR') } { 4 }
+            { $_ -in @('InlineI8', 'InlineR') } { 8 }
+            default { throw '固定 IL 含未批准的操作数形式' }
+        }
+        if ($offset + $size -gt $il.Length) { throw '固定 IL 操作数被截断' }
+        $operand = if ($size -eq 1) { [int]$il[$offset] } elseif ($size -eq 2) {
+            [BitConverter]::ToUInt16($il, $offset)
+        } elseif ($size -eq 4) { [BitConverter]::ToInt32($il, $offset) } else { $null }
+        $instructions += [pscustomobject]@{ offset = $startOffset; opcode = $opcode.Name; operand = $operand }
+        $offset += $size
+    }
+    $boundaryCalls = @(for ($i = 2; $i -lt $instructions.Count; $i++) {
+        if ($instructions[$i].opcode -ceq 'call' -and $instructions[$i].operand -eq $boundary.MetadataToken) { $i }
+    })
+    if ($boundaryCalls.Count -ne 1) { throw '固定续点调用不唯一' }
+    $callIndex = $boundaryCalls[0]
+    $booleanLoad = $instructions[$callIndex - 2]
+    $startInfoLoad = $instructions[$callIndex - 1]
+    $booleanIndex = if ($booleanLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
+        elseif ($booleanLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$booleanLoad.operand }
+        else { throw '固定布尔参数不是按值读取的局部变量' }
+    $startInfoIndex = if ($startInfoLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
+        elseif ($startInfoLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$startInfoLoad.operand }
+        else { throw '固定 ProcessStartInfo 不是局部变量' }
+    if ($booleanIndex -ge $body.LocalVariables.Count -or $startInfoIndex -ge $body.LocalVariables.Count -or
+        $body.LocalVariables[$booleanIndex].LocalType.FullName -cne 'System.Boolean' -or
+        $body.LocalVariables[$startInfoIndex].LocalType.FullName -cne 'System.Diagnostics.ProcessStartInfo') {
+        throw '固定续点局部变量类型不符'
+    }
+    $decisionIndex = $callIndex + 1
+    while ($decisionIndex -lt $instructions.Count -and $instructions[$decisionIndex].opcode -ceq 'nop') { $decisionIndex++ }
+    if ($decisionIndex -ge $instructions.Count) { throw '固定边界调用后缺少布尔读取' }
+    $decisionLoad = $instructions[$decisionIndex]
+    $decisionLocal = if ($decisionLoad.opcode -match '^ldloc\.([0-3])$') { [int]$Matches[1] }
+        elseif ($decisionLoad.opcode -in @('ldloc', 'ldloc.s')) { [int]$decisionLoad.operand }
+        else { throw '固定边界调用后不是布尔局部读取' }
+    if ($decisionLocal -ne $booleanIndex) { throw '固定调用前后布尔局部不同' }
+    $receipt.fixture_continuation = [ordered]@{
+        method_token = $shellMethod.MetadataToken; boundary_method_token = $boundary.MetadataToken
+        approved_il_offsets = @($decisionLoad.offset)
+        boundary_bool_load_offset = $booleanLoad.offset; boundary_call_offset = $instructions[$callIndex].offset
+        bool_local_index = $booleanIndex; start_info_local_index = $startInfoIndex
+        il_base64 = [Convert]::ToBase64String($il)
+        expected_boolean = $true; expected_use_shell_execute = $false
+    }
     $receipt.fixture_method_tokens = @('ThrowNative', 'ThrowSecondNative', 'WrapNative', 'WrapOperation', 'Exercise') | ForEach-Object {
         $method = $type.GetMethod($_, $flags)
         if ($null -eq $method) { throw '固定夹具方法元数据缺失' }

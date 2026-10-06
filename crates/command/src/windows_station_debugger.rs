@@ -11,15 +11,16 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::{
-    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_SAME_ACCESS, DuplicateHandle,
-    ERROR_SEM_TIMEOUT, GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, HLOCAL, LocalFree,
-    NTSTATUS,
+    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DBG_REPLY_LATER, DUPLICATE_SAME_ACCESS,
+    DuplicateHandle, ERROR_SEM_TIMEOUT, EXCEPTION_SINGLE_STEP, GetHandleInformation, HANDLE,
+    HANDLE_FLAG_INHERIT, HLOCAL, LocalFree, NTSTATUS,
 };
 use windows::Win32::Security::Authorization::ConvertStringSidToSidW;
 use windows::Win32::Security::{PSID, SECURITY_CAPABILITIES};
 use windows::Win32::System::Diagnostics::Debug::{
     CREATE_PROCESS_DEBUG_EVENT, CREATE_THREAD_DEBUG_EVENT, ContinueDebugEvent, DEBUG_EVENT,
-    DebugSetProcessKillOnExit, EXIT_PROCESS_DEBUG_EVENT, LOAD_DLL_DEBUG_EVENT, WaitForDebugEvent,
+    DebugSetProcessKillOnExit, EXCEPTION_DEBUG_EVENT, EXIT_PROCESS_DEBUG_EVENT,
+    LOAD_DLL_DEBUG_EVENT, WaitForDebugEvent,
 };
 use windows::Win32::System::Threading::{
     CREATE_NEW_CONSOLE, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
@@ -120,17 +121,26 @@ struct Pending {
     pid: u32,
     tid: u32,
     code: u32,
+    reply_later_allowed: bool,
 }
 impl Pending {
     fn matches(&self, sequence: u64, pid: u32, tid: u32, code: u32) -> bool {
-        *self
-            == Self {
-                sequence,
-                pid,
-                tid,
-                code,
-            }
+        (self.sequence, self.pid, self.tid, self.code) == (sequence, pid, tid, code)
     }
+    fn accepts_status(&self, status: NTSTATUS) -> bool {
+        status == DBG_CONTINUE
+            || status == DBG_EXCEPTION_NOT_HANDLED
+            || (status == DBG_REPLY_LATER
+                && self.code == EXCEPTION_DEBUG_EVENT.0
+                && self.reply_later_allowed)
+    }
+}
+fn reply_later_allowed(event: &DEBUG_EVENT) -> bool {
+    if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT {
+        return false;
+    }
+    let exception = unsafe { event.u.Exception };
+    exception.dwFirstChance == 1 && exception.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Inflight {
@@ -406,6 +416,7 @@ impl StationDebugger {
             pid: event.pid,
             tid: event.tid,
             code: event.code,
+            reply_later_allowed: reply_later_allowed(&native),
         });
         client.delivery = None;
         client.event_handles = handles;
@@ -422,13 +433,10 @@ impl StationDebugger {
         status: NTSTATUS,
         deadline: Instant,
     ) -> io::Result<NTSTATUS> {
-        require(
-            status == DBG_CONTINUE || status == DBG_EXCEPTION_NOT_HANDLED,
-            "调试继续状态无效",
-        )?;
         let mut guard = self.lock()?;
         let client = guard.as_mut().ok_or_else(|| invalid("调试控制已关闭"))?;
         let pending = client.pending.ok_or_else(|| invalid("调试事件缺失"))?;
+        require(pending.accepts_status(status), "调试继续状态与原事件不符")?;
         require(
             pending.pid == pid && pending.tid == tid,
             "调试继续身份不匹配",
@@ -661,6 +669,7 @@ impl Package {
                 pid: event.dwProcessId,
                 tid: event.dwThreadId,
                 code: event.dwDebugEventCode.0,
+                reply_later_allowed: reply_later_allowed(&event),
             },
             (!file.is_invalid()).then(|| owned(file)),
             process,
@@ -678,15 +687,13 @@ impl Package {
         Event::capture(self.event_sequence, &event).map(Some)
     }
     fn continue_event(&mut self, expected: Pending, status: NTSTATUS) -> io::Result<()> {
-        require(
-            status == DBG_CONTINUE || status == DBG_EXCEPTION_NOT_HANDLED,
-            "原调试继续状态无效",
-        )?;
         let pending = self
             .pending
             .as_ref()
             .ok_or_else(|| invalid("原调试事件缺失"))?
             .0;
+        // 延期资格只来自原生 Wait 事件，不接受客户端声明或请求中的替代值。
+        require(pending.accepts_status(status), "原调试继续状态与原事件不符")?;
         require(
             pending.matches(expected.sequence, expected.pid, expected.tid, expected.code),
             "原调试继续绑定不匹配",
@@ -802,6 +809,7 @@ impl Server {
                             pid,
                             tid,
                             code,
+                            reply_later_allowed: false,
                         },
                         NTSTATUS(status),
                     )?;

@@ -12,40 +12,371 @@ use std::process::{Child, ExitStatus, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest as _, Sha256};
+use windows::core::{w, BOOL, PCWSTR};
 use windows::Win32::Foundation::{
-    DUPLICATE_HANDLE_OPTIONS, DuplicateHandle, FILETIME, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    DuplicateHandle, DUPLICATE_HANDLE_OPTIONS, FILETIME, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Storage::FileSystem::{
-    BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT,
-    FILE_NAME_NORMALIZED, FILE_SHARE_READ, GetFileInformationByHandle, GetFileVersionInfoSizeW,
-    GetFileVersionInfoW, GetFinalPathNameByHandleW, VS_FIXEDFILEINFO, VerQueryValueW,
+    GetFileInformationByHandle, GetFileVersionInfoSizeW, GetFileVersionInfoW,
+    GetFinalPathNameByHandleW, VerQueryValueW, BY_HANDLE_FILE_INFORMATION,
+    FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT, FILE_NAME_NORMALIZED,
+    FILE_SHARE_READ, VS_FIXEDFILEINFO,
 };
 use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
     JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 use windows::Win32::System::SystemInformation::{GetTickCount64, GetWindowsDirectoryW};
 use windows::Win32::System::Threading::{
     GetCurrentProcess, GetProcessId, GetProcessIdOfThread, GetProcessTimes, GetThreadId,
-    GetThreadTimes, PROCESS_QUERY_INFORMATION, PROCESS_SYNCHRONIZE, PROCESS_VM_READ,
-    THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION, WaitForSingleObject,
+    GetThreadTimes, WaitForSingleObject, PROCESS_QUERY_INFORMATION, PROCESS_SYNCHRONIZE,
+    PROCESS_VM_READ, THREAD_GET_CONTEXT, THREAD_QUERY_INFORMATION,
 };
-use windows::core::{BOOL, PCWSTR, w};
 
 use crate::blocking::Command;
 
 pub(super) const MAX_FILE: u64 = 64 * 1024 * 1024;
 pub(super) const MAX_OUTPUT: u64 = 32768;
 const REQUEST_SIZE: usize = 168;
+const MANAGED_EXTENSION_SIZE: usize = 200;
 const MAX_POLL: Duration = Duration::from_millis(100);
 const FIXTURE_READ_BYTES: u32 = 16 * 1024 * 1024;
 const POWERSHELL_READ_BYTES: u32 = 24 * 1024 * 1024;
 const CLR_EXCEPTION: u32 = 0xe0434352;
 const NATIVE_RETURN_SINGLE_STEP: u32 = 0x80000004;
+
+/// 只允许原停点实际方法中的固定 IL 与局部变量索引，不触发目标求值。
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ClrManagedMethodSpec {
+    pub module_mvid: String,
+    pub method_token: u32,
+    pub approved_il_offsets: Vec<u32>,
+    pub bool_local_index: u32,
+    pub start_info_local_index: Option<u32>,
+}
+
+impl ClrManagedMethodSpec {
+    fn validate(&self) -> io::Result<()> {
+        let mvid = uuid::Uuid::parse_str(&self.module_mvid).map_err(io::Error::other)?;
+        require(
+            !mvid.is_nil()
+                && mvid.to_string() == self.module_mvid
+                && self.method_token & 0xff00_0000 == 0x0600_0000
+                && self.method_token & 0x00ff_ffff != 0
+                && !self.approved_il_offsets.is_empty()
+                && self.approved_il_offsets.len() <= 4
+                && self
+                    .approved_il_offsets
+                    .iter()
+                    .enumerate()
+                    .all(|(index, il)| {
+                        *il < 0x10000 && !self.approved_il_offsets[..index].contains(il)
+                    })
+                && self.bool_local_index < 256
+                && self
+                    .start_info_local_index
+                    .is_none_or(|index| index < 256 && index != self.bool_local_index),
+            "CLR 托管方法规格无效",
+        )
+    }
+}
+
+/// 只由已回收 reader 的私有回复构造；应用层不能制造地址票据。
+#[derive(Clone)]
+pub struct ManagedContinuationTarget {
+    pub(crate) process_id: u32,
+    pub(crate) thread_id: u32,
+    pub(crate) process_birth: u64,
+    pub(crate) thread_birth: u64,
+    pub(crate) pre_sequence: u64,
+    pub(crate) pre_nonce: [u8; 16],
+    pub(crate) module_mvid: String,
+    pub(crate) method_token: u32,
+    pub(crate) il_offset: u32,
+    pub(crate) enc_version: u32,
+    pub(crate) frame_rsp: u64,
+    pub(crate) extent_start: u64,
+    pub(crate) extent_end: u64,
+    pub(crate) address: u64,
+    pub(crate) map_count: u32,
+    pub(crate) map_sha256: [u8; 32],
+    pub(crate) code_sha256: [u8; 32],
+    pub(crate) spec: ClrManagedMethodSpec,
+}
+
+impl std::fmt::Debug for ManagedContinuationTarget {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ManagedContinuationTarget { 私有地址已隐藏 }")
+    }
+}
+
+impl ManagedContinuationTarget {
+    pub fn safe_evidence(&self) -> Value {
+        json!({"module_mvid":self.module_mvid,"method_token":self.method_token,
+            "il_offset":self.il_offset,"enc_version":self.enc_version,"map_count":self.map_count,
+            "map_sha256":hex(&self.map_sha256),"code_sha256":hex(&self.code_sha256),
+            "extent_length":self.extent_end-self.extent_start,"pre_sequence":self.pre_sequence})
+    }
+}
+
+fn fixed_hex<const N: usize>(value: &Value) -> io::Result<[u8; N]> {
+    let text = value
+        .as_str()
+        .ok_or_else(|| io::Error::other("CLR 私有摘要缺失"))?;
+    require(
+        text.len() == N * 2
+            && text
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)),
+        "CLR 私有摘要格式无效",
+    )?;
+    let mut bytes = [0; N];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte =
+            u8::from_str_radix(&text[index * 2..index * 2 + 2], 16).map_err(io::Error::other)?;
+    }
+    require(bytes != [0; N], "CLR 私有摘要不能为空")?;
+    Ok(bytes)
+}
+
+fn managed_target(
+    value: &Value,
+    binding: &Value,
+    spec: &ClrManagedMethodSpec,
+) -> io::Result<ManagedContinuationTarget> {
+    spec.validate()?;
+    let number = |key: &str| {
+        value[key]
+            .as_u64()
+            .ok_or_else(|| io::Error::other("CLR 私有票据整数缺失"))
+    };
+    let small = |key: &str| u32::try_from(number(key)?).map_err(io::Error::other);
+    let target = ManagedContinuationTarget {
+        process_id: small("process_id")?,
+        thread_id: small("thread_id")?,
+        process_birth: number("process_birth")?,
+        thread_birth: number("thread_birth")?,
+        pre_sequence: number("pre_sequence")?,
+        pre_nonce: fixed_hex(&value["pre_nonce"])?,
+        module_mvid: value["module_mvid"]
+            .as_str()
+            .ok_or_else(|| io::Error::other("CLR 私有模块缺失"))?
+            .into(),
+        method_token: small("method_token")?,
+        il_offset: small("il_offset")?,
+        enc_version: small("enc_version")?,
+        frame_rsp: number("frame_rsp")?,
+        extent_start: number("extent_start")?,
+        extent_end: number("extent_end")?,
+        address: number("address")?,
+        map_count: small("map_count")?,
+        map_sha256: fixed_hex(&value["map_sha256"])?,
+        code_sha256: fixed_hex(&value["code_sha256"])?,
+        spec: spec.clone(),
+    };
+    require(
+        binding["operation"] == 3
+            && binding["event_sequence"] == target.pre_sequence
+            && binding["nonce"] == hex(&target.pre_nonce)
+            && binding["pid"] == target.process_id
+            && binding["tid"] == target.thread_id
+            && binding["process_birth"] == target.process_birth
+            && binding["thread_birth"] == target.thread_birth
+            && target.pre_sequence != 0
+            && target.process_id != 0
+            && target.thread_id != 0
+            && target.process_birth != 0
+            && target.thread_birth != 0
+            && target.module_mvid == spec.module_mvid
+            && target.method_token == spec.method_token
+            && spec.approved_il_offsets.contains(&target.il_offset)
+            && (1..=256).contains(&target.map_count)
+            && target.frame_rsp >= 0x10000
+            && target.frame_rsp <= 0x0000_7fff_ffff_ffff
+            && target.frame_rsp % 8 == 0
+            && target.extent_start >= 0x10000
+            && target.extent_end > target.extent_start
+            && target.extent_end - target.extent_start <= 65536
+            && target.extent_end <= 0x0000_8000_0000_0000
+            && target.address >= target.extent_start
+            && target.address < target.extent_end,
+        "CLR 私有续点票据未绑定原停点或完整方法",
+    )?;
+    Ok(target)
+}
+
+fn managed_extension(
+    spec: &ClrManagedMethodSpec,
+    target: Option<&ManagedContinuationTarget>,
+) -> io::Result<Vec<u8>> {
+    spec.validate()?;
+    let mut bytes = vec![0; MANAGED_EXTENSION_SIZE];
+    bytes[..36].copy_from_slice(spec.module_mvid.as_bytes());
+    put32(&mut bytes, 36, spec.method_token);
+    put32(&mut bytes, 40, spec.approved_il_offsets.len() as u32);
+    for (index, il) in spec.approved_il_offsets.iter().enumerate() {
+        put32(&mut bytes, 44 + index * 4, *il);
+    }
+    put32(&mut bytes, 60, spec.bool_local_index);
+    put32(
+        &mut bytes,
+        64,
+        spec.start_info_local_index.unwrap_or(u32::MAX),
+    );
+    if let Some(target) = target {
+        put64(&mut bytes, 68, target.pre_sequence);
+        bytes[76..92].copy_from_slice(&target.pre_nonce);
+        put32(&mut bytes, 92, target.il_offset);
+        put32(&mut bytes, 96, target.enc_version);
+        put64(&mut bytes, 100, target.frame_rsp);
+        put64(&mut bytes, 108, target.extent_start);
+        put64(&mut bytes, 116, target.extent_end);
+        put64(&mut bytes, 124, target.address);
+        put32(&mut bytes, 132, target.map_count);
+        bytes[136..168].copy_from_slice(&target.map_sha256);
+        bytes[168..200].copy_from_slice(&target.code_sha256);
+    }
+    Ok(bytes)
+}
+
+fn validate_managed_observation(
+    value: &Value,
+    target: &ManagedContinuationTarget,
+) -> io::Result<()> {
+    require(
+        value["bound"].is_boolean()
+            && value["api_hresult"]
+                .as_u64()
+                .is_some_and(|n| n <= u32::MAX as u64),
+        "CLR 托管续点结果缺失",
+    )?;
+    if value["bound"] == false {
+        return require(
+            value["mapping"].is_null()
+                && value["boolean_local"].is_null()
+                && value["start_info_field"].is_null()
+                && value["api_hresult"] != 0,
+            "CLR 未绑定续点不能报告局部值",
+        );
+    }
+    require(
+        value["api_hresult"] == 0 && value["mapping"] == target.safe_evidence(),
+        "CLR 托管续点与原映射不符",
+    )?;
+    let boolean = &value["boolean_local"];
+    require(
+        boolean["index"] == target.spec.bool_local_index,
+        "CLR 布尔局部索引不符",
+    )?;
+    validate_local_value(boolean, "", 1, 1, boolean["value"].is_boolean())?;
+    require(
+        boolean["value"].is_boolean() || boolean["value"].is_null(),
+        "CLR 布尔局部值格式无效",
+    )?;
+    if boolean["value"].is_boolean() {
+        require(
+            boolean["type_name"] == "System.Boolean",
+            "CLR 局部不是真实 Boolean",
+        )?;
+    } else {
+        require(boolean["api_hresult"] != 0, "CLR 布尔成功结果缺少真实值")?;
+    }
+    let field = &value["start_info_field"];
+    let requested = target.spec.start_info_local_index.is_some();
+    require(
+        field["requested"] == requested
+            && field["index"] == json!(target.spec.start_info_local_index)
+            && (field["value"].is_boolean() || field["value"].is_null()),
+        "CLR PSI 请求或值不符",
+    )?;
+    if !requested {
+        return require(field["value"].is_null(), "CLR 未请求 PSI 不应报告字段值");
+    }
+    validate_local_value(field, "local_", 8, 0x10, field["value"].is_boolean())?;
+    require(
+        field["api_hresult"]
+            .as_u64()
+            .is_some_and(|n| n <= u32::MAX as u64),
+        "CLR PSI 结果码缺失",
+    )?;
+    if field["value"].is_boolean() {
+        let mvid = field["module_mvid"]
+            .as_str()
+            .and_then(|text| uuid::Uuid::parse_str(text).ok());
+        require(
+            field["api_hresult"] == 0
+                && field["field_read_hresult"] == 0
+                && field["field_name"] == "useShellExecute"
+                && field["field_type"] == 2
+                && field["field_sig_type"] == 2
+                && mvid.is_some_and(|id| !id.is_nil())
+                && field["type_token"].as_u64().is_some_and(|n| {
+                    n & 0xff00_0000 == 0x0200_0000 && n & 0x00ff_ffff != 0 && n <= u32::MAX as u64
+                })
+                && field["field_token"].as_u64().is_some_and(|n| {
+                    n & 0xff00_0000 == 0x0400_0000 && n & 0x00ff_ffff != 0 && n <= u32::MAX as u64
+                }),
+            "CLR PSI 字段未由实际元数据绑定",
+        )?;
+    } else {
+        require(field["api_hresult"] != 0, "CLR PSI 成功结果缺少字段值")?;
+    }
+    Ok(())
+}
+
+fn validate_local_value(
+    value: &Value,
+    prefix: &str,
+    bytes: u64,
+    kind: u64,
+    read: bool,
+) -> io::Result<()> {
+    for field in [
+        "api_hresult",
+        "get_local_hresult",
+        "locations_hresult",
+        "type_hresult",
+        "type_name_hresult",
+        "flags_hresult",
+        "size_hresult",
+        "bytes_hresult",
+    ] {
+        let key = format!("{prefix}{field}");
+        require(
+            value[&key].as_u64().is_some_and(|n| n <= u32::MAX as u64),
+            "CLR 局部读取结果码缺失",
+        )?;
+        if read {
+            // 引用 Value 没有声明类型实例；只读引用字节后由实际对象 MT 校验类型。
+            let expected = if kind == 0x10 && matches!(field, "type_hresult" | "type_name_hresult")
+            {
+                0x8000_000a_u32
+            } else {
+                0
+            };
+            require(value[&key] == expected, "CLR 局部读取或未请求类型状态不符")?;
+        }
+    }
+    if read {
+        require(
+            value[format!("{prefix}locations")]
+                .as_u64()
+                .is_some_and(|n| (1..=2).contains(&n))
+                && value[format!("{prefix}flags")]
+                    .as_u64()
+                    .is_some_and(|n| n & 0x7f == kind)
+                && value[format!("{prefix}size")] == bytes
+                && value[format!("{prefix}bytes_read")] == bytes,
+            "CLR 局部位置、类型或字节数不完整",
+        )?;
+    }
+    Ok(())
+}
 
 pub(super) fn require(value: bool, message: &'static str) -> io::Result<()> {
     if value {
@@ -453,6 +784,36 @@ pub struct ClrNativeReturnStop<'a> {
     pub read_budget_bytes: u32,
 }
 
+/// 仅限 core 由私有方法票据布置并确认的自有托管续点 DR。
+#[derive(Debug)]
+pub struct ClrManagedContinuationStop<'a> {
+    pub process: BorrowedHandle<'a>,
+    pub thread: BorrowedHandle<'a>,
+    pub process_id: u32,
+    pub thread_id: u32,
+    pub event_sequence: u64,
+    pub exception_code: u32,
+    pub first_chance: u32,
+    pub hresult: u32,
+    pub read_budget_bytes: u32,
+}
+
+impl<'a> From<ClrManagedContinuationStop<'a>> for ClrStop<'a> {
+    fn from(stop: ClrManagedContinuationStop<'a>) -> Self {
+        Self {
+            process: stop.process,
+            thread: stop.thread,
+            process_id: stop.process_id,
+            thread_id: stop.thread_id,
+            event_sequence: stop.event_sequence,
+            exception_code: stop.exception_code,
+            first_chance: stop.first_chance,
+            hresult: stop.hresult,
+            read_budget_bytes: stop.read_budget_bytes,
+        }
+    }
+}
+
 struct ClrStop<'a> {
     process: BorrowedHandle<'a>,
     thread: BorrowedHandle<'a>,
@@ -508,7 +869,7 @@ fn valid_read_budget(bytes: u32) -> bool {
 fn valid_stop_kind(operation: u32, code: u32, first_chance: u32, hresult: u32) -> bool {
     first_chance == 1
         && ((operation == 1 && code == CLR_EXCEPTION)
-            || (operation == 3 && code == NATIVE_RETURN_SINGLE_STEP && hresult == 0))
+            || (matches!(operation, 3 | 4) && code == NATIVE_RETURN_SINGLE_STEP && hresult == 0))
 }
 
 fn validate_stop(stop: &ClrStop<'_>, operation: u32, sequence: u64) -> io::Result<()> {
@@ -538,7 +899,7 @@ fn validate_stop(stop: &ClrStop<'_>, operation: u32, sequence: u64) -> io::Resul
 fn validate_reply(value: &Value, binding: &Value) -> io::Result<()> {
     require(
         value["schema"] == 1
-            && matches!(binding["operation"].as_u64(), Some(1 | 3))
+            && matches!(binding["operation"].as_u64(), Some(1 | 3 | 4))
             && value["operation"] == binding["operation"],
         "CLR reader 回复协议不符",
     )?;
@@ -549,7 +910,7 @@ fn validate_reply(value: &Value, binding: &Value) -> io::Result<()> {
         ),
         "CLR reader 回复状态无效",
     )?;
-    if binding["operation"] == 3 {
+    if binding["operation"] == 3 || binding["operation"] == 4 {
         require(
             value["event_hresult"] == 0
                 && value["exception_source"] == "none"
@@ -627,6 +988,10 @@ pub struct ClrReader {
     exit_status: Option<ExitStatus>,
     reaped: bool,
     delivered: bool,
+    managed_spec: Option<ClrManagedMethodSpec>,
+    managed_request_target: Option<ManagedContinuationTarget>,
+    managed_response_target: Option<ManagedContinuationTarget>,
+    managed_target_taken: bool,
 }
 
 impl ClrReader {
@@ -659,6 +1024,23 @@ impl ClrReader {
             private_root,
             &format!("native-return-reader-{sequence}"),
             3,
+            sequence,
+            deadline,
+        )
+    }
+
+    pub fn start_managed_continuation(
+        image: &mut ClrReaderImage,
+        private_root: &Path,
+        sequence: u64,
+        deadline: Instant,
+    ) -> io::Result<Self> {
+        require(sequence != 0, "CLR 托管续点序号无效")?;
+        Self::start_named(
+            image,
+            private_root,
+            &format!("managed-continuation-reader-{sequence}"),
+            4,
             sequence,
             deadline,
         )
@@ -709,6 +1091,10 @@ impl ClrReader {
             exit_status: None,
             reaped: false,
             delivered: false,
+            managed_spec: None,
+            managed_request_target: None,
+            managed_response_target: None,
+            managed_target_taken: false,
         })
     }
 
@@ -742,6 +1128,46 @@ impl ClrReader {
         stop: ClrNativeReturnStop<'_>,
     ) -> io::Result<()> {
         require(self.operation == 3, "CLR reader 不是原生返回读取请求")?;
+        self.bind_stop_and_send(image, runtime, stop.into())
+    }
+
+    pub fn bind_native_return_with_managed_spec_and_send(
+        &mut self,
+        image: &mut ClrReaderImage,
+        runtime: &mut ClrRuntimeBinding,
+        stop: ClrNativeReturnStop<'_>,
+        spec: &ClrManagedMethodSpec,
+    ) -> io::Result<()> {
+        require(
+            self.operation == 3 && self.managed_spec.is_none() && !self.initialization_attempted,
+            "CLR 托管规格请求不能重放",
+        )?;
+        spec.validate()?;
+        self.managed_spec = Some(spec.clone());
+        self.bind_stop_and_send(image, runtime, stop.into())
+    }
+
+    pub fn bind_managed_continuation_and_send(
+        &mut self,
+        image: &mut ClrReaderImage,
+        runtime: &mut ClrRuntimeBinding,
+        stop: ClrManagedContinuationStop<'_>,
+        target: &ManagedContinuationTarget,
+    ) -> io::Result<()> {
+        require(
+            self.operation == 4
+                && self.managed_spec.is_none()
+                && !self.initialization_attempted
+                && target.pre_sequence < stop.event_sequence
+                && target.process_id == stop.process_id
+                && target.thread_id == stop.thread_id
+                && birth(HANDLE(stop.process.as_raw_handle()), false)? == target.process_birth
+                && birth(HANDLE(stop.thread.as_raw_handle()), true)? == target.thread_birth,
+            "CLR 托管续点没有原票据或原身份变化",
+        )?;
+        target.spec.validate()?;
+        self.managed_spec = Some(target.spec.clone());
+        self.managed_request_target = Some(target.clone());
         self.bind_stop_and_send(image, runtime, stop.into())
     }
 
@@ -803,6 +1229,13 @@ impl ClrReader {
         put32(&mut bytes, 156, stop.hresult);
         put32(&mut bytes, 160, stop.first_chance);
         put32(&mut bytes, 164, stop.exception_code);
+        if let Some(spec) = self.managed_spec.as_ref() {
+            put32(&mut bytes, 8, 2);
+            bytes.extend(managed_extension(
+                spec,
+                self.managed_request_target.as_ref(),
+            )?);
+        }
         bytes.extend(path.iter().flat_map(|unit| unit.to_le_bytes()));
         self.send(&bytes)
     }
@@ -903,11 +1336,75 @@ impl ClrReader {
         let Some(exit) = self.poll_exit(self.deadline, cancelled)? else {
             return Ok(None);
         };
-        let value = self.read_output()?;
+        let mut value = self.read_output()?;
         require(exit.success(), "CLR reader 原生读取失败，原件已保留")?;
         validate_reply(&value, self.binding.as_ref().expect("已核对原请求绑定"))?;
+        let private = value
+            .as_object_mut()
+            .ok_or_else(|| io::Error::other("CLR 回复不是对象"))?
+            .remove("private_target");
+        if let Some(spec) = self.managed_spec.as_ref() {
+            if self.operation == 3 {
+                let mapping = &value["managed_mapping"];
+                require(
+                    matches!(mapping["status"].as_str(), Some("bound" | "unknown")),
+                    "CLR 方法映射状态缺失",
+                )?;
+                if mapping["status"] == "bound" {
+                    require(
+                        mapping["api_hresult"] == 0
+                            && mapping["matched_frames"] == 1
+                            && value["budget_exhausted"] == false,
+                        "CLR 方法映射未完整绑定",
+                    )?;
+                    let target = managed_target(
+                        private
+                            .as_ref()
+                            .ok_or_else(|| io::Error::other("CLR 私有续点缺失"))?,
+                        self.binding.as_ref().expect("已核对原请求绑定"),
+                        spec,
+                    )?;
+                    require(
+                        mapping["mapping"] == target.safe_evidence(),
+                        "CLR 公开映射与私有票据不一致",
+                    )?;
+                    self.managed_response_target = Some(target);
+                } else {
+                    require(private.is_none(), "CLR 未知映射不能携带地址")?;
+                }
+            } else {
+                require(private.is_none(), "CLR 续点回复不能发布新地址")?;
+                let target = self
+                    .managed_request_target
+                    .as_ref()
+                    .ok_or_else(|| io::Error::other("CLR 原续点票据缺失"))?;
+                validate_managed_observation(&value["managed_continuation"], target)?;
+            }
+        } else {
+            require(
+                private.is_none()
+                    && value.get("managed_mapping").is_none()
+                    && value.get("managed_continuation").is_none(),
+                "CLR 旧协议回复混入托管票据",
+            )?;
+        }
         self.delivered = true;
         Ok(Some(value))
+    }
+
+    pub fn take_managed_continuation_target(
+        &mut self,
+    ) -> io::Result<Option<ManagedContinuationTarget>> {
+        require(
+            self.operation == 3
+                && self.managed_spec.is_some()
+                && self.reaped
+                && self.delivered
+                && !self.managed_target_taken,
+            "CLR 私有续点尚未回收交付或已取走",
+        )?;
+        self.managed_target_taken = true;
+        Ok(self.managed_response_target.take())
     }
 
     pub fn abort_and_reap(&mut self, cleanup_deadline: Instant) -> io::Result<()> {

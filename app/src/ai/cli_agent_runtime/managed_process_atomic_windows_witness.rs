@@ -5,6 +5,7 @@ use std::os::windows::ffi::OsStrExt as _;
 use std::os::windows::io::BorrowedHandle;
 
 use command::windows::{ShellClassificationObservation, ShellClassificationWitness};
+use windows::Win32::Foundation::{DBG_REPLY_LATER, NTSTATUS};
 use windows::Win32::System::Threading::{PROCESS_NAME_WIN32, QueryFullProcessImageNameW};
 use windows::core::PWSTR;
 
@@ -93,15 +94,19 @@ struct RootThread {
     process_created: u64,
 }
 
-struct OriginalDebugEvent(DEBUG_EVENT);
+struct OriginalDebugEvent {
+    event: DEBUG_EVENT,
+    sequence: u64,
+}
 
 impl fmt::Debug for OriginalDebugEvent {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("OriginalDebugEvent")
-            .field("process_id", &self.0.dwProcessId)
-            .field("thread_id", &self.0.dwThreadId)
-            .field("code", &self.0.dwDebugEventCode)
+            .field("process_id", &self.event.dwProcessId)
+            .field("thread_id", &self.event.dwThreadId)
+            .field("code", &self.event.dwDebugEventCode)
+            .field("sequence", &self.sequence)
             .finish()
     }
 }
@@ -179,6 +184,8 @@ pub(super) struct NativeWitness {
     pre_node_classification_entry: Option<serde_json::Value>,
     pre_node_classification_return: Option<serde_json::Value>,
     post_node_exception: Option<serde_json::Value>,
+    managed_continuation_deferred: Option<serde_json::Value>,
+    managed_continuation: Option<serde_json::Value>,
     pending_event: Option<OriginalDebugEvent>,
     continuation_failed: bool,
     expected_temp_environment: [Vec<u16>; 3],
@@ -187,6 +194,36 @@ pub(super) struct NativeWitness {
     failures: Vec<serde_json::Value>,
     cancelled: bool,
     exit_confirmed: bool,
+}
+
+fn validate_continuation_delivery(
+    receipt: &serde_json::Value,
+    deferred: Option<&serde_json::Value>,
+) -> io::Result<()> {
+    let first = receipt["first_delivery_sequence"].as_u64();
+    let replay = receipt["event_sequence"].as_u64();
+    let valid = match (receipt["deferred_for_node"].as_bool(), deferred) {
+        (Some(false), None) => first.is_some_and(|first| first != 0) && first == replay,
+        (Some(true), Some(original)) => {
+            original["first_delivery_sequence"] == receipt["first_delivery_sequence"]
+                && original["generation"] == receipt["generation"]
+                && original["identity"] == receipt["identity"]
+                && original["pre_return_sequence"] == receipt["pre_return_sequence"]
+                && original["phase"] == "suspended_before_continue"
+                && original["suspend_owned"] == true
+                && original["reply_later_confirmed"] == false
+                && original["node_create_sequence"].is_null()
+                && original["replay_sequence"].is_null()
+                && first
+                    .zip(replay)
+                    .is_some_and(|(first, replay)| first != 0 && first < replay)
+        }
+        (Some(false), Some(_)) | (Some(true), None) | (None, None | Some(_)) => false,
+    };
+    if !valid {
+        return Err(error("native_witness.continuation_delivery_binding"));
+    }
+    Ok(())
 }
 
 fn classification_node_path(
@@ -409,6 +446,8 @@ impl WindowsImageDebugSession {
                 pre_node_classification_entry: None,
                 pre_node_classification_return: None,
                 post_node_exception: None,
+                managed_continuation_deferred: None,
+                managed_continuation: None,
                 pending_event: None,
                 continuation_failed: false,
                 expected_temp_environment,
@@ -442,10 +481,22 @@ impl WindowsImageDebugSession {
         error("managed_process.native_witness_failed")
     }
 
-    pub(super) fn native_witness_received(&mut self, event: &DEBUG_EVENT) {
-        if let Some(witness) = &mut self.native_witness {
-            witness.pending_event = Some(OriginalDebugEvent(*event));
+    pub(super) fn native_witness_received(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        if self.native_witness.is_none() {
+            return Ok(());
         }
+        // 必须在 trace.received 之后保留本次序号，不能在稍后 Continue 时重取累计值。
+        let sequence = self.native_sequence()?;
+        if let Some(witness) = &mut self.native_witness {
+            if witness.pending_event.is_some() {
+                return Err(error("native_witness.original_event_pending"));
+            }
+            witness.pending_event = Some(OriginalDebugEvent {
+                event: *event,
+                sequence,
+            });
+        }
+        Ok(())
     }
 
     fn native_sequence(&self) -> io::Result<u64> {
@@ -910,6 +961,7 @@ impl WindowsImageDebugSession {
         pid: u32,
         tid: u32,
         code: DEBUG_EVENT_CODE,
+        actual_status: NTSTATUS,
     ) -> io::Result<()> {
         let cleanup = self
             .npm_diagnostics
@@ -919,13 +971,16 @@ impl WindowsImageDebugSession {
             return Ok(());
         };
         let result = (|| {
-            let event = witness
+            let pending = witness
                 .pending_event
                 .take()
-                .ok_or_else(|| error("native_witness.original_event_missing"))?
-                .0;
+                .ok_or_else(|| error("native_witness.original_event_missing"))?;
+            let event = pending.event;
             if (event.dwProcessId, event.dwThreadId, event.dwDebugEventCode) != (pid, tid, code) {
                 return Err(error("native_witness.original_event_changed"));
+            }
+            if let Some(shell) = &mut witness.classification {
+                shell.on_event_continued(&event, pending.sequence, actual_status)?;
             }
             if pid == self.root_process_id && code == EXIT_THREAD_DEBUG_EVENT {
                 if let Some(shell) = &mut witness.classification
@@ -979,6 +1034,17 @@ impl WindowsImageDebugSession {
         &mut self,
         deadline: Instant,
     ) -> io::Result<()> {
+        if let Some(witness) = &mut self.native_witness
+            && let Some(shell) = &mut witness.classification
+            && let Err(failure) = shell.cancel_deferred_after_target_termination()
+        {
+            // 精确 Job 已请求终止；保留失败但仍排空退出事件，最终确认不能计通过。
+            witness.continuation_failed = true;
+            witness.failures.push(serde_json::json!({
+                "stage":"continuation_deferred_cancel",
+                "failure":classification_failure("continuation_deferred_cancel", &failure),
+            }));
+        }
         if let Some(clr) = self
             .native_witness
             .as_mut()
@@ -1096,6 +1162,9 @@ impl WindowsImageDebugSession {
         if self.native_witness.is_none() {
             return Ok(None);
         }
+        if self.snapshot_stopped(deadline) {
+            return Err(error("native_witness.classification_cancelled_or_expired"));
+        }
         let sequence = self.native_sequence()?;
         let Some(witness) = &mut self.native_witness else {
             return Ok(None);
@@ -1103,6 +1172,9 @@ impl WindowsImageDebugSession {
         let Some(shell) = &mut witness.classification else {
             return Ok(None);
         };
+        if let Some(clr) = &witness.clr {
+            clr.ensure_reaped()?;
+        }
         let receipt = match shell.observe(event, sequence) {
             Ok(ShellClassificationObservation::NotOwned) => return Ok(None),
             Ok(ShellClassificationObservation::OwnedSkipped) => return Ok(Some(DBG_CONTINUE)),
@@ -1144,12 +1216,15 @@ impl WindowsImageDebugSession {
                     deadline,
                     self.cancellation.as_deref(),
                 );
-                if let Err(failure) = observed {
-                    return Err(self.native_failure(
-                        "clr_pre_node_classification",
-                        safe_failure("clr_pre_node_classification", &failure),
-                    ));
-                }
+                let target = match observed {
+                    Ok(target) => target,
+                    Err(failure) => {
+                        return Err(self.native_failure(
+                            "clr_pre_node_classification",
+                            safe_failure("clr_pre_node_classification", &failure),
+                        ));
+                    }
+                };
                 // 同停点 reader 必须先完成原 Job 回收；任一步失败均不重新布防或继续事件。
                 if let Err(failure) = clr.ensure_reaped() {
                     return Err(self.native_failure(
@@ -1165,10 +1240,110 @@ impl WindowsImageDebugSession {
                 {
                     return Err(error("native_witness.pre_node_resume_cancelled_or_expired"));
                 }
-                if let Err(failure) = shell.resume_after_pre_node_return(event, sequence) {
+                let resumed = match target {
+                    Some(target) => shell
+                        .resume_after_pre_node_return_with_continuation(event, sequence, target),
+                    None => shell.resume_after_pre_node_return(event, sequence),
+                };
+                if let Err(failure) = resumed {
                     return Err(self.native_failure(
                         "classification_pre_node_resume",
                         classification_failure("classification_pre_node_resume", &failure),
+                    ));
+                }
+                return Ok(Some(DBG_CONTINUE));
+            }
+            Ok(ShellClassificationObservation::OwnedManagedContinuationDeferred(receipt)) => {
+                if witness.managed_continuation_deferred.is_some()
+                    || witness.managed_continuation.is_some()
+                    || witness.node_create.is_some()
+                {
+                    return Err(error("native_witness.continuation_deferred_phase"));
+                }
+                witness.managed_continuation_deferred = Some(serde_json::to_value(receipt)?);
+                // 已形成自有暂停时若取消或过期，必须交原精确 Job 终止路径平衡，不能继续重放。
+                if Instant::now() >= deadline
+                    || self
+                        .cancellation
+                        .as_ref()
+                        .is_some_and(|value| value.load(Ordering::Acquire))
+                {
+                    return Err(error(
+                        "native_witness.continuation_deferred_cancelled_or_expired",
+                    ));
+                }
+                if let Some(clr) = &witness.clr {
+                    clr.ensure_reaped()?;
+                }
+                return Ok(Some(DBG_REPLY_LATER));
+            }
+            Ok(ShellClassificationObservation::OwnedManagedContinuation(receipt)) => {
+                if witness.managed_continuation.is_some() {
+                    return Err(error("native_witness.continuation_phase"));
+                }
+                let receipt = serde_json::to_value(receipt)?;
+                validate_continuation_delivery(
+                    &receipt,
+                    witness.managed_continuation_deferred.as_ref(),
+                )?;
+                witness.managed_continuation = Some(receipt.clone());
+                if shell.requires_restoration() {
+                    return Err(error("native_witness.continuation_restore_unconfirmed"));
+                }
+                let pre_return = witness
+                    .pre_node_classification_return
+                    .as_ref()
+                    .ok_or_else(|| error("native_witness.continuation_pre_return_missing"))?;
+                let node = witness
+                    .node_create
+                    .as_ref()
+                    .ok_or_else(|| error("native_witness.continuation_node_missing"))?;
+                let root = witness
+                    .root_thread
+                    .as_ref()
+                    .ok_or_else(|| error("native_clr.root_missing"))?;
+                let clr = witness
+                    .clr
+                    .as_mut()
+                    .ok_or_else(|| error("native_clr.reader_missing"))?;
+                if let Err(failure) = clr.observe_managed_continuation(
+                    event,
+                    &root.process,
+                    root.process_created,
+                    self.root_process_id,
+                    sequence,
+                    &receipt,
+                    pre_return,
+                    node,
+                    shell.managed_continuation_target()?,
+                    deadline,
+                    self.cancellation.as_deref(),
+                ) {
+                    return Err(self.native_failure(
+                        "clr_managed_continuation",
+                        safe_failure("clr_managed_continuation", &failure),
+                    ));
+                }
+                if let Err(failure) = clr.ensure_reaped() {
+                    return Err(self.native_failure(
+                        "clr_continuation_reap",
+                        safe_failure("clr_continuation_reap", &failure),
+                    ));
+                }
+                if Instant::now() >= deadline
+                    || self
+                        .cancellation
+                        .as_ref()
+                        .is_some_and(|value| value.load(Ordering::Acquire))
+                {
+                    return Err(error(
+                        "native_witness.continuation_resume_cancelled_or_expired",
+                    ));
+                }
+                if let Err(failure) = shell.resume_after_managed_continuation(event, sequence) {
+                    return Err(self.native_failure(
+                        "continuation_resume",
+                        classification_failure("continuation_resume", &failure),
                     ));
                 }
                 return Ok(Some(DBG_CONTINUE));
@@ -1204,7 +1379,7 @@ impl WindowsImageDebugSession {
             .root_thread
             .as_ref()
             .ok_or_else(|| error("native_clr.root_missing"))?;
-        clr.observe_native_return(
+        if let Err(failure) = clr.observe_native_return(
             event,
             &root.process,
             root.process_created,
@@ -1213,13 +1388,36 @@ impl WindowsImageDebugSession {
             &receipt,
             deadline,
             self.cancellation.as_deref(),
-        )
-        .map_err(|failure| {
-            self.native_failure(
+        ) {
+            return Err(self.native_failure(
                 "clr_classification",
                 safe_failure("clr_classification", &failure),
-            )
-        })?;
+            ));
+        }
+        if let Err(failure) = clr.ensure_reaped() {
+            return Err(self.native_failure(
+                "clr_classification_reap",
+                safe_failure("clr_classification_reap", &failure),
+            ));
+        }
+        if Instant::now() >= deadline
+            || self
+                .cancellation
+                .as_ref()
+                .is_some_and(|value| value.load(Ordering::Acquire))
+        {
+            return Err(error(
+                "native_witness.post_node_resume_cancelled_or_expired",
+            ));
+        }
+        // 分类先返回时仍保留独立续点租约；无租约则保持原停止状态。
+        if let Err(failure) = shell.resume_after_post_node_return_for_continuation(event, sequence)
+        {
+            return Err(self.native_failure(
+                "classification_post_node_resume",
+                classification_failure("classification_post_node_resume", &failure),
+            ));
+        }
         Ok(Some(DBG_CONTINUE))
     }
 
@@ -1753,6 +1951,9 @@ impl WindowsImageDebugSession {
             summary["pre_node_classification_return"] =
                 serde_json::json!(witness.pre_node_classification_return);
             summary["post_node_exception"] = serde_json::json!(witness.post_node_exception);
+            summary["managed_continuation_first_delivery"] =
+                serde_json::json!(witness.managed_continuation_deferred);
+            summary["managed_continuation"] = serde_json::json!(witness.managed_continuation);
             // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

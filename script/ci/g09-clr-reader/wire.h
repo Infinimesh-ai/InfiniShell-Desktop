@@ -36,6 +36,33 @@ static_assert(sizeof(G09ClrRequest) == 168);
 static_assert(offsetof(G09ClrRequest, process_handle) == 64);
 static_assert(offsetof(G09ClrRequest, dac_path_units) == 152);
 
+// v2 仅用于显式方法规格的 op3 与独立 op4；位于原头之后、DAC 路径之前。
+// MVID 为固定 36 字节小写 UUID 文本；地址仅通过私有管道，公开收据不包含地址。
+#pragma pack(push, 1)
+struct G09ManagedRequest {
+  char module_mvid[36];
+  std::uint32_t method_token;
+  std::uint32_t approved_count;
+  std::uint32_t approved_il[4];
+  std::uint32_t bool_local_index;
+  std::uint32_t start_info_local_index; // UINT32_MAX 表示不请求
+  std::uint64_t pre_sequence;
+  std::uint8_t pre_nonce[16];
+  std::uint32_t il_offset;
+  std::uint32_t enc_version;
+  std::uint64_t frame_rsp;
+  std::uint64_t extent_start;
+  std::uint64_t extent_end;
+  std::uint64_t address;
+  std::uint32_t map_count;
+  std::uint8_t map_sha256[32];
+  std::uint8_t code_sha256[32];
+};
+#pragma pack(pop)
+static_assert(sizeof(G09ManagedRequest) == 200);
+static_assert(offsetof(G09ManagedRequest, pre_sequence) == 68);
+static_assert(offsetof(G09ManagedRequest, map_sha256) == 136);
+
 constexpr std::uint32_t G09_CLR_FIXTURE_READ_BYTES = 16 * 1024 * 1024;
 constexpr std::uint32_t G09_CLR_POWERSHELL_READ_BYTES = 24 * 1024 * 1024;
 constexpr std::uint32_t G09_CLR_MAX_READ_CALLS = 8192;

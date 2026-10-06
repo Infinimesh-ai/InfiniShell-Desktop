@@ -35,6 +35,7 @@ namespace {
 constexpr std::uint8_t magic[8] = {'G', '0', '9', 'C', 'L', 'R', '1', 0};
 constexpr CorElementType element_i4 = 0x08;
 constexpr CorElementType element_class = 0x12;
+constexpr CorElementType element_boolean = 0x02;
 
 struct Handle {
   HANDLE value = nullptr;
@@ -125,6 +126,15 @@ struct Result {
   std::uint32_t read_calls = 0;
   std::vector<std::string> chain;
   std::vector<std::string> frames;
+  std::string managed_mapping;
+  std::string managed_continuation;
+  std::string private_target;
+  std::string managed_map_notes = "null";
+  ULONG32 managed_matches = 0;
+  HRESULT managed_error = E_PENDING;
+  bool managed_bound = false;
+  bool managed_values = false;
+  ULONG32 scanned_frames = 0;
 };
 
 // 回调只读取当前原停点；不提供写入、TLS 修改、目标方法求值或目标执行控制。
@@ -673,7 +683,328 @@ HRESULT terminal_il_mapping(IXCLRDataMethodInstance *method, CLRDATA_ADDRESS ip,
   return S_OK;
 }
 
-HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return, Target &target, Result &result) {
+HRESULT hash_bytes(const BYTE *bytes, ULONG length, std::uint8_t digest[32]) {
+  BCRYPT_ALG_HANDLE algorithm = nullptr;
+  BCRYPT_HASH_HANDLE hash = nullptr;
+  NTSTATUS status = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
+  if (status < 0) return HRESULT_FROM_NT(status);
+  DWORD size = 0, actual = 0;
+  status = BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<BYTE *>(&size), sizeof(size), &actual, 0);
+  HRESULT hr = S_OK;
+  if (status < 0 || actual != sizeof(size) || size > 65536) hr = status < 0 ? HRESULT_FROM_NT(status) : E_UNEXPECTED;
+  std::vector<BYTE> object(size <= 65536 ? size : 0);
+  if (hr == S_OK) {
+    status = BCryptCreateHash(algorithm, &hash, object.data(), size, nullptr, 0, 0);
+    if (status >= 0) status = BCryptHashData(hash, const_cast<BYTE *>(bytes), length, 0);
+    if (status >= 0) status = BCryptFinishHash(hash, digest, 32, 0);
+    if (status < 0) hr = HRESULT_FROM_NT(status);
+  }
+  if (hash) BCryptDestroyHash(hash);
+  BCryptCloseAlgorithmProvider(algorithm, 0);
+  return hr;
+}
+
+std::string managed_safe(const G09ManagedRequest &m) {
+  std::ostringstream out;
+  out << "{\"module_mvid\":\"" << std::string(m.module_mvid, 36) << "\",\"method_token\":" << m.method_token
+      << ",\"il_offset\":" << m.il_offset << ",\"enc_version\":" << m.enc_version << ",\"map_count\":" << m.map_count
+      << ",\"map_sha256\":\"" << hex(m.map_sha256,32) << "\",\"code_sha256\":\"" << hex(m.code_sha256,32)
+      << "\",\"extent_length\":" << m.extent_end-m.extent_start << ",\"pre_sequence\":" << m.pre_sequence << "}";
+  return out.str();
+}
+
+HRESULT managed_map(IXCLRDataMethodInstance *method, const CONTEXT &context, const G09ClrRequest &r,
+                    const G09ManagedRequest &spec, Target &target, G09ManagedRequest &bound, std::string &notes) {
+  bound = spec;
+  bound.map_count = 0;
+  CLRDATA_ADDRESS entry = 0;
+  CLRDATA_ADDRESS_RANGE extent{}, extra{};
+  std::array<CLRDATA_IL_ADDRESS_MAP,256> maps{};
+  std::array<bool,256> closed{}, checked{};
+  std::array<HRESULT,4> reverse_hr{};
+  std::array<bool,4> reversed{};
+  std::array<ULONG32,4> reverse_count{}, reverse_il{};
+  bool map_returned = false;
+  CLRDATA_ADDRESS excluded = 0;
+  std::vector<ULONG32> open_indices;
+  std::vector<ULONG32> zero_indices;
+  ULONG32 failed_index = UINT32_MAX;
+  ULONG32 zero_sentinels = 0;
+  const auto finish = [&](const char *stage, HRESULT status) {
+    std::ostringstream note;
+    const auto relative = [&](CLRDATA_ADDRESS address) {
+      if(address>=entry) note << address-entry;
+      else note << '-' << entry-address;
+    };
+    note << "{\"stage\":\"" << stage << "\",\"map_count\":" << bound.map_count
+         << ",\"map_complete\":" << (map_returned ? "true" : "false") << ",\"extent_length\":";
+    if(extent.endAddress>entry) note << extent.endAddress-entry; else note << "null";
+    note << ",\"failed_map_index\":";
+    if(failed_index!=UINT32_MAX) note << failed_index; else note << "null";
+    note << ",\"raw_il\":";
+    if(failed_index!=UINT32_MAX) note << maps[failed_index].ilOffset; else note << "null";
+    note << ",\"start_offset\":";
+    if(failed_index!=UINT32_MAX) relative(maps[failed_index].startAddress); else note << "null";
+    note << ",\"end_offset\":";
+    if(failed_index!=UINT32_MAX) relative(maps[failed_index].endAddress); else note << "null";
+    note << ",\"returned_il_offsets\":[";
+    if(map_returned) for(ULONG32 i=0;i<bound.map_count;++i) {
+      if(i) note << ',';
+      note << maps[i].ilOffset;
+    }
+    note << "],\"approved_points\":[";
+    for(ULONG32 approved=0;approved<spec.approved_count;++approved) {
+      if(approved) note << ',';
+      ULONG32 count=0,index=0;
+      if(map_returned) for(ULONG32 i=0;i<bound.map_count;++i)
+        if(maps[i].ilOffset==spec.approved_il[approved]) { ++count; index=i; }
+      note << "{\"il_offset\":" << spec.approved_il[approved] << ",\"match_count\":";
+      if(map_returned) note << count; else note << "null";
+      note << ",\"closed_range\":";
+      if(count==1 && checked[index]) note << (closed[index] ? "true" : "false"); else note << "null";
+      note << ",\"reverse_hresult\":";
+      if(reversed[approved]) note << static_cast<std::uint32_t>(reverse_hr[approved]); else note << "null";
+      note << ",\"reverse_count\":";
+      if(reversed[approved]) note << reverse_count[approved]; else note << "null";
+      note << ",\"reverse_il_offset\":";
+      if(reversed[approved] && reverse_hr[approved]==S_OK && reverse_count[approved]==1) note << reverse_il[approved];
+      else note << "null";
+      note << '}';
+    }
+    note << "],\"open_exclusions\":[";
+    for(std::size_t n=0;n<open_indices.size();++n) {
+      if(n) note << ',';
+      const auto i=open_indices[n];
+      note << "{\"index\":" << i << ",\"raw_il\":" << maps[i].ilOffset << ",\"start_offset\":";
+      relative(maps[i].startAddress);
+      note << ",\"end_offset\":";
+      relative(maps[i].endAddress);
+      note << '}';
+    }
+    note << "],\"zero_length_entries\":[";
+    for(std::size_t n=0;n<zero_indices.size();++n) {
+      if(n) note << ',';
+      const auto i=zero_indices[n];
+      note << "{\"index\":" << i << ",\"raw_il\":" << maps[i].ilOffset << ",\"offset\":";
+      relative(maps[i].startAddress);
+      note << '}';
+    }
+    const bool terminal_open=!open_indices.empty() && open_indices.back()+1==bound.map_count;
+    note << "],\"zero_length_entries_selectable\":false,\"zero_length_entries_occupy_range\":false"
+         << ",\"zero_length_sentinel_count\":" << zero_sentinels << ",\"terminal_exclusion\":{\"present\":"
+         << (terminal_open ? "true" : "false") << ",\"raw_il\":";
+    if(terminal_open) note << maps[bound.map_count-1].ilOffset; else note << "null";
+    note << ",\"start_offset\":";
+    if(terminal_open) relative(maps[bound.map_count-1].startAddress); else note << "null";
+    note << ",\"raw_end_offset\":" << (terminal_open ? "0" : "null") << ",\"excluded_to_extent_end\":"
+         << (terminal_open ? "true" : "false") << "}}";
+    notes=note.str();
+    return status;
+  };
+  HRESULT hr = method->GetRepresentativeEntryAddress(&entry);
+  if (hr != S_OK) return finish("entry_api",hr);
+  if (target.expired()) return finish("enc_deadline",HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+  hr = method->GetEnCVersion(&bound.enc_version);
+  if (hr != S_OK) return finish("enc_api",hr);
+  CLRDATA_ENUM iterator = 0;
+  hr = method->StartEnumExtents(&iterator);
+  if (hr != S_OK) return finish("extent_start_api",hr);
+  const HRESULT first = target.expired() ? HRESULT_FROM_WIN32(ERROR_TIMEOUT) : method->EnumExtent(&iterator,&extent);
+  const HRESULT second = first == S_OK && !target.expired() ? method->EnumExtent(&iterator,&extra) : E_PENDING;
+  const HRESULT ended = method->EndEnumExtents(iterator);
+  if (first != S_OK) return finish("extent_first_api",first);
+  if (second != S_FALSE) return finish("extent_unique",second == S_OK ? E_UNEXPECTED : second);
+  if (ended != S_OK) return finish("extent_end_api",ended);
+  if (entry < 0x10000 || extent.startAddress != entry || extent.endAddress <= entry ||
+      extent.endAddress-entry > 65536 || extent.endAddress > 0x0000800000000000ULL ||
+      context.Rip < entry || context.Rip >= extent.endAddress || context.Rsp < 0x10000 || context.Rsp % 8)
+    return finish("extent_context_bounds",E_UNEXPECTED);
+  if (target.expired()) return finish("map_deadline",HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+  hr = method->GetILAddressMap(static_cast<ULONG32>(maps.size()),&bound.map_count,maps.data());
+  if (hr != S_OK) return finish("map_api",hr);
+  if (!bound.map_count || bound.map_count > maps.size()) return finish("map_completeness",E_UNEXPECTED);
+  map_returned = true;
+  std::vector<BYTE> canonical;
+  for (ULONG32 i=0;i<bound.map_count;++i) {
+    const auto &map = maps[i];
+    failed_index=i;
+    if(map.startAddress<entry || map.startAddress>extent.endAddress) return finish("map_start_bounds",E_UNEXPECTED);
+    checked[i]=true;
+    // 旧 DAC 任意 EPILOG 都可开放；完整保全，只排除其后代码，不推算到下一 funclet。
+    if((map.ilOffset==0xfffffffdU || (i+1==bound.map_count && map.ilOffset<0xfffffffdU)) &&
+       map.endAddress==entry && map.startAddress>entry && map.startAddress<extent.endAddress) {
+      open_indices.push_back(i);
+      excluded=excluded ? (std::min)(excluded,map.startAddress) : map.startAddress;
+    }
+    // GetILAddressMap 保留普通 IL 的零长记录；半开空集无覆盖，也不能选作续点。
+    else if(map.startAddress==map.endAddress) {
+      zero_indices.push_back(i);
+      if(map.ilOffset>=0xfffffffdU) ++zero_sentinels;
+    }
+    else {
+      if(map.endAddress<=map.startAddress || map.endAddress>extent.endAddress) return finish("map_range_bounds",E_UNEXPECTED);
+      closed[i]=true;
+      for(ULONG32 j=0;j<i;++j)
+        if(closed[j] && map.startAddress<maps[j].endAddress && maps[j].startAddress<map.endAddress)
+          return finish("map_overlap",E_UNEXPECTED);
+    }
+    const std::uint64_t fields[] = {map.ilOffset,map.startAddress-entry,map.endAddress-entry,static_cast<std::uint64_t>(map.type)};
+    for (const auto number:fields) for(unsigned b=0;b<8;++b) canonical.push_back(static_cast<BYTE>(number>>(8*b)));
+  }
+  failed_index=UINT32_MAX;
+  bool selected = false;
+  for (ULONG32 approved=0;approved<spec.approved_count && !selected;++approved) {
+    ULONG32 count=0;
+    ULONG32 index=0;
+    CLRDATA_ADDRESS address=0;
+    bool closed_candidate=false;
+    for (ULONG32 i=0;i<bound.map_count;++i) if(maps[i].ilOffset==spec.approved_il[approved]) {
+      ++count; index=i; address=maps[i].startAddress; closed_candidate=closed[i];
+    }
+    if (!count) continue;
+    if (count != 1 || !closed_candidate) return finish("approved_not_unique_closed",E_UNEXPECTED);
+    if(excluded && maps[index].endAddress>excluded) {
+      failed_index=index;
+      return finish("approved_open_exclusion_overlap",E_UNEXPECTED);
+    }
+    ULONG32 needed=0;
+    std::array<ULONG32,8> offsets{};
+    hr=method->GetILOffsetsByAddress(address,static_cast<ULONG32>(offsets.size()),&needed,offsets.data());
+    reversed[approved]=true; reverse_hr[approved]=hr; reverse_count[approved]=needed; reverse_il[approved]=offsets[0];
+    if(hr!=S_OK) return finish("reverse_api",hr);
+    if(needed!=1 || offsets[0]!=spec.approved_il[approved]) return finish("reverse_not_unique_exact",E_UNEXPECTED);
+    bound.il_offset=offsets[0]; bound.address=address; selected=true;
+  }
+  if(!selected) return finish("approved_missing",E_NOINTERFACE);
+  bound.extent_start=entry; bound.extent_end=extent.endAddress; bound.frame_rsp=context.Rsp;
+  if(r.operation==3) { bound.pre_sequence=r.event_sequence; std::memcpy(bound.pre_nonce,r.nonce,16); }
+  hr=hash_bytes(canonical.data(),static_cast<ULONG>(canonical.size()),bound.map_sha256);
+  if(hr!=S_OK) return finish("map_hash",hr);
+  std::vector<BYTE> code(static_cast<std::size_t>(extent.endAddress-entry));
+  if(target.expired()) return finish("code_deadline",HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+  hr=target.read(entry,code.data(),static_cast<ULONG32>(code.size()));
+  if(hr!=S_OK) return finish("code_read",hr);
+  hr=hash_bytes(code.data(),static_cast<ULONG>(code.size()),bound.code_sha256);
+  return finish(hr==S_OK ? "bound" : "code_hash",hr);
+}
+
+std::string private_managed(const G09ClrRequest &r,const G09ManagedRequest &m) {
+  std::string safe=managed_safe(m);
+  safe.pop_back();
+  std::ostringstream out;
+  out << safe << ",\"process_id\":" << r.process_id << ",\"thread_id\":" << r.thread_id
+      << ",\"process_birth\":" << r.process_birth << ",\"thread_birth\":" << r.thread_birth
+      << ",\"pre_nonce\":\"" << hex(m.pre_nonce,16) << "\",\"frame_rsp\":" << m.frame_rsp
+      << ",\"extent_start\":" << m.extent_start << ",\"extent_end\":" << m.extent_end << ",\"address\":" << m.address << "}";
+  return out.str();
+}
+
+struct LocalRead {
+  HRESULT get_local_hr=E_PENDING;
+  HRESULT api=E_PENDING,locations_hr=E_PENDING,type_hr=E_PENDING,name_hr=E_PENDING,flags_hr=E_PENDING,size_hr=E_PENDING,bytes_hr=E_PENDING;
+  ULONG32 locations=0,flags=0,bytes_read=0;
+  ULONG64 size=0;
+  bool type_matched=false;
+  std::string fields(const char *prefix) const {
+    std::ostringstream out;
+    out << "\"" << prefix << "api_hresult\":" << static_cast<std::uint32_t>(api)
+        << ",\"" << prefix << "get_local_hresult\":" << static_cast<std::uint32_t>(get_local_hr)
+        << ",\"" << prefix << "locations_hresult\":" << static_cast<std::uint32_t>(locations_hr)
+        << ",\"" << prefix << "locations\":" << locations
+        << ",\"" << prefix << "type_hresult\":" << static_cast<std::uint32_t>(type_hr)
+        << ",\"" << prefix << "type_name_hresult\":" << static_cast<std::uint32_t>(name_hr)
+        << ",\"" << prefix << "flags_hresult\":" << static_cast<std::uint32_t>(flags_hr)
+        << ",\"" << prefix << "flags\":" << flags
+        << ",\"" << prefix << "size_hresult\":" << static_cast<std::uint32_t>(size_hr)
+        << ",\"" << prefix << "size\":" << size
+        << ",\"" << prefix << "bytes_hresult\":" << static_cast<std::uint32_t>(bytes_hr)
+        << ",\"" << prefix << "bytes_read\":" << bytes_read;
+    return out.str();
+  }
+};
+
+HRESULT local_bytes(IXCLRDataFrame *frame,ULONG32 index,const wchar_t *expected,ULONG32 flags,ULONG32 size,
+                    BYTE *bytes,Target &target,LocalRead &read) {
+  if(target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+  Com<IXCLRDataValue> value;
+  HRESULT hr=frame->GetLocalVariableByIndex(index,value.put(),0,nullptr,nullptr);
+  read.get_local_hr=hr;
+  if(hr!=S_OK || !value.value) return hr==S_OK ? E_NOINTERFACE : hr;
+  read.locations_hr=value->GetNumLocations(&read.locations);
+  if(read.locations_hr!=S_OK) return read.locations_hr;
+  if(!read.locations || read.locations>2) return E_NOINTERFACE;
+  read.flags_hr=value->GetFlags(&read.flags);
+  if(read.flags_hr!=S_OK) return read.flags_hr;
+  if((read.flags & CLRDATA_VALUE_ALL_KINDS)!=flags) return E_UNEXPECTED;
+  // 引用 Value 的 GetType 按 DAC 合同返回 S_FALSE；读取引用后由实际对象 MT 核对类型。
+  if(flags!=CLRDATA_VALUE_IS_REFERENCE) {
+    Com<IXCLRDataTypeInstance> type;
+    read.type_hr=value->GetType(type.put());
+    if(read.type_hr!=S_OK || !type.value) return read.type_hr==S_OK ? E_NOINTERFACE : read.type_hr;
+    wchar_t name[256]{}; ULONG32 needed=0;
+    read.name_hr=type->GetName(0,256,&needed,name);
+    if(read.name_hr!=S_OK) return read.name_hr;
+    if(!needed || needed>256 || name[needed-1] || std::wcscmp(name,expected)!=0) return E_UNEXPECTED;
+    read.type_matched=true;
+  }
+  read.size_hr=value->GetSize(&read.size);
+  if(read.size_hr!=S_OK) return read.size_hr;
+  if(read.size!=size) return E_UNEXPECTED;
+  if(target.expired()) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+  read.bytes_hr=value->GetBytes(size,&read.bytes_read,bytes);
+  if(read.bytes_hr!=S_OK) return read.bytes_hr;
+  return read.bytes_read==size ? S_OK : E_UNEXPECTED;
+}
+
+std::string managed_values(IXCLRDataProcess *clr,IXCLRDataFrame *frame,const G09ManagedRequest &m,
+                           Target &target,bool &complete) {
+  BYTE boolean=0;
+  LocalRead local;
+  local.api=local_bytes(frame,m.bool_local_index,L"System.Boolean",CLRDATA_VALUE_IS_PRIMITIVE,1,&boolean,target,local);
+  if(local.api==S_OK && boolean>1) local.api=E_UNEXPECTED;
+  complete=local.api==S_OK;
+  std::ostringstream out;
+  out << "\"boolean_local\":{\"index\":" << m.bool_local_index << ',' << local.fields("")
+      << ",\"type_name\":\"" << (local.type_matched ? "System.Boolean" : "unknown_type") << "\",\"value\":";
+  if(local.api==S_OK) out << (boolean ? "true" : "false"); else out << "null";
+  const bool requested=m.start_info_local_index!=UINT32_MAX;
+  LocalRead reference;
+  HRESULT field_hr=E_PENDING,field_read_hr=E_PENDING;
+  std::string module;
+  mdTypeDef type_token=0; DacpFieldDescData descriptor{};
+  BYTE field_value=0;
+  if(requested) {
+    CLRDATA_ADDRESS address=0;
+    reference.api=local_bytes(frame,m.start_info_local_index,L"System.Diagnostics.ProcessStartInfo",CLRDATA_VALUE_IS_REFERENCE,
+                             sizeof(address),reinterpret_cast<BYTE *>(&address),target,reference);
+    field_hr=reference.api;
+    if(field_hr==S_OK && (address<0x10000 || address>0x00007fffffffffffULL || address%8)) field_hr=E_UNEXPECTED;
+    Com<ISOSDacInterface> sos;
+    DacpObjectData object{}; BoundType type;
+    if(field_hr==S_OK) field_hr=clr->QueryInterface(__uuidof(ISOSDacInterface),reinterpret_cast<void **>(sos.put()));
+    if(field_hr==S_OK && !sos.value) field_hr=E_NOINTERFACE;
+    if(field_hr==S_OK) field_hr=sos->GetObjectData(address,&object);
+    if(field_hr==S_OK && (object.ObjectType!=OBJ_OTHER || !object.MethodTable || object.Size<16)) field_hr=E_UNEXPECTED;
+    if(field_hr==S_OK) field_hr=bind_type(sos.value,object.MethodTable,type);
+    if(field_hr==S_OK && (std::wcscmp(type.name,L"System.Diagnostics.ProcessStartInfo") || object.Size!=type.data.BaseSize)) field_hr=E_UNEXPECTED;
+    if(field_hr==S_OK) { module=guid(type.mvid); type_token=type.data.cl; field_hr=field(sos.value,type,L"useShellExecute",target,descriptor); }
+    if(field_hr==S_OK) { field_read_hr=read_field(target,address,object,descriptor,element_boolean,&field_value,1); field_hr=field_read_hr; }
+    if(field_hr==S_OK && field_value>1) field_hr=E_UNEXPECTED;
+    complete=complete && field_hr==S_OK;
+  }
+  out << "},\"start_info_field\":{\"requested\":" << (requested ? "true" : "false") << ",\"index\":";
+  if(requested) out << m.start_info_local_index; else out << "null";
+  out << ",\"api_hresult\":" << static_cast<std::uint32_t>(field_hr) << ',' << reference.fields("local_")
+      << ",\"module_mvid\":\"" << module << "\",\"type_token\":" << type_token << ",\"field_token\":" << descriptor.mb
+      << ",\"field_name\":\"useShellExecute\",\"field_type\":" << descriptor.Type << ",\"field_sig_type\":" << descriptor.sigType
+      << ",\"field_read_hresult\":" << static_cast<std::uint32_t>(field_read_hr) << ",\"value\":";
+  if(field_hr==S_OK) out << (field_value ? "true" : "false"); else out << "null";
+  out << "}";
+  return out.str();
+}
+
+HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return, Target &target, Result &result,
+                      const G09ClrRequest &request, const G09ManagedRequest *managed, IXCLRDataProcess *clr) {
   Com<IXCLRDataStackWalk> walk;
   HRESULT hr =
       task->CreateStackWalk(CLRDATA_SIMPFRAME_MANAGED_METHOD | CLRDATA_SIMPFRAME_RUNTIME_MANAGED_CODE |
@@ -698,6 +1029,7 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return
       if (hr == S_FALSE) return partial || !metadata_frame ? S_FALSE : S_OK;
       if (hr != S_OK) return hr;
     }
+    result.scanned_frames=n+1;
     CLRDataSimpleFrameType simple_type;
     CLRDataDetailedFrameType detailed_type;
     hr = walk->GetFrameType(&simple_type, &detailed_type);
@@ -721,6 +1053,30 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return
     ULONG32 context_size = 0;
     const HRESULT context_hr =
         walk->GetContext(CONTEXT_CONTROL, sizeof(context), &context_size, reinterpret_cast<BYTE *>(&context));
+    if(managed && token==managed->method_token && guid(mvid)==std::string(managed->module_mvid,36)) {
+      ++result.managed_matches;
+      G09ManagedRequest bound{};
+      HRESULT managed_hr=context_hr;
+      if(result.managed_matches!=1) managed_hr=E_UNEXPECTED;
+      else if(context_hr==S_OK && context_size<=sizeof(context) && context_size>=offsetof(CONTEXT,Rip)+sizeof(context.Rip))
+        managed_hr=managed_map(method.value,context,request,*managed,target,bound,result.managed_map_notes);
+      else if(context_hr==S_OK) managed_hr=E_UNEXPECTED;
+      if(request.operation==4 && managed_hr==S_OK) {
+        if(!result.frames.empty() || context.Rip!=managed->address || stopped_context.Rip!=managed->address ||
+            std::memcmp(reinterpret_cast<const BYTE *>(&bound)+68,reinterpret_cast<const BYTE *>(managed)+68,sizeof(bound)-68)!=0)
+          managed_hr=E_UNEXPECTED;
+      }
+      if(result.managed_matches!=1) managed_hr=E_UNEXPECTED;
+      result.managed_error=managed_hr;
+      if(managed_hr==S_OK) {
+        result.managed_mapping=managed_safe(bound);
+        if(request.operation==3) result.private_target=private_managed(request,bound);
+        else {
+          result.managed_bound=true;
+          result.managed_continuation=managed_values(clr,frame.value,bound,target,result.managed_values);
+        }
+      } else { result.private_target.clear(); result.managed_bound=false; result.managed_mapping.clear(); }
+    }
     HRESULT mapping = context_hr;
     HRESULT mapping_hr = E_PENDING;
     HRESULT terminal_hr = E_PENDING;
@@ -816,7 +1172,7 @@ HRESULT collect_stack(IXCLRDataTask *task, ULONG32 thread_id, bool native_return
   return S_FALSE;
 }
 
-void observe(const G09ClrRequest &r, const std::wstring &supplied, Result &result) {
+void observe(const G09ClrRequest &r, const std::wstring &supplied, const G09ManagedRequest *managed, Result &result) {
   Handle process(reinterpret_cast<HANDLE>(r.process_handle));
   Handle thread(reinterpret_cast<HANDLE>(r.thread_handle));
   Target target(r, result);
@@ -912,16 +1268,19 @@ void observe(const G09ClrRequest &r, const std::wstring &supplied, Result &resul
   // operation 3 是调用方自有的原生返回单步，只读当前 CLR 栈，不查询异常对象。
   result.stack_error = target.expired()   ? HRESULT_FROM_WIN32(ERROR_TIMEOUT)
                        : result.exhausted ? HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_QUOTA)
-                                          : collect_stack(task.value, r.thread_id, r.operation == 3, target, result);
-  result.status = (r.operation == 3 ? !result.frames.empty() : result.object_chain_complete) &&
-                          result.stack_error == S_OK && !result.exhausted && !target.expired()
+                                          : collect_stack(task.value, r.thread_id, r.operation == 3, target, result,r,managed,clr.value);
+  if(managed && !result.managed_matches) result.managed_error=E_NOINTERFACE;
+  result.status = (r.operation != 1 ? !result.frames.empty() : result.object_chain_complete) &&
+                           result.stack_error == S_OK && !result.exhausted && !target.expired()
+                           && (r.operation!=4 || (result.managed_bound && result.managed_values))
                       ? "observed"
                       : "partial";
   result.error = S_OK;
 }
 
 bool valid_request(const G09ClrRequest &r) {
-  if (std::memcmp(r.magic, magic, 8) != 0 || r.version != 1 || !nonzero(r.nonce, 16) ||
+  if (std::memcmp(r.magic, magic, 8) != 0 || (r.version != 1 && r.version != 2) ||
+      (r.version==2 && r.operation!=3 && r.operation!=4) || (r.version==1 && r.operation==4) || !nonzero(r.nonce, 16) ||
       r.deadline_tick_ms <= GetTickCount64())
     return false;
   if (r.operation == 2) {
@@ -934,7 +1293,7 @@ bool valid_request(const G09ClrRequest &r) {
     return std::memcmp(&allowed, &r, sizeof(r)) == 0;
   }
   const bool stop_kind = (r.operation == 1 && r.exception_code == 0xe0434352) ||
-                         (r.operation == 3 && r.exception_code == 0x80000004 && r.exception_hresult == 0);
+                         ((r.operation == 3 || r.operation == 4) && r.exception_code == 0x80000004 && r.exception_hresult == 0);
   return stop_kind && r.event_sequence && r.process_id && r.thread_id && r.process_birth && r.thread_birth &&
          r.process_handle && r.thread_handle && r.process_handle != r.thread_handle &&
          r.process_handle < (std::uint64_t(1) << 63) && r.thread_handle < (std::uint64_t(1) << 63) &&
@@ -945,6 +1304,35 @@ bool valid_request(const G09ClrRequest &r) {
          r.read_budget_calls && r.read_budget_calls <= G09_CLR_MAX_READ_CALLS && r.dac_file_size &&
          r.dac_file_size <= 64 * 1024 * 1024 && nonzero(r.dac_sha256, 32) && r.dac_path_units &&
          r.dac_path_units <= G09_CLR_MAX_PATH_UNITS && r.first_chance == 1;
+}
+bool valid_managed_request(const G09ClrRequest &r,const G09ManagedRequest &m) {
+  if(r.version!=2 || !m.approved_count || m.approved_count>4 ||
+      (m.method_token & 0xff000000)!=0x06000000 || !(m.method_token & 0x00ffffff) ||
+      m.bool_local_index>=256 || (m.start_info_local_index!=UINT32_MAX &&
+          (m.start_info_local_index>=256 || m.start_info_local_index==m.bool_local_index))) return false;
+  bool nonzero_mvid=false;
+  for(unsigned i=0;i<36;++i) {
+    const char c=m.module_mvid[i];
+    if(i==8 || i==13 || i==18 || i==23) { if(c!='-') return false; }
+    else { if(!((c>='0' && c<='9') || (c>='a' && c<='f'))) return false; if(c!='0') nonzero_mvid=true; }
+  }
+  if(!nonzero_mvid) return false;
+  bool selected=false;
+  for(unsigned i=0;i<4;++i) {
+    if(i>=m.approved_count) { if(m.approved_il[i]) return false; continue; }
+    if(m.approved_il[i]>=65536) return false;
+    for(unsigned j=0;j<i;++j) if(m.approved_il[j]==m.approved_il[i]) return false;
+    if(m.approved_il[i]==m.il_offset) selected=true;
+  }
+  if(r.operation==3) {
+    const auto *bytes=reinterpret_cast<const std::uint8_t *>(&m);
+    return !nonzero(bytes+68,sizeof(m)-68);
+  }
+  return r.operation==4 && m.pre_sequence && m.pre_sequence<r.event_sequence && nonzero(m.pre_nonce,16) &&
+      std::memcmp(m.pre_nonce,r.nonce,16)!=0 && selected && m.frame_rsp>=0x10000 && m.frame_rsp<=0x00007fffffffffffULL && !(m.frame_rsp%8) &&
+      m.extent_start>=0x10000 && m.extent_end>m.extent_start && m.extent_end-m.extent_start<=65536 &&
+      m.extent_end<=0x0000800000000000ULL && m.address>=m.extent_start && m.address<m.extent_end &&
+      m.map_count && m.map_count<=256 && nonzero(m.map_sha256,32) && nonzero(m.code_sha256,32);
 }
 std::string output(const G09ClrRequest &r, const Result &result) {
   std::ostringstream text;
@@ -973,18 +1361,38 @@ std::string output(const G09ClrRequest &r, const Result &result) {
     if (i) text << ',';
     text << result.frames[i];
   }
-  text << "]}\n";
+  text << "]";
+  if(r.version==2 && r.operation==3) {
+    const bool bound=result.managed_error==S_OK && result.managed_matches==1 && !result.private_target.empty() && !result.exhausted;
+    text << ",\"managed_mapping\":{\"status\":\"" << (bound ? "bound" : "unknown") << "\",\"api_hresult\":"
+         << static_cast<std::uint32_t>(result.managed_error) << ",\"matched_frames\":" << result.managed_matches
+         << ",\"scan_frame_count\":" << result.scanned_frames << ",\"stack_api_hresult\":" << static_cast<std::uint32_t>(result.stack_error)
+         << ",\"scan_complete\":" << (result.stack_error==S_OK ? "true" : "false") << ",\"mapping\":"
+         << (bound ? result.managed_mapping : "null") << ",\"map_notes\":" << result.managed_map_notes << "}";
+    if(bound) text << ",\"private_target\":" << result.private_target;
+  }
+  if(r.version==2 && r.operation==4) {
+    text << ",\"managed_continuation\":{\"bound\":" << (result.managed_bound ? "true" : "false")
+         << ",\"api_hresult\":" << static_cast<std::uint32_t>(result.managed_error) << ",\"mapping\":"
+         << (result.managed_bound ? result.managed_mapping : "null") << ',';
+    if(result.managed_bound) text << result.managed_continuation;
+    else text << "\"boolean_local\":null,\"start_info_field\":null";
+    text << ",\"map_notes\":" << result.managed_map_notes << "}";
+  }
+  text << "}\n";
   return text.str();
 }
 } // namespace
 
 int main(int argc, char **) {
   G09ClrRequest request{};
+  G09ManagedRequest managed{};
   Result result;
   int exit_code = 2;
   try {
     const HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
-    if (argc == 1 && read_exact(input, &request, sizeof(request)) && valid_request(request)) {
+    if (argc == 1 && read_exact(input, &request, sizeof(request)) && valid_request(request) &&
+        (request.version==1 || (read_exact(input,&managed,sizeof(managed)) && valid_managed_request(request,managed)))) {
       std::wstring path(request.dac_path_units, L'\0');
       if ((path.empty() || read_exact(input, path.data(), request.dac_path_units * 2)) &&
           path.find(L'\0') == std::wstring::npos) {
@@ -994,7 +1402,7 @@ int main(int argc, char **) {
         const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
         if (got == 0 && (ok || error == ERROR_BROKEN_PIPE) && valid_request(request)) {
           if (request.operation == 2) Sleep(INFINITE);
-          observe(request, path, result);
+          observe(request, path, request.version==2 ? &managed : nullptr, result);
           exit_code = result.identity && result.dac_loaded ? 0 : 3;
         }
       }

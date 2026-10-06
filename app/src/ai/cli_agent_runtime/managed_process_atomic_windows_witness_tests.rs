@@ -279,6 +279,8 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
             pre_node_classification_entry: None,
             pre_node_classification_return: None,
             post_node_exception: None,
+            managed_continuation_deferred: None,
+            managed_continuation: None,
             pending_event: None,
             continuation_failed: false,
             expected_temp_environment: [vec![], vec![], vec![]],
@@ -418,10 +420,10 @@ fn witness_continuation_rejects_a_different_original_event() {
         dwThreadId: 2,
         ..Default::default()
     };
-    session.native_witness_received(&event);
+    receive_witness_event(&mut session, &event);
     assert!(
         session
-            .native_witness_continued(1, 3, EXIT_THREAD_DEBUG_EVENT)
+            .native_witness_continued(1, 3, EXIT_THREAD_DEBUG_EVENT, DBG_CONTINUE)
             .is_err()
     );
 }
@@ -441,13 +443,100 @@ fn witness_cleanup_drains_but_cannot_pass_after_invalid_continuation() {
         dwThreadId: 2,
         ..Default::default()
     };
-    session.native_witness_received(&event);
+    receive_witness_event(&mut session, &event);
     session
-        .native_witness_continued(1, 3, EXIT_THREAD_DEBUG_EVENT)
+        .native_witness_continued(1, 3, EXIT_THREAD_DEBUG_EVENT, DBG_CONTINUE)
         .unwrap();
     session.root_exit_observed = true;
     assert!(session.native_witness_confirm_exit().is_err());
     assert!(!session.native_witness.as_ref().unwrap().exit_confirmed);
+}
+
+fn receive_witness_event(session: &mut WindowsImageDebugSession, event: &DEBUG_EVENT) {
+    let trace = session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .get_or_insert_with(|| NpmDebugTrace::new(Uuid::nil(), 1));
+    trace.received(event, 0, 1, false);
+    session.native_witness_received(event).unwrap();
+}
+
+#[test]
+fn witness_pending_event_keeps_received_sequence_and_cannot_be_overwritten() {
+    let (_directory, file) = module_file(&module_bytes());
+    let mut session = witness_session(&file, WitnessMode::PowerShell);
+    let event = DEBUG_EVENT {
+        dwDebugEventCode: EXIT_THREAD_DEBUG_EVENT,
+        dwProcessId: 1,
+        dwThreadId: 2,
+        ..Default::default()
+    };
+    assert!(session.native_witness_received(&event).is_err());
+    receive_witness_event(&mut session, &event);
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .as_mut()
+        .unwrap()
+        .received = 9;
+    assert!(session.native_witness_received(&event).is_err());
+    let pending = session
+        .native_witness
+        .as_ref()
+        .unwrap()
+        .pending_event
+        .as_ref()
+        .unwrap();
+    assert_eq!(pending.sequence, 1);
+    assert_eq!(pending.event.dwThreadId, 2);
+    session
+        .native_witness_continued(1, 2, EXIT_THREAD_DEBUG_EVENT, DBG_CONTINUE)
+        .unwrap();
+    assert!(
+        session
+            .native_witness
+            .as_ref()
+            .unwrap()
+            .pending_event
+            .is_none()
+    );
+}
+
+#[test]
+fn continuation_delivery_requires_the_preserved_first_stop_for_a_replay() {
+    let original = serde_json::json!({"generation":[1],"identity":{"thread_id":8},
+        "pre_return_sequence":4,"first_delivery_sequence":5,
+        "phase":"suspended_before_continue","suspend_owned":true,
+        "reply_later_confirmed":false,"node_create_sequence":null,"replay_sequence":null});
+    let receipt = serde_json::json!({"generation":[1],"identity":{"thread_id":8},
+        "pre_return_sequence":4,"first_delivery_sequence":5,"event_sequence":7,
+        "deferred_for_node":true});
+    assert!(validate_continuation_delivery(&receipt, Some(&original)).is_ok());
+    assert!(validate_continuation_delivery(&receipt, None).is_err());
+    for (field, value) in [
+        ("first_delivery_sequence", serde_json::json!(6)),
+        ("identity", serde_json::json!({"thread_id":9})),
+        ("pre_return_sequence", serde_json::json!(3)),
+        ("phase", serde_json::json!("replayed")),
+        ("suspend_owned", serde_json::json!(false)),
+        ("reply_later_confirmed", serde_json::json!(true)),
+        ("node_create_sequence", serde_json::json!(6)),
+    ] {
+        let mut changed = original.clone();
+        changed[field] = value;
+        assert!(validate_continuation_delivery(&receipt, Some(&changed)).is_err());
+    }
+    let mut direct = receipt;
+    direct["deferred_for_node"] = serde_json::json!(false);
+    direct["first_delivery_sequence"] = serde_json::json!(7);
+    assert!(validate_continuation_delivery(&direct, None).is_ok());
+    assert!(validate_continuation_delivery(&direct, Some(&original)).is_err());
+    direct["first_delivery_sequence"] = serde_json::Value::Null;
+    assert!(validate_continuation_delivery(&direct, None).is_err());
 }
 
 #[test]

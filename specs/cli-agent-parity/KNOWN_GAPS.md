@@ -1,6 +1,46 @@
 # CLI 能力缺项与验收缺口
 
+## 当前接续状态（2026-10-07）：本机托管续点固定能力通过，原环境待验
+
+G01–G08、G10、V03共10项关闭；G09仍开放，新增关闭0项；V01/V02/V05移交后续实机、不计通过，PR #22保持草稿。当前基于374642b的未提交增量已实现Complete原方法的有界托管续点；本机固定能力通过，原runner和真实PowerShell尚未运行本增量，不改变37469893834的ProbeFailed及首因未知结论。
+
+pre原停点只读取得唯一实际MethodInstance、MVID/token、EnC、IL/native映射、代码摘要和原帧身份，绑定单次DR1；op4只在同一原工作线程/帧和批准IL读取Boolean及PSI字段。若父线程续点先于子进程CREATE递送，精确暂停原工作线程一次，以DBG_REPLY_LATER继续原事件；真实Node身份绑定后平衡自有暂停，在同事件重放后读取。helper两端只接受原始首机会单步的延期资格。首次递送、Node、重放分别保存，不改写时序；应用共用原期限、至多四reader，原首CLR预算与NOT_HANDLED语义保持。
+
+本机a8通过124普通（108跳过）和唯一原生夹具一次（1.478秒、231跳过、零重试）。原链为pre71→73→RF skip74→首次续点75→Node76→重放/op4 77→首CLR155→post156→157→其余原异常158/159/160。op4实际MVID 6dfc3e1e-8933-42c8-8a7c-387588962a72、MethodDef100663299、IL162、37项映射/737字节extent；Boolean local4真实类型System.Boolean、位置1、字节1、值true；PSI local2实际引用8字节，System MVID/TypeDef/FieldDef与getter合同匹配，useShellExecute=false。引用GetType/GetName未请求，HRESULT保留E_PENDING。自有Suspend前计数0、Resume前计数1、最终不再拥有暂停；170事件全部继续，原进程/后代/readers/Jobs均回收。独审managed-continuation-a8-audit.safe.json为168947字节，SHA 593f0b4c640ae84e9780ab60f94a651db3eb74d84d6dd081fb050c6f5881e36e。
+
+固定分类方法明确使用NoInlining|NoOptimization，准备收据核实际MethodImpl flags=72，不能外推真实PowerShell的优化后局部可读性。a5的ref和a6的按值参数在IL153均返回Boolean零位置；a7调用返回后的IL162中Boolean与PSI均零位置，全部为unknown/null并失败，不能将其当false或首因。三轮独立失败审计与原件保留；a8仅证明明确固定编译条件下的读值能力，真实PowerShell不改优化、不force JIT、不写IL。a6应用测试编译的两处闭包生命周期错误已修，失败原件保留。
+
+本轮command特性check、Warp check、应用诊断回归和i18n门禁已通过，详细计数及日志摘要见CURRENT_STATUS.json的g09_managed_continuation_local_20261007；20份变动来源和明确测试二进制/reader/fixture前后绑定不等于全仓冻结。无需本地化变更：只有内部诊断、夹具和证据，无用户文案、产品语义或布局变化。仓外证据根C:/Coding/InfiniShell-Evidence/g09-20261006-a，cleanup_ready=false，原失败与26异常均保留。
+
+下一步提交后先验证原runner新固定能力，再运行同提交真实PowerShell，依据真实分支与同停点证据精准修复；正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁仍未完成，合并条件未满足。
+
+## 历史记录：374642b原runner固定能力及真实PS失败
+
+以下保留当时原文；其中“尚未实现”“当前”和“下一步”只描述该历史阶段，最新状态以上文为准。
+
 ## 当前接续状态（2026-10-06）
+
+G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。同一提交374642b的原runner固定37469139712通过88普通及唯一native；真实PS37469893834仍为ProbeFailed。pre179→180取得完整17744/0x4550及局部SMA栈，Node185后首异常186取得28帧，首帧映射到ThrowInstruction.Run的rethrow抛出点；ExitException仅为last-thrown候选，freshness未证明。post分类仍0/unknown；PS12228ms零输出退出1，Node/Codex随后0。67来源仅完成执行前逐字节绑定，失败后全套复核未运行；事件继续及清理已核。新增关闭0项；后续直接观察Complete启动后等待决策的只读设计尚未实现，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。
+
+同一提交 `374642b149c9f38e13d9ea6702a965ab4be0885b` 的[固定能力37469139712](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37469139712)在原runner22/同CLR-DAC通过88普通（114跳过）及唯一native一次（1.373秒、201跳过、无重试）。实际链为pre72→74（完整17744、caller IL70）→RF skip75→Node76→首异常153（operation1、Win32 native code1234）→reader回收/同停点恢复→post154→155（完整17744、IL243）→其余原异常156/157/158。原四CLR异常均NOT_HANDLED，169事件全部继续，21次累计live DR恢复、dirty0，原进程/后代/reader/Jobs清理通过。13准备来源与Git逐字节匹配且前后一致；固定能力不代证真实PS成功。独审 `fixture-37469139712/independent-fixed-audit.safe.json` 为102108字节，SHA `e04d3613409b3c9ffe46e96a73076323835db358a75815e2073174e86635da26`。
+
+随后同HEAD的[真实PS37469893834](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37469893834)在原runner22、job112290389147终态failure，仅首updated为ProbeFailed，model_inputs_sent=0。pre179→180完整u64=17744/0x4550；Node185后原worker首异常186为CLR `0xe0434352`、first-chance=1、HRESULT `0x80131501`。operation1取得28帧真实module/MVID/token/IL，SMA MVID `0a210000-3870-4dec-b53e-175f62acb623` 下首帧MethodDef `0x060035e8`/IL24映射到 `System.Management.Automation.Interpreter.ThrowInstruction.Run`：原合同IL0x13为newobj RethrowException，IL0x18为throw。reader的单个 `last_thrown_object_candidate` TypeDef `0x02000238` 按同MVID合同解析为ExitException，freshness未证明；不能将它等同于本次当前抛出的对象，不能据此认定首因。名称与IL语义来自原静态合同，运行时返回的是身份/token/IL；不把静态SMA文件SHA当作本次加载字节SHA。
+
+28帧中没有Complete/Process.Start/Console，不能从缺帧推出未执行；末三帧IL=4294967293为特殊映射值，不当普通IL偏移。post分类selected/returned仍为0、entry/return为null、结果unknown。seq186的DR采样仅证明原root当前事件线程在该停点的地址/配置相符，不证明全线程或整个区间持续性。两个reader（pre180与首异常186）均按原身份回收后恢复，未重新逐项采集原26异常；last-thrown对象链完整不代表tracker完整或当前对象已证。
+
+实际时序为Node11076ms创建，PS12228ms退出1且stdout0字节，Codex15337ms创建/16964ms退出0，Node17337ms退出0，无取消。PS415、CMD198事件received=validated=continued，pending为空；两代原进程/后代、reader/Job、desktop、DeviceMap、station及LSA清理通过。pre和首异常reader前live DR恢复累计56次，最终29线程以原进程退出确认、dirty0，不能称29次live读回恢复。
+
+67份来源与374642b原始Git blob逐字节相同，仅证明执行前绑定；失败后末尾source/binary/manager复核未运行、summary.safe缺失，不称执行后67来源或全仓冻结。reader构建13来源前后一致、11份归档源及实际180/186所用reader原件摘要已核；未归档worker/supervisor/node/npm原件，不冒称离线重算。实际LOAD、180与186读取器的CLR/DAC FileID/大小/SHA均与原失败一致，版本4.8.9310.0；SMA运行时字节SHA未核。
+
+仓外根 `C:/Coding/InfiniShell-Evidence/g09-20261006-a` 保留全部旧失败、原26异常和本轮原件；真实终审 `ps-classification-37469893834/independent-terminal-audit.safe.json` 为176680字节，SHA `92edf1339fc02bd0b1ef06f0a006600771d6a3b438d4e5119c0ebd3afd4a7468`，cleanup_ready=false。首异常186完成收据SHA `61c330fd325300b4a3ad8cb0ed4472b901392072bf483bcddd010b8f91abaa77`；名称/IL解析使用原 `original-evidence/members/11353475918/contract.safe.json`，SHA `d6ae4082fe989adf7622b326bddab86a14deeefa17166578a03d0fd5bdc01baf`。
+
+下一步需直接观测NativeCommandProcessor.Complete在Process.Start之后的实际等待决策；不能从静态路径、Node CREATE、未命中post或缺失栈帧推断原PS首因。后续只读动态设计尚未实现、未执行，不列作已有能力；不能调用目标方法、force JIT、写IL或重采原26异常。先由真实停点与实际可用映射决定最小观察范围，再精准修复；正常witness=false五场景、三次独立冷恢复和最终同一冻结源码Linux/Windows门禁仍待完成。
+
+无需本地化变更：本次只同步内部诊断证据与状态文档，没有用户文案、语义或布局变化。既有本机88普通、command特性check、warp check、i18n11、应用诊断54与唯一native收据保留；不作为G09关闭依据。
+
+## 历史记录：374642b提交前的本地门禁与f3b失败
+
+以下保留当时原文；其中“当前工作树”“待验证”“下一步”仅代表该历史阶段，最新结论以上文为准。
 
 G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。f3b原runner固定77普通及唯一native通过；真实PS37455611629仍ProbeFailed：pre173→174返回完整17744/0x4550并取得同停点SMA局部栈，Node179后post返回仍未知。PS12406ms零输出退出1，Node/Codex随后0，原CLR/DAC身份和退出清理已核。当前工作树新增单次postNode原worker首异常诊断；command普通88、command特性check、warp check、i18n11、应用诊断54与唯一native全部通过，原runner当前增量仍待验证。八源码/测试exe前后绑定不代表全仓冻结，不继承f3b真实候选通过。新增关闭0项，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。
 

@@ -1,11 +1,506 @@
 {
   "schema": 1,
   "status": "windows_g09_in_progress_pr_draft",
+  "g09_managed_continuation_local_20261007": {
+    "base_head": "374642b149c9f38e13d9ea6702a965ab4be0885b",
+    "status": "local_fixed_capability_passed_original_runner_and_real_powershell_pending",
+    "closed_items_added": 0,
+    "g09_closed": false,
+    "pr_must_remain_draft": true,
+    "repository_frozen": false,
+    "source_scope": "twenty_changed_sources_before_after_not_whole_repository_freeze",
+    "implementation": "原pre同停点唯一实际方法映射绑定一次DR1续点；op4只读实际Boolean和PSI字段；必要时原工作线程自有一次暂停、DBG_REPLY_LATER、真实Node绑定及同事件重放。应用至多四reader共用原期限，原首CLR预算和NOT_HANDLED语义保持。",
+    "local_gates": {
+      "command-check": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-command-check-a8.safe.json",
+        "bytes": 9903,
+        "sha256": "37d435459a0e89203f28a4dcc6d78e0c14b388699d74ed404b16d2587aed0fe5",
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-command-check-a8.log",
+          "bytes": 127,
+          "sha256": "9dc28f44a01278da76665cb74a7e0c636bd15b5193907ed8d44f37f8637bc54c"
+        },
+        "exit_code": 0
+      },
+      "command-tests": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-command-tests-a8.safe.json",
+        "bytes": 10246,
+        "sha256": "af967860afd71699e423b7c5841e03f9a3318acc67e17e201941f34316b17fd1",
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-command-tests-a8.log",
+          "bytes": 17824,
+          "sha256": "63c298c7610c8bd9aaf93e592c7ced2ef5035af655c0d4923e8a49fc34a3068d"
+        },
+        "exit_code": 0
+      },
+      "app-tests": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-app-tests-a8.safe.json",
+        "bytes": 10142,
+        "sha256": "55d177aff077b885e50fd85bf1db2b05ae2dc64646c02594361312e1d0c626cd",
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-app-tests-a8.log",
+          "bytes": 21311,
+          "sha256": "b23e8d029f48d7c7b38f9020fa9f0c07a7fa9f6fc94e2033f2821affb8e61cbe"
+        },
+        "exit_code": 0
+      },
+      "warp-check": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-warp-check-a8.safe.json",
+        "bytes": 9832,
+        "sha256": "3c9092ef9c5bb132085816a00037c997667a6b5bbd7d8a82e382352073add102",
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-warp-check-a8.log",
+          "bytes": 10468,
+          "sha256": "5384e96ea3d55f462c10a05caf01903c5b3213978fd573062bd06e4c1c5dc178"
+        },
+        "exit_code": 0
+      },
+      "i18n": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-i18n-a8.safe.json",
+        "bytes": 9941,
+        "sha256": "872eaa7e400f8543e6b004817541499334a3180ad03426dd8e024630f1502483",
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-i18n-a8.log",
+          "bytes": 10095,
+          "sha256": "94355c684ffebf8132341284d15e53493fe969e8c62ada8e5df354325bc7bc3f"
+        },
+        "exit_code": 0
+      },
+      "default_branch_warning_fix_check": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-warp-check-a9.safe.json",
+        "bytes": 9831,
+        "sha256": "ac82458461e3348f1ef5c4cf7c5380205f7ff9c32d05a9e1a03735a562f0f43e",
+        "log": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-warp-check-a9.log",
+          "bytes": 6397,
+          "sha256": "c5fc5921a087ee4b9b07b05095686e26ab765c6a4cf63e367208bdc1002fea61"
+        },
+        "exit_code": 0,
+        "old_source": {
+          "path": "C:\\Coding\\InfiniShell-Desktop\\app\\src\\ai\\cli_agent_runtime\\managed_process_atomic_windows.rs",
+          "bytes": 113899,
+          "sha256": "73563c2406489d6fbd8b3df3084ca1e21f99e3173ab42e36bf6e285ef0c4c097"
+        },
+        "new_source": {
+          "path": "C:\\Coding\\InfiniShell-Desktop\\app\\src\\ai\\cli_agent_runtime\\managed_process_atomic_windows.rs",
+          "bytes": 113911,
+          "sha256": "2252d30a3a1e26cdfde03079adf2576ff75a1a342cbc1a864461ce0ba6253680"
+        },
+        "boundary": "a8各门禁同20来源；之后仅默认配置分支将result?恢复为result.map(|_| ())?，当前default cargo check另行通过。该行在a8应用及i18n的cli-agent-native-witness构建中不参与编译，未将旧测试二进制冒充新源码全仓冻结。"
+      }
+    },
+    "ordinary_passed": 124,
+    "ordinary_skipped": 108,
+    "application_diagnostic_passed": 67,
+    "application_diagnostic_skipped": 8305,
+    "i18n_passed": 11,
+    "i18n_features": [
+      "cli-agent-native-witness"
+    ],
+    "native_passed": 1,
+    "native_skipped": 231,
+    "native_seconds": 1.478,
+    "native_retries": 0,
+    "fixed_audit": {
+      "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-a8-audit.safe.json",
+      "bytes": 168947,
+      "sha256": "593f0b4c640ae84e9780ab60f94a651db3eb74d84d6dd081fb050c6f5881e36e"
+    },
+    "mapping": {
+      "code_sha256": "2b93246b2f579b4c65f8ab8872f235bcd5e8e8d3a1a123b2e00654f838138952",
+      "enc_version": 0,
+      "extent_length": 737,
+      "il_offset": 162,
+      "map_count": 37,
+      "map_sha256": "3a6112243d029b29f8ea6ac034b2c23eb96e428590648181ea6b15a8859aa0fc",
+      "method_token": 100663299,
+      "module_mvid": "6dfc3e1e-8933-42c8-8a7c-387588962a72",
+      "pre_sequence": 73
+    },
+    "boolean_local": {
+      "api_hresult": 0,
+      "bytes_hresult": 0,
+      "bytes_read": 1,
+      "flags": 1,
+      "flags_hresult": 0,
+      "get_local_hresult": 0,
+      "index": 4,
+      "locations": 1,
+      "locations_hresult": 0,
+      "size": 1,
+      "size_hresult": 0,
+      "type_hresult": 0,
+      "type_name": "System.Boolean",
+      "type_name_hresult": 0,
+      "value": true
+    },
+    "start_info_field": {
+      "api_hresult": 0,
+      "field_name": "useShellExecute",
+      "field_read_hresult": 0,
+      "field_sig_type": 2,
+      "field_token": 67119270,
+      "field_type": 2,
+      "index": 2,
+      "local_api_hresult": 0,
+      "local_bytes_hresult": 0,
+      "local_bytes_read": 8,
+      "local_flags": 16,
+      "local_flags_hresult": 0,
+      "local_get_local_hresult": 0,
+      "local_locations": 1,
+      "local_locations_hresult": 0,
+      "local_size": 8,
+      "local_size_hresult": 0,
+      "local_type_hresult": 2147483658,
+      "local_type_name_hresult": 2147483658,
+      "module_mvid": "402af08d-116e-430d-9d66-ba6ee06ad4bb",
+      "requested": true,
+      "type_token": 33555711,
+      "value": false
+    },
+    "deferred": {
+      "first_delivery_sequence": 75,
+      "generation": [
+        87,
+        178,
+        114,
+        95,
+        180,
+        222,
+        70,
+        64,
+        171,
+        158,
+        33,
+        127,
+        117,
+        48,
+        10,
+        47
+      ],
+      "identity": {
+        "process_birth": 134357779006760062,
+        "process_id": 28836,
+        "thread_birth": 134357779007718136,
+        "thread_id": 30580
+      },
+      "node_create_sequence": 76,
+      "original_thread_exit_confirmed": true,
+      "phase": "replayed",
+      "pre_return_sequence": 73,
+      "replay_sequence": 77,
+      "reply_later_confirmed": true,
+      "resume_previous_count": 1,
+      "suspend_owned": false,
+      "suspend_previous_count": 0
+    },
+    "actual_sequence_chain": [
+      71,
+      73,
+      74,
+      75,
+      76,
+      77,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160
+    ],
+    "events_continued": 170,
+    "all_cleanup_verified": true,
+    "fixture_optimization_boundary": "仅固定ClassifyBoundNode明确NoInlining|NoOptimization，prepare读取实际MethodImpl flags=72；/debug-原件无DebuggableAttribute，a5/a6在IL153仍为bool零位置，a7在IL162的bool/PSI均零位置；不以未知当false，不宣称ref或停点位置是首因。真实PowerShell不改变优化、环境或IL。",
+    "preserved_failures": [
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-a5-failure-audit-v2.safe.json",
+        "bytes": 169364,
+        "sha256": "29ce5e31b6979328ad0ecd3213547c2b4d35b3bc12894bb7190547c4cf7c75d9"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-a6-failure-audit.safe.json",
+        "bytes": 169559,
+        "sha256": "cf5738eb26b31a8e454c8fe3accfa74235f7860824a6be238545fb3cc34b4434"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-a7-failure-audit.safe.json",
+        "bytes": 168476,
+        "sha256": "8134ef14bc014e69f9d380d58a3454d8719af285b7863ed1479da9ed9dab8b7b"
+      },
+      {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\managed-continuation-app-tests-a6.safe.json",
+        "bytes": 10145,
+        "sha256": "3caf9ed743ea0279e5896a9b78f7c953acb687d37271b8743ec82a4567be8462"
+      }
+    ],
+    "next": "提交后先在原runner验证新固定能力，再同提交真实PowerShell；只有实际原分支及同停点证据成立后精准修产品。随后正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁，全部满足后才能转正式并合并。",
+    "localization": "无需本地化变更：仅内部诊断、固定夹具及状态证据，无用户文案、产品语义或布局变化。",
+    "cleanup_ready": false
+  },
+  "g09_374642b_terminal_audit_20261006": {
+    "commit": "374642b149c9f38e13d9ea6702a965ab4be0885b",
+    "status": "original_runner_fixed_passed_actual_powershell_failed_cause_unknown",
+    "runner_id": 22,
+    "machine": "WIN-E000APDGSNS",
+    "fixed": {
+      "run_id": 37469139712,
+      "job_id": 112287774402,
+      "conclusion": "success",
+      "ordinary_passed": 88,
+      "ordinary_skipped": 114,
+      "native_passed": 1,
+      "native_execution_count": 1,
+      "native_seconds": 1.373,
+      "native_skipped": 201,
+      "retries": 0,
+      "actual_sequence_chain": [
+        72,
+        74,
+        75,
+        76,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158
+      ],
+      "raw_pre_post_return_u64": 17744,
+      "pre_post_caller_il": [
+        70,
+        243
+      ],
+      "first_exception_operation": 1,
+      "first_exception_native_error_code": 1234,
+      "all_four_clr_not_handled": true,
+      "events_continued": 169,
+      "live_dr_restorations": 21,
+      "all_cleanup_verified": true,
+      "source_count": 13,
+      "all_sources_exact_git_and_before_after_equal": true,
+      "audit_file": "C:/Coding/InfiniShell-Evidence/g09-20261006-a/fixture-37469139712/independent-fixed-audit.safe.json",
+      "audit_bytes": 102108,
+      "audit_sha256": "e04d3613409b3c9ffe46e96a73076323835db358a75815e2073174e86635da26",
+      "artifact": {
+        "id": 11416155985,
+        "bytes": 532619,
+        "members": 45,
+        "sha256": "2b29bbda659a48bc0cb3c0d58ea379b96245b416eda37a9e5f0b8a9a10c4a461"
+      },
+      "scope": "唯一固定夹具能力通过，不代证实际PowerShell或G09。"
+    },
+    "actual_run": 37469893834,
+    "job_id": 112290389147,
+    "actual_result": "failure_ProbeFailed",
+    "case": "updated",
+    "model_inputs_sent": 0,
+    "audit_file": "C:/Coding/InfiniShell-Evidence/g09-20261006-a/ps-classification-37469893834/independent-terminal-audit.safe.json",
+    "audit_bytes": 176680,
+    "audit_sha256": "92edf1339fc02bd0b1ef06f0a006600771d6a3b438d4e5119c0ebd3afd4a7468",
+    "ordinary_gates": {
+      "warp_passed": 1146,
+      "warp_skipped": 7108,
+      "i18n_included": 11,
+      "command_passed": 91,
+      "command_skipped": 111,
+      "witness_preflight_passed": 129,
+      "witness_groups": [
+        19,
+        16,
+        14,
+        29,
+        25,
+        3,
+        14,
+        9
+      ],
+      "node_passed": 19,
+      "python_groups_passed": [
+        15,
+        1,
+        28
+      ],
+      "nextest_status_anomalies": []
+    },
+    "candidate_libtest": {
+      "exit_code": 101,
+      "passed": 0,
+      "failed": 1,
+      "filtered_out": 8358,
+      "seconds": 110.0
+    },
+    "powershell": {
+      "generation": "e6538a96-bd7c-400e-b8fa-81459ee3088c",
+      "process_id": 19620,
+      "process_birth": 134357704310493135,
+      "thread_id": 28052,
+      "thread_birth": 134357704365623284,
+      "exit_code": 1,
+      "exit_ms": 12228,
+      "stdout_bytes": 0,
+      "cancelled": false
+    },
+    "pre": {
+      "entry_sequence": 179,
+      "return_sequence": 180,
+      "raw_return_u64": 17744,
+      "flags": 8192,
+      "path_comparison": "matched",
+      "operation": 3,
+      "stack_status": "partial",
+      "stack_api_hresult": 1,
+      "frames": 32,
+      "read_bytes": 3899508,
+      "read_calls": 3340,
+      "budget_exhausted": false,
+      "sma_mvid": "0a210000-3870-4dec-b53e-175f62acb623",
+      "actual_token_il": [
+        [
+          100668021,
+          8
+        ],
+        [
+          100668027,
+          172
+        ],
+        [
+          100668016,
+          0
+        ]
+      ],
+      "reader_reaped": true,
+      "reader_job_empty": true
+    },
+    "node": {
+      "process_id": 24968,
+      "process_birth": 134357704412060189,
+      "create_sequence": 185,
+      "create_ms": 11076,
+      "exit_ms": 17337,
+      "exit_code": 0
+    },
+    "codex": {
+      "create_ms": 15337,
+      "exit_ms": 16964,
+      "exit_code": 0
+    },
+    "post_node_first_exception": {
+      "event_sequence": 186,
+      "exception_code": 3762504530,
+      "exception_code_hex": "0xe0434352",
+      "first_chance": 1,
+      "event_hresult": 2148734209,
+      "event_hresult_hex": "0x80131501",
+      "parameter_count": 5,
+      "reader_operation": 1,
+      "status": "observed",
+      "stack_frames": 28,
+      "stack_api_hresult": 0,
+      "exception_api_hresult": 0,
+      "read_bytes": 6704059,
+      "read_calls": 3302,
+      "budget_exhausted": false,
+      "actual_sma_mvid": "0a210000-3870-4dec-b53e-175f62acb623",
+      "actual_first_method_token": 100677096,
+      "actual_first_il": 24,
+      "contract_resolved_name": "System.Management.Automation.Interpreter.ThrowInstruction.Run",
+      "contract_at_il19": "newobj RethrowException",
+      "contract_at_il24": "throw",
+      "exception_source": "last_thrown_object_candidate",
+      "candidate_type_token": 33555000,
+      "contract_resolved_candidate_type": "System.Management.Automation.ExitException",
+      "candidate_freshness_proven": false,
+      "exception_object_current_inferred": false,
+      "object_chain_complete": true,
+      "tracker_complete": false,
+      "native_error_code": null,
+      "native_error_read_hresult": 2147500034,
+      "reader_reaped": true,
+      "reader_job_empty": true,
+      "execution_context_unchanged": true,
+      "registers_restored": true,
+      "selected_calls": 1,
+      "resumed_calls": 1,
+      "receipt_sha256": "61c330fd325300b4a3ad8cb0ed4472b901392072bf483bcddd010b8f91abaa77",
+      "contract_file": "C:/Coding/InfiniShell-Evidence/g09-20261006-a/original-evidence/members/11353475918/contract.safe.json",
+      "contract_sha256": "d6ae4082fe989adf7622b326bddab86a14deeefa17166578a03d0fd5bdc01baf",
+      "boundary": "28帧中没有Complete/Process.Start/Console，不能从缺帧推出未执行；末三帧IL=4294967293为特殊映射值，不当普通IL偏移。post分类selected/returned仍为0、entry/return为null、结果unknown。seq186的DR采样仅证明原root当前事件线程在该停点的地址/配置相符，不证明全线程或整个区间持续性。两个reader（pre180与首异常186）均按原身份回收后恢复，未重新逐项采集原26异常；last-thrown对象链完整不代表tracker完整或当前对象已证。"
+    },
+    "post_classification": {
+      "selected": 0,
+      "returned": 0,
+      "entry": null,
+      "return": null,
+      "result": "unknown",
+      "first_skipped_entry": null,
+      "skipped_entries": 0,
+      "rf_writes": 0,
+      "dr_sample_sequence": 186,
+      "dr_sample_scope": "original_root_event_thread_at_this_stop_only",
+      "dr_addresses_and_configuration_equal": true,
+      "dr6": 4294905840,
+      "dr7": 1025
+    },
+    "source_count": 67,
+    "all_source_blobs_exact_to_commit": true,
+    "post_run_full_source_binary_manager_recheck_completed": false,
+    "source_boundary": "67份来源与374642b原始Git blob逐字节相同，仅证明执行前绑定；失败后末尾source/binary/manager复核未运行、summary.safe缺失，不称执行后67来源或全仓冻结。reader构建13来源前后一致、11份归档源及实际180/186所用reader原件摘要已核；未归档worker/supervisor/node/npm原件，不冒称离线重算。实际LOAD、180与186读取器的CLR/DAC FileID/大小/SHA均与原失败一致，版本4.8.9310.0；SMA运行时字节SHA未核。",
+    "cleanup": {
+      "powershell_events_received_validated_continued": 415,
+      "cmd_events_received_validated_continued": 198,
+      "pending_event": null,
+      "reader_observations": 2,
+      "all_readers_reaped": true,
+      "live_dr_restorations": 56,
+      "threads_original_exit_confirmed": 29,
+      "dirty_threads": 0,
+      "root_descendants_jobs_desktop_device_map_station_lsa_released": true,
+      "boundary": "实际时序为Node11076ms创建，PS12228ms退出1且stdout0字节，Codex15337ms创建/16964ms退出0，Node17337ms退出0，无取消。PS415、CMD198事件received=validated=continued，pending为空；两代原进程/后代、reader/Job、desktop、DeviceMap、station及LSA清理通过。pre和首异常reader前live DR恢复累计56次，最终29线程以原进程退出确认、dirty0，不能称29次live读回恢复。"
+    },
+    "artifacts": [
+      {
+        "id": 11419743519,
+        "bytes": 463729253,
+        "members": 86,
+        "sha256": "574c61b0acfee006fab5500cc78f56f9a89dcd50a44c0a52ee9fe84b95330854"
+      },
+      {
+        "id": 11419212924,
+        "bytes": 351466,
+        "members": 16,
+        "sha256": "6055d6e284fdbd546fefa5b510d2d405cb0fb02ec0364d48c5e9963e51bfc3e2"
+      },
+      {
+        "id": 11417430477,
+        "bytes": 395,
+        "members": 1,
+        "sha256": "44aacd85eee5d0d5986f434fb041719e65f6819e8f2fbac90851062b1de318da"
+      }
+    ],
+    "logs": {
+      "bytes": 275358,
+      "members": 25,
+      "sha256": "9ad866e6996a24e73f687285f258fe62832079099ad572046b8a71af5c6076b7",
+      "official_digest_available": false
+    },
+    "all_member_crc_sha_and_safe_paths_verified": true,
+    "cleanup_ready": false,
+    "native_cause_proven": false,
+    "G09_closed": false,
+    "newly_closed": [],
+    "next_dynamic_observation_implemented": false,
+    "next": "下一步需直接观测NativeCommandProcessor.Complete在Process.Start之后的实际等待决策；不能从静态路径、Node CREATE、未命中post或缺失栈帧推断原PS首因。后续只读动态设计尚未实现、未执行，不列作已有能力；不能调用目标方法、force JIT、写IL或重采原26异常。先由真实停点与实际可用映射决定最小观察范围，再精准修复；正常witness=false五场景、三次独立冷恢复和最终同一冻结源码Linux/Windows门禁仍待完成。",
+    "normal_witness_false_five_cases_completed": false,
+    "independent_cold_recoveries_completed": 0,
+    "final_same_source_dual_platform_gate": false,
+    "localization": "无需本地化变更：本次只同步内部诊断证据与状态文档，没有用户文案、语义或布局变化。既有本机88普通、command特性check、warp check、i18n11、应用诊断54与唯一native收据保留；不作为G09关闭依据。"
+  },
   "g09_post_node_first_exception_20261006": {
-    "status": "local_fixed_capability_passed_original_runner_pending",
-    "source_scope": "eight_changed_sources_and_exact_test_binary_bound_before_after_not_whole_repository_freeze",
+    "status": "original_runner_fixed_passed_actual_powershell_failed_cause_unknown",
+    "source_scope": "本机八改动来源/精确测试文件前后绑定的历史范围保留；374642b原runner固定13来源前后核验通过，真实PS67来源仅执行前绑定，失败后全套复核未执行。",
     "trigger_evidence_run": 37455611629,
-    "implementation": "当前工作树已实现单次postNode原worker首EXCEPTION诊断：core独立一次性票据在原停点核身份并撤下全部自有DR，合法CLR首事件复用operation1，reader与精确Job回收后在同停点复核原完整上下文与期限再恢复观察；非CLR或不合法首事件记unknown并消费该槽，不追逐后续异常。pre/post分类各一次及原选择/成功条件不变；应用三槽共用原deadline，至多启动三个reader，不重采原26异常。唯一固定夹具改为pre→Node→原Win32(1234)异常→post→原其余三异常，沿用四异常而不扩矩阵。本轮command普通/特性check、warp check、i18n、应用诊断特性测试及唯一native全部通过；原runner当前增量仍待验证，这些本地限定门禁不作为产品修复或缺口关闭。无需本地化变更：仅内部诊断、夹具和证据，无用户文案、语义或布局变化。",
+    "implementation": "374642b已实现单次postNode原worker首EXCEPTION诊断：core独立一次性票据在原停点核身份并撤下全部自有DR，合法CLR首事件复用operation1，reader与精确Job回收后在同停点复核原完整上下文与期限再恢复观察；非CLR或不合法首事件记unknown并消费该槽，不追逐后续异常。pre/post分类各一次及原选择/成功条件不变；应用三槽共用原deadline，至多启动三个reader，不重采原26异常。唯一固定夹具改为pre→Node→原Win32(1234)异常→post→原其余三异常，沿用四异常而不扩矩阵。本轮command普通/特性check、warp check、i18n、应用诊断特性测试及唯一native全部通过；同提交原runner固定37469139712通过、真实PS37469893834仍ProbeFailed，这些本地限定门禁不作为产品修复或缺口关闭。无需本地化变更：仅内部诊断、夹具和证据，无用户文案、语义或布局变化。",
     "pre_classification_budget": 1,
     "post_classification_budget": 1,
     "first_worker_exception_budget": 1,
@@ -86,11 +581,11 @@
         "bytes": 8166,
         "sha256": "424f90b2387074c042f8acb4f5382cbaac96460c4e5379df2a76856563260f20",
         "source_scope": "eight_changed_sources_bound_before_after_each_local_gate_not_whole_repository_freeze",
-        "original_runner_current_increment": "pending"
+        "original_runner_current_increment": "固定37469139712通过，真实37469893834失败；详见g09_374642b_terminal_audit_20261006。"
       }
     },
-    "original_runner_fixed_gate": "pending",
-    "actual_powershell_evidence": "pending",
+    "original_runner_fixed_gate": "passed_run_37469139712",
+    "actual_powershell_evidence": "run_37469893834_failed_ProbeFailed_first_exception_observed_cause_unknown",
     "native_cause_proven": false,
     "G09_closed": false,
     "newly_closed": [],
@@ -100,7 +595,8 @@
       "command_check_a1": "wrong_cli_agent_native_witness_feature_command_error_preserved_not_passed",
       "native_retries": 0
     },
-    "native_boundary": "唯一native a1实际执行一次，1.206秒通过/201跳过、无native重试。真实链为pre entry71→return73（完整0x4550、caller IL70）→RF skip74→Node75→原worker首异常151（operation1、Win32 native code1234）→reader回收并同停点rearm→post entry152→return153（完整0x4550、IL243）→原其余三异常154/155/156。四CLR异常全部DBG_EXCEPTION_NOT_HANDLED，166事件全部继续，21次累计live DR恢复、dirty0、原root/三后代/reader及Jobs回收。独审 `post-node-exception-a1-audit.safe.json` 为139520字节，SHA `623c405eaca8d2a1f7c5f5d17dfe68499f32bf6bec33ae265bbb23369868ad6d`；精确测试exe SHA `ae23a9696a3b3fa7199f4210bdae18070e097279dbff62748525549283b6ecf7`。13准备来源中只有Fixture.cs相对f3b不同，本机CLR/DAC4.8.9345.0不代原runner4.8.9310.0或真实PS；八源码/测试exe绑定不代表全仓冻结。"
+    "native_boundary": "唯一native a1实际执行一次，1.206秒通过/201跳过、无native重试。真实链为pre entry71→return73（完整0x4550、caller IL70）→RF skip74→Node75→原worker首异常151（operation1、Win32 native code1234）→reader回收并同停点rearm→post entry152→return153（完整0x4550、IL243）→原其余三异常154/155/156。四CLR异常全部DBG_EXCEPTION_NOT_HANDLED，166事件全部继续，21次累计live DR恢复、dirty0、原root/三后代/reader及Jobs回收。独审 `post-node-exception-a1-audit.safe.json` 为139520字节，SHA `623c405eaca8d2a1f7c5f5d17dfe68499f32bf6bec33ae265bbb23369868ad6d`；精确测试exe SHA `ae23a9696a3b3fa7199f4210bdae18070e097279dbff62748525549283b6ecf7`。13准备来源中只有Fixture.cs相对f3b不同，本机CLR/DAC4.8.9345.0不代原runner4.8.9310.0或真实PS；八源码/测试exe绑定不代表全仓冻结。",
+    "validated_commit": "374642b149c9f38e13d9ea6702a965ab4be0885b"
   },
   "g09_f3b_terminal_audit_20261006": {
     "commit": "f3b7476a4df2bf4b3c32f5867073cd51c1e0638f",
@@ -352,7 +848,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。f3b原runner固定77普通及唯一native通过；真实PS37455611629仍ProbeFailed：pre173→174返回完整17744/0x4550并取得同停点SMA局部栈，Node179后post返回仍未知。PS12406ms零输出退出1，Node/Codex随后0，原CLR/DAC身份和退出清理已核。当前工作树新增单次postNode原worker首异常诊断；command普通88、command特性check、warp check、i18n11、应用诊断54与唯一native全部通过，原runner当前增量仍待验证。八源码/测试exe前后绑定不代表全仓冻结，不继承f3b真实候选通过。新增关闭0项，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。",
+  "status_zh": "G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。同一提交374642b的原runner固定37469139712通过88普通及唯一native；真实PS37469893834仍为ProbeFailed。pre179→180取得完整17744/0x4550及局部SMA栈，Node185后首异常186取得28帧，首帧映射到ThrowInstruction.Run的rethrow抛出点；ExitException仅为last-thrown候选，freshness未证明。post分类仍0/unknown；PS12228ms零输出退出1，Node/Codex随后0。67来源仅完成执行前逐字节绑定，失败后全套复核未运行；事件继续及清理已核。新增关闭0项；后续直接观察Complete启动后等待决策的只读设计尚未实现，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -1980,16 +2476,17 @@
     },
     "g09_progress": {
       "status": "open",
-      "audit_ref": "g09_mac_empty_acl_fix_20261005",
+      "audit_ref": "g09_374642b_terminal_audit_20261006",
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "本次Mac范围10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。74dd/r-f6ta9tcm显式空ACL两场景/一次独立冷恢复通过独审，不外推新增相对路径、GUI或完整5/2重跑。用户三类特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持。Windows37209945616首updated失败及后4场景/3冷恢复未跑的事实保留，固定CLR夹具尚未原生验证；b5 Linux通知send超时仍为原失败，后续37267752920运行中。最终同源双平台门禁未完成，新增关闭0项。",
+      "boundary": "G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。同一提交374642b的原runner固定37469139712通过88普通及唯一native；真实PS37469893834仍为ProbeFailed。pre179→180取得完整17744/0x4550及局部SMA栈，Node185后首异常186取得28帧，首帧映射到ThrowInstruction.Run的rethrow抛出点；ExitException仅为last-thrown候选，freshness未证明。post分类仍0/unknown；PS12228ms零输出退出1，Node/Codex随后0。67来源仅完成执行前逐字节绑定，失败后全套复核未运行；事件继续及清理已核。新增关闭0项；后续直接观察Complete启动后等待决策的只读设计尚未实现，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。 用户特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持；既有Mac验收记录与其他平台历史失败继续保留。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
-      "latest_result_ref": "g09_mac_empty_acl_fix_20261005",
-      "latest_result_source_commit": "74ddcaa42ada3e3f7306adab1fd5b7b69df30d13",
-      "latest_preparation_ref": "g09_mac_empty_acl_fix_20261005",
-      "mac_platform_binding_regression_complete": true
+      "latest_result_ref": "g09_374642b_terminal_audit_20261006",
+      "latest_result_source_commit": "374642b149c9f38e13d9ea6702a965ab4be0885b",
+      "latest_preparation_ref": "g09_post_node_first_exception_20261006",
+      "mac_platform_binding_regression_complete": true,
+      "next_dynamic_observation_implemented": false
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -2869,7 +3366,7 @@
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
-  "documentation_updated_at": "2026-10-06",
+  "documentation_updated_at": "2026-10-07",
   "documentation_source_commit": "7a8c03bd2301d982625a3bac41047aa9d69f4ecc",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",

@@ -103,7 +103,10 @@ impl SuspendedChild {
 
 impl std::os::windows::io::AsRawHandle for SuspendedChild {
     fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
-        self.child.as_ref().expect("冻结进程必须存在").as_raw_handle()
+        self.child
+            .as_ref()
+            .expect("冻结进程必须存在")
+            .as_raw_handle()
     }
 }
 
@@ -317,7 +320,8 @@ mod tests;
 mod clr_reader;
 #[cfg(any(test, feature = "native-probe-witness"))]
 pub use clr_reader::{
-    ClrExceptionStop, ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding,
+    ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodSpec, ClrNativeReturnStop,
+    ClrReader, ClrReaderImage, ClrRuntimeBinding, ManagedContinuationTarget,
 };
 
 #[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
