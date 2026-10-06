@@ -146,6 +146,14 @@ jobs:
         test(terminal::input::slash_commands::tests::) |
         test(aborting_remote_run_command_kills_process_and_clears_in_progress_request) |
         test(terminal::cli_agent_sessions::plugin_manager::) |
+        test(ai::agent_providers::tools::) |
+        test(ai::agent_providers::chat_stream::skill_tests::) |
+        test(settings_view::cloud_sync_page::tests::) |
+        test(cli_subagent_sizes) |
+        test(ai::blocklist::block::cli::) |
+        test(persistence::sqlite::tests::) |
+        test(terminal::grid_renderer::tests::) |
+        test(terminal::local_tty::unix::tests::) |
         test(i18n::tests) | test(app_services::linux::startup_tests::) |
         test(app_services::windows::startup_tests::)
     steps:
@@ -300,6 +308,14 @@ jobs:
             echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib'
             cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
+
+      - name: 测试窗口迁移与同步错误类型
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 \
+            -p warpui_core -p persistence -p infinishell_sync -p warp_ssh_manager --lib \
+            2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/zap-crate-tests.log"
 
       - name: 测试 v2 补全路径边界
         shell: bash
