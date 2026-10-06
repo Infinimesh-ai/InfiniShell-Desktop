@@ -335,6 +335,10 @@ fn build_host_shell_command(
     // Specify terminal name and capabilities.
     builder.env("TERM", "xterm-256color");
     builder.env("TERM_PROGRAM", "WarpTerminal");
+    // 终端提供逻辑像素；旧版 terminal-browser 与新版 pixel 使用不同变量。
+    for key in ["TERMINAL_BROWSER_DISPLAY_SCALE", "PIXEL_DISPLAY_SCALE"] {
+        builder.env(key, std::env::var_os(key).unwrap_or_else(|| "1".into()));
+    }
     // Advertise 24-bit color support.
     builder.env("COLORTERM", "truecolor");
 
