@@ -1188,12 +1188,19 @@ fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
         .ok_or_else(|| io::Error::other("缺少固定启动前跳过入口收据"))?;
     require(skips.len() == 1, "固定启动前跳过入口不唯一")?;
     let skipped = &skips[0];
+    let first_skipped = &summary["first_skipped_entry"];
     let resume_before = skipped["resume_flag_writes_before"].as_u64();
     let fixed_before = skipped["fixed_eflags_api_readbacks_before"].as_u64();
     let fixed_after = skipped["fixed_eflags_api_readbacks_after"].as_u64();
     require(
         skipped["node_created_before_event"] == false
             && sequence(&skipped["sequence"])? < sequence(&node["sequence"])?
+            && first_skipped["sequence"] == skipped["sequence"]
+            && first_skipped.get("node_create_sequence") == Some(&Value::Null)
+            && first_skipped["generation"] == receipt["generation"]
+            && first_skipped["identity"] == receipt["identity"]
+            && first_skipped["flags"] == 0x2000
+            && first_skipped["path_comparison"] == "matched"
             && skipped["pid"] == item["pid"]
             && skipped["tid"] == item["tid"]
             && skipped["thread_birth"] == item["thread_birth"]
@@ -1705,6 +1712,9 @@ fn fixed_native_return_receipt() -> (Value, Value) {
         "shell_entries":[{"sequence":10,"tid":42}],
         "shell_classification":{"generation":generation,"root_process_id":41,"selected_calls":1,"returned_calls":1,
             "skipped_entries":1,"resume_flag_writes":1,"fixed_eflags_api_readbacks":1,
+            "first_skipped_entry":{"generation":generation,
+                "identity":{"process_id":41,"thread_id":42,"process_birth":100,"thread_birth":200},
+                "sequence":7,"node_create_sequence":null,"flags":0x2000,"path_comparison":"matched"},
             "dirty_threads":0,"threads_exited_before_restore":0,"restoration":"readback_verified",
             "restored_threads":2,"original_process_exit_confirmed":true,"stopped":true},
         "shell_observation":observation
@@ -1908,6 +1918,37 @@ fn native_return_requires_pre_node_skipped_entry_on_the_original_worker() {
     let skips = repeated["shell_skips"].as_array_mut().unwrap();
     skips.push(skips[0].clone());
     assert!(validate_native_return(&repeated, &prepared).is_err());
+}
+
+#[test]
+fn native_return_requires_bound_first_skipped_receipt_and_observed_path_match() {
+    let (report, prepared) = fixed_native_return_receipt();
+    for (field, value) in [
+        ("sequence", json!(8)),
+        ("node_create_sequence", json!(6)),
+        ("generation", serde_json::to_value([2_u8; 16]).unwrap()),
+        (
+            "identity",
+            json!({"process_id":41,"thread_id":40,"process_birth":100,"thread_birth":200}),
+        ),
+        ("flags", json!(0)),
+        ("path_comparison", json!("not_checked")),
+        ("path_comparison", json!("mismatched")),
+        ("path_comparison", json!("unreadable")),
+    ] {
+        let mut changed = report.clone();
+        changed["shell_classification"]["first_skipped_entry"][field] = value;
+        assert!(validate_native_return(&changed, &prepared).is_err());
+    }
+    let mut missing = report.clone();
+    missing["shell_classification"]["first_skipped_entry"] = Value::Null;
+    assert!(validate_native_return(&missing, &prepared).is_err());
+    let mut missing_node_state = report;
+    missing_node_state["shell_classification"]["first_skipped_entry"]
+        .as_object_mut()
+        .unwrap()
+        .remove("node_create_sequence");
+    assert!(validate_native_return(&missing_node_state, &prepared).is_err());
 }
 
 #[test]

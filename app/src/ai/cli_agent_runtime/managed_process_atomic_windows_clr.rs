@@ -22,6 +22,7 @@ pub(super) struct NativeClr {
     directory: PathBuf,
     image: ClrReaderImage,
     runtime: Option<(u64, ClrRuntimeBinding)>,
+    runtime_binding_at_load: Option<serde_json::Value>,
     threads: HashMap<u32, ThreadBinding>,
     active_reader: Option<ClrReader>,
     last_sequence: u64,
@@ -95,6 +96,7 @@ impl NativeClr {
             directory: directory.to_path_buf(),
             image: ClrReaderImage::bind(&binding.path, hash)?,
             runtime: None,
+            runtime_binding_at_load: None,
             threads: HashMap::new(),
             active_reader: None,
             last_sequence: 0,
@@ -150,7 +152,10 @@ impl NativeClr {
         }
         // A 层核固定 Framework64 来源、原 LOAD 文件身份和配对 DAC；不借 unwind 租约放行。
         self.phase = "bind_runtime";
-        self.runtime = Some((base, ClrRuntimeBinding::from_load(file, base)?));
+        let runtime = ClrRuntimeBinding::from_load(file, base)?;
+        // 即使没有分类返回，也保留本代原 LOAD 身份；配对 DAC 不代表 reader 已加载它。
+        self.runtime_binding_at_load = Some(runtime.receipt());
+        self.runtime = Some((base, runtime));
         Ok(())
     }
 
@@ -320,6 +325,8 @@ impl NativeClr {
         serde_json::json!({"recorded_events":self.completed,"last_sequence":self.last_sequence,
             "operation":3,"scope":"post_start_classification_return_only",
             "phase":self.phase,"identity_failure":self.identity_failure,"reader_cleanup":self.reader_cleanup,
+            "runtime_binding_at_load":self.runtime_binding_at_load,
+            "runtime_still_held":self.runtime.is_some(),
             "active_reader":self.active_reader.as_ref().map(|reader| serde_json::json!({
                 "reaped":reader.is_reaped(),"binding":reader.binding()}))})
     }

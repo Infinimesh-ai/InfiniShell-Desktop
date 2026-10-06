@@ -127,6 +127,85 @@ fn exact_utf16_node_requires_case_units_and_single_terminator() {
 }
 
 #[test]
+fn path_comparison_distinguishes_unreadable_memory_from_observed_mismatch() {
+    let expected = [81_u16, 58, 92];
+    let mismatched = [113_u16, 58, 92, 0];
+    let process = unsafe { GetCurrentProcess() };
+    assert_eq!(
+        compare_node_path(process, 0, &expected),
+        PathComparison::Unreadable
+    );
+    assert_eq!(
+        compare_node_path(process, u64::MAX, &expected),
+        PathComparison::Unreadable
+    );
+    assert_eq!(
+        compare_node_path(process, mismatched.as_ptr() as u64, &expected),
+        PathComparison::Mismatched
+    );
+}
+
+#[test]
+fn path_comparison_requires_exact_units_and_reads_only_through_expected_terminator() {
+    let expected = [81_u16, 58, 92];
+    let terminated = [81_u16, 58, 92, 0, 1234];
+    let extended = [81_u16, 58, 92, 100, 0];
+    let shortened = [81_u16, 58, 0, 0];
+    let process = unsafe { GetCurrentProcess() };
+    assert_eq!(
+        compare_node_path(process, terminated.as_ptr() as u64, &expected),
+        PathComparison::Matched
+    );
+    assert_eq!(
+        compare_node_path(process, extended.as_ptr() as u64, &expected),
+        PathComparison::Mismatched
+    );
+    assert_eq!(
+        compare_node_path(process, shortened.as_ptr() as u64, &expected),
+        PathComparison::Mismatched
+    );
+}
+
+#[test]
+fn skipped_receipt_serialization_keeps_unknown_states_without_path_or_address() {
+    let receipt = SkippedEntryReceipt {
+        generation: [1; 16],
+        identity: ObjectIdentity {
+            process_id: 1,
+            thread_id: 2,
+            process_birth: 3,
+            thread_birth: 4,
+        },
+        sequence: 7,
+        node_create_sequence: None,
+        flags: 0x2000,
+        path_comparison: PathComparison::NotChecked,
+    };
+    let mut value = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(value["node_create_sequence"], serde_json::Value::Null);
+    assert_eq!(value["path_comparison"], "not_checked");
+    for field in [
+        "generation",
+        "identity",
+        "sequence",
+        "node_create_sequence",
+        "flags",
+        "path_comparison",
+    ] {
+        assert!(value.as_object_mut().unwrap().remove(field).is_some());
+    }
+    assert_eq!(value, serde_json::json!({}));
+    let unreadable = SkippedEntryReceipt {
+        node_create_sequence: Some(5),
+        path_comparison: PathComparison::Unreadable,
+        ..receipt
+    };
+    let value = serde_json::to_value(unreadable).unwrap();
+    assert_eq!(value["node_create_sequence"], 5);
+    assert_eq!(value["path_comparison"], "unreadable");
+}
+
+#[test]
 fn existing_dr_or_single_step_configuration_is_never_vacant() {
     let original = empty_registers();
     assert!(original.vacant(0));

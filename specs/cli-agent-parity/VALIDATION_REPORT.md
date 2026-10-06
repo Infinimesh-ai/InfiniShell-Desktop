@@ -1,5 +1,25 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-06：首个未选择调用的有界收据
+
+诊断器保存首个未选择调用的原 generation、进程/线程身份、sequence、当时已观察到的 Node CREATE sequence、flags 和路径比较四态；仅首个 flags=0x2000 的未选择入口允许额外做一次有界比较，不记录路径或地址，不改变 Node 后选择门槛、返回预算或成功条件。应用摘要另保留原 LOAD 时已核验的 CLR/配对 DAC 身份，即使 reader 未启动或运行时句柄已释放也能审计；这不代表 reader 已加载 DAC，也不补证 SMA。
+
+本机64项普通测试、command 特性测试目标 check、11项i18n和36项应用诊断测试通过。唯一native实际执行一次、1.192秒通过：首skip71明确 Node 未创建、flags=0x2000、path matched；Node73→entry148→return150，完整0x4550、同worker caller IL179、四异常与164事件继续、7线程恢复及root/后代/reader/Job回收均已核。测试exe和三份command来源执行前后摘要相同；13准备来源与HEAD逐字节相同，但工作树dirty，不称整个仓库冻结。独审SHA `6cee15a6e10cf8a57bb843cfe9a897819c705d0c3666d7821de69cda4a02c789`。首次nextest参数冲突发生于启动前，exit2原日志保留，没有第二次原生执行。
+
+四份源码全部修改后，`cargo check --locked -p warp` 通过（14条既有警告），综合本机门禁收据SHA `64c24961e05fd4b89dd5c8d260b33a4e1ffa25d7b116abafb17c4856767ef89c`。下一步在原runner先复核本提交固定能力，再用同提交采真实PS的新收据；原首因、真实分类返回/同停点CLR、正常五场景/三次冷恢复和最终同源门禁仍待完成。新增关闭0项，PR草稿。无需本地化变更：仅诊断和证据记录，无用户文案或布局变化。
+
+## 2026-10-06：原症状复现，未取得选中的分类返回
+
+同一冻结提交 `b12f59967cab7af22a6b606c6f7310257e656f44` 的[固定能力37395058332](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37395058332)在原runner通过60普通及唯一native；13准备来源逐字节相同，实际RF路径、完整0x4550、同worker caller IL179、原四异常及169事件继续和清理均已核。CLR/DAC与原失败身份一致，SMA不在本夹具范围。固定独审SHA `b66385a07627f61f9ec18e30d36650010120e3d18638caa512b1d0937ef1d821`。
+
+随后[真实PS37395641796](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37395641796)终态failure：1146应用普通（含i18n11）、91命令普通及111项诊断预检通过，无nextest失败/重试/FLAKY/LEAK。首updated实际返回ProbeFailed：Node在8183ms创建（seq181），PS在9200ms正常退出1且stdout0字节；Codex在12410ms创建、14032ms退出0，Node在14401ms退出0。无取消，414事件全部验证并继续。
+
+本代分类selected/returned均0、skipped为1，没有选中入口、返回或operation3；唯一skip未保存时序、flags和路径比较，不能判为preNode，也不能推断没有发生分类调用或UseShellExecute=true。RF写回成功，但观察未报告错误也不等于覆盖完整。原26异常没有重新逐项采集，原失败首因仍未知。
+
+67来源全部与b12原始blob逐字节一致。CMD/PS两代进程、Job、desktop、DeviceMap、station和LSA回收均有原收据；分类27个已退出线程依原句柄确认、dirty0，不称活线程读回恢复。PowerShell/Node清单身份与原失败相同；本代reader未启动，CLR/DAC/SMA实际加载身份未取得。失败后全套二次来源验证未执行，worker/supervisor等无二进制原件，不冒称离线重算。
+
+原生ZIP SHA `2bb06309e733faf8b09b66263058938992d2a99bae7f5d62281aeac21cc0ed32`（78成员CRC/SHA全核），终审SHA `ef7f790e963ef56e562ad26ebb58d2a9ea0da013770102457d5bd59eaa623539`。下一步补首个未选择调用的有界收据和复核观察范围，不用本轮清理通过关闭G09。正常五场景/三冷恢复、精准修复及最终同源双平台门禁仍待完成。无需本地化变更，新增关闭0项，PR保持草稿。
+
 ## 2026-10-06：启动前 RF 读回失败及固定能力修复
 
 [真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。

@@ -216,6 +216,25 @@ pub struct ReturnReceipt {
     pub post_start_clr_stack_required: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PathComparison {
+    NotChecked,
+    Matched,
+    Mismatched,
+    Unreadable,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SkippedEntryReceipt {
+    pub generation: [u8; 16],
+    pub identity: ObjectIdentity,
+    pub sequence: u64,
+    pub node_create_sequence: Option<u64>,
+    pub flags: u32,
+    pub path_comparison: PathComparison,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Summary {
     pub generation: [u8; 16],
@@ -223,6 +242,7 @@ pub struct Summary {
     pub selected_calls: u32,
     pub returned_calls: u32,
     pub skipped_entries: u64,
+    pub first_skipped_entry: Option<SkippedEntryReceipt>,
     pub dirty_threads: usize,
     pub restored_threads: u64,
     pub inactive_api_readbacks: u64,
@@ -641,6 +661,32 @@ fn exact_node(expected: &[u16], actual: &[u16]) -> bool {
         && actual.last() == Some(&0)
         && &actual[..expected.len()] == expected
 }
+fn compare_node_path(process: HANDLE, address: u64, expected: &[u16]) -> PathComparison {
+    let mut actual = Vec::new();
+    for (index, wanted) in expected
+        .iter()
+        .copied()
+        .chain(std::iter::once(0))
+        .enumerate()
+    {
+        let Some(at) = address.checked_add((index * 2) as u64) else {
+            return PathComparison::Unreadable;
+        };
+        let Ok(bytes) = memory(process, at, 2) else {
+            return PathComparison::Unreadable;
+        };
+        let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
+        if unit != wanted {
+            return PathComparison::Mismatched;
+        }
+        actual.push(unit);
+    }
+    if exact_node(expected, &actual) {
+        PathComparison::Matched
+    } else {
+        PathComparison::Mismatched
+    }
+}
 struct Thread {
     handle: OwnedHandle,
     identity: ObjectIdentity,
@@ -751,6 +797,7 @@ pub struct ShellClassificationWitness {
     selected: u32,
     returned: u32,
     skipped: u64,
+    first_skipped_entry: Option<SkippedEntryReceipt>,
     restored: u64,
     exited_dirty: u64,
     exited: bool,
@@ -815,6 +862,7 @@ impl ShellClassificationWitness {
             selected: 0,
             returned: 0,
             skipped: 0,
+            first_skipped_entry: None,
             restored: 0,
             exited_dirty: 0,
             exited: false,
@@ -975,29 +1023,6 @@ impl ShellClassificationWitness {
         self.last_sequence = sequence;
         Ok(())
     }
-    fn path_matches(&self, address: u64) -> bool {
-        let mut actual = Vec::new();
-        for (index, wanted) in self
-            .expected_node
-            .iter()
-            .copied()
-            .chain(std::iter::once(0))
-            .enumerate()
-        {
-            let Some(at) = address.checked_add((index * 2) as u64) else {
-                return false;
-            };
-            let Ok(bytes) = memory(raw(&self.process), at, 2) else {
-                return false;
-            };
-            let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
-            if unit != wanted {
-                return false;
-            }
-            actual.push(unit);
-        }
-        exact_node(&self.expected_node, &actual)
-    }
     pub fn observe(&mut self, event: &DEBUG_EVENT, sequence: u64) -> io::Result<Observation> {
         if event.dwProcessId != self.root_pid || event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT {
             return Ok(Observation::NotOwned);
@@ -1055,10 +1080,17 @@ impl ShellClassificationWitness {
                 .checked_add(0x28)
                 .ok_or_else(|| invalid("API 参数槽溢出"))?;
             let flags = dword(&memory(raw(&self.process), flags_address, 4)?, 0)?;
-            let selected = self.node.is_some_and(|node| sequence > node.0)
+            let eligible = self.node.is_some_and(|node| sequence > node.0)
                 && flags == 0x2000
-                && self.selected < MAX_CALLS
-                && self.path_matches(current.0.Rcx);
+                && self.selected < MAX_CALLS;
+            // 仅首个跳过入口可额外比较一次路径；启动前诊断不改变 postNode 选择门槛。
+            let path_comparison =
+                if eligible || (self.first_skipped_entry.is_none() && flags == 0x2000) {
+                    compare_node_path(raw(&self.process), current.0.Rcx, &self.expected_node)
+                } else {
+                    PathComparison::NotChecked
+                };
+            let selected = eligible && path_comparison == PathComparison::Matched;
             let thread = self.threads.get_mut(&event.dwThreadId).unwrap();
             require(thread.pending.is_none(), "分类调用意外重入")?;
             if !selected {
@@ -1070,6 +1102,15 @@ impl ShellClassificationWitness {
                 expected.status &= !OWN_STATUS;
                 thread.change(resumed, expected, change_resume_flag)?;
                 self.skipped += 1;
+                self.first_skipped_entry
+                    .get_or_insert_with(|| SkippedEntryReceipt {
+                        generation: self.generation,
+                        identity: thread.identity,
+                        sequence,
+                        node_create_sequence: self.node.map(|node| node.0),
+                        flags,
+                        path_comparison,
+                    });
                 return Ok(Observation::OwnedSkipped);
             }
             let returned_to = qword(&memory(raw(&self.process), current.0.Rsp, 8)?, 0)?;
@@ -1216,6 +1257,7 @@ impl ShellClassificationWitness {
             selected_calls: self.selected,
             returned_calls: self.returned,
             skipped_entries: self.skipped,
+            first_skipped_entry: self.first_skipped_entry.clone(),
             dirty_threads: self.threads.values().filter(|thread| thread.dirty).count(),
             restored_threads: self.restored,
             inactive_api_readbacks: self.completed_inactive_api_readbacks

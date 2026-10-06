@@ -2,6 +2,10 @@
 
 ## Windows 接续最新状态（2026-10-06）
 
+本提交已补首个未选择调用的有界收据（原身份、时序、Node状态、flags、路径比较四态），并保留原LOAD时已核CLR/配对DAC身份；选择门槛与成功条件不变。本机64普通、command特性check、i18n11和应用诊断36通过，唯一native实际执行一次通过并核源码/测试exe前后摘要，独审SHA `6cee15a6e10cf8a57bb843cfe9a897819c705d0c3666d7821de69cda4a02c789`。本机不同CLR版本不能代证原PS。下一步先原runner固定能力，再同提交真实PS；G09开放，新增关闭0项，无需本地化变更。
+
+最新 `b12f59967` 原runner固定能力37395058332已通过60普通及唯一native，独审SHA `b66385a07627f61f9ec18e30d36650010120e3d18638caa512b1d0937ef1d821`。同一提交的[真实PS37395641796](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37395641796)再次复现零输出退出1、Node/Codex随后退出0；67来源逐字节匹配、CMD/PS两代进程及station/LSA清理通过。selected/returned为0，skipped为1；唯一skip的时序、flags及路径比较未保存，不能称为preNode或推UseShellExecute=true。没有选中分类返回或同停点CLR，本代实际CLR/DAC/SMA身份也未取得。终审SHA `ef7f790e963ef56e562ad26ebb58d2a9ea0da013770102457d5bd59eaa623539`。下一步先补首skip有界证据、复核观察器，再继续真实取证；不重跑相同无信息候选，不改变成功条件。G09仍开放，正常五场景/三冷恢复与最终同源门禁仍待完成。以下为历史顺序及原失败记录。
+
 [真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。
 
 本机60普通及唯一原生夹具通过：preNode skipped71、NodeCREATE73→entry148→return150、完整0x4550、同worker caller IL179、原四异常及164事件继续和退出清理均已核；另有36应用诊断特性及21准备入口测试通过。这些绑定本轮明确dirty源码，不能标成7f6冻结执行，也不覆盖真实PS/LSA清理。下一步先在原runner复核固定能力，再恢复真实PS取证；G09仍开放，正常五场景/三冷恢复和最终同源双平台门禁仍待完成。无需本地化变更。

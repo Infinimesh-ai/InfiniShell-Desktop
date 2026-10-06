@@ -1,5 +1,9 @@
 # CLI 能力缺项与验收缺口
 
+本提交补首个未选择调用的有界时序/身份/flags/路径比较收据，保留原LOAD已核CLR/配对DAC来源；不改变实际选择或成功门槛。本机64普通、i18n11、应用诊断36与唯一native通过，源码和测试exe前后绑定已审计，SHA `6cee15a6e10cf8a57bb843cfe9a897819c705d0c3666d7821de69cda4a02c789`。原runner固定能力及同提交真实PS仍待执行，原首因未知；G09开放、新增关闭0项，无需本地化变更。
+
+最新 `b12f59967` 原runner固定能力37395058332已通过60普通及唯一native。随后[真实PS37395641796](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37395641796)再次零输出退出1，Node/Codex随后退出0；67来源逐字节匹配、CMD/PS两代进程及station/LSA清理均通过独审。分类selected/returned为0，仅一次未选择调用，缺其时序与排除理由，不能据此推UseShellExecute或首因。原件终审SHA `ef7f790e963ef56e562ad26ebb58d2a9ea0da013770102457d5bd59eaa623539`。下一步补首skip有界证据并复核观察范围；G09仍开放，新增关闭0项，正常五场景/三冷恢复及最终同源门禁未完成。以下失败与当时判断按原范围保留。
+
 [真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。
 
 本机60普通及唯一原生夹具通过：preNode skipped71、NodeCREATE73→entry148→return150、完整0x4550、同worker caller IL179、原四异常及164事件继续和退出清理均已核；另有36应用诊断特性及21准备入口测试通过。这些绑定本轮明确dirty源码，不能标成7f6冻结执行，也不覆盖真实PS/LSA清理。下一步先在原runner复核固定能力，再恢复真实PS取证；G09仍开放，正常五场景/三冷恢复和最终同源双平台门禁仍待完成。无需本地化变更。
