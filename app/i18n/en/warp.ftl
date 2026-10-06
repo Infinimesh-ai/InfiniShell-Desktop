@@ -6144,3 +6144,20 @@ cli-agent-reviewed-command-background = The CLI reported background execution de
 cli-agent-input-remote-image-unconfirmed = Image delivery is unconfirmed; the CLI may already have received this input. Your draft and attachments are kept. Check the CLI before continuing; this input will not be resent automatically.
 
 cli-agent-input-remote-claude-image-hint = Send this input to the remote Claude session to read the original images. Approve Read in the terminal if requested; queued text alone does not confirm image delivery.
+
+# Plan 保存提示与云同步错误：操作指导在应用层按界面语言渲染。
+ai-plan-saved-locally-tooltip = The plan was automatically saved locally.
+cloud-sync-error-encrypt = Could not encrypt sync data: { $error }
+cloud-sync-error-decrypt = Could not decrypt sync data: { $error }
+cloud-sync-error-provider = Could not access local sync data: { $error }
+cloud-sync-error-serialization = Could not read or write the sync data format: { $error }
+cloud-sync-error-version-store = Could not access the local sync version: { $error }
+cloud-sync-gist-error-request = The sync request failed. Check your network connection and try again. { $error }
+cloud-sync-gist-error-not-found = Cloud sync data was not found. Upload your configuration before downloading it.
+cloud-sync-gist-error-no-token = A sync token is not configured. Add a token in Settings → Cloud Sync and try again.
+cloud-sync-gist-error-api = The sync service returned HTTP { $status }: { $body }
+cloud-sync-gist-error-missing-login = The service response did not identify an account, so the token could not be verified. Check the token and your network or proxy settings, then try again.
+cloud-sync-error-read-secret = Could not read credentials for { $node } ({ $kind }): { $error }. The credential store may be locked or unavailable in this environment. Unlock it or enable secret-service / Credential Manager, then retry the upload. If this server does not need password sync, clear that field in the SSH manager.
+cloud-sync-error-read-previous-secret = Could not read the previous credentials for { $node } ({ $kind }): { $error }. Credential changes rolled back: { $count }. Confirm that the credential store is available, then retry the download.
+cloud-sync-error-write-secret = Could not write credentials for { $node } ({ $kind }): { $error }. Check the credential store permissions, then retry the download.
+cloud-sync-error-write-database = Could not save the downloaded configuration: { $error }. Credential changes rolled back: { $count }.

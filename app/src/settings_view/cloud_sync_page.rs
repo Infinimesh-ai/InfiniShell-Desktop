@@ -3,9 +3,14 @@
 // author: logic
 // date: 2026-05-25
 
-use infinishell_sync::{GistClient, SyncEngine, SyncPlatform, SyncResult};
+use std::sync::Arc;
+
+use infinishell_sync::{
+    CryptoError, GistClient, GistClientError, SyncEngine, SyncEngineError, SyncPlatform, SyncResult,
+};
 use pathfinder_geometry::vector::vec2f;
 use settings::Setting;
+use warp_ssh_manager::sync_provider::SshSyncProviderError;
 use warp_ssh_manager::{DbVersionStore, SshSyncProvider, SyncMetaRepository, with_conn};
 use warpui::elements::{
     ChildAnchor, Container, CrossAxisAlignment, Dismiss, Element, Flex, MainAxisSize,
@@ -33,6 +38,90 @@ use crate::view_components::dropdown::{Dropdown, DropdownItem};
 const INPUT_AREA_MAX_WIDTH: f32 = 420.0;
 const BUTTON_PADDING: f32 = 6.0;
 const DIALOG_WIDTH: f32 = 450.0;
+
+/// 在界面边界翻译错误及操作指导，底层错误保留类型和稳定诊断来源。
+fn localize_sync_error(error: &SyncEngineError) -> String {
+    match error {
+        SyncEngineError::Crypto(CryptoError::Encrypt(detail)) => {
+            crate::t!("cloud-sync-error-encrypt", error = detail.as_str())
+        }
+        SyncEngineError::Crypto(CryptoError::Decrypt(detail)) => {
+            crate::t!("cloud-sync-error-decrypt", error = detail.as_str())
+        }
+        SyncEngineError::Gist(error) => localize_gist_error(error),
+        SyncEngineError::Provider(error) => match error.downcast_ref::<SshSyncProviderError>() {
+            Some(error) => localize_ssh_sync_error(error),
+            None => crate::t!("cloud-sync-error-provider", error = error.to_string()),
+        },
+        SyncEngineError::Serialization(detail) => {
+            crate::t!("cloud-sync-error-serialization", error = detail.as_str())
+        }
+        SyncEngineError::VersionStore(detail) => {
+            crate::t!("cloud-sync-error-version-store", error = detail.as_str())
+        }
+    }
+}
+
+fn localize_gist_error(error: &GistClientError) -> String {
+    match error {
+        GistClientError::Request(error) => {
+            crate::t!("cloud-sync-gist-error-request", error = error.to_string())
+        }
+        GistClientError::NotFound => crate::t!("cloud-sync-gist-error-not-found"),
+        GistClientError::NoToken => crate::t!("cloud-sync-gist-error-no-token"),
+        GistClientError::Api { status, body } => crate::t!(
+            "cloud-sync-gist-error-api",
+            status = u32::from(*status),
+            body = body.as_str()
+        ),
+        GistClientError::MissingLogin => crate::t!("cloud-sync-gist-error-missing-login"),
+    }
+}
+
+fn localize_ssh_sync_error(error: &SshSyncProviderError) -> String {
+    match error {
+        SshSyncProviderError::ReadSecret {
+            node_id,
+            kind,
+            source,
+        } => crate::t!(
+            "cloud-sync-error-read-secret",
+            node = node_id.as_str(),
+            kind = format!("{kind:?}"),
+            error = source.to_string()
+        ),
+        SshSyncProviderError::ReadPreviousSecret {
+            node_id,
+            kind,
+            rolled_back,
+            source,
+        } => crate::t!(
+            "cloud-sync-error-read-previous-secret",
+            node = node_id.as_str(),
+            kind = format!("{kind:?}"),
+            count = (*rolled_back),
+            error = source.to_string()
+        ),
+        SshSyncProviderError::WriteSecret {
+            node_id,
+            kind,
+            source,
+        } => crate::t!(
+            "cloud-sync-error-write-secret",
+            node = node_id.as_str(),
+            kind = format!("{kind:?}"),
+            error = source.to_string()
+        ),
+        SshSyncProviderError::WriteDatabase {
+            rolled_back,
+            source,
+        } => crate::t!(
+            "cloud-sync-error-write-database",
+            count = (*rolled_back),
+            error = source.to_string()
+        ),
+    }
+}
 
 /// 同步方向
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,7 +174,7 @@ pub enum CloudSyncPageAction {
     TokenValidated {
         platform_setting: SyncPlatformSetting,
         token: String,
-        result: Result<String, String>,
+        result: Result<String, Arc<GistClientError>>,
     },
     /// 请求上传同步（弹出确认弹窗,避免误覆盖云端历史）
     Upload,
@@ -95,7 +184,7 @@ pub enum CloudSyncPageAction {
     SyncComplete {
         platform: SyncPlatform,
         direction: SyncDirection,
-        result: Result<SyncResult, String>,
+        result: Result<SyncResult, Arc<SyncEngineError>>,
     },
     /// 强制上传（覆盖远程）
     ForceUpload { platform: SyncPlatform },
@@ -343,7 +432,7 @@ impl CloudSyncPageView {
                             engine
                                 .download(sync_platform, &spawn_token, &[&provider], &version_store)
                                 .await
-                                .map_err(|e| e.to_string())
+                                .map_err(Arc::new)
                         },
                         move |view, result, ctx| {
                             match &result {
@@ -382,7 +471,9 @@ impl CloudSyncPageView {
                                 }
                                 Err(e) => {
                                     // 非冲突结局：恢复 Failed 并清理 conflict_token
-                                    view.sync_state = SyncState::Failed { message: e.clone() };
+                                    view.sync_state = SyncState::Failed {
+                                        message: localize_sync_error(e),
+                                    };
                                     view.conflict_token.clear();
                                     log::warn!("Auto sync download failed: {e}");
                                     ctx.notify();
@@ -658,7 +749,7 @@ impl CloudSyncPageView {
                 engine
                     .upload(platform, &spawn_token, &[&provider], &version_store)
                     .await
-                    .map_err(|e| e.to_string())
+                    .map_err(Arc::new)
             },
             move |view, result, ctx| {
                 view.handle_action(
@@ -707,7 +798,7 @@ impl CloudSyncPageView {
                 engine
                     .download(platform, &token, &[&provider], &version_store)
                     .await
-                    .map_err(|e| e.to_string())
+                    .map_err(Arc::new)
             },
             move |view, result, ctx| {
                 view.handle_action(
@@ -755,7 +846,7 @@ impl CloudSyncPageView {
                 engine
                     .force_upload(platform, &token, &[&provider], &version_store)
                     .await
-                    .map_err(|e| e.to_string())
+                    .map_err(Arc::new)
             },
             move |view, result, ctx| {
                 view.handle_action(
@@ -825,7 +916,7 @@ impl CloudSyncPageView {
                 engine
                     .upload(platform, &spawn_token, &[&provider], &version_store)
                     .await
-                    .map_err(|e| e.to_string())
+                    .map_err(Arc::new)
             },
             move |view, result, ctx| {
                 // 上传完成后设置最终状态（成功/冲突/失败由 SyncComplete 统一处理）
@@ -880,7 +971,7 @@ impl TypedActionView for CloudSyncPageView {
                         client
                             .validate_token(platform, &token)
                             .await
-                            .map_err(|e| e.to_string())
+                            .map_err(Arc::new)
                     },
                     move |view, result, ctx| {
                         view.handle_action(
@@ -924,7 +1015,9 @@ impl TypedActionView for CloudSyncPageView {
                     Err(e) => {
                         if *platform_setting == current_platform {
                             self.has_valid_token = false;
-                            self.sync_state = SyncState::Failed { message: e.clone() };
+                            self.sync_state = SyncState::Failed {
+                                message: localize_gist_error(e),
+                            };
                         }
                     }
                 }
@@ -1046,7 +1139,9 @@ impl TypedActionView for CloudSyncPageView {
                         self.conflict_token.clear();
                     }
                     Err(e) => {
-                        self.sync_state = SyncState::Failed { message: e.clone() };
+                        self.sync_state = SyncState::Failed {
+                            message: localize_sync_error(e),
+                        };
                         self.conflict_token.clear();
                     }
                 }
@@ -1514,3 +1609,7 @@ impl SettingsWidget for CloudSyncPageWidget {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cloud_sync_page_tests.rs"]
+mod tests;

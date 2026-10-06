@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use ai::skills::{SkillPathOrigin, SkillProvider, SkillReference, SkillScope};
-use genai::chat::ToolCall;
+use ai::skills::{ParsedSkill, SkillPathOrigin, SkillProvider, SkillReference, SkillScope};
+use genai::chat::{ChatRole, ToolCall};
 use serde_json::json;
 use warp_multi_agent_api as api;
 use warp_util::host_id::HostId;
@@ -9,12 +11,17 @@ use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 
-use super::{make_tool_call_message, parse_incoming_tool_call, serialize_outgoing_tool_call};
+use super::{
+    AgentProviderApiType, RequestParams, build_chat_request, make_tool_call_message,
+    parse_incoming_tool_call, serialize_outgoing_tool_call,
+};
 use crate::ai::agent::api::{
     ConversionParams, ConvertAPIMessageToClientOutputMessage, MaybeAIAgentOutputMessage,
 };
 use crate::ai::agent::task::TaskId;
-use crate::ai::agent::{AIAgentActionType, AIAgentOutputMessageType};
+use crate::ai::agent::{
+    AIAgentActionType, AIAgentInput, AIAgentOutputMessageType, InvokeSkillUserQuery,
+};
 use crate::ai::agent_providers::tools::skill::SkillResolutionError;
 use crate::ai::skills::SkillDescriptor;
 
@@ -344,4 +351,53 @@ fn incomplete_skill_arguments_cannot_become_executable_tool() {
     let tool = parse_incoming_tool_call(&call, None, &skills, &origin).unwrap();
 
     assert_eq!(action_reference(tool, &origin), reference);
+}
+
+#[test]
+fn skill_request_preserves_user_language_and_exact_skill_content() {
+    let content = "# Task\nPreserve the user's requested changes.";
+    for query in ["Review the authentication change.", "检查认证改动。"] {
+        let params = RequestParams::new_for_test(
+            vec![AIAgentInput::InvokeSkill {
+                context: Arc::from([]),
+                skill: ParsedSkill {
+                    path: LocalOrRemotePath::Local(PathBuf::from(LOCAL_SKILL_PATH)),
+                    name: "localmind".to_string(),
+                    description: "Review code".to_string(),
+                    content: content.to_string(),
+                    line_range: None,
+                    provider: SkillProvider::Agents,
+                    scope: SkillScope::Home,
+                },
+                user_query: Some(InvokeSkillUserQuery {
+                    query: query.to_string(),
+                    referenced_attachments: HashMap::new(),
+                }),
+            }],
+            vec![api::Task {
+                id: "task-1".to_string(),
+                ..Default::default()
+            }],
+        );
+        let (request, _) = build_chat_request(
+            &params,
+            true,
+            false,
+            false,
+            AgentProviderApiType::OpenAi,
+            Default::default(),
+        )
+        .unwrap();
+        let text = request
+            .messages
+            .iter()
+            .filter(|message| message.role == ChatRole::User)
+            .map(|message| message.content.texts().join(""))
+            .find(|text| text.contains("localmind"))
+            .expect("请求必须包含技能指令");
+        assert!(text.starts_with("Perform the task"));
+        assert!(text.contains(content));
+        assert!(text.ends_with(query));
+        assert!(!text.contains("请按下面的技能"));
+    }
 }

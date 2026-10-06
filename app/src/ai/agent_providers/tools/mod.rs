@@ -260,3 +260,7 @@ pub fn action_result_to_msg_result(
 #[cfg(test)]
 #[path = "launch_failure_tests.rs"]
 mod launch_failure_tests;
+
+#[cfg(test)]
+#[path = "language_tests.rs"]
+mod language_tests;

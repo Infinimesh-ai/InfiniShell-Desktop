@@ -48,7 +48,7 @@ fn parameters() -> Value {
         "properties": {
             "name": {
                 "type": "string",
-                "description": "Skill 名称(与 system prompt 内 <available_skills><skill><name> 字段完全一致),同名时传清单中的完整 skill_path。"
+                "description": "The skill name (exactly as it appears in the <available_skills><skill><name> field of the system prompt). For duplicate names, pass the full skill_path from the list."
             }
         },
         "required": ["name"],

@@ -85,20 +85,20 @@ fn parameters() -> Value {
                 "items": { "type": "string" },
                 "minItems": 1,
                 "maxItems": MAX_NODE_IDS,
-                "description": "要执行命令的主机 node_id 列表(取自 <project_context> 的主机清单)。"
+                "description": "The target host node_ids from the host list in <project_context>."
             },
             "command": {
                 "type": "string",
-                "description": "要在每台主机上执行的 shell 命令(完整命令行)。避免 pager / 交互式命令。"
+                "description": "The complete shell command to run on each host. Avoid pagers and interactive commands."
             },
             "canary": {
                 "type": "boolean",
-                "description": "金丝雀模式:先在第一台主机执行,失败(非零退出码或错误)则中止其余主机。默认 true。",
+                "description": "Canary mode: run on the first host, then stop before the remaining hosts if it fails (a nonzero exit code or an error). Defaults to true.",
                 "default": true
             },
             "timeout_seconds": {
                 "type": "integer",
-                "description": "单台主机的命令超时秒数,超时返回当前输出快照。默认 120,上限 600。",
+                "description": "The command timeout in seconds for each host. A timeout returns the current output snapshot. Defaults to 120; maximum 600.",
                 "default": DEFAULT_TIMEOUT_SECONDS,
                 "maximum": MAX_TIMEOUT_SECONDS
             }
