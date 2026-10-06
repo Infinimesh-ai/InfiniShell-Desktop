@@ -1,4 +1,4 @@
-//! 原 PowerShell 工作线程的一次 Shell32 分类返回观察，不参与映像授权或候选成功判定。
+//! 原 PowerShell 工作线程启动前后各一次 Shell32 分类返回观察，不参与映像授权或候选成功判定。
 //!
 //! 调用方独占调试事件，持续持有原 Job 和映像租约。本模块不等待或继续事件，不按
 //! PID/TID 重开对象，不写代码。每次返回先恢复所有自有 DR，再交调用方读取 CLR 栈。
@@ -24,7 +24,8 @@ use windows::Win32::Storage::FileSystem::{
 use windows::Win32::System::Diagnostics::Debug::{
     CONTEXT, CONTEXT_CONTROL_AMD64, CONTEXT_DEBUG_REGISTERS_AMD64, CONTEXT_INTEGER_AMD64,
     CREATE_PROCESS_DEBUG_EVENT, CREATE_THREAD_DEBUG_EVENT, DEBUG_EVENT, EXCEPTION_DEBUG_EVENT,
-    EXIT_THREAD_DEBUG_EVENT, LOAD_DLL_DEBUG_EVENT, UNLOAD_DLL_DEBUG_EVENT,
+    EXIT_THREAD_DEBUG_EVENT, LOAD_DLL_DEBUG_EVENT, OUTPUT_DEBUG_STRING_EVENT,
+    UNLOAD_DLL_DEBUG_EVENT,
 };
 use windows::Win32::System::Memory::{
     MEM_COMMIT, MEM_IMAGE, MEM_PRIVATE, MEMORY_BASIC_INFORMATION, PAGE_EXECUTE, PAGE_EXECUTE_READ,
@@ -216,6 +217,40 @@ pub struct ReturnReceipt {
     pub post_start_clr_stack_required: bool,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct PreNodeReturnReceipt {
+    pub generation: [u8; 16],
+    pub identity: ObjectIdentity,
+    pub pair_nonce: [u8; 16],
+    pub entry_sequence: u64,
+    pub return_sequence: u64,
+    pub expected_node_matched: bool,
+    pub flags: u32,
+    pub raw_return_u64: u64,
+    pub raw_return_low32: u32,
+    pub return_region_kind: &'static str,
+    pub registers_restored: bool,
+    pub execution_context_unchanged: bool,
+    pub pre_node_clr_stack_required: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct PostNodeDrSample {
+    pub generation: [u8; 16],
+    pub identity: ObjectIdentity,
+    pub sequence: u64,
+    pub node_create_sequence: u64,
+    pub event_code: u32,
+    pub scope: &'static str,
+    pub dirty: bool,
+    pub addresses_equal: Option<bool>,
+    pub configuration_equal: Option<bool>,
+    pub dr6_expected: Option<u64>,
+    pub dr6_actual: u64,
+    pub dr7_expected: Option<u64>,
+    pub dr7_actual: u64,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PathComparison {
@@ -241,6 +276,10 @@ pub struct Summary {
     pub root_process_id: u32,
     pub selected_calls: u32,
     pub returned_calls: u32,
+    pub pre_node_selected_calls: u32,
+    pub pre_node_returned_calls: u32,
+    pub post_node_root_stop_attempted: bool,
+    pub post_node_root_stop: Option<PostNodeDrSample>,
     pub skipped_entries: u64,
     pub first_skipped_entry: Option<SkippedEntryReceipt>,
     pub dirty_threads: usize,
@@ -260,6 +299,8 @@ pub struct Summary {
 pub enum Observation {
     NotOwned,
     OwnedSkipped,
+    OwnedPreNodeEntry,
+    OwnedPreNodeReturn(PreNodeReturnReceipt),
     OwnedEntry,
     OwnedReturn(ReturnReceipt),
 }
@@ -639,12 +680,86 @@ impl Image {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CallPhase {
+    PreNode,
+    PostNode { node_create_sequence: u64 },
+}
+fn select_phase(
+    node: Option<(u64, u32, u64)>,
+    sequence: u64,
+    flags: u32,
+    pre_selected: u32,
+    post_selected: u32,
+) -> Option<CallPhase> {
+    if flags != 0x2000 || sequence == 0 {
+        return None;
+    }
+    match node {
+        None => (pre_selected < MAX_CALLS).then_some(CallPhase::PreNode),
+        Some((created, _, _)) => (created != 0 && created < sequence && post_selected < MAX_CALLS)
+            .then_some(CallPhase::PostNode {
+                node_create_sequence: created,
+            }),
+    }
+}
 struct Pending {
     stack: u64,
     returned_to: u64,
     region: ReturnRegion,
     sequence: u64,
     nonce: [u8; 16],
+    phase: CallPhase,
+}
+fn return_phase_matches(pending: &Pending, node: Option<(u64, u32, u64)>, sequence: u64) -> bool {
+    pending.sequence < sequence
+        && match (pending.phase, node) {
+            (CallPhase::PreNode, None) => true,
+            (
+                CallPhase::PostNode {
+                    node_create_sequence,
+                },
+                Some((created, _, _)),
+            ) => created == node_create_sequence && created != 0 && created < pending.sequence,
+            (CallPhase::PreNode, Some(_)) | (CallPhase::PostNode { .. }, None) => false,
+        }
+}
+struct PreNodeResume {
+    sequence: u64,
+    identity: ObjectIdentity,
+    context: CONTEXT,
+}
+fn resume_event_matches(event: &DEBUG_EVENT, sequence: u64, ticket: &PreNodeResume) -> bool {
+    if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT
+        || event.dwProcessId != ticket.identity.process_id
+        || event.dwThreadId != ticket.identity.thread_id
+        || sequence != ticket.sequence
+    {
+        return false;
+    }
+    let exception = unsafe { event.u.Exception };
+    exception.dwFirstChance == 1
+        && exception.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP
+        && exception.ExceptionRecord.ExceptionAddress as u64 == ticket.context.Rip
+}
+fn live_root_sample_event(event: &DEBUG_EVENT, root_pid: u32) -> bool {
+    event.dwProcessId == root_pid
+        && event.dwThreadId != 0
+        && matches!(
+            event.dwDebugEventCode,
+            EXCEPTION_DEBUG_EVENT
+                | CREATE_THREAD_DEBUG_EVENT
+                | LOAD_DLL_DEBUG_EVENT
+                | UNLOAD_DLL_DEBUG_EVENT
+                | OUTPUT_DEBUG_STRING_EVENT
+        )
+}
+fn confirm_live(handle: HANDLE) -> io::Result<()> {
+    let status = unsafe { WaitForSingleObject(handle, 0) };
+    if status == WAIT_FAILED {
+        return Err(io::Error::last_os_error());
+    }
+    require(status == WAIT_TIMEOUT, "采样原对象已退出或等待状态无效")
 }
 fn matching_return(pending: &Pending, value: &CONTEXT) -> bool {
     value.Rip == pending.returned_to && pending.stack.checked_add(8) == Some(value.Rsp)
@@ -796,6 +911,11 @@ pub struct ShellClassificationWitness {
     last_sequence: u64,
     selected: u32,
     returned: u32,
+    pre_selected: u32,
+    pre_returned: u32,
+    pre_resume: Option<PreNodeResume>,
+    post_node_sample_attempted: bool,
+    post_node_root_stop: Option<PostNodeDrSample>,
     skipped: u64,
     first_skipped_entry: Option<SkippedEntryReceipt>,
     restored: u64,
@@ -861,6 +981,11 @@ impl ShellClassificationWitness {
             last_sequence: 0,
             selected: 0,
             returned: 0,
+            pre_selected: 0,
+            pre_returned: 0,
+            pre_resume: None,
+            post_node_sample_attempted: false,
+            post_node_root_stop: None,
             skipped: 0,
             first_skipped_entry: None,
             restored: 0,
@@ -926,6 +1051,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn retain_thread(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.pre_resume = None;
         self.stopped(event)?;
         require(
             event.dwDebugEventCode == CREATE_THREAD_DEBUG_EVENT,
@@ -939,6 +1065,7 @@ impl ShellClassificationWitness {
         file: &File,
         expected_sha256: [u8; 32],
     ) -> io::Result<()> {
+        self.pre_resume = None;
         self.stopped(event)?;
         require(
             event.dwDebugEventCode == LOAD_DLL_DEBUG_EVENT && self.image.is_none() && !self.stopped,
@@ -950,6 +1077,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn arm_all(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.pre_resume = None;
         self.stopped(event)?;
         if self.stopped || self.selected >= MAX_CALLS {
             return Ok(());
@@ -974,11 +1102,113 @@ impl ShellClassificationWitness {
         }
         Ok(())
     }
+    /// 调用方须先确认同停点 CLR reader 已退出且 Job 清空；本模块不负责继续事件。
+    pub fn resume_after_pre_node_return(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<()> {
+        // 先消耗一次性票据；任一核验失败都不能通过重试清除停止状态。
+        let ticket = self
+            .pre_resume
+            .take()
+            .ok_or_else(|| invalid("没有可恢复的启动前返回停点"))?;
+        self.stopped(event)?;
+        require(
+            self.stopped
+                && self.node.is_none()
+                && self.pre_selected == 1
+                && self.pre_returned == 1
+                && self.selected == 0
+                && self.returned == 0
+                && self.last_sequence == sequence
+                && !self.requires_restoration()
+                && resume_event_matches(event, sequence, &ticket),
+            "启动前返回恢复事件或阶段不符",
+        )?;
+        confirm_live(raw(&self.process))?;
+        let thread = self
+            .threads
+            .get(&event.dwThreadId)
+            .ok_or_else(|| invalid("启动前返回原线程缺失"))?;
+        thread.verify(raw(&self.process))?;
+        confirm_live(raw(&thread.handle))?;
+        let current = context(raw(&thread.handle))?;
+        require(
+            thread.identity == ticket.identity
+                && execution_equal(&ticket.context, &current.0)
+                && Registers::read(&ticket.context) == Registers::read(&current.0),
+            "启动前返回恢复上下文改变",
+        )?;
+        require(self.image.is_some(), "启动前返回 Shell32 租约缺失")?;
+        self.stopped = false;
+        let result = self.arm_all(event);
+        if result.is_err() {
+            self.stopped = true;
+        }
+        result
+    }
+    /// 仅覆盖此调试停点的原 root 事件线程，不代表其他线程或后续期间的 DR 状态。
+    pub fn sample_post_node_root_stop(
+        &mut self,
+        event: &DEBUG_EVENT,
+        sequence: u64,
+    ) -> io::Result<bool> {
+        self.pre_resume = None;
+        require(
+            live_root_sample_event(event, self.root_pid),
+            "DR 采样必须使用原 root 活线程停点",
+        )?;
+        let Some((node_sequence, _, _)) = self.node else {
+            return Ok(false);
+        };
+        if self.post_node_sample_attempted {
+            return Ok(false);
+        }
+        require(
+            node_sequence < sequence && sequence >= self.last_sequence,
+            "DR 采样必须晚于绑定 Node CREATE",
+        )?;
+        self.post_node_sample_attempted = true;
+        self.stopped(event)?;
+        confirm_live(raw(&self.process))?;
+        let thread = self
+            .threads
+            .get(&event.dwThreadId)
+            .ok_or_else(|| invalid("DR 采样原线程尚未绑定"))?;
+        thread.verify(raw(&self.process))?;
+        confirm_live(raw(&thread.handle))?;
+        let current = context(raw(&thread.handle))?;
+        let actual = Registers::read(&current.0);
+        self.post_node_root_stop = Some(PostNodeDrSample {
+            generation: self.generation,
+            identity: thread.identity,
+            sequence,
+            node_create_sequence: node_sequence,
+            event_code: event.dwDebugEventCode.0,
+            scope: "original_root_event_thread_at_this_stop_only",
+            dirty: thread.dirty,
+            addresses_equal: thread
+                .expected
+                .map(|expected| expected.address == actual.address),
+            configuration_equal: thread.expected.map(|expected| {
+                actual.same_configuration(expected)
+                    || actual.same_configuration(expected.inactive_api_view())
+            }),
+            dr6_expected: thread.expected.map(|expected| expected.status),
+            dr6_actual: actual.status,
+            dr7_expected: thread.expected.map(|expected| expected.control),
+            dr7_actual: actual.control,
+        });
+        // 不推进观察序号，同一原事件还要交 observe 配对。
+        Ok(true)
+    }
     pub fn bound_base(&self) -> Option<u64> {
         self.image.as_ref().map(|image| image.base)
     }
     /// 必须在原 UNLOAD 停点撤销后停止，不能对同基址的新映像自动重新安装。
     pub fn unload(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.pre_resume = None;
         self.stopped(event)?;
         require(
             event.dwDebugEventCode == UNLOAD_DLL_DEBUG_EVENT
@@ -991,6 +1221,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn finish_observation(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.pre_resume = None;
         self.stopped(event)?;
         self.stopped = true;
         self.withdraw_all(event)
@@ -1002,6 +1233,7 @@ impl ShellClassificationWitness {
         sequence: u64,
         node_birth: u64,
     ) -> io::Result<()> {
+        self.pre_resume = None;
         require(
             !self.exited
                 && unsafe { GetCurrentThreadId() } == self.debugger_tid
@@ -1024,7 +1256,23 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn observe(&mut self, event: &DEBUG_EVENT, sequence: u64) -> io::Result<Observation> {
+        self.pre_resume = None;
+        let result = self.observe_event(event, sequence);
+        if result.is_err() {
+            self.stopped = true;
+            self.pre_resume = None;
+        }
+        result
+    }
+    fn observe_event(&mut self, event: &DEBUG_EVENT, sequence: u64) -> io::Result<Observation> {
         if event.dwProcessId != self.root_pid || event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT {
+            return Ok(Observation::NotOwned);
+        }
+        require(
+            !self.stopped || !self.requires_restoration(),
+            "已停止分类观察仍有未恢复配置",
+        )?;
+        if self.stopped {
             return Ok(Observation::NotOwned);
         }
         self.stopped(event)?;
@@ -1080,20 +1328,18 @@ impl ShellClassificationWitness {
                 .checked_add(0x28)
                 .ok_or_else(|| invalid("API 参数槽溢出"))?;
             let flags = dword(&memory(raw(&self.process), flags_address, 4)?, 0)?;
-            let eligible = self.node.is_some_and(|node| sequence > node.0)
-                && flags == 0x2000
-                && self.selected < MAX_CALLS;
-            // 仅首个跳过入口可额外比较一次路径；启动前诊断不改变 postNode 选择门槛。
+            let phase = select_phase(self.node, sequence, flags, self.pre_selected, self.selected);
+            // 启动前独立预算不消费 postNode 预算；首个跳过入口仍只额外比较一次路径。
             let path_comparison =
-                if eligible || (self.first_skipped_entry.is_none() && flags == 0x2000) {
+                if phase.is_some() || (self.first_skipped_entry.is_none() && flags == 0x2000) {
                     compare_node_path(raw(&self.process), current.0.Rcx, &self.expected_node)
                 } else {
                     PathComparison::NotChecked
                 };
-            let selected = eligible && path_comparison == PathComparison::Matched;
+            let phase = phase.filter(|_| path_comparison == PathComparison::Matched);
             let thread = self.threads.get_mut(&event.dwThreadId).unwrap();
             require(thread.pending.is_none(), "分类调用意外重入")?;
-            if !selected {
+            let Some(phase) = phase else {
                 let mut resumed = current;
                 let change_resume_flag = resumed.0.EFlags & RF == 0;
                 thread.resume_flag = Some((resumed.0.Rip, resumed.0.EFlags & RF != 0));
@@ -1112,7 +1358,7 @@ impl ShellClassificationWitness {
                         path_comparison,
                     });
                 return Ok(Observation::OwnedSkipped);
-            }
+            };
             let returned_to = qword(&memory(raw(&self.process), current.0.Rsp, 8)?, 0)?;
             let region = return_region(raw(&self.process), returned_to)?;
             let pending = Pending {
@@ -1121,12 +1367,19 @@ impl ShellClassificationWitness {
                 region,
                 sequence,
                 nonce: nonce(self.generation, sequence),
+                phase,
             };
             let original = thread.original.ok_or_else(|| invalid("原 DR 配置缺失"))?;
             thread.pending = Some(pending);
-            self.selected += 1;
+            match phase {
+                CallPhase::PreNode => self.pre_selected += 1,
+                CallPhase::PostNode { .. } => self.selected += 1,
+            }
             thread.change(current, original.armed(returned_to, true), false)?;
-            return Ok(Observation::OwnedEntry);
+            return Ok(match phase {
+                CallPhase::PreNode => Observation::OwnedPreNodeEntry,
+                CallPhase::PostNode { .. } => Observation::OwnedEntry,
+            });
         }
         require(slot == 3, "意外的自有调试槽")?;
         let thread = self.threads.get(&event.dwThreadId).unwrap();
@@ -1139,28 +1392,54 @@ impl ShellClassificationWitness {
                 && return_region(raw(&self.process), pending.returned_to)? == pending.region,
             "分类返回栈或代码映射改变",
         )?;
-        let node = self.node.ok_or_else(|| invalid("Node 绑定缺失"))?;
-        let receipt = ReturnReceipt {
-            generation: self.generation,
-            identity: thread.identity,
-            pair_nonce: pending.nonce,
-            entry_sequence: pending.sequence,
-            return_sequence: sequence,
-            node_create_sequence: node.0,
-            node_process_id: node.1,
-            node_process_birth: node.2,
-            expected_node_matched: true,
-            flags: 0x2000,
-            raw_return_u64: current.0.Rax,
-            raw_return_low32: current.0.Rax as u32,
-            return_region_kind: if pending.region.kind == MEM_PRIVATE.0 {
-                "private"
-            } else {
-                "image"
-            },
-            registers_restored: true,
-            execution_context_unchanged: true,
-            post_start_clr_stack_required: true,
+        require(
+            return_phase_matches(pending, self.node, sequence),
+            "分类调用跨越 Node 创建或返回阶段不符",
+        )?;
+        let identity = thread.identity;
+        let return_region_kind = if pending.region.kind == MEM_PRIVATE.0 {
+            "private"
+        } else {
+            "image"
+        };
+        let phase = pending.phase;
+        let observation = match phase {
+            CallPhase::PreNode => Observation::OwnedPreNodeReturn(PreNodeReturnReceipt {
+                generation: self.generation,
+                identity,
+                pair_nonce: pending.nonce,
+                entry_sequence: pending.sequence,
+                return_sequence: sequence,
+                expected_node_matched: true,
+                flags: 0x2000,
+                raw_return_u64: current.0.Rax,
+                raw_return_low32: current.0.Rax as u32,
+                return_region_kind,
+                registers_restored: true,
+                execution_context_unchanged: true,
+                pre_node_clr_stack_required: true,
+            }),
+            CallPhase::PostNode { .. } => {
+                let node = self.node.ok_or_else(|| invalid("Node 绑定缺失"))?;
+                Observation::OwnedReturn(ReturnReceipt {
+                    generation: self.generation,
+                    identity,
+                    pair_nonce: pending.nonce,
+                    entry_sequence: pending.sequence,
+                    return_sequence: sequence,
+                    node_create_sequence: node.0,
+                    node_process_id: node.1,
+                    node_process_birth: node.2,
+                    expected_node_matched: true,
+                    flags: 0x2000,
+                    raw_return_u64: current.0.Rax,
+                    raw_return_low32: current.0.Rax as u32,
+                    return_region_kind,
+                    registers_restored: true,
+                    execution_context_unchanged: true,
+                    post_start_clr_stack_required: true,
+                })
+            }
         };
         self.withdraw_all(event)?;
         let after = context(raw(&self.threads[&event.dwThreadId].handle))?;
@@ -1168,9 +1447,19 @@ impl ShellClassificationWitness {
             execution_equal(&current.0, &after.0),
             "恢复 DR 后原返回执行上下文改变",
         )?;
-        self.returned += 1;
         self.stopped = true;
-        Ok(Observation::OwnedReturn(receipt))
+        match phase {
+            CallPhase::PreNode => {
+                self.pre_returned += 1;
+                self.pre_resume = Some(PreNodeResume {
+                    sequence,
+                    identity,
+                    context: after.0,
+                });
+            }
+            CallPhase::PostNode { .. } => self.returned += 1,
+        }
+        Ok(observation)
     }
     fn unowned_exception(&mut self, event: &DEBUG_EVENT) -> io::Result<Observation> {
         if self.threads.values().any(|thread| thread.pending.is_some()) {
@@ -1181,6 +1470,7 @@ impl ShellClassificationWitness {
         Ok(Observation::NotOwned)
     }
     pub fn withdraw_all(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.pre_resume = None;
         self.stopped(event)?;
         let mut failure = None;
         for thread in self.threads.values_mut() {
@@ -1204,6 +1494,7 @@ impl ShellClassificationWitness {
     }
     /// EXIT_THREAD 已由原事件拥有者继续后调用；退出不冒充恢复读回。
     pub fn thread_exited(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.pre_resume = None;
         require(
             event.dwProcessId == self.root_pid
                 && event.dwDebugEventCode == EXIT_THREAD_DEBUG_EVENT
@@ -1223,6 +1514,7 @@ impl ShellClassificationWitness {
         Ok(())
     }
     pub fn confirm_process_exit(&mut self) -> io::Result<()> {
+        self.pre_resume = None;
         require(
             unsafe { GetCurrentThreadId() } == self.debugger_tid,
             "必须由原调试线程确认退出",
@@ -1256,6 +1548,10 @@ impl ShellClassificationWitness {
             root_process_id: self.root_pid,
             selected_calls: self.selected,
             returned_calls: self.returned,
+            pre_node_selected_calls: self.pre_selected,
+            pre_node_returned_calls: self.pre_returned,
+            post_node_root_stop_attempted: self.post_node_sample_attempted,
+            post_node_root_stop: self.post_node_root_stop.clone(),
             skipped_entries: self.skipped,
             first_skipped_entry: self.first_skipped_entry.clone(),
             dirty_threads: self.threads.values().filter(|thread| thread.dirty).count(),

@@ -1,5 +1,29 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-06：独立启动前返回与受限DR采样
+
+本增量已接入独立一次启动前分类返回及同停点CLR；先恢复全部自有DR、回收reader，再以一次性原停点票据核身份/完整上下文及期限后重新布点。启动后选择条件、一次预算和验收字段保持，新增采样只证明首次受支持root活停点的当前事件线程。唯一夹具扩展同一条执行链，不增加原生用例矩阵。本机77普通、command特性check、warp check、i18n11和应用诊断45项通过，八份修改来源在每项门禁前后相同，综合收据SHA `80d693dc1a242955a6959ddee40f87e1262de540d9f44d7f1abe0a82a949c81b`。
+
+唯一native实际执行一次，1.615秒通过：pre entry71→return73（完整0x4550/IL56）→reader回收后rearm→RF skip74→Node75→原worker DR采样/entry150→post return152（完整0x4550/IL198）→原四异常153–156；166事件全部继续，14次live DR恢复，原进程/后代/reader及Job回收。执行文件与八源码前后摘要一致，独审SHA `b10413dd0ef38b22973d1074548f763461f2dfc0cb5ffd04f1bb3f80a176e79b`。本机准备a1因继承模块路径缺WinPS Utility而在任何native启动前失败；原件保留，a2仅在受控子进程绑定已核系统模块后准备成功。13份准备来源中修改的Fixture.cs与02fb不同，明确记为本机dirty工作树；本机CLR/DAC4.8.9345.0不能代证原runner4.8.9310.0或真实PS。
+
+下一步在原runner先复核该提交固定能力，再取同提交真实PS返回/CLR和DR收据。启动前证据不能替代Complete中的启动后门禁；首次未命中原因及原PS首因仍未知。G09开放，新增关闭0项；正常witness=false五场景、三次独立冷恢复、精准修复和最终同源双平台门禁仍待完成。无需本地化变更：只有内部诊断、夹具与证据，无用户文案、语义或布局变化。
+
+以下记录按各自提交与当时范围保留。
+
+## 2026-10-06：02fb 同源原runner固定能力与真实PS终审
+
+同一冻结提交 `02fb1cde5e20fc7863927bc720e9d796821646b3` 的原runner固定能力37442360399通过64普通及唯一native；真实PS37442785591仍失败。首次未选择调用seq182明确在Node187之前，flags=0x2000且路径匹配；启动后selected/returned仍为0，未取得分类返回或同停点CLR。实际PS/Node与原LOAD CLR/配对DAC身份和原失败相同；后者不代表reader已加载DAC或取得SMA栈。PS在9414ms退出1且零输出，Codex/Node随后退出0；420事件全部继续，30线程原退出确认，CMD/PS清理通过。67来源逐字节绑定，终审SHA `0620ef990ad0896908e4b5942753a6a9ec6b0db8eb0e2a77ad6d7df90cbc7aed`。首因仍未知，G09开放，新增关闭0项。
+
+[固定能力37442360399](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37442360399)的唯一native用时1.474秒，首skip74→Node76→entry150→return153，完整0x4550、同worker caller IL179、四异常、169事件继续及7线程恢复/原对象清理均已核。13准备来源与02fb原始Git blob一致，独审SHA `aa6a6b182880dc24129176f6b6cc283abbb06b974e65813e706c671b743d156e`，工件SHA `8e44ba04a3b4d5719c2f8aed53659e607cd830baf1f713005ffd006cdb4f8b2c`。这只证明固定能力。
+
+[真实PS37442785591](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37442785591)先通过1146应用普通（含i18n11）、91命令普通及111诊断前置。PS generation `5669edf9-8238-4939-a4e6-fe15fae92c72`、root24532，首skip原thread30744/birth134357564902008396；Node25372在8350ms创建，PS9414ms退出1/输出0，Codex12635ms创建/14280ms退出0，Node14644ms退出0。未取消，420事件received=validated=continued，pending为空。selected/returned为0、reader事件0、RF及固定bit读回各1，不冒称实际没有后续API调用。
+
+本代原LOAD CLR SHA `8aa62b9be054d79b6575bef1dcedcb2a707741e0245ec876af4fa0dab71594ff`、配对DAC SHA `b53550c6288be21fe6e485b17de71b191e7cd756635763b696db3d11b38180ef`，FileID/size/version4.8.9310.0与原失败逐项一致。实际PS/Node身份一致；reader未启动，SMA运行时栈仍无。独立reader构建工件有13来源前后绑定及11份归档来源，但不代证真实候选DAC加载。
+
+CMD返回codex-cli 0.156.1；CMD/PS各自manifest/launch/exit摘要绑定、helper双0、Job空、desktop/DeviceMap关闭、station_absent及logon_absent均true。分类30线程由原句柄确认退出、dirty0，不能记为30次活线程DR恢复。原npm ZIP SHA `ca9c2b5990af75b56eb712303caef6135172053bd1174cdb18cefffeb60d41b9`，78成员CRC/SHA全核；唯一原件保持cleanup_ready=false。
+
+下一增量单独观察首次启动前分类返回及同停点CLR，并在读取器完全回收后恢复启动后观察；仅采一次支持的原root活停点DR配置。启动前证据不替代Complete中的启动后分类门禁，不从无命中推断没有执行。保持唯一原生夹具和四异常，不重采原26异常。精准修复、正常witness=false五场景/三次独立冷恢复及最终同源双平台门禁仍待完成。无需本地化变更。
+
 ## 2026-10-06：首个未选择调用的有界收据
 
 诊断器保存首个未选择调用的原 generation、进程/线程身份、sequence、当时已观察到的 Node CREATE sequence、flags 和路径比较四态；仅首个 flags=0x2000 的未选择入口允许额外做一次有界比较，不记录路径或地址，不改变 Node 后选择门槛、返回预算或成功条件。应用摘要另保留原 LOAD 时已核验的 CLR/配对 DAC 身份，即使 reader 未启动或运行时句柄已释放也能审计；这不代表 reader 已加载 DAC，也不补证 SMA。

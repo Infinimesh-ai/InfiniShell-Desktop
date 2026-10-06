@@ -10,6 +10,56 @@ use super::*;
 const SINGLE_STEP: u32 = 0x80000004;
 const READ_BUDGET_BYTES: u32 = 24 * 1024 * 1024;
 
+#[derive(Clone, Copy, Debug)]
+enum ReturnStage {
+    PreNode,
+    PostNode,
+}
+
+impl ReturnStage {
+    fn file_prefix(self) -> &'static str {
+        match self {
+            Self::PreNode => "native-clr-pre-node-classification",
+            Self::PostNode => "native-clr-classification",
+        }
+    }
+
+    fn scope(self) -> &'static str {
+        match self {
+            Self::PreNode => "pre_node_classification_return_only",
+            Self::PostNode => "post_start_classification_return_only",
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct ReturnBudget {
+    pre_node: Option<u64>,
+    post_node: Option<u64>,
+}
+
+impl ReturnBudget {
+    fn last_sequence(&self) -> u64 {
+        self.post_node.or(self.pre_node).unwrap_or(0)
+    }
+
+    fn reserve(&mut self, stage: ReturnStage, sequence: u64, expired: bool) -> io::Result<()> {
+        let available = match stage {
+            ReturnStage::PreNode => self.pre_node.is_none() && self.post_node.is_none(),
+            ReturnStage::PostNode => self.post_node.is_none(),
+        };
+        if !available || sequence <= self.last_sequence() || expired {
+            return Err(error("native_clr.event_sequence_or_deadline"));
+        }
+        // 读取失败也消耗本阶段唯一预算；不能借重试重复观察原停点。
+        match stage {
+            ReturnStage::PreNode => self.pre_node = Some(sequence),
+            ReturnStage::PostNode => self.post_node = Some(sequence),
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 struct ThreadBinding {
     handle: OwnedHandle,
@@ -25,8 +75,9 @@ pub(super) struct NativeClr {
     runtime_binding_at_load: Option<serde_json::Value>,
     threads: HashMap<u32, ThreadBinding>,
     active_reader: Option<ClrReader>,
-    last_sequence: u64,
+    budget: ReturnBudget,
     completed: u64,
+    pre_node_completed: u64,
     phase: &'static str,
     identity_failure: Option<serde_json::Value>,
     reader_cleanup: Option<serde_json::Value>,
@@ -74,6 +125,56 @@ fn validate_return_binding(
     Ok(())
 }
 
+fn validate_pre_node_return_binding(
+    event: &DEBUG_EVENT,
+    root_pid: u32,
+    sequence: u64,
+    generation: Uuid,
+    classification: &serde_json::Value,
+) -> io::Result<()> {
+    if event.dwDebugEventCode != EXCEPTION_DEBUG_EVENT || event.dwProcessId != root_pid {
+        return Err(error("native_clr.pre_node_return_event"));
+    }
+    let information = unsafe { event.u.Exception };
+    if root_pid == 0
+        || event.dwThreadId == 0
+        || information.dwFirstChance != 1
+        || information.ExceptionRecord.ExceptionCode.0 as u32 != SINGLE_STEP
+        || classification["generation"] != serde_json::json!(generation.as_bytes())
+        || classification["identity"]["process_id"] != root_pid
+        || classification["identity"]["thread_id"] != event.dwThreadId
+        || classification["identity"]["process_birth"]
+            .as_u64()
+            .is_none_or(|value| value == 0)
+        || classification["identity"]["thread_birth"]
+            .as_u64()
+            .is_none_or(|value| value == 0)
+        || classification["entry_sequence"]
+            .as_u64()
+            .is_none_or(|entry| entry == 0 || entry >= sequence)
+        || classification["return_sequence"] != sequence
+        || classification.get("node_create_sequence").is_some()
+        || classification.get("node_process_id").is_some()
+        || classification.get("node_process_birth").is_some()
+        || classification
+            .get("post_start_clr_stack_required")
+            .is_some()
+        || classification["pre_node_clr_stack_required"] != true
+        || classification["expected_node_matched"] != true
+        || classification["flags"] != 0x2000
+        || !classification["raw_return_u64"]
+            .as_u64()
+            .is_some_and(|value| {
+                classification["raw_return_low32"].as_u64() == Some(u64::from(value as u32))
+            })
+        || classification["registers_restored"] != true
+        || classification["execution_context_unchanged"] != true
+    {
+        return Err(error("native_clr.pre_node_return_classification_binding"));
+    }
+    Ok(())
+}
+
 fn write_receipt(path: &Path, receipt: &serde_json::Value) -> io::Result<()> {
     let mut output = OpenOptions::new().write(true).create_new(true).open(path)?;
     serde_json::to_writer(&mut output, receipt)?;
@@ -99,8 +200,9 @@ impl NativeClr {
             runtime_binding_at_load: None,
             threads: HashMap::new(),
             active_reader: None,
-            last_sequence: 0,
+            budget: ReturnBudget::default(),
             completed: 0,
+            pre_node_completed: 0,
             phase: "bound",
             identity_failure: None,
             reader_cleanup: None,
@@ -192,7 +294,7 @@ impl NativeClr {
         if let Some(reader) = &mut self.active_reader {
             reader.abort_and_reap(deadline)?;
             self.reader_cleanup = Some(serde_json::json!({
-                "event_sequence":self.last_sequence,"binding":reader.binding(),
+                "event_sequence":self.budget.last_sequence(),"binding":reader.binding(),
                 "reader_reaped":reader.is_reaped(),"target_termination_requested_first":true,
             }));
         }
@@ -212,30 +314,89 @@ impl NativeClr {
         deadline: Instant,
         cancellation: Option<&AtomicBool>,
     ) -> io::Result<()> {
-        validate_return_binding(event, root_pid, sequence, classification)?;
+        self.observe_return(
+            ReturnStage::PostNode,
+            event,
+            process,
+            process_created,
+            root_pid,
+            sequence,
+            classification,
+            deadline,
+            cancellation,
+        )
+    }
+
+    pub(super) fn observe_pre_node_return(
+        &mut self,
+        event: &DEBUG_EVENT,
+        process: &OwnedHandle,
+        process_created: u64,
+        root_pid: u32,
+        sequence: u64,
+        classification: &serde_json::Value,
+        deadline: Instant,
+        cancellation: Option<&AtomicBool>,
+    ) -> io::Result<()> {
+        self.observe_return(
+            ReturnStage::PreNode,
+            event,
+            process,
+            process_created,
+            root_pid,
+            sequence,
+            classification,
+            deadline,
+            cancellation,
+        )
+    }
+
+    fn observe_return(
+        &mut self,
+        stage: ReturnStage,
+        event: &DEBUG_EVENT,
+        process: &OwnedHandle,
+        process_created: u64,
+        root_pid: u32,
+        sequence: u64,
+        classification: &serde_json::Value,
+        deadline: Instant,
+        cancellation: Option<&AtomicBool>,
+    ) -> io::Result<()> {
+        match stage {
+            ReturnStage::PreNode => validate_pre_node_return_binding(
+                event,
+                root_pid,
+                sequence,
+                self.generation,
+                classification,
+            )?,
+            ReturnStage::PostNode => {
+                validate_return_binding(event, root_pid, sequence, classification)?;
+            }
+        }
         if classification["generation"] != serde_json::json!(self.generation.as_bytes()) {
             return Err(error("native_clr.return_generation"));
         }
         self.phase = "native_return_identity";
         self.ensure_reaped()?;
-        if self.completed != 0 || sequence <= self.last_sequence || Instant::now() >= deadline {
-            return Err(error("native_clr.event_sequence_or_deadline"));
-        }
         if cancellation.is_some_and(|value| value.load(Ordering::Acquire)) {
             return Err(io::Error::new(
                 io::ErrorKind::Interrupted,
                 "native_clr.cancelled",
             ));
         }
-        self.last_sequence = sequence;
+        self.budget
+            .reserve(stage, sequence, Instant::now() >= deadline)?;
+        let prefix = stage.file_prefix();
         // 先保全原停点；后续身份、运行时或 reader 失败不能抹去本次事件。
         write_receipt(
             &self
                 .directory
-                .join(format!("native-clr-classification-{sequence}.pending.json")),
+                .join(format!("{prefix}-{sequence}.pending.json")),
             &serde_json::json!({"generation":self.generation,"process_id":root_pid,
                 "thread_id":event.dwThreadId,"event_sequence":sequence,"hresult":0,
-                "classification":classification,"operation":3,
+                "classification":classification,"operation":3,"scope":stage.scope(),
                 "phase":"pending_not_read","candidate_success_inferred":false}),
         )?;
         let thread = self
@@ -302,28 +463,34 @@ impl NativeClr {
         let receipt = serde_json::json!({
             "schema":1,"generation":self.generation,"mode":"powershell",
             "event_sequence":sequence,"process_id":root_pid,"thread_id":event.dwThreadId,
-            "identity":current,"exception_code":SINGLE_STEP,"hresult":0,"operation":3,
+            "identity":current,"exception_code":SINGLE_STEP,"hresult":0,"operation":3,"scope":stage.scope(),
             "classification":classification,"live_threads_restored_before_reader":true,
             "binding":reader.binding(),"reader":self.image.receipt(),"runtime":runtime.receipt(),
             "result":result,"reader_reaped":true,"reader_job_empty":true,"candidate_success_inferred":false,
         });
         self.phase = "write_receipt";
         write_receipt(
-            &self
-                .directory
-                .join(format!("native-clr-classification-{sequence}.json")),
+            &self.directory.join(format!("{prefix}-{sequence}.json")),
             &receipt,
         )?;
         // 合法 observed/partial/unavailable 均已绑定且 reader 已退出；后两者不是读取通过。
         self.active_reader = None;
-        self.completed += 1;
+        match stage {
+            ReturnStage::PreNode => self.pre_node_completed += 1,
+            ReturnStage::PostNode => self.completed += 1,
+        }
         self.phase = "event_recorded";
         Ok(())
     }
 
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"recorded_events":self.completed,"last_sequence":self.last_sequence,
+        serde_json::json!({"recorded_events":self.completed,"last_sequence":self.budget.post_node.unwrap_or(0),
             "operation":3,"scope":"post_start_classification_return_only",
+            "pre_node":{"recorded_events":self.pre_node_completed,
+                "last_sequence":self.budget.pre_node.unwrap_or(0),
+                "scope":"pre_node_classification_return_only","candidate_success_inferred":false},
+            "total_recorded_events":self.completed + self.pre_node_completed,
+            "last_reader_sequence":self.budget.last_sequence(),
             "phase":self.phase,"identity_failure":self.identity_failure,"reader_cleanup":self.reader_cleanup,
             "runtime_binding_at_load":self.runtime_binding_at_load,
             "runtime_still_held":self.runtime.is_some(),

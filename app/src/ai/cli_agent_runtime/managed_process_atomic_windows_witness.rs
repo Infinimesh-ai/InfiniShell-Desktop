@@ -176,6 +176,8 @@ pub(super) struct NativeWitness {
     node_create: Option<serde_json::Value>,
     classification_entry: Option<serde_json::Value>,
     classification_return: Option<serde_json::Value>,
+    pre_node_classification_entry: Option<serde_json::Value>,
+    pre_node_classification_return: Option<serde_json::Value>,
     pending_event: Option<OriginalDebugEvent>,
     continuation_failed: bool,
     expected_temp_environment: [Vec<u16>; 3],
@@ -403,6 +405,8 @@ impl WindowsImageDebugSession {
                 node_create: None,
                 classification_entry: None,
                 classification_return: None,
+                pre_node_classification_entry: None,
+                pre_node_classification_return: None,
                 pending_event: None,
                 continuation_failed: false,
                 expected_temp_environment,
@@ -459,6 +463,7 @@ impl WindowsImageDebugSession {
         if self.native_witness.is_none() {
             return Ok(());
         }
+        self.native_post_node_root_sample(event)?;
         let base = unsafe { event.u.LoadDll.lpBaseOfDll } as u64;
         if event.dwProcessId == self.root_process_id {
             // CLR/DAC 与 Shell32 独立绑定原已授权 LOAD，不受快照的 64 项容量限制。
@@ -728,6 +733,7 @@ impl WindowsImageDebugSession {
     }
 
     pub(super) fn native_witness_unload(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        self.native_post_node_root_sample(event)?;
         let at_ms = self
             .npm_diagnostics
             .as_ref()
@@ -775,6 +781,7 @@ impl WindowsImageDebugSession {
         event: &DEBUG_EVENT,
         deadline: Instant,
     ) -> io::Result<Option<windows::Win32::Foundation::NTSTATUS>> {
+        self.native_post_node_root_sample(event)?;
         if let Some(status) = self.native_classification_exception(event, deadline)? {
             return Ok(Some(status));
         }
@@ -863,6 +870,34 @@ impl WindowsImageDebugSession {
                     classification_failure("classification_thread", &failure),
                 ));
             }
+        }
+        self.native_post_node_root_sample(event)?;
+        Ok(())
+    }
+
+    fn native_post_node_root_sample(&mut self, event: &DEBUG_EVENT) -> io::Result<()> {
+        if event.dwProcessId != self.root_process_id
+            || self
+                .native_witness
+                .as_ref()
+                .is_none_or(|witness| witness.classification.is_none())
+        {
+            return Ok(());
+        }
+        let sequence = self.native_sequence()?;
+        let Some(shell) = self
+            .native_witness
+            .as_mut()
+            .and_then(|witness| witness.classification.as_mut())
+        else {
+            return Ok(());
+        };
+        // 仅首个支持的原 root 活停点；不宣称覆盖所有事件类型或整个执行区间。
+        if let Err(failure) = shell.sample_post_node_root_stop(event, sequence) {
+            return Err(self.native_failure(
+                "classification_post_node_sample",
+                classification_failure("classification_post_node_sample", &failure),
+            ));
         }
         Ok(())
     }
@@ -972,6 +1007,73 @@ impl WindowsImageDebugSession {
         let receipt = match shell.observe(event, sequence) {
             Ok(ShellClassificationObservation::NotOwned) => return Ok(None),
             Ok(ShellClassificationObservation::OwnedSkipped) => return Ok(Some(DBG_CONTINUE)),
+            Ok(ShellClassificationObservation::OwnedPreNodeEntry) => {
+                if witness.node_create.is_some() || witness.pre_node_classification_entry.is_some()
+                {
+                    return Err(error("native_witness.pre_node_entry_phase"));
+                }
+                witness.pre_node_classification_entry = Some(serde_json::json!({
+                    "sequence":sequence,"process_id":event.dwProcessId,"thread_id":event.dwThreadId,
+                }));
+                return Ok(Some(DBG_CONTINUE));
+            }
+            Ok(ShellClassificationObservation::OwnedPreNodeReturn(receipt)) => {
+                if witness.node_create.is_some() || witness.pre_node_classification_return.is_some()
+                {
+                    return Err(error("native_witness.pre_node_return_phase"));
+                }
+                let receipt = serde_json::to_value(receipt)?;
+                witness.pre_node_classification_return = Some(receipt.clone());
+                if shell.requires_restoration() {
+                    return Err(error("native_witness.pre_node_restore_unconfirmed"));
+                }
+                let clr = witness
+                    .clr
+                    .as_mut()
+                    .ok_or_else(|| error("native_clr.reader_missing"))?;
+                let root = witness
+                    .root_thread
+                    .as_ref()
+                    .ok_or_else(|| error("native_clr.root_missing"))?;
+                let observed = clr.observe_pre_node_return(
+                    event,
+                    &root.process,
+                    root.process_created,
+                    self.root_process_id,
+                    sequence,
+                    &receipt,
+                    deadline,
+                    self.cancellation.as_deref(),
+                );
+                if let Err(failure) = observed {
+                    return Err(self.native_failure(
+                        "clr_pre_node_classification",
+                        safe_failure("clr_pre_node_classification", &failure),
+                    ));
+                }
+                // 同停点 reader 必须先完成原 Job 回收；任一步失败均不重新布防或继续事件。
+                if let Err(failure) = clr.ensure_reaped() {
+                    return Err(self.native_failure(
+                        "clr_pre_node_reap",
+                        safe_failure("clr_pre_node_reap", &failure),
+                    ));
+                }
+                if Instant::now() >= deadline
+                    || self
+                        .cancellation
+                        .as_ref()
+                        .is_some_and(|value| value.load(Ordering::Acquire))
+                {
+                    return Err(error("native_witness.pre_node_resume_cancelled_or_expired"));
+                }
+                if let Err(failure) = shell.resume_after_pre_node_return(event, sequence) {
+                    return Err(self.native_failure(
+                        "classification_pre_node_resume",
+                        classification_failure("classification_pre_node_resume", &failure),
+                    ));
+                }
+                return Ok(Some(DBG_CONTINUE));
+            }
             Ok(ShellClassificationObservation::OwnedEntry) => {
                 witness.classification_entry = Some(serde_json::json!({
                     "sequence":sequence,"process_id":event.dwProcessId,"thread_id":event.dwThreadId,
@@ -1547,6 +1649,10 @@ impl WindowsImageDebugSession {
             summary["classification_node_create"] = serde_json::json!(witness.node_create);
             summary["classification_entry"] = serde_json::json!(witness.classification_entry);
             summary["classification_return"] = serde_json::json!(witness.classification_return);
+            summary["pre_node_classification_entry"] =
+                serde_json::json!(witness.pre_node_classification_entry);
+            summary["pre_node_classification_return"] =
+                serde_json::json!(witness.pre_node_classification_return);
             // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

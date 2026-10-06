@@ -276,6 +276,8 @@ fn witness_session(file: &File, mode: WitnessMode) -> WindowsImageDebugSession {
             node_create: None,
             classification_entry: None,
             classification_return: None,
+            pre_node_classification_entry: None,
+            pre_node_classification_return: None,
             pending_event: None,
             continuation_failed: false,
             expected_temp_environment: [vec![], vec![], vec![]],

@@ -272,6 +272,7 @@ fn return_pair_requires_exact_stack_and_preserves_register_scalar() {
         },
         sequence: 1,
         nonce: [1; 16],
+        phase: CallPhase::PreNode,
     };
     let mut value = CONTEXT {
         Rip: pending.returned_to,
@@ -280,6 +281,9 @@ fn return_pair_requires_exact_stack_and_preserves_register_scalar() {
         ..CONTEXT::default()
     };
     assert!(matching_return(&pending, &value));
+    assert!(return_phase_matches(&pending, None, 2));
+    assert!(!return_phase_matches(&pending, None, 1));
+    assert!(!return_phase_matches(&pending, Some((2, 5, 6)), 3));
     let original = value;
     empty_registers().write(&mut value);
     assert!(execution_equal(&original, &value));
@@ -287,6 +291,257 @@ fn return_pair_requires_exact_stack_and_preserves_register_scalar() {
     assert!(!execution_equal(&original, &value));
     value.Rsp += 8;
     assert!(!matching_return(&pending, &value));
+    let post = Pending {
+        sequence: 4,
+        phase: CallPhase::PostNode {
+            node_create_sequence: 3,
+        },
+        ..pending
+    };
+    assert!(return_phase_matches(&post, Some((3, 5, 6)), 5));
+    assert!(!return_phase_matches(&post, None, 5));
+    assert!(!return_phase_matches(&post, Some((2, 5, 6)), 5));
+    assert!(!return_phase_matches(&post, Some((3, 5, 6)), 4));
+}
+
+#[test]
+fn pre_node_budget_cannot_consume_or_relax_the_post_node_budget() {
+    assert_eq!(
+        select_phase(None, 1, 0x2000, 0, 0),
+        Some(CallPhase::PreNode)
+    );
+    assert_eq!(select_phase(None, 2, 0x2000, 1, 0), None);
+    assert_eq!(
+        select_phase(Some((3, 5, 6)), 4, 0x2000, 1, 0),
+        Some(CallPhase::PostNode {
+            node_create_sequence: 3,
+        })
+    );
+    assert_eq!(select_phase(Some((3, 5, 6)), 4, 0x2000, 0, 1), None);
+    for sequence in [0, 2, 3] {
+        assert_eq!(select_phase(Some((3, 5, 6)), sequence, 0x2000, 0, 0), None);
+    }
+    assert_eq!(select_phase(None, 0, 0x2000, 0, 0), None);
+    assert_eq!(select_phase(Some((0, 5, 6)), 1, 0x2000, 0, 0), None);
+    assert_eq!(select_phase(None, 1, 0, 0, 0), None);
+    assert_eq!(select_phase(Some((3, 5, 6)), 4, 0x2001, 0, 0), None);
+}
+
+#[test]
+fn pre_node_receipt_preserves_full_return_without_inventing_a_node_identity() {
+    let receipt = PreNodeReturnReceipt {
+        generation: [1; 16],
+        identity: ObjectIdentity {
+            process_id: 1,
+            thread_id: 2,
+            process_birth: 3,
+            thread_birth: 4,
+        },
+        pair_nonce: nonce([1; 16], 5),
+        entry_sequence: 5,
+        return_sequence: 6,
+        expected_node_matched: true,
+        flags: 0x2000,
+        raw_return_u64: 0x1234_5678_0000_4550,
+        raw_return_low32: 0x4550,
+        return_region_kind: "private",
+        registers_restored: true,
+        execution_context_unchanged: true,
+        pre_node_clr_stack_required: true,
+    };
+    let output = serde_json::to_value(receipt).unwrap();
+    assert_eq!(
+        output["raw_return_u64"].as_u64(),
+        Some(0x1234_5678_0000_4550)
+    );
+    assert_eq!(output["raw_return_low32"], 0x4550);
+    assert_eq!(output["pre_node_clr_stack_required"], true);
+    for field in [
+        "node_create_sequence",
+        "node_process_id",
+        "node_process_birth",
+        "post_start_clr_stack_required",
+        "return_address",
+    ] {
+        assert!(output.get(field).is_none());
+    }
+}
+
+fn resume_test_event() -> (DEBUG_EVENT, PreNodeResume) {
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        dwProcessId: 1,
+        dwThreadId: 2,
+        ..DEBUG_EVENT::default()
+    };
+    event.u.Exception.dwFirstChance = 1;
+    event.u.Exception.ExceptionRecord.ExceptionCode = EXCEPTION_SINGLE_STEP;
+    event.u.Exception.ExceptionRecord.ExceptionAddress = 0x20000 as *mut c_void;
+    let ticket = PreNodeResume {
+        sequence: 4,
+        identity: ObjectIdentity {
+            process_id: 1,
+            thread_id: 2,
+            process_birth: 3,
+            thread_birth: 4,
+        },
+        context: CONTEXT {
+            Rip: 0x20000,
+            ..CONTEXT::default()
+        },
+    };
+    (event, ticket)
+}
+
+#[test]
+fn pre_node_resume_rejects_another_thread_event_sequence_or_exception() {
+    let (event, ticket) = resume_test_event();
+    assert!(resume_event_matches(&event, 4, &ticket));
+    assert!(!resume_event_matches(&event, 5, &ticket));
+    let mut changed = event;
+    changed.dwProcessId += 1;
+    assert!(!resume_event_matches(&changed, 4, &ticket));
+    changed = event;
+    changed.dwThreadId += 1;
+    assert!(!resume_event_matches(&changed, 4, &ticket));
+    changed = event;
+    changed.dwDebugEventCode = EXIT_THREAD_DEBUG_EVENT;
+    assert!(!resume_event_matches(&changed, 4, &ticket));
+    changed = event;
+    changed.u.Exception.dwFirstChance = 0;
+    assert!(!resume_event_matches(&changed, 4, &ticket));
+    changed = event;
+    changed.u.Exception.ExceptionRecord.ExceptionCode = windows::Win32::Foundation::NTSTATUS(1);
+    assert!(!resume_event_matches(&changed, 4, &ticket));
+    changed = event;
+    changed.u.Exception.ExceptionRecord.ExceptionAddress = 0x20001 as *mut c_void;
+    assert!(!resume_event_matches(&changed, 4, &ticket));
+}
+
+fn stopped_resume_witness() -> (ShellClassificationWitness, DEBUG_EVENT) {
+    let process = duplicate(
+        unsafe { GetCurrentProcess() },
+        (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_SYNCHRONIZE).0,
+    )
+    .unwrap();
+    let process_birth = birth(raw(&process), false).unwrap();
+    let root_pid = unsafe { GetCurrentProcessId() };
+    let (mut event, mut ticket) = resume_test_event();
+    event.dwProcessId = root_pid;
+    ticket.identity.process_id = root_pid;
+    ticket.identity.process_birth = process_birth;
+    (
+        ShellClassificationWitness {
+            process,
+            process_birth,
+            root_pid,
+            debugger_tid: unsafe { GetCurrentThreadId() },
+            generation: [1; 16],
+            expected_node: vec![1],
+            threads: BTreeMap::new(),
+            image: None,
+            node: None,
+            last_sequence: 4,
+            selected: 0,
+            returned: 0,
+            pre_selected: 1,
+            pre_returned: 1,
+            pre_resume: Some(ticket),
+            post_node_sample_attempted: false,
+            post_node_root_stop: None,
+            skipped: 0,
+            first_skipped_entry: None,
+            restored: 1,
+            exited_dirty: 0,
+            exited: false,
+            stopped: true,
+            first_unowned_single_step: None,
+            completed_inactive_api_readbacks: 0,
+            completed_resume_flag_writes: 0,
+            completed_fixed_eflags_api_readbacks: 0,
+        },
+        event,
+    )
+}
+
+#[test]
+fn failed_resume_consumes_the_ticket_and_cannot_clear_a_stop() {
+    let (mut witness, event) = stopped_resume_witness();
+    assert!(witness.resume_after_pre_node_return(&event, 5).is_err());
+    assert!(witness.stopped);
+    assert!(witness.pre_resume.is_none());
+    assert!(witness.resume_after_pre_node_return(&event, 4).is_err());
+    assert!(witness.stopped);
+    assert_eq!(witness.summary().result, "unknown");
+}
+
+#[test]
+fn changed_process_identity_invalidates_resume_without_clearing_the_stop() {
+    let (mut witness, event) = stopped_resume_witness();
+    witness.process_birth += 1;
+    assert!(witness.resume_after_pre_node_return(&event, 4).is_err());
+    assert!(witness.pre_resume.is_none());
+    assert!(witness.stopped);
+    witness.process_birth -= 1;
+    assert!(witness.resume_after_pre_node_return(&event, 4).is_err());
+    assert!(witness.stopped);
+}
+
+#[test]
+fn explicit_finish_or_intervening_event_invalidates_pre_node_resume() {
+    let (mut witness, event) = stopped_resume_witness();
+    witness.finish_observation(&event).unwrap();
+    assert!(witness.resume_after_pre_node_return(&event, 4).is_err());
+    assert!(witness.stopped);
+    let (mut witness, event) = stopped_resume_witness();
+    assert!(matches!(
+        witness.observe(&event, 5).unwrap(),
+        Observation::NotOwned
+    ));
+    assert!(witness.resume_after_pre_node_return(&event, 4).is_err());
+    assert!(witness.stopped);
+}
+
+#[test]
+fn post_node_sample_rejects_child_create_and_exited_events_without_claiming_coverage() {
+    let (mut witness, mut event) = stopped_resume_witness();
+    witness.node = Some((3, 5, 6));
+    let original_sequence = witness.last_sequence;
+    event.dwDebugEventCode = CREATE_PROCESS_DEBUG_EVENT;
+    assert!(witness.sample_post_node_root_stop(&event, 5).is_err());
+    event.dwProcessId += 1;
+    event.dwDebugEventCode = EXCEPTION_DEBUG_EVENT;
+    assert!(witness.sample_post_node_root_stop(&event, 5).is_err());
+    event.dwProcessId = witness.root_pid;
+    event.dwDebugEventCode = EXIT_THREAD_DEBUG_EVENT;
+    assert!(witness.sample_post_node_root_stop(&event, 5).is_err());
+    event.dwDebugEventCode = windows::Win32::System::Diagnostics::Debug::EXIT_PROCESS_DEBUG_EVENT;
+    assert!(witness.sample_post_node_root_stop(&event, 5).is_err());
+    assert!(witness.post_node_root_stop.is_none());
+    assert!(!witness.post_node_sample_attempted);
+    assert_eq!(witness.last_sequence, original_sequence);
+}
+
+#[test]
+fn failed_post_node_sample_has_one_attempt_and_does_not_advance_observation() {
+    let (mut witness, event) = stopped_resume_witness();
+    witness.node = Some((3, 5, 6));
+    assert!(witness.sample_post_node_root_stop(&event, 5).is_err());
+    assert!(witness.post_node_sample_attempted);
+    assert!(witness.post_node_root_stop.is_none());
+    assert!(!witness.sample_post_node_root_stop(&event, 6).unwrap());
+    assert_eq!(witness.last_sequence, 4);
+}
+
+#[test]
+fn confirmed_root_exit_cannot_be_sampled_as_a_live_stop() {
+    let (mut witness, event) = stopped_resume_witness();
+    witness.node = Some((3, 5, 6));
+    witness.exited = true;
+    assert!(witness.sample_post_node_root_stop(&event, 5).is_err());
+    assert!(witness.post_node_sample_attempted);
+    assert!(witness.post_node_root_stop.is_none());
+    assert_eq!(witness.last_sequence, 4);
 }
 
 #[test]

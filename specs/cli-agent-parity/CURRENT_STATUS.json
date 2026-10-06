@@ -1,6 +1,84 @@
 {
   "schema": 1,
   "status": "windows_g09_in_progress_pr_draft",
+  "g09_pre_node_return_20261006": {
+    "status": "local_fixed_capability_passed_original_runner_pending",
+    "base_head": "02fb1cde5e20fc7863927bc720e9d796821646b3",
+    "source_scope": "eight_changed_sources_bound_before_after_each_local_gate_not_whole_repository_freeze",
+    "implementation": "本增量已接入独立一次启动前分类返回及同停点CLR；先恢复全部自有DR、回收reader，再以一次性原停点票据核身份/完整上下文及期限后重新布点。启动后选择条件、一次预算和验收字段保持，新增采样只证明首次受支持root活停点的当前事件线程。唯一夹具扩展同一条执行链，不增加原生用例矩阵。本机77普通、command特性check、warp check、i18n11和应用诊断45项通过，八份修改来源在每项门禁前后相同，综合收据SHA `80d693dc1a242955a6959ddee40f87e1262de540d9f44d7f1abe0a82a949c81b`。",
+    "gates_sha256": "80d693dc1a242955a6959ddee40f87e1262de540d9f44d7f1abe0a82a949c81b",
+    "ordinary_pass": 77,
+    "app_feature_pass": 45,
+    "i18n_pass": 11,
+    "unique_native": {
+      "actual_execution_count": 1,
+      "seconds": 1.615,
+      "audit_sha256": "b10413dd0ef38b22973d1074548f763461f2dfc0cb5ffd04f1bb3f80a176e79b",
+      "pre_entry": 71,
+      "pre_return": 73,
+      "pre_value_u64": 17744,
+      "pre_caller_il": 56,
+      "rf_skip": 74,
+      "node_create": 75,
+      "post_dr_sample_and_entry": 150,
+      "post_return": 152,
+      "post_value_u64": 17744,
+      "post_caller_il": 198,
+      "four_original_exceptions": [
+        153,
+        154,
+        155,
+        156
+      ],
+      "all_events_continued": 166,
+      "live_dr_restorations": 14
+    },
+    "boundary": "下一步在原runner先复核该提交固定能力，再取同提交真实PS返回/CLR和DR收据。启动前证据不能替代Complete中的启动后门禁；首次未命中原因及原PS首因仍未知。G09开放，新增关闭0项；正常witness=false五场景、三次独立冷恢复、精准修复和最终同源双平台门禁仍待完成。无需本地化变更：只有内部诊断、夹具与证据，无用户文案、语义或布局变化。",
+    "native_boundary": "唯一native实际执行一次，1.615秒通过：pre entry71→return73（完整0x4550/IL56）→reader回收后rearm→RF skip74→Node75→原worker DR采样/entry150→post return152（完整0x4550/IL198）→原四异常153–156；166事件全部继续，14次live DR恢复，原进程/后代/reader及Job回收。执行文件与八源码前后摘要一致，独审SHA `b10413dd0ef38b22973d1074548f763461f2dfc0cb5ffd04f1bb3f80a176e79b`。本机准备a1因继承模块路径缺WinPS Utility而在任何native启动前失败；原件保留，a2仅在受控子进程绑定已核系统模块后准备成功。13份准备来源中修改的Fixture.cs与02fb不同，明确记为本机dirty工作树；本机CLR/DAC4.8.9345.0不能代证原runner4.8.9310.0或真实PS。",
+    "native_cause_proven": false,
+    "G09_closed": false,
+    "newly_closed": []
+  },
+  "g09_02fb_terminal_audit_20261006": {
+    "commit": "02fb1cde5e20fc7863927bc720e9d796821646b3",
+    "fixed_run": 37442360399,
+    "fixed_ordinary_pass": 64,
+    "fixed_unique_native": "passed_1.474_seconds",
+    "fixed_audit_sha256": "aa6a6b182880dc24129176f6b6cc283abbb06b974e65813e706c671b743d156e",
+    "actual_run": 37442785591,
+    "actual_result": "failure_ProbeFailed",
+    "audit_sha256": "0620ef990ad0896908e4b5942753a6a9ec6b0db8eb0e2a77ad6d7df90cbc7aed",
+    "artifact_sha256": "ca9c2b5990af75b56eb712303caef6135172053bd1174cdb18cefffeb60d41b9",
+    "first_skip": {
+      "sequence": 182,
+      "node_create_sequence": null,
+      "flags": 8192,
+      "path_comparison": "matched",
+      "thread_id": 30744,
+      "thread_birth": 134357564902008396
+    },
+    "node_create_sequence": 187,
+    "classification": {
+      "selected": 0,
+      "returned": 0,
+      "reader_events": 0,
+      "result": "unknown"
+    },
+    "same_original_identities": [
+      "PowerShell",
+      "Node",
+      "loaded_CLR",
+      "paired_DAC"
+    ],
+    "module_boundary": "配对DAC身份不代表reader已加载；SMA运行时栈未取得。",
+    "events_continued": 420,
+    "source_blobs_verified": 67,
+    "cleanup": "CMD/PS原进程/后代/Job/desktop/DeviceMap/station/LSA均确认；30原线程退出、dirty0，不称活DR恢复；原件保留。",
+    "next": "下一增量单独观察首次启动前分类返回及同停点CLR，并在读取器完全回收后恢复启动后观察；仅采一次支持的原root活停点DR配置。启动前证据不替代Complete中的启动后分类门禁，不从无命中推断没有执行。保持唯一原生夹具和四异常，不重采原26异常。精准修复、正常witness=false五场景/三次独立冷恢复及最终同源双平台门禁仍待完成。无需本地化变更。",
+    "native_cause_proven": false,
+    "G09_closed": false,
+    "newly_closed": []
+  },
   "g09_first_skipped_receipt_20261006": {
     "status": "local_fixed_capability_passed_original_runner_pending",
     "source_scope": "b12f59967基础上的明确dirty工作树；三command来源与测试exe执行前后摘要相同，不称整个仓库冻结。",
@@ -34,7 +112,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "G01–G08/G10/V03共10项关闭，G09开放，V01/V02/V05移交不计通过，PR草稿。同一b12提交的原runner固定能力37395058332通过，真实PS37395641796再次零输出退出1而Node/Codex随后退出0；67份来源字节及退出清理通过独审，但没有选中分类返回或同停点CLR栈，唯一未选择调用的时序与排除原因未保存，首因仍未知。正常五场景/三次冷恢复及最终同源双平台门禁未完成，新增关闭0项。",
+  "status_zh": "G01–G08/G10/V03共10项关闭；G09开放，V01/V02/V05移交不计通过，PR草稿。02fb原runner固定64普通/唯一native通过，真实PS37442785591仍提前退出1/零输出、Node/Codex随后0。首skip182确定在Node187前，flags2000且路径匹配；实际CLR/DAC与原失败相同。启动后返回与CLR栈缺失，首因未知；正常五场景/三冷恢复及最终同源门禁未完成，新增关闭0项。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,

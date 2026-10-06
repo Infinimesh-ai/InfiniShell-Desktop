@@ -70,6 +70,8 @@ struct Fixture {
     shell_skips: Vec<Value>,
     shell_entries: Vec<Value>,
     shell_observation: Option<Value>,
+    pre_node_shell_entries: Vec<Value>,
+    pre_node_shell_observation: Option<Value>,
     initial_breakpoints: HashSet<u32>,
     handling_stage: &'static str,
     continuation_stage: &'static str,
@@ -131,6 +133,8 @@ impl Fixture {
             shell_skips: vec![],
             shell_entries: vec![],
             shell_observation: None,
+            pre_node_shell_entries: vec![],
+            pre_node_shell_observation: None,
             initial_breakpoints: HashSet::new(),
             handling_stage: "not_started",
             continuation_stage: "not_started",
@@ -228,14 +232,19 @@ impl Fixture {
         &mut self,
         event: &DEBUG_EVENT,
         receipt: Value,
+        pre_node: bool,
         image: &mut ClrReaderImage,
         root: &Path,
         deadline: Instant,
     ) -> io::Result<()> {
-        require(self.shell_observation.is_none(), "固定分类调用只能返回一次")?;
+        let observation = if pre_node {
+            &mut self.pre_node_shell_observation
+        } else {
+            &mut self.shell_observation
+        };
+        require(observation.is_none(), "固定分类每阶段只能返回一次")?;
         require(self.active_reader.is_none(), "上次 reader 尚未释放")?;
-        self.shell_observation =
-            Some(json!({"classification":receipt,"main_tid":self.main_thread}));
+        *observation = Some(json!({"classification":receipt,"main_tid":self.main_thread}));
         let shell = self
             .shell
             .as_ref()
@@ -244,9 +253,7 @@ impl Fixture {
             !shell.requires_restoration(),
             "分类返回后仍有未恢复调试寄存器",
         )?;
-        self.shell_observation
-            .as_mut()
-            .expect("刚记录的分类返回必须存在")["live_threads_restored_before_reader"] =
+        observation.as_mut().expect("刚记录的分类返回必须存在")["live_threads_restored_before_reader"] =
             json!(true);
         let clr = self
             .clr
@@ -294,8 +301,26 @@ impl Fixture {
         observation["reader"] = result;
         observation["reader_reaped"] = json!(reader.is_reaped());
         observation["reader_job_empty"] = json!(reader.job_empty_fixture()?);
-        self.shell_observation = Some(observation);
+        require(
+            reader.is_reaped() && reader.job_empty_fixture()?,
+            "分类读取器尚未完全回收",
+        )?;
+        if pre_node {
+            self.pre_node_shell_observation = Some(observation);
+        } else {
+            self.shell_observation = Some(observation);
+        }
         self.active_reader.take();
+        if pre_node {
+            remaining(deadline)?;
+            self.shell
+                .as_mut()
+                .expect("原分类观察器必须保留")
+                .resume_after_pre_node_return(event, self.sequence)?;
+            self.pre_node_shell_observation
+                .as_mut()
+                .expect("启动前收据必须保留")["rearmed_after_reader_reaped"] = json!(true);
+        }
         Ok(())
     }
 
@@ -662,6 +687,10 @@ impl Fixture {
             }
             EXCEPTION_DEBUG_EVENT => {
                 self.handling_stage = "shell_observe";
+                self.shell
+                    .as_mut()
+                    .ok_or_else(|| io::Error::other("异常停点缺少原根"))?
+                    .sample_post_node_root_stop(event, self.sequence)?;
                 let before = self.shell.as_ref().map(ShellClassificationWitness::summary);
                 let observation = self
                     .shell
@@ -696,12 +725,35 @@ impl Fixture {
                         require(self.shell_entries.len() == 1, "固定分类调用入口不唯一")?;
                         return Ok(());
                     }
+                    ShellClassificationObservation::OwnedPreNodeEntry => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        self.pre_node_shell_entries
+                            .push(json!({"sequence":self.sequence,"tid":event.dwThreadId}));
+                        require(
+                            self.pre_node_shell_entries.len() == 1,
+                            "固定启动前入口不唯一",
+                        )?;
+                        return Ok(());
+                    }
+                    ShellClassificationObservation::OwnedPreNodeReturn(receipt) => {
+                        self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
+                        self.handling_stage = "pre_node_return_reader";
+                        return self.capture_native_return(
+                            event,
+                            serde_json::to_value(receipt)?,
+                            true,
+                            image,
+                            root,
+                            deadline,
+                        );
+                    }
                     ShellClassificationObservation::OwnedReturn(receipt) => {
                         self.pending.as_mut().expect("当前停点必须存在").1 = DBG_CONTINUE;
                         self.handling_stage = "native_return_reader";
                         return self.capture_native_return(
                             event,
                             serde_json::to_value(receipt)?,
+                            false,
                             image,
                             root,
                             deadline,
@@ -1102,16 +1154,9 @@ fn validate_observations(observations: &[Value], prepared: &Value) -> io::Result
     require(count == 4, "四次固定异常没有按顺序各读取一次")
 }
 
-fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
-    validate_descendant_receipts(report)?;
-    let item = &report["shell_observation"];
+fn validate_native_return_reader(item: &Value, prepared: &Value) -> io::Result<()> {
     let reader = &item["reader"];
     let receipt = &item["classification"];
-    let node = &report["node_created"];
-    let summary = &report["shell_classification"];
-    let entries = report["shell_entries"]
-        .as_array()
-        .ok_or_else(|| io::Error::other("分类入口记录缺失"))?;
     validate_fixture_thread(item)?;
     require(
         item["reader_reaped"] == true && item["reader_job_empty"] == true,
@@ -1163,6 +1208,87 @@ fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
             "分类 entry/return 与 reader 身份不符",
         )?;
     }
+    let mvid = prepared["fixture_mvid"]
+        .as_str()
+        .ok_or_else(|| io::Error::other("缺少夹具 MVID"))?;
+    let token = prepared["fixture_shell_method_token"]
+        .as_u64()
+        .ok_or_else(|| io::Error::other("缺少分类方法 MethodDef"))?;
+    let frames = reader["frames"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("分类 CLR 帧缺失"))?;
+    for (index, frame) in frames.iter().enumerate() {
+        let offsets = frame["il_offsets"]
+            .as_array()
+            .ok_or_else(|| io::Error::other("分类 CLR 帧的 IL 列表缺失"))?;
+        let metadata_frame = frame["frame_kind"] == "metadata_method"
+            && frame["method_token"]
+                .as_u64()
+                .is_some_and(|token| token > 0x06000000 && token <= 0x06ffffff)
+            && frame["context_hresult"] == 0
+            && frame["il_status"] == 0
+            && !offsets.is_empty()
+            && offsets.len() <= 8
+            && frame["il_offsets_needed"].as_u64() == Some(offsets.len() as u64)
+            && offsets.iter().all(|offset| {
+                offset
+                    .as_u64()
+                    .is_some_and(|offset| offset <= u32::MAX as u64)
+            });
+        // 只允许已由同一 MethodInstance 完整名称确认的首个 P/Invoke 帧无 metadata。
+        // 保留该帧的原始 E_FAIL；后方正确的 caller 不能掩盖未知帧或其它映射失败。
+        let runtime_frame = index == 0
+            && frame["frame_kind"] == "runtime_pinvoke_stub"
+            && matches!(
+                frame["runtime_name"].as_str(),
+                Some("domain_bound_pinvoke_stub" | "domain_neutral_pinvoke_stub")
+            )
+            && frame["method_token"] == 0x06000000_u32
+            && frame["simple_frame_type"] == 2
+            && frame["detailed_frame_type"] == 0
+            && frame["name_hresult"] == 0
+            && frame["name_complete"] == true
+            && frame["name_units_needed"]
+                .as_u64()
+                .is_some_and(|needed| (1..=512).contains(&needed))
+            && frame["context_hresult"] == 0
+            && frame["mapping_hresult"] == 0x80004005_u32
+            && frame["il_status"] == 0x80004005_u32
+            && offsets.is_empty()
+            && frame["il_offsets_needed"] == 0;
+        require(
+            metadata_frame || runtime_frame,
+            "分类 CLR 栈含未知帧、不完整映射或伪造的 runtime IL",
+        )?;
+    }
+    require(
+        frames.len() <= 32
+            && frames.iter().any(|frame| {
+                frame["module_mvid"]
+                    .as_str()
+                    .is_some_and(|value| value.eq_ignore_ascii_case(mvid))
+                    && frame["method_token"].as_u64() == Some(token)
+                    && frame["il_status"] == 0
+                    && frame["il_offsets"].as_array().is_some_and(|offsets| {
+                        offsets
+                            .iter()
+                            .any(|offset| offset.as_u64().is_some_and(|offset| offset < 0xfffffffd))
+                    })
+            }),
+        "原分类工作线程缺少精确夹具托管帧",
+    )
+}
+
+fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
+    validate_descendant_receipts(report)?;
+    let item = &report["shell_observation"];
+    let receipt = &item["classification"];
+    let node = &report["node_created"];
+    let summary = &report["shell_classification"];
+    let entries = report["shell_entries"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("分类入口记录缺失"))?;
+    validate_native_return_reader(item, prepared)?;
     let sequence = |value: &Value| {
         value
             .as_u64()
@@ -1255,74 +1381,80 @@ fn validate_native_return(report: &Value, prepared: &Value) -> io::Result<()> {
             && summary["stopped"] == true,
         "分类没有停止、恢复或确认原进程退出",
     )?;
-    let mvid = prepared["fixture_mvid"]
-        .as_str()
-        .ok_or_else(|| io::Error::other("缺少夹具 MVID"))?;
-    let token = prepared["fixture_shell_method_token"]
-        .as_u64()
-        .ok_or_else(|| io::Error::other("缺少分类方法 MethodDef"))?;
-    let frames = reader["frames"]
-        .as_array()
-        .ok_or_else(|| io::Error::other("分类 CLR 帧缺失"))?;
-    for (index, frame) in frames.iter().enumerate() {
-        let offsets = frame["il_offsets"]
-            .as_array()
-            .ok_or_else(|| io::Error::other("分类 CLR 帧的 IL 列表缺失"))?;
-        let metadata_frame = frame["frame_kind"] == "metadata_method"
-            && frame["method_token"]
-                .as_u64()
-                .is_some_and(|token| token > 0x06000000 && token <= 0x06ffffff)
-            && frame["context_hresult"] == 0
-            && frame["il_status"] == 0
-            && !offsets.is_empty()
-            && offsets.len() <= 8
-            && frame["il_offsets_needed"].as_u64() == Some(offsets.len() as u64)
-            && offsets.iter().all(|offset| {
-                offset
-                    .as_u64()
-                    .is_some_and(|offset| offset <= u32::MAX as u64)
-            });
-        // 只允许已由同一 MethodInstance 完整名称确认的首个 P/Invoke 帧无 metadata。
-        // 保留该帧的原始 E_FAIL；后方正确的 caller 不能掩盖未知帧或其它映射失败。
-        let runtime_frame = index == 0
-            && frame["frame_kind"] == "runtime_pinvoke_stub"
-            && matches!(
-                frame["runtime_name"].as_str(),
-                Some("domain_bound_pinvoke_stub" | "domain_neutral_pinvoke_stub")
-            )
-            && frame["method_token"] == 0x06000000_u32
-            && frame["simple_frame_type"] == 2
-            && frame["detailed_frame_type"] == 0
-            && frame["name_hresult"] == 0
-            && frame["name_complete"] == true
-            && frame["name_units_needed"]
-                .as_u64()
-                .is_some_and(|needed| (1..=512).contains(&needed))
-            && frame["context_hresult"] == 0
-            && frame["mapping_hresult"] == 0x80004005_u32
-            && frame["il_status"] == 0x80004005_u32
-            && offsets.is_empty()
-            && frame["il_offsets_needed"] == 0;
-        require(
-            metadata_frame || runtime_frame,
-            "分类 CLR 栈含未知帧、不完整映射或伪造的 runtime IL",
-        )?;
-    }
+    Ok(())
+}
+
+fn validate_pre_node_return(report: &Value, prepared: &Value) -> io::Result<()> {
+    let item = &report["pre_node_shell_observation"];
+    validate_native_return_reader(item, prepared)?;
+    let receipt = &item["classification"];
+    let summary = &report["shell_classification"];
+    let post = &report["shell_observation"]["classification"];
+    let sample = &summary["post_node_root_stop"];
     require(
-        frames.len() <= 32
-            && frames.iter().any(|frame| {
-                frame["module_mvid"]
-                    .as_str()
-                    .is_some_and(|value| value.eq_ignore_ascii_case(mvid))
-                    && frame["method_token"].as_u64() == Some(token)
-                    && frame["il_status"] == 0
-                    && frame["il_offsets"].as_array().is_some_and(|offsets| {
-                        offsets
-                            .iter()
-                            .any(|offset| offset.as_u64().is_some_and(|offset| offset < 0xfffffffd))
-                    })
-            }),
-        "原分类工作线程缺少精确夹具托管帧",
+        summary["post_node_root_stop_attempted"] == true
+            && sample["generation"] == summary["generation"]
+            && sample["identity"] == post["identity"]
+            && sample["node_create_sequence"] == report["node_created"]["sequence"]
+            && sample["sequence"]
+                .as_u64()
+                .zip(sample["node_create_sequence"].as_u64())
+                .is_some_and(|(sequence, node)| node < sequence)
+            && sample["sequence"]
+                .as_u64()
+                .zip(post["entry_sequence"].as_u64())
+                .is_some_and(|(sequence, entry)| sequence <= entry)
+            && sample["event_code"] == EXCEPTION_DEBUG_EVENT.0
+            && sample["scope"] == "original_root_event_thread_at_this_stop_only"
+            && sample["dirty"] == true
+            && sample["addresses_equal"] == true
+            && sample["configuration_equal"] == true,
+        "固定启动后原工作线程停点未核实入口 DR 配置",
+    )?;
+    let entries = report["pre_node_shell_entries"]
+        .as_array()
+        .ok_or_else(|| io::Error::other("启动前入口收据缺失"))?;
+    let entry = receipt["entry_sequence"].as_u64();
+    let returned = receipt["return_sequence"].as_u64();
+    let skipped = summary["first_skipped_entry"]["sequence"].as_u64();
+    require(
+        entries.len() == 1
+            && entries[0]["sequence"] == receipt["entry_sequence"]
+            && entries[0]["tid"] == item["tid"]
+            && receipt["return_sequence"] == item["event_sequence"]
+            && entry
+                .zip(returned)
+                .is_some_and(|(entry, returned)| 0 < entry && entry < returned)
+            && returned
+                .zip(skipped)
+                .is_some_and(|(returned, skipped)| returned < skipped)
+            && skipped
+                .zip(report["node_created"]["sequence"].as_u64())
+                .is_some_and(|(skipped, node)| skipped < node),
+        "启动前返回、预算外跳过与原 Node 创建时序不符",
+    )?;
+    require(
+        receipt.get("node_create_sequence").is_none()
+            && receipt.get("node_process_id").is_none()
+            && receipt.get("node_process_birth").is_none()
+            && receipt.get("post_start_clr_stack_required").is_none()
+            && receipt["pre_node_clr_stack_required"] == true
+            && receipt["identity"] == post["identity"]
+            && receipt["generation"] == post["generation"]
+            && receipt["generation"] == summary["generation"]
+            && receipt["expected_node_matched"] == true
+            && receipt["flags"] == 0x2000
+            && receipt["return_region_kind"] == "private"
+            && receipt["registers_restored"] == true
+            && receipt["execution_context_unchanged"] == true
+            && item["live_threads_restored_before_reader"] == true
+            && item["rearmed_after_reader_reaped"] == true
+            && receipt["raw_return_u64"] == 0x4550
+            && receipt["raw_return_low32"] == 0x4550
+            && report["fixture_pre_node_return_u64"] == receipt["raw_return_u64"]
+            && summary["pre_node_selected_calls"] == 1
+            && summary["pre_node_returned_calls"] == 1,
+        "启动前返回未独立绑定原线程、完整值、恢复或重新布点",
     )
 }
 
@@ -1429,6 +1561,8 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     report["shell_skips"] = json!(fixture.shell_skips);
     report["shell_entries"] = json!(fixture.shell_entries);
     report["shell_observation"] = json!(fixture.shell_observation);
+    report["pre_node_shell_entries"] = json!(fixture.pre_node_shell_entries);
+    report["pre_node_shell_observation"] = json!(fixture.pre_node_shell_observation);
     report["node_created"] = json!(fixture.node_created);
     report["descendant_creates"] = json!(fixture.descendant_creates);
     report["descendant_exits"] = json!(fixture.descendant_exits);
@@ -1503,19 +1637,27 @@ fn run(root: &Path, report: &mut Value) -> io::Result<()> {
     )?;
     validate_observations(&fixture.observations, &prepared)?;
     let output = fs::read(root.join("fixture.stdout"))?;
-    require(output.len() <= 22, "固定分类返回输出超过数值边界")?;
-    let returned = std::str::from_utf8(&output)
-        .ok()
-        .and_then(|value| value.trim().parse::<u64>().ok())
-        .ok_or_else(|| io::Error::other("固定分类返回不是完整 64 位整数"))?;
+    require(output.len() <= 44, "固定分类返回输出超过数值边界")?;
+    let text =
+        std::str::from_utf8(&output).map_err(|_| io::Error::other("固定分类返回不是 UTF-8"))?;
+    let values = text
+        .lines()
+        .map(str::parse::<u64>)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| io::Error::other("固定分类返回不是完整 64 位整数"))?;
+    require(values.len() == 2, "固定启动前和启动后返回数量不符")?;
+    let before = values[0];
+    let returned = values[1];
     require(
-        output == format!("{returned}\r\n").as_bytes()
-            || output == format!("{returned}\n").as_bytes(),
+        output == format!("{before}\r\n{returned}\r\n").as_bytes()
+            || output == format!("{before}\n{returned}\n").as_bytes(),
         "固定分类返回存在额外输出",
     )?;
     report["fixture_shell_return_u64"] = json!(returned);
     report["fixture_shell_return_low32"] = json!(returned as u32);
+    report["fixture_pre_node_return_u64"] = json!(before);
     validate_native_return(report, &prepared)?;
+    validate_pre_node_return(report, &prepared)?;
     reader.verify()?;
     fixture_image.verify()?;
     fixture.node_image.verify()?;
@@ -1740,6 +1882,123 @@ fn fixed_native_return_with_stub_receipt() -> (Value, Value) {
                 "il_offsets":[],"il_offsets_needed":0}),
         );
     (report, prepared)
+}
+
+fn fixed_pre_node_return_receipt() -> (Value, Value) {
+    let (mut report, prepared) = fixed_native_return_receipt();
+    let mut item = report["shell_observation"].clone();
+    item["event_sequence"] = json!(5);
+    item["reader"]["event_sequence"] = json!(5);
+    item["classification"]["entry_sequence"] = json!(4);
+    item["classification"]["return_sequence"] = json!(5);
+    item["classification"]["pre_node_clr_stack_required"] = json!(true);
+    item["rearmed_after_reader_reaped"] = json!(true);
+    for field in [
+        "node_create_sequence",
+        "node_process_id",
+        "node_process_birth",
+        "post_start_clr_stack_required",
+    ] {
+        item["classification"]
+            .as_object_mut()
+            .unwrap()
+            .remove(field);
+    }
+    report["pre_node_shell_observation"] = item;
+    report["pre_node_shell_entries"] = json!([{"sequence":4,"tid":42}]);
+    report["fixture_pre_node_return_u64"] = json!(17744);
+    report["shell_classification"]["pre_node_selected_calls"] = json!(1);
+    report["shell_classification"]["pre_node_returned_calls"] = json!(1);
+    report["shell_classification"]["post_node_root_stop_attempted"] = json!(true);
+    report["shell_classification"]["post_node_root_stop"] = json!({
+        "generation":report["shell_classification"]["generation"],
+        "identity":report["shell_observation"]["classification"]["identity"],
+        "sequence":10,"node_create_sequence":8,"event_code":1,
+        "scope":"original_root_event_thread_at_this_stop_only",
+        "dirty":true,"addresses_equal":true,"configuration_equal":true,
+    });
+    (report, prepared)
+}
+
+#[test]
+fn pre_node_return_requires_an_independent_pair_before_skip_and_node() {
+    let (report, prepared) = fixed_pre_node_return_receipt();
+    assert!(validate_pre_node_return(&report, &prepared).is_ok());
+    for field in ["entry_sequence", "return_sequence"] {
+        let mut changed = report.clone();
+        changed["pre_node_shell_observation"]["classification"][field] = json!(8);
+        assert!(validate_pre_node_return(&changed, &prepared).is_err());
+    }
+    let mut repeated = report.clone();
+    repeated["shell_classification"]["pre_node_returned_calls"] = json!(2);
+    assert!(validate_pre_node_return(&repeated, &prepared).is_err());
+    let mut second_entry = report;
+    second_entry["pre_node_shell_entries"] =
+        json!([{"sequence":4,"tid":42},{"sequence":6,"tid":42}]);
+    assert!(validate_pre_node_return(&second_entry, &prepared).is_err());
+}
+
+#[test]
+fn pre_node_return_cannot_borrow_post_node_identity_or_replace_its_gate() {
+    let (report, prepared) = fixed_pre_node_return_receipt();
+    for (field, value) in [
+        ("node_create_sequence", Value::Null),
+        ("node_process_id", json!(0)),
+        ("node_process_birth", json!(300)),
+        ("post_start_clr_stack_required", json!(true)),
+        ("pre_node_clr_stack_required", json!(false)),
+        ("generation", serde_json::to_value([2_u8; 16]).unwrap()),
+        ("raw_return_u64", json!(0x1_0000_4550_u64)),
+    ] {
+        let mut changed = report.clone();
+        changed["pre_node_shell_observation"]["classification"][field] = value;
+        assert!(validate_pre_node_return(&changed, &prepared).is_err());
+    }
+    let mut no_post = report.clone();
+    no_post["shell_observation"] = Value::Null;
+    assert!(validate_native_return(&no_post, &prepared).is_err());
+    assert!(validate_pre_node_return(&no_post, &prepared).is_err());
+}
+
+#[test]
+fn pre_node_return_requires_reader_reaping_and_same_stop_stack_before_rearm() {
+    let (report, prepared) = fixed_pre_node_return_receipt();
+    for field in [
+        "reader_reaped",
+        "reader_job_empty",
+        "rearmed_after_reader_reaped",
+        "live_threads_restored_before_reader",
+    ] {
+        let mut changed = report.clone();
+        changed["pre_node_shell_observation"][field] = json!(false);
+        assert!(validate_pre_node_return(&changed, &prepared).is_err());
+    }
+    let mut old_thread = report.clone();
+    old_thread["pre_node_shell_observation"]["reader"]["thread_birth"] = json!(201);
+    assert!(validate_pre_node_return(&old_thread, &prepared).is_err());
+    let mut unknown_frame = report;
+    unknown_frame["pre_node_shell_observation"]["reader"]["frames"][0]["il_status"] =
+        json!(0x80004005_u32);
+    assert!(validate_pre_node_return(&unknown_frame, &prepared).is_err());
+}
+
+#[test]
+fn post_node_sample_requires_the_original_live_worker_stop_and_owned_configuration() {
+    let (report, prepared) = fixed_pre_node_return_receipt();
+    for (field, value) in [
+        ("sequence", json!(8)),
+        ("sequence", json!(11)),
+        ("event_code", json!(5)),
+        ("identity", Value::Null),
+        ("scope", json!("all_threads_continuously")),
+        ("addresses_equal", json!(false)),
+        ("configuration_equal", Value::Null),
+        ("dirty", json!(false)),
+    ] {
+        let mut changed = report.clone();
+        changed["shell_classification"]["post_node_root_stop"][field] = value;
+        assert!(validate_pre_node_return(&changed, &prepared).is_err());
+    }
 }
 
 #[test]
