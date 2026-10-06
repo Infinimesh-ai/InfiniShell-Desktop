@@ -143,10 +143,13 @@ fn mapped_command(
     let arguments = match mode {
         "cmd" => format!("/d /v:off /s /c \"\"{entry}\" --version\""),
         "powershell" => {
+            // PowerShell 从 FileSystem 当前位置设置原生子进程的工作目录。
+            // 先切到已绑定映射根，让原 shim 不再依赖启动时的物理路径位置。
+            let cwd = root.display();
             // 空输入和流式输出让原 shim 请求独立管道，不保证禁止系统启动回退。
             // 非零初值避免未取得原生退出码时沿用成功状态。
             format!(
-                r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; @() | & '{entry}' --version | & {{ process {{ $_ }} }}; exit $global:LASTEXITCODE""#
+                r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; Set-Location -LiteralPath '{cwd}' -ErrorAction Stop; @() | & '{entry}' --version | & {{ process {{ $_ }} }}; exit $global:LASTEXITCODE""#
             )
         }
         _ => return Err(invalid()),

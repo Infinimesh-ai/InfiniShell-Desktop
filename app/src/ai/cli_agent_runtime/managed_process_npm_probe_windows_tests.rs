@@ -40,7 +40,7 @@ fn mapped_powershell_keeps_alongside_node_selection_without_a_path_override() {
     let (arguments, environment) = mapped_command("powershell", root, true).unwrap();
     assert_eq!(
         arguments,
-        r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; @() | & 'D:\install\codex.ps1' --version | & { process { $_ } }; exit $global:LASTEXITCODE""#
+        r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; Set-Location -LiteralPath 'D:\' -ErrorAction Stop; @() | & 'D:\install\codex.ps1' --version | & { process { $_ } }; exit $global:LASTEXITCODE""#
     );
     let baseline = candidate_environment("powershell", root).unwrap();
     assert_eq!(

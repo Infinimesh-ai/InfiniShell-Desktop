@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：双阶段读取本机固定能力通过，原环境待验
+## 当前接续状态（2026-10-07）：原机双阶段实证CreateProcess回退，产品验收仍失败
+
+同一提交 `a4a6b4ebd8ff03679f2e1c5e4822ce26c2293c08` 在原runner22完成两轮独审。固定能力[37537472413](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37537472413)通过151项普通测试和唯一native一次（1.694秒、无重试），独审263项检查全部通过；263是审计检查数，不是测试数。准备范围13份来源执行前后逐字节一致，原CLR/DAC身份匹配。该固定轮未触发pre-Start异常，也未触发late延迟重放，不能将这两条原生路径记为本轮通过。
+
+真实PowerShell[37538211705](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37538211705)仍为首个updated的 `ProbeFailed`。实际顺序为pre179→initial181→pre-Start CLR182→Node188→late189：Complete IL0x46的local4（soloCommand）为true、PSI local5的useShellExecute为false；IL0x293的local0为true、同帧PSI为true。首个pre-Start CLR栈顶落在原System的 `Process.StartWithCreateProcess` IL0x3f0，Complete调用帧为IL0xf7。结合原冻结IL合同，这证明实际先尝试CreateProcess、随后走ShellExecute回退及跳过等待的路径；尚未证明失败的具体输入或最终首因。Win32Exception的267仅是LastThrown候选字段，freshness=false，不能写成当前错误码；32帧为有界局部栈，不能称完整栈。实际PATHEXT环境字符串未读取，post分类保持unknown。
+
+PowerShell在12517ms零输出退出1，Codex在17334ms退出0，Node在17726ms退出0。418个PS调试事件全部继续；累计98次存活线程DR恢复和27次恢复前已退出线程分别记账。4个reader及精确Job、进程、station和LSA清理已核，但证据仍保留，cleanup_ready=false。该轮默认nextest1146项（含i18n11）、command93项、诊断150项、Node19及Python15/1/28通过；67份产品来源仅在执行前完成Git字节绑定，失败后末尾复核未到，不能称全仓冻结或最终同源门禁通过。
+
+仓外证据根为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`。固定独审 `fixture-37537472413/independent-fixed-two-stage-audit.safe.json` SHA为 `2fa4fdf5069e5022bec82cd631ea7acd0eecefe8594dde77b30f0f6723e4c04a`；真实独审 `ps-two-stage-37538211705/independent-two-stage-actual-audit-v2.safe.json` SHA为 `6a7b0852ba41999870d544204ad30dd91971e8c92be6e9ab3b2e619fc5d5cbbd`。生命周期和reader构建独审摘要、原件摘要及边界见CURRENT_STATUS.json的 `g09_two_stage_original_result_20261007`。实际审计v1的4项失败源于审计假设错误，v2按有界栈和产品非零退出的真实合同修正；生命周期脚本v1错键及错误说明保留，v2修正。没有据此修改产品源码、覆盖原件或抹去候选失败。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 当前工作区已加入最小产品改动：PowerShell调用原shim前Set-Location到已绑定映射根，本机默认构建的10项npm probe测试、11项i18n与cargo check已通过，三份收据及源码前后摘要见CURRENT_STATUS；原机验证仍待完成。提交后直接在原runner执行正常witness=false、scope=all五场景和三次独立冷恢复；固定观察器13份来源未变，复用原机固定能力的来源验证，不重复固定native或诊断witness候选。原PSI.WorkingDirectory精确字符串和267 freshness仍未知，PATHEXT单键修复未解决原故障的反证保持。正常验收及最终同一冻结源码Linux/Windows门禁均未完成。V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示使用原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：本轮调整受管PowerShell工作目录并同步内部验收证据，用户失败仍通过既有本地化错误路径报告，无用户文案或布局变化。
+
+## 历史记录：双阶段读取本机固定能力通过，原环境待验
 
 基于 `6fe81afb56ec4453ab1d9ab637e92d49c505d119` 的本轮增量已实现同一 Complete 方法首次 Start 前及后续返回点的实际读取。pre-op3 使用固定400B双规格一次交付同帧、同方法版本、同代码/map摘要的两张私有票据；initial op4 在 IL0x46读取已初始化的 local4（soloCommand）与 PSI local5，回收reader并恢复原上下文后换装晚期DR1、正常继续，不等待尚未创建的Node。后续点沿用原批准集合。四reader硬上限不变：pre、initial、late各一次，第四槽由early恢复后Node前首个原worker CLR与post分类互斥使用；后者未读时仍保存原生raw，明确CLR未满足，unknown不折成false。
 

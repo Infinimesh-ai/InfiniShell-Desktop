@@ -1,6 +1,18 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态（2026-10-07）：双阶段读取本机固定能力通过，原环境待验
+## 当前接续状态（2026-10-07）：原机双阶段实证CreateProcess回退，产品验收仍失败
+
+同一提交 `a4a6b4ebd8ff03679f2e1c5e4822ce26c2293c08` 在原runner22完成两轮独审。固定能力[37537472413](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37537472413)通过151项普通测试和唯一native一次（1.694秒、无重试），独审263项检查全部通过；263是审计检查数，不是测试数。准备范围13份来源执行前后逐字节一致，原CLR/DAC身份匹配。该固定轮未触发pre-Start异常，也未触发late延迟重放，不能将这两条原生路径记为本轮通过。
+
+真实PowerShell[37538211705](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37538211705)仍为首个updated的 `ProbeFailed`。实际顺序为pre179→initial181→pre-Start CLR182→Node188→late189：Complete IL0x46的local4（soloCommand）为true、PSI local5的useShellExecute为false；IL0x293的local0为true、同帧PSI为true。首个pre-Start CLR栈顶落在原System的 `Process.StartWithCreateProcess` IL0x3f0，Complete调用帧为IL0xf7。结合原冻结IL合同，这证明实际先尝试CreateProcess、随后走ShellExecute回退及跳过等待的路径；尚未证明失败的具体输入或最终首因。Win32Exception的267仅是LastThrown候选字段，freshness=false，不能写成当前错误码；32帧为有界局部栈，不能称完整栈。实际PATHEXT环境字符串未读取，post分类保持unknown。
+
+PowerShell在12517ms零输出退出1，Codex在17334ms退出0，Node在17726ms退出0。418个PS调试事件全部继续；累计98次存活线程DR恢复和27次恢复前已退出线程分别记账。4个reader及精确Job、进程、station和LSA清理已核，但证据仍保留，cleanup_ready=false。该轮默认nextest1146项（含i18n11）、command93项、诊断150项、Node19及Python15/1/28通过；67份产品来源仅在执行前完成Git字节绑定，失败后末尾复核未到，不能称全仓冻结或最终同源门禁通过。
+
+仓外证据根为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`。固定独审 `fixture-37537472413/independent-fixed-two-stage-audit.safe.json` SHA为 `2fa4fdf5069e5022bec82cd631ea7acd0eecefe8594dde77b30f0f6723e4c04a`；真实独审 `ps-two-stage-37538211705/independent-two-stage-actual-audit-v2.safe.json` SHA为 `6a7b0852ba41999870d544204ad30dd91971e8c92be6e9ab3b2e619fc5d5cbbd`。生命周期和reader构建独审摘要、原件摘要及边界见CURRENT_STATUS.json的 `g09_two_stage_original_result_20261007`。实际审计v1的4项失败源于审计假设错误，v2按有界栈和产品非零退出的真实合同修正；生命周期脚本v1错键及错误说明保留，v2修正。没有据此修改产品源码、覆盖原件或抹去候选失败。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 当前工作区已加入最小产品改动：PowerShell调用原shim前Set-Location到已绑定映射根，本机默认构建的10项npm probe测试、11项i18n与cargo check已通过，三份收据及源码前后摘要见CURRENT_STATUS；原机验证仍待完成。提交后直接在原runner执行正常witness=false、scope=all五场景和三次独立冷恢复；固定观察器13份来源未变，复用原机固定能力的来源验证，不重复固定native或诊断witness候选。原PSI.WorkingDirectory精确字符串和267 freshness仍未知，PATHEXT单键修复未解决原故障的反证保持。正常验收及最终同一冻结源码Linux/Windows门禁均未完成。V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示使用原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：本轮调整受管PowerShell工作目录并同步内部验收证据，用户失败仍通过既有本地化错误路径报告，无用户文案或布局变化。
+
+## 历史记录：双阶段读取本机固定能力通过，原环境待验
 
 基于 `6fe81afb56ec4453ab1d9ab637e92d49c505d119` 的本轮增量已实现同一 Complete 方法首次 Start 前及后续返回点的实际读取。pre-op3 使用固定400B双规格一次交付同帧、同方法版本、同代码/map摘要的两张私有票据；initial op4 在 IL0x46读取已初始化的 local4（soloCommand）与 PSI local5，回收reader并恢复原上下文后换装晚期DR1、正常继续，不等待尚未创建的Node。后续点沿用原批准集合。四reader硬上限不变：pre、initial、late各一次，第四槽由early恢复后Node前首个原worker CLR与post分类互斥使用；后者未读时仍保存原生raw，明确CLR未满足，unknown不折成false。
 
@@ -146,7 +158,7 @@ G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台�
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | 74dd/r-f6ta9tcm Mac显式空ACL两场景／一次独立冷恢复通过独审，未覆盖新增路径、GUI或完整5/2重跑。用户允许三类特殊权限安装提示原安装工具升级，普通安装及已支持只读ACL自动升级保持。1d85固定CLR四异常的完整链、原码、实际throw帧与精确Job回收已通过独审，仅证明诊断能力。a5ecc Windows首updated失败（后4场景／3冷恢复未跑），b5发送超时及74dd外层Node超时均保留；最终同源双平台门禁未完成 |
+| G09 | 开放 | a4a6原runner固定37537472413通过151普通及唯一native；真实37538211705首updated仍ProbeFailed，已实证初始PSI=false→CreateProcess抛出→晚期PSI=true回退，267仅LastThrown候选、freshness未证。工作区已加入Set-Location到已绑定映射根，本机门禁及原机待验。正常witness=false五场景／三次独立冷恢复及最终同源双平台门禁未完成。74dd/r-f6ta9tcm Mac显式空ACL两场景／一次独立冷恢复等历史结果保留，不替代新增路径、GUI或完整重跑。特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持；历史超时和失败不抹除 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”及“范围待用户决定”均为历史阶段判断；当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准，安全属性范围以 G09 下的2026-10-05用户决定为准。各轮源码、平台、失败和未验边界不变。
@@ -399,6 +411,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-07 原机两阶段值已实证，候选仍失败**：`a4a6b4e`的固定37537472413通过151普通及唯一native；真实37538211705取得pre179→initial181（PSI=false）→原System.StartWithCreateProcess抛出182→Node188→late189（PSI=true），对应ShellExecute回退。267仅LastThrown候选，32帧局部栈不等于完整栈；具体失败输入和最终首因尚未证实。工作区已加入Set-Location到已绑定映射根，本机门禁及原机待验；随后直接验证正常witness=false五场景和三次独立冷恢复，不重复诊断候选。最新审计、清理和源码绑定边界见本文件顶部及CURRENT_STATUS.json的 `g09_two_stage_original_result_20261007`；历史记录继续保留。**新增关闭0项；G09、正常五场景／三冷恢复及最终同源双门禁仍开放，PR草稿。**
 
 - **2026-10-06 真实PS接入候选前取消，映射路径绑定修正待原生验证**：`b1150f4a4`的[37349685626](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37349685626)在源码检查阶段主动取消；reader/真实候选均未启动，取消独审SHA `9c782642a6f0bc9039a3d34b8a81220312f2144b34eba6f4626e9b2e479210b7`。旧诊断把Node宿主物理路径直接用于参数匹配，未证明与本代私有DeviceMap路径等价；现已接入同一spawn的原目录/Node租约和已验证映射根，不改候选命令、权限或期限。本机warp check、34诊断测试及独审通过；该接线缺口不是原PS首因，实际返回仍待验，原失败、原静审及取消工件保持。无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
 
