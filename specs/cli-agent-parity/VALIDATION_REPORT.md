@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：最小两段及身份握手出现残留差分
+## 当前接续状态（2026-10-07）：省去外层二代观察仍有残留
+
+i7共用冻结i6 first/leaf，first始终两段并保留原PI身份、相同ACK及自然退出/关闭；只有controller对second的额外观察开关不同。A观察开启，在原及owner退出后查询均present、测量完整后才启动B；B省去外部second OpenProcess、完整token/image/精确Job查询及其句柄后续操作。两臂原各50条LSA样本均status0、非空、Size272、返回本臂LUID、free调用及返回0，原elapsed3031/3015ms；owner自然退出并关闭原柄后的唯一查询仍present、free0。
+
+A first11956/leaf30016、LUID2853456782/0；B first29432/leaf16672、LUID2853461019/0。B的second身份、Resume1、自然0及原PI关闭来自first原件；外部独立身份、实际映像、精确second Job成员及外柄终态均明确not_observed，父Job为空不能补足。B确无second-created和对应外部事件。
+
+pair SHA `cd3f504f47a3e28e46db157b6539ef05f71adc8e28db62cffe67443fcdb46e23`；独审SHA `9c4da4aec92ff5622b4f4dfaa21a78dfb0a20b507f3307c3c447fedf817d566a`，92份原件前后稳定。wrapper0只表示测量完整，两臂清理均未通过；该外部观察整组在本次不是残留必要条件，尚未定位单API、ACK或系统持有者首因。d2曾两段清理的反例和b1实际产品失败保持，不用诊断代替产品修复。
+
+下一步只读设计取消ACK等待/读取的有界对照，尚未准备或执行。原runner8e84正常五场景/三次冷恢复已通过但均自动站，最终同一冻结源码Linux/Windows门禁仍待完成。G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。
+
+详见CURRENT_STATUS的 `g09_second_observer_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：最小两段及身份握手出现残留差分
 
 i5自身TokenStatistics对照两臂自然退出，原首次LSA及owner退出后唯一查询均不存在；独审SHA `d34beb3855c3b06f3f820ee7ebaefb570038414009dbad30d61dff78a2939119`。B的冻结流程与退出0支持open/query/精确长度/关闭成功，但没有child统计字段或返回LUID原件，不以外层身份补写。
 

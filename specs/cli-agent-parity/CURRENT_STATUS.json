@@ -1,4 +1,136 @@
 {
+  "g09_second_observer_control_20261007": {
+    "recorded_utc": "2026-10-07T09:39:22.224012+00:00",
+    "repository_head_unchanged": "cb2a7587b305a9b61255c6c91fe73e1e45307c7d",
+    "scope": "仓外冻结两段程序及ACK不变，仅控制器外部二代观察整组on/off；两臂仍残留",
+    "prepared": {
+      "path": "local-second-observer-control-i7/prepared.safe.json",
+      "bytes": 21616,
+      "sha256": "1db8e4e99d1aafa88cbcbe38dab084072973d48885ccde77264e36a39a2a4c27"
+    },
+    "pair": {
+      "path": "local-second-observer-control-i7/pair.safe.json",
+      "bytes": 104681,
+      "sha256": "cd3f504f47a3e28e46db157b6539ef05f71adc8e28db62cffe67443fcdb46e23"
+    },
+    "audit": {
+      "path": "local-second-observer-control-i7/audit.safe.json",
+      "bytes": 90390,
+      "sha256": "9c4da4aec92ff5622b4f4dfaa21a78dfb0a20b507f3307c3c447fedf817d566a"
+    },
+    "root_execution": {
+      "path": "i7-root-execution.safe.json",
+      "bytes": 274,
+      "sha256": "b2f8a85c0c7d4426ee4f1aca06c8d314442a989e107ee26bb0e313e63a39142c"
+    },
+    "started_utc": "2026-10-07T09:32:52.460850+00:00",
+    "finished_utc": "2026-10-07T09:32:58.985044+00:00",
+    "wrapper_exit_code": 0,
+    "retry_count": 0,
+    "cases": [
+      {
+        "controller_arm": "A",
+        "first_arm": "B",
+        "first_controller_observation": {
+          "pid": 11956,
+          "created_low": 3546769409,
+          "created_high": 31282750,
+          "auth_low": 2853456782,
+          "auth_high": 0,
+          "session": 2,
+          "token_type": 1,
+          "elevated": 0,
+          "integrity": 8192,
+          "sid_length": 28,
+          "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+        },
+        "second_first_original_pi_observation": {
+          "pid": 30016,
+          "created_low": 3547081943,
+          "created_high": 31282750,
+          "auth_low": 2853456782,
+          "auth_high": 0
+        },
+        "external_second": {
+          "status": "observed",
+          "identity": "observed",
+          "actual_image": "observed",
+          "exact_second_job_membership": "observed",
+          "terminal_and_handle_close": "observed"
+        },
+        "original_query_count": 50,
+        "original_every_size": 272,
+        "original_every_returned_luid_matches": true,
+        "original_every_buffer_freed_with_status_0": true,
+        "original_lsa_absent": false,
+        "elapsed_ms": 3031,
+        "post_owner_exists": true,
+        "post_owner_free_ntstatus": 0,
+        "natural_exit_confirmed": true
+      },
+      {
+        "controller_arm": "B",
+        "first_arm": "B",
+        "first_controller_observation": {
+          "pid": 29432,
+          "created_low": 3579150566,
+          "created_high": 31282750,
+          "auth_low": 2853461019,
+          "auth_high": 0,
+          "session": 2,
+          "token_type": 1,
+          "elevated": 0,
+          "integrity": 8192,
+          "sid_length": 28,
+          "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+        },
+        "second_first_original_pi_observation": {
+          "pid": 16672,
+          "created_low": 3579387740,
+          "created_high": 31282750,
+          "auth_low": 2853461019,
+          "auth_high": 0
+        },
+        "external_second": {
+          "status": "not_observed",
+          "identity": "not_observed",
+          "actual_image": "not_observed",
+          "exact_second_job_membership": "not_observed",
+          "terminal_and_handle_close": "not_observed"
+        },
+        "original_query_count": 50,
+        "original_every_size": 272,
+        "original_every_returned_luid_matches": true,
+        "original_every_buffer_freed_with_status_0": true,
+        "original_lsa_absent": false,
+        "elapsed_ms": 3015,
+        "post_owner_exists": true,
+        "post_owner_free_ntstatus": 0,
+        "natural_exit_confirmed": true
+      }
+    ],
+    "frozen_inputs": 60,
+    "originals_stable": 92,
+    "measurement_complete": true,
+    "cleanup_passed": false,
+    "product_acceptance_passed": false,
+    "A_present_in_original_and_post_required_before_B": true,
+    "boundary": "B省去controller second OpenProcess/完整token与实际image/精确Job查询、该外部句柄后续wait/exit/close，没有对应原件和事件。first原PI的PID/birth/LUID、逐字ACK、Resume1、自然0及原PI关闭仍可按原件报告；B外部独立身份、实际image、精确second Job及外柄终态均not_observed，不以父Job空补足。仅说明该外部观察整组在本次不是残留必要条件，不证明创建API、ACK或系统持有者首因；d2单次clean反例仍保留。",
+    "next_step": "只读设计取消first ACK等待/读取及controller ACK写入的最小对照，保留原PI身份/退出/关闭收据；尚未准备或执行，不因本轮观察缩减而更改产品安全验证。",
+    "original_runner_success_ref": "g09_original_normal_matrix_and_local_handles_20261007",
+    "local_product_failure_ref": "g09_station_publish_repairs_20261007",
+    "g09_closed": false,
+    "closed_count": 10,
+    "pr_draft": true,
+    "final_same_source_linux_windows_complete": false,
+    "platform_handoff_not_passed": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "cleanup_ready": false,
+    "localization": "无需本地化变更；只有证据文档，无产品、用户文案或布局改动。"
+  },
   "g09_minimal_two_stage_difference_20261007": {
     "recorded_utc": "2026-10-07T09:23:31.149291+00:00",
     "repository_head_unchanged": "d213d433ae6330d2c13c7546ca66f6ce2d381903",
@@ -5555,17 +5687,17 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner8e84正常矩阵通过，本机b1显式站LSA失败保持。i5两臂清理；i6A单段清理、B最小两段加身份握手在自然退出/原柄关闭后仍LSA残留，尚非单API首因或产品修复。i7外层观察开关仅准备，最终同源双平台未完成，新增关闭0。",
+      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner8e84正常矩阵通过，本机b1产品失败保持。i6最小两段及握手残留；i7关外层second观察仍残留，仅否定该观察整组在本次为必要条件。取消ACK尚只读设计，产品未修复，最终同源双平台未完成，新增关闭0。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_original_normal_matrix_and_local_handles_20261007",
       "latest_result_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
-      "latest_preparation_ref": "g09_minimal_two_stage_difference_20261007",
+      "latest_preparation_ref": "g09_second_observer_control_20261007",
       "mac_platform_binding_regression_complete": true,
       "next_dynamic_observation_implemented": true,
       "both_public_candidate_modes_passed": true,
       "updated_transaction_complete": false,
       "current_local_repair_ref": "g09_station_publish_repairs_20261007",
-      "current_diagnostic_ref": "g09_minimal_two_stage_difference_20261007",
+      "current_diagnostic_ref": "g09_second_observer_control_20261007",
       "latest_result_source_diff_sha256": null,
       "both_public_candidate_modes_passed_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
       "latest_local_failure_ref": "g09_station_publish_repairs_20261007",
