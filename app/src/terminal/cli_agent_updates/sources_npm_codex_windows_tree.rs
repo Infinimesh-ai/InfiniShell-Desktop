@@ -355,13 +355,16 @@ pub(super) fn rename(root: &Path, destination: &Path, expected: &Snapshot) -> Re
     {
         return Err(Error::SourceChanged);
     }
-    let name: Vec<_> = destination.as_os_str().encode_wide().collect();
+    let mut name: Vec<_> = destination.as_os_str().encode_wide().collect();
+    let name_length = name.len() * 2;
+    // FileNameLength 不含终止符，但提交缓冲区必须显式容纳它，不能依赖对齐补零。
+    name.push(0);
     let length = std::mem::offset_of!(FILE_RENAME_INFO, FileName) + name.len() * 2;
     let mut buffer = vec![0usize; length.div_ceil(std::mem::size_of::<usize>())];
     let rename = buffer.as_mut_ptr().cast::<FILE_RENAME_INFO>();
     unsafe {
         (*rename).Anonymous.ReplaceIfExists = false;
-        (*rename).FileNameLength = (name.len() * 2) as u32;
+        (*rename).FileNameLength = name_length as u32;
         std::ptr::copy_nonoverlapping(
             name.as_ptr(),
             std::ptr::addr_of_mut!((*rename).FileName).cast(),

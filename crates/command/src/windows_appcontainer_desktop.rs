@@ -24,20 +24,16 @@ use windows::Win32::Security::{
     TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
 use windows::Win32::System::StationsAndDesktops::{
-    CloseDesktop, CreateDesktopW, DESKTOP_CONTROL_FLAGS, GetProcessWindowStation, GetThreadDesktop,
-    GetUserObjectInformationW, HDESK, HWINSTA, SetThreadDesktop, UOI_FLAGS, UOI_NAME,
-    USEROBJECTFLAGS,
-};
-#[cfg(any(test, feature = "test-util"))]
-use windows::Win32::System::StationsAndDesktops::{
-    CloseWindowStation, CreateWindowStationW, SetProcessWindowStation,
+    CloseDesktop, CloseWindowStation, CreateDesktopW, CreateWindowStationW, DESKTOP_CONTROL_FLAGS,
+    GetProcessWindowStation, GetThreadDesktop, GetUserObjectInformationW, HDESK, HWINSTA,
+    SetProcessWindowStation, SetThreadDesktop, UOI_FLAGS, UOI_NAME, USEROBJECTFLAGS,
 };
 #[cfg(any(test, feature = "test-util"))]
 use windows::Win32::System::Threading::STARTUPINFOW;
 use windows::Win32::System::Threading::{GetCurrentProcess, GetCurrentThreadId, OpenProcessToken};
-#[cfg(any(test, feature = "test-util"))]
-use windows::Win32::UI::WindowsAndMessaging::CWF_CREATE_ONLY;
-use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, WSF_VISIBLE};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CWF_CREATE_ONLY, GetSystemMetrics, SM_CXSCREEN, WSF_VISIBLE,
+};
 use windows::core::{BOOL, Error as WindowsError, PCWSTR, PWSTR};
 
 use super::{handle, owned, wide};
@@ -129,6 +125,51 @@ pub(in crate::windows) fn verify_expected_station_name(
                 message: "新登录窗口站或 AppContainer SID 不匹配",
                 caller_station_matched: Some(name.eq_ignore_ascii_case(caller_station)),
             },
+        ));
+    }
+    Ok(())
+}
+
+fn needs_owned_station(
+    name: &str,
+    expected_station: &str,
+    caller_station: &str,
+) -> io::Result<bool> {
+    match verify_expected_station_name(name, expected_station, caller_station) {
+        Ok(()) => {
+            if name.eq_ignore_ascii_case(caller_station) {
+                return Err(check_error(
+                    "new_logon_caller_station_reused",
+                    "新登录窗口站或 AppContainer SID 不匹配",
+                ));
+            }
+            Ok(false)
+        }
+        Err(error) => {
+            if diagnostic_caller_station_matched(&error) == Some(true) {
+                Ok(true)
+            } else {
+                Err(error)
+            }
+        }
+    }
+}
+
+fn verify_created_station_name(
+    name: &str,
+    expected_station: &str,
+    caller_station: &str,
+) -> io::Result<()> {
+    if !name.eq_ignore_ascii_case(expected_station) {
+        return Err(check_error(
+            "new_logon_created_station_name_mismatch",
+            "新登录窗口站或 AppContainer SID 不匹配",
+        ));
+    }
+    if name.eq_ignore_ascii_case(caller_station) {
+        return Err(check_error(
+            "new_logon_created_caller_station_reused",
+            "新登录窗口站或 AppContainer SID 不匹配",
         ));
     }
     Ok(())
@@ -257,10 +298,54 @@ impl Drop for Descriptor {
     }
 }
 
+enum NewLogonStation {
+    Borrowed(HWINSTA),
+    Owned {
+        original: HWINSTA,
+        handle: Option<HWINSTA>,
+    },
+}
+
+impl NewLogonStation {
+    fn handle(&self) -> io::Result<HWINSTA> {
+        match self {
+            Self::Borrowed(station) => Ok(*station),
+            Self::Owned { handle, .. } => handle
+                .ok_or_else(|| check_error("new_logon_owned_station_closed", "新登录窗口站已关闭")),
+        }
+    }
+
+    fn restore_target(&self, current: HWINSTA) -> io::Result<Option<HWINSTA>> {
+        match self {
+            Self::Borrowed(station) => {
+                if current != *station {
+                    return Err(check_error(
+                        "new_logon_restore_station_changed",
+                        "新站桌面恢复前窗口站已变化",
+                    ));
+                }
+                Ok(None)
+            }
+            Self::Owned { original, handle } => {
+                if current == *original {
+                    Ok(None)
+                } else if *handle == Some(current) {
+                    Ok(Some(*original))
+                } else {
+                    Err(check_error(
+                        "new_logon_owned_restore_station_changed",
+                        "新站桌面恢复前窗口站已变化",
+                    ))
+                }
+            }
+        }
+    }
+}
+
 /// 仅由已核实新 LUID 与原创建父进程的第二段 helper 建立。
-/// 窗口站句柄来自当前进程，始终借用并持有到进程退出，不按名称重开替代。
+/// 自动连接站仅借用；显式创建站独占持有，不按名称重开替代。
 pub(in crate::windows) struct NewLogonDesktop {
-    station: HWINSTA,
+    station: NewLogonStation,
     original_desktop: HDESK,
     desktop: Option<HDESK>,
     station_sd: Descriptor,
@@ -293,12 +378,15 @@ impl NewLogonDesktop {
         let name = object_name(HANDLE(station.0), "new_logon_station_name")?;
         let name = String::from_utf16(&name)
             .map_err(|_| check_error("new_logon_station_name_encoding", "新站名称编码无效"))?;
-        verify_expected_station_name(&name, expected_station, caller_station)?;
-        if name.eq_ignore_ascii_case(caller_station) {
-            return Err(check_error(
-                "new_logon_caller_station_reused",
-                "新登录窗口站或 AppContainer SID 不匹配",
-            ));
+        if needs_owned_station(&name, expected_station, caller_station)? {
+            // 仅处理已读回的 caller 站；不推断自动连接机制，也不修改该对象。
+            return Self::create_owned(
+                station,
+                expected_station,
+                profile,
+                container,
+                caller_station,
+            );
         }
         if !station_is_noninteractive(station)? {
             return Err(check_error(
@@ -375,51 +463,164 @@ impl NewLogonDesktop {
         let original_desktop = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
             .map_err(|error| api_error("new_logon_original_desktop", error))?;
         let mut result = Self {
-            station,
+            station: NewLogonStation::Borrowed(station),
             original_desktop,
             desktop: None,
             station_sd,
             desktop_sd,
         };
-        let name = wide(profile.as_ref())?;
-        let attributes = result.desktop_sd.attributes();
-        result.desktop = Some(
-            unsafe {
-                CreateDesktopW(
-                    PCWSTR(name.as_ptr()),
-                    None,
-                    None,
-                    DESKTOP_CONTROL_FLAGS(0),
-                    DESKTOP_OWNER_ACCESS,
-                    Some(&attributes),
-                )
-            }
-            .map_err(|error| api_error("new_logon_desktop_create", error))?,
-        );
-        if result.desktop == Some(original_desktop) {
-            return Err(check_error(
-                "new_logon_original_desktop_reused",
-                "新建桌面不得复用 helper 初始桌面",
-            ));
-        }
+        result.create_desktop(profile)?;
         result.restore()?;
         result.verify()?;
         Ok(result)
     }
 
-    fn restore(&self) -> io::Result<()> {
+    fn create_owned(
+        original_station: HWINSTA,
+        expected_station: &str,
+        profile: &str,
+        container: &str,
+        caller_station: &str,
+    ) -> io::Result<Self> {
+        let owner = current_user_sid()?;
+        if owner == container {
+            return Err(check_error(
+                "new_logon_owner_is_container",
+                "新站不属于本次本地用户",
+            ));
+        }
+        let station_sd = Descriptor::new(
+            &owner,
+            container,
+            STATION_OWNER_ACCESS,
+            STATION_CONTAINER_ACCESS,
+        )?;
+        let desktop_sd = Descriptor::new(
+            &owner,
+            container,
+            DESKTOP_OWNER_ACCESS,
+            DESKTOP_CONTAINER_ACCESS,
+        )?;
+        let original_desktop = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+            .map_err(|error| api_error("new_logon_owned_original_desktop", error))?;
+        let mut result = Self {
+            station: NewLogonStation::Owned {
+                original: original_station,
+                handle: None,
+            },
+            original_desktop,
+            desktop: None,
+            station_sd,
+            desktop_sd,
+        };
+        // NULL 让系统按本次登录标识命名；已有对象必须失败，不重开或放宽描述符。
+        let attributes = result.station_sd.attributes();
+        let station = unsafe {
+            CreateWindowStationW(
+                PCWSTR::null(),
+                CWF_CREATE_ONLY,
+                STATION_OWNER_ACCESS,
+                Some(&attributes),
+            )
+        }
+        .map_err(|error| api_error("new_logon_owned_station_create", error))?;
+        if station == original_station {
+            return Err(check_error(
+                "new_logon_created_original_station_reused",
+                "新建窗口站不得复用 helper 初始窗口站",
+            ));
+        }
+        // 先交给 Drop 持有，后续任一校验失败都只回收本次创建的句柄。
+        result.station = NewLogonStation::Owned {
+            original: original_station,
+            handle: Some(station),
+        };
+        let name = object_name(HANDLE(station.0), "new_logon_created_station_name")?;
+        let name = String::from_utf16(&name).map_err(|_| {
+            check_error(
+                "new_logon_created_station_name_encoding",
+                "新站名称编码无效",
+            )
+        })?;
+        verify_created_station_name(&name, expected_station, caller_station)?;
+        if !station_is_noninteractive(station)? {
+            return Err(check_error(
+                "new_logon_created_station_interactive",
+                "新登录窗口站或 AppContainer SID 不匹配",
+            ));
+        }
+        // 创建时即使用严格 SD；读回同时核 owner、DACL、低标签及不可继承属性。
+        verify_object(HANDLE(station.0), &result.station_sd, true)?;
+        unsafe { SetProcessWindowStation(station) }
+            .map_err(|error| api_error("new_logon_owned_station_select", error))?;
         if unsafe { GetProcessWindowStation() }
-            .map_err(|error| api_error("new_logon_restore_station", error))?
-            != self.station
+            .map_err(|error| api_error("new_logon_owned_selected_station", error))?
+            != station
         {
             return Err(check_error(
-                "new_logon_restore_station_changed",
-                "新站桌面恢复前窗口站已变化",
+                "new_logon_owned_station_not_selected",
+                "新登录窗口站选择未确认",
             ));
+        }
+        result.create_desktop(profile)?;
+        // Ready 前恢复 helper 原上下文，候选另以已绑定的完整桌面路径启动。
+        result.restore()?;
+        result.verify()?;
+        Ok(result)
+    }
+
+    fn create_desktop(&mut self, profile: &str) -> io::Result<()> {
+        let name = wide(profile.as_ref())?;
+        let attributes = self.desktop_sd.attributes();
+        let desktop = unsafe {
+            CreateDesktopW(
+                PCWSTR(name.as_ptr()),
+                None,
+                None,
+                DESKTOP_CONTROL_FLAGS(0),
+                DESKTOP_OWNER_ACCESS,
+                Some(&attributes),
+            )
+        }
+        .map_err(|error| api_error("new_logon_desktop_create", error))?;
+        if desktop == self.original_desktop {
+            return Err(check_error(
+                "new_logon_original_desktop_reused",
+                "新建桌面不得复用 helper 初始桌面",
+            ));
+        }
+        self.desktop = Some(desktop);
+        Ok(())
+    }
+
+    fn restore(&self) -> io::Result<()> {
+        let current_station = unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("new_logon_restore_station", error))?;
+        if let Some(original) = self.station.restore_target(current_station)? {
+            // SetThreadDesktop 要求目标桌面属于进程当前站，因此必须先恢复站。
+            unsafe { SetProcessWindowStation(original) }
+                .map_err(|error| api_error("new_logon_owned_restore_station", error))?;
+        }
+        if let NewLogonStation::Owned { original, .. } = &self.station {
+            if unsafe { GetProcessWindowStation() }
+                .map_err(|error| api_error("new_logon_owned_restored_station", error))?
+                != *original
+            {
+                return Err(check_error(
+                    "new_logon_owned_original_station_not_restored",
+                    "新站 helper 原窗口站恢复未确认",
+                ));
+            }
         }
         let current = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
             .map_err(|error| api_error("new_logon_current_desktop", error))?;
         if current != self.original_desktop {
+            if self.station_owned() && self.desktop != Some(current) {
+                return Err(check_error(
+                    "new_logon_owned_restore_desktop_changed",
+                    "新站桌面恢复前桌面已变化",
+                ));
+            }
             unsafe { SetThreadDesktop(self.original_desktop) }
                 .map_err(|error| api_error("new_logon_restore_desktop", error))?;
         }
@@ -436,20 +637,38 @@ impl NewLogonDesktop {
     }
 
     pub(in crate::windows) fn verify(&self) -> io::Result<()> {
+        let expected_current_station = match &self.station {
+            NewLogonStation::Borrowed(station) => *station,
+            NewLogonStation::Owned { original, .. } => *original,
+        };
         if unsafe { GetProcessWindowStation() }
             .map_err(|error| api_error("new_logon_station_recheck", error))?
-            != self.station
+            != expected_current_station
         {
             return Err(check_error(
                 "new_logon_station_changed",
                 "新站持有者切换了窗口站",
             ));
         }
-        verify_object(HANDLE(self.station.0), &self.station_sd, true)?;
+        if self.station_owned()
+            && unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+                .map_err(|error| api_error("new_logon_owned_desktop_recheck", error))?
+                != self.original_desktop
+        {
+            return Err(check_error(
+                "new_logon_owned_original_desktop_changed",
+                "新站 helper 原桌面恢复未确认",
+            ));
+        }
+        verify_object(HANDLE(self.station.handle()?.0), &self.station_sd, true)?;
         let desktop = self
             .desktop
             .ok_or_else(|| check_error("new_logon_desktop_closed", "新登录桌面已关闭"))?;
         verify_object(HANDLE(desktop.0), &self.desktop_sd, false)
+    }
+
+    pub(in crate::windows) fn station_owned(&self) -> bool {
+        matches!(self.station, NewLogonStation::Owned { .. })
     }
 
     #[cfg(feature = "native-probe-witness")]
@@ -460,14 +679,21 @@ impl NewLogonDesktop {
     }
 
     pub(in crate::windows) fn close(&mut self) -> io::Result<()> {
-        // 只恢复同一新站的初始桌面；不切换窗口站，也不关闭借用的初始句柄。
+        // 原站和原桌面都只借用；恢复完成后按桌面、站的顺序关闭自有句柄。
         self.restore()?;
         if let Some(desktop) = self.desktop {
             unsafe { CloseDesktop(desktop) }
                 .map_err(|error| api_error("new_logon_desktop_close", error))?;
             self.desktop = None;
         }
-        // 系统自动连接的 station 不能 CloseWindowStation；所有者进程退出后再由父核消失。
+        if let NewLogonStation::Owned { handle, .. } = &mut self.station {
+            if let Some(station) = *handle {
+                unsafe { CloseWindowStation(station) }
+                    .map_err(|error| api_error("new_logon_owned_station_close", error))?;
+                *handle = None;
+            }
+        }
+        // 自动连接站不能 CloseWindowStation；两种路径均由父继续核站和 LSA 消失。
         Ok(())
     }
 }

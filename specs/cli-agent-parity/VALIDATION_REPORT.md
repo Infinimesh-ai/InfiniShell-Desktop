@@ -1,6 +1,20 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：本机确认第二段使用调用方站，修复待实施
+## 当前接续状态（2026-10-07）：局部修复通过普通门禁，真实 CMD 收尾仍失败
+
+原 runner22 的 [37556769074](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37556769074) 已结束为 failure。首个 updated 的实际错误已由冻结源码对应到 `SetFileInformationByHandle(FileRenameInfo)` 返回 `0x80070003`，阶段为 inactive_rename；CMD/PS 候选均输出新版本、退出0并完成原生清理。普通测试1153项中1152通过、1失败；失败测试三次真实尝试的错误依次为 rename 0x80070003、open os_error2、rename 0x8007007b。只归档到 Prepared，原机尾部 buffer 字节及回滚终态仍未知，不能以静态几何认定唯一首因。
+
+本机原生合同对照证明未补 NUL 的 FileRenameInfo 可将已分配缓冲区的尾部字节纳入目标名；现在明确补 UTF-16 NUL，提交长度包含 NUL，FileNameLength 不包含它，保持原身份、父目录锁、映像冻结和不覆盖约束。同时仅在实测使用 caller 站的分支显式创建本次新 LUID 私有站，保留原自动站路径；失败的 station 所有权先转交外层，异常回收最多尝试一次，未确认回收不得删除 profile。
+
+本机 a4 的两候选及站/桌面/DeviceMap/LSA 清理已通过，也到达发布和最终版本检查，但公共 PowerShell 查询仍 CommandFailed；原 worker 未保留该子进程原生码。后续固定输入对照分别定位到公共 powershell.exe、官方 codex.ps1 和验收环境 SYSTEMROOT 的 verbatim 路径表示：三者采用同一对象的安全 Win32 表示后，实际公共 PS 查询退出0、输出0.156.1，未修改执行策略。产品改用 dunce 安全表示并复核 canonical/stamp 身份；驱动仅调整 SYSTEMROOT 的同对象表示，特殊尾点/空格、设备名和长路径继续保留原语义。这些事后对照不能补写 a4 原退出码或其未执行的最终检查。
+
+本轮 b1 冻结7198份来源，基于 aa3b314bc09022f87810a5718668fe299f4af3f8 加修复增量，diff SHA为 `465d37db980606c8fba43b80a3f649d85ff01ba62a569eec26694969f3ec5dbe`。Python31、command40、npm52（1项真实 native 显式忽略）、i18n11、cargo check及默认构建均通过。默认正常 witness=false 五场景实际在首个 updated 的第一代 CMD 收尾停止：CMD/Node/Codex/console均退出0，输出0.156.1，205个调试事件均继续；两级 helper 退出0、Job为空、桌面及 DeviceMap 已关闭、站已不存在，但期限内 LSA 会话仍存在，正常关闭与异常清理均 TimedOut。最终受控退出收据为1、cleanup_confirmed=false；产品 RecoveryRequired，driver退出1、worker退出101；未到 PS 候选、发布或冷恢复。不能将窗口站消失当作 LSA 清理成功，实际持有者尚未确定。
+
+本轮源码在 wrapper 运行前后快照及独审截止2026-10-07T04:38:59.963135Z均匹配；5个程序、3个归档程序和2324份 manager 文件的准备绑定与独审后验重算匹配。原 driver 未到末尾复核，这些后验检查不补造产品已完成步骤。原失败、a4、差分对照与 b1 原件分开保留；详细收据、独审及摘要见 CURRENT_STATUS.json 的 `g09_station_publish_repairs_20261007` 和 `g09_original_native_rename_20261007`。这是局部验证，未替代原 runner 或最终同源双平台门禁。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 正常五场景、三次独立冷恢复、最终同一冻结源码Linux/Windows门禁尚未完成；V01/V02/V05移交不计通过。特殊权限安装决定不变，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：既有中英文错误语义适用，无用户文案或布局变化，i18n11项通过。下一步取得本代 LSA 收尾的持有者证据并验证修复；原始证据保留，cleanup_ready=false。
+
+## 历史记录：本机确认第二段使用调用方站，修复当时待实施
 
 `430b8be416ed6593387dfebc7a93c836a4571cd9` 加内部诊断增量在受控本机入口执行一次正常 `witness=false` 的 updated：第二段返回 `new_logon_station_name_mismatch`／`InvalidData`，`caller_station_matched=true`。实际名称匹配调用方而不匹配预期新LUID站；不能仅凭同名认定继承或自动选择机制。候选root_pid=0、调试事件0，尚未查询站的非交互属性/owner、修改站ACL、发送Ready或执行发布；产品仍为RecoveryRequired，driver退出1、libtest退出101。它没有复现原runner的PersistenceFailed。
 

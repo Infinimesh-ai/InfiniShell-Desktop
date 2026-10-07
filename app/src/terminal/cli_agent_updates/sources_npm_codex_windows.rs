@@ -52,14 +52,26 @@ pub(super) fn version_invocation(entry: &Path) -> Result<Option<Invocation>, Err
         .join("WindowsPowerShell/v1.0/powershell.exe")
         .canonicalize()
         .map_err(|_| Error::UnsupportedPlatform)?;
+    // PowerShell 对 verbatim 路径有不同解释；只简化安全的呈现形式，并复核原有绑定。
+    // 尾点、保留名、UNC 或长路径等不能安全简化的路径保持原义，不直接截去前缀。
+    let presented_program = dunce::simplified(&program);
+    let presented_entry = dunce::simplified(&before.canonical);
+    if presented_program
+        .canonicalize()
+        .map_err(|_| Error::SourceChanged)?
+        != program
+        || stamp(presented_entry)? != before
+    {
+        return Err(Error::SourceChanged);
+    }
     Ok(Some(Invocation::new(
-        &program,
+        presented_program,
         [
             OsString::from("-NoLogo"),
             "-NoProfile".into(),
             "-NonInteractive".into(),
             "-File".into(),
-            entry.as_os_str().to_owned(),
+            presented_entry.as_os_str().to_owned(),
             "--version".into(),
         ],
     )))

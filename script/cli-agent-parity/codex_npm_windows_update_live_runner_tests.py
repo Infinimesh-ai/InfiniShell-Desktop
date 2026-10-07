@@ -150,6 +150,7 @@ class RunnerTests(unittest.TestCase):
             runner.package_contract(metadata,members,runner.TARGET)
 
     def test_environment_discards_auth_and_user_npm_settings(self):
+        (self.root / "Windows").mkdir()
         with patch.dict(os.environ,{"OPENAI_API_KEY":"must-not-propagate","NODE_OPTIONS":"--require injected.js",
                                     "NPM_CONFIG_PREFIX":"user-prefix","PSExecutionPolicyPreference":"Bypass",
                                     "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW":"codex-npm-first-cmd-v1",
@@ -168,6 +169,50 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(Path(result["NPM_CONFIG_USERCONFIG"]),self.root / "npm/user.npmrc")
         self.assertEqual(Path(result["CODEX_HOME"]),self.root / "home/.codex")
         self.assertEqual(result["INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW"],runner.SCOPE)
+
+    def test_environment_normalizes_only_systemroot_and_preserves_private_bindings(self):
+        root = PureWindowsPath(r"\\?\C:\private fixture")
+        system_root = PureWindowsPath(r"\\?\C:\Windows")
+        binaries = {name:{"path":str(PureWindowsPath(r"\\?\C:\tools") / (name + ".exe")),"sha256":"a"*64}
+                    for name in ("node","supervisor")}
+        before = json.dumps(binaries,sort_keys=True)
+        with patch.object(runner.os,"name","nt"), patch.object(runner,"Path",PureWindowsPath), \
+                patch.object(runner.os.path,"samefile",return_value=True) as same:
+            result = runner.environment(root,binaries,system_root,"recover")
+
+        self.assertEqual(result["SYSTEMROOT"],r"C:\Windows")
+        same.assert_called_once_with(str(system_root),r"C:\Windows")
+        self.assertEqual(result["WINDIR"],str(system_root))
+        self.assertEqual(result["COMSPEC"],str(system_root / "System32/cmd.exe"))
+        self.assertEqual(result["PATH"],os.pathsep.join((r"\\?\C:\tools",str(system_root / "System32"),
+                                                       str(system_root / "System32/WindowsPowerShell/v1.0"))))
+        for name,relative in runner.ENV_PATHS.items():
+            with self.subTest(name=name):
+                self.assertEqual(result[name],str(root / relative))
+        self.assertEqual(result["INFINISHELL_CLI_CODEX_WINDOWS_NPM_MANIFEST"],str(root / "manifest.private.json"))
+        self.assertEqual(result["INFINISHELL_CLI_SUPERVISOR_EXECUTABLE"],binaries["supervisor"]["path"])
+        self.assertEqual(result["INFINISHELL_CLI_CODEX_WINDOWS_NPM_STEP"],"recover")
+        self.assertEqual(json.dumps(binaries,sort_keys=True),before)
+
+    def test_environment_rejects_systemroot_presentation_identity_change(self):
+        root = PureWindowsPath(r"\\?\C:\private fixture")
+        system_root = PureWindowsPath(r"\\?\C:\Windows")
+        with patch.object(runner.os,"name","nt"), patch.object(runner,"Path",PureWindowsPath), \
+                patch.object(runner.os.path,"samefile",return_value=False):
+            with self.assertRaisesRegex(ValueError,"npm_path_identity_changed"):
+                runner.environment(root,self.binaries,system_root,"execute")
+
+    def test_environment_systemroot_retains_the_same_existing_directory(self):
+        system_directory = self.root / "Windows"
+        system_directory.mkdir()
+        system_root = runner.canonical(system_directory)
+
+        result = runner.environment(self.root,self.binaries,system_root,"execute")
+
+        self.assertTrue(os.path.samefile(result["SYSTEMROOT"],system_root))
+        self.assertTrue(Path(result["SYSTEMROOT"]).is_dir())
+        self.assertFalse(result["SYSTEMROOT"].startswith("\\\\?\\"))
+        self.assertEqual(result["WINDIR"],str(system_root))
 
     def test_witness_rejects_repeated_or_full_matrix_before_native_setup(self):
         for cases in (None, ["old_moved"], ["updated", "updated"], ["updated", "old_moved"]):

@@ -189,7 +189,8 @@ def expected_files(wrapper, platform_package):
 
 def environment(root, binaries, system_root, step):
     result = {name:str(root / relative) for name,relative in ENV_PATHS.items()}
-    result.update(SYSTEMROOT=str(system_root), WINDIR=str(system_root), COMSPEC=str(system_root / "System32/cmd.exe"),
+    # WinPS 的系统模块发现需要原生盘符呈现；只转换同一目录，身份清单保持 canonical。
+    result.update(SYSTEMROOT=npm_path(system_root), WINDIR=str(system_root), COMSPEC=str(system_root / "System32/cmd.exe"),
         PATH=os.pathsep.join((str(Path(binaries["node"]["path"]).parent), str(system_root / "System32"),
                              str(system_root / "System32/WindowsPowerShell/v1.0"))),
         PATHEXT=".COM;.EXE;.BAT;.CMD", LANG="C", LC_ALL="C", DISABLE_AUTOUPDATER="1",

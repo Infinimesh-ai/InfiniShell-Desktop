@@ -32,6 +32,127 @@ fn expected_station_match_leaves_caller_safety_check_to_the_existing_next_branch
     verify_expected_station_name("STATION", "station", "STATION").unwrap();
 }
 
+#[test]
+fn new_logon_station_selection_preserves_the_expected_automatic_station() {
+    assert!(
+        !needs_owned_station("PRIVATE_EXPECTED", "private_expected", "PRIVATE_CALLER").unwrap()
+    );
+}
+
+#[test]
+fn new_logon_station_selection_creates_only_for_the_observed_caller() {
+    assert!(needs_owned_station("PRIVATE_CALLER", "PRIVATE_EXPECTED", "private_caller").unwrap());
+
+    let failure =
+        needs_owned_station("PRIVATE_OTHER", "PRIVATE_EXPECTED", "PRIVATE_CALLER").unwrap_err();
+    assert_eq!(failure.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(
+        diagnostic_check(&failure),
+        Some("new_logon_station_name_mismatch")
+    );
+    assert_eq!(diagnostic_caller_station_matched(&failure), Some(false));
+    assert_eq!(diagnostic_code(&failure), None);
+    assert!(!format!("{failure:?}").contains("PRIVATE_"));
+}
+
+#[test]
+fn new_logon_station_selection_rejects_caller_as_the_expected_station() {
+    let failure =
+        needs_owned_station("PRIVATE_CALLER", "private_caller", "PRIVATE_CALLER").unwrap_err();
+
+    assert_eq!(
+        diagnostic_check(&failure),
+        Some("new_logon_caller_station_reused")
+    );
+    assert_eq!(diagnostic_caller_station_matched(&failure), None);
+}
+
+#[test]
+fn new_logon_created_station_requires_the_bound_name_without_reusing_caller() {
+    verify_created_station_name("PRIVATE_NEW", "private_new", "PRIVATE_CALLER").unwrap();
+
+    for (name, expected, caller, stage) in [
+        (
+            "PRIVATE_OTHER",
+            "PRIVATE_NEW",
+            "PRIVATE_CALLER",
+            "new_logon_created_station_name_mismatch",
+        ),
+        (
+            "PRIVATE_CALLER",
+            "PRIVATE_NEW",
+            "PRIVATE_CALLER",
+            "new_logon_created_station_name_mismatch",
+        ),
+        (
+            "PRIVATE_CALLER",
+            "private_caller",
+            "PRIVATE_CALLER",
+            "new_logon_created_caller_station_reused",
+        ),
+    ] {
+        let failure = verify_created_station_name(name, expected, caller).unwrap_err();
+        assert_eq!(diagnostic_check(&failure), Some(stage));
+        assert_eq!(diagnostic_caller_station_matched(&failure), None);
+        assert_eq!(diagnostic_code(&failure), None);
+        assert!(!format!("{failure:?}").contains("PRIVATE_"));
+    }
+}
+
+#[test]
+fn new_logon_owned_restore_accepts_only_the_retained_station_pair() {
+    // 这些不透明标记只进入纯状态判断，不传给任何 Windows API。
+    let original = HWINSTA(1usize as *mut c_void);
+    let created = HWINSTA(2usize as *mut c_void);
+    let unrelated = HWINSTA(3usize as *mut c_void);
+    let station = NewLogonStation::Owned {
+        original,
+        handle: Some(created),
+    };
+
+    assert_eq!(station.restore_target(created).unwrap(), Some(original));
+    assert_eq!(station.restore_target(original).unwrap(), None);
+    let failure = station.restore_target(unrelated).unwrap_err();
+    assert_eq!(
+        diagnostic_check(&failure),
+        Some("new_logon_owned_restore_station_changed")
+    );
+}
+
+#[test]
+fn new_logon_borrowed_station_never_requests_a_process_switch() {
+    let original = HWINSTA(1usize as *mut c_void);
+    let unrelated = HWINSTA(2usize as *mut c_void);
+    let station = NewLogonStation::Borrowed(original);
+
+    assert_eq!(station.restore_target(original).unwrap(), None);
+    let failure = station.restore_target(unrelated).unwrap_err();
+    assert_eq!(
+        diagnostic_check(&failure),
+        Some("new_logon_restore_station_changed")
+    );
+}
+
+#[test]
+fn new_logon_closed_owned_station_cannot_rebind_an_unretained_handle() {
+    let original = HWINSTA(1usize as *mut c_void);
+    let released = HWINSTA(2usize as *mut c_void);
+    let station = NewLogonStation::Owned {
+        original,
+        handle: None,
+    };
+
+    assert_eq!(station.restore_target(original).unwrap(), None);
+    assert_eq!(
+        diagnostic_check(&station.restore_target(released).unwrap_err()),
+        Some("new_logon_owned_restore_station_changed")
+    );
+    assert_eq!(
+        diagnostic_check(&station.handle().unwrap_err()),
+        Some("new_logon_owned_station_closed")
+    );
+}
+
 fn station_name(station: HWINSTA) -> io::Result<Vec<u16>> {
     let mut name = [0u16; 128];
     let mut used = 0;
@@ -124,6 +245,7 @@ pub(crate) fn private_descriptor_binds_exact_owner_container_and_low_label() {
     )
     .unwrap();
     let (owner, dacl, label) = relative_parts(descriptor.bytes()).unwrap();
+    assert!(!descriptor.attributes().bInheritHandle.as_bool());
     assert!(!owner.is_empty());
     assert_eq!(u16::from_le_bytes([dacl[4], dacl[5]]), 2);
     assert_eq!(u32::from_le_bytes(label[12..16].try_into().unwrap()), 1);

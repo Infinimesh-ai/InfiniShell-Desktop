@@ -507,6 +507,7 @@ struct Ready {
     nonce: String,
     process: Snapshot,
     station: String,
+    station_created_explicitly: bool,
     desktop: String,
     device_map: device_map::Binding,
     device_map_verified_and_created: bool,
@@ -967,6 +968,7 @@ pub(super) struct PrivateStation {
     device_map: Option<device_map::Binding>,
     closed: bool,
     reaped: bool,
+    abort_attempted: bool,
     close_attempted: bool,
     #[cfg(feature = "native-probe-witness")]
     witness_desktop: Option<WitnessDesktop>,
@@ -980,7 +982,7 @@ impl PrivateStation {
         profile: &str,
         sid: PSID,
         job_operation: &mut dyn FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
-    ) -> io::Result<Self> {
+    ) -> io::Result<(Self, io::Result<()>)> {
         no_impersonation()?;
         image.lease.verify()?;
         let image = StationBootstrapImage::capture(image.lease.path(), image.size, &image.sha256)?;
@@ -1042,6 +1044,7 @@ impl PrivateStation {
             device_map: None,
             closed: false,
             reaped: false,
+            abort_attempted: false,
             close_attempted: false,
             #[cfg(feature = "native-probe-witness")]
             witness_desktop: None,
@@ -1063,8 +1066,8 @@ impl PrivateStation {
                 .as_ref()
                 .and_then(|process| exit_code(raw(process)).ok()),
         );
-        started?;
-        Ok(result)
+        // 启动失败也先移交持有对象，让调用方按原回收结果决定是否清理 profile。
+        Ok((result, started))
     }
     fn start(
         &mut self,
@@ -1514,6 +1517,9 @@ impl PrivateStation {
         if self.closed || self.reaped {
             return Ok(());
         }
+        require(!self.abort_attempted, "窗口站异常回收已失败")?;
+        // 失败后的字段析构不能暗中再开启一轮等待，或把未确认回收当作成功。
+        self.abort_attempted = true;
         let mut first_exit = self
             .first
             .as_ref()
@@ -1559,7 +1565,9 @@ impl PrivateStation {
 }
 impl Drop for PrivateStation {
     fn drop(&mut self) {
-        let _ = self.abort_and_reap();
+        if !self.abort_attempted {
+            let _ = self.abort_and_reap();
+        }
     }
 }
 
@@ -1714,6 +1722,7 @@ fn helper_second(
         nonce: request.nonce.clone(),
         process: identity.clone(),
         station: binding.first.station_name(),
+        station_created_explicitly: desktop.station_owned(),
         desktop: request.profile.clone(),
         device_map: device_map.binding().clone(),
         device_map_verified_and_created: true,
@@ -1842,4 +1851,4 @@ pub fn run_station_bootstrap() -> io::Result<()> {
 
 #[cfg(test)]
 #[path = "windows_station_bootstrap_tests.rs"]
-mod tests;
+pub(super) mod tests;

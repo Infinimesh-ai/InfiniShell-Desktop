@@ -1,6 +1,114 @@
 use super::super::appcontainer::desktop::verify_expected_station_name;
 use super::*;
 
+// 只持有空 Job 和普通文件；不运行引导程序，也不连接或修改测试宿主的窗口站。
+pub(in crate::windows) fn unstarted_station(root: &Path, job: OwnedHandle) -> PrivateStation {
+    let image = root.join("bootstrap.exe");
+    fs::write(&image, b"fixed-image").unwrap();
+    let digest = format!("{:x}", Sha256::digest(b"fixed-image"));
+    PrivateStation {
+        root: PathLease::capture(root).unwrap(),
+        package_root: PathLease::capture(root).unwrap(),
+        image: StationBootstrapImage::capture(&image, 11, &digest).unwrap(),
+        job,
+        first: None,
+        first_identity: None,
+        second: None,
+        second_identity: None,
+        first_pipe: None,
+        second_pipe: None,
+        debugger: None,
+        nonce: Uuid::new_v4().simple().to_string(),
+        phase: "prepare",
+        startup: Vec::new(),
+        device_map: None,
+        closed: false,
+        reaped: false,
+        abort_attempted: false,
+        close_attempted: false,
+        #[cfg(feature = "native-probe-witness")]
+        witness_desktop: None,
+        #[cfg(feature = "native-probe-witness")]
+        witness_desktop_error: None,
+    }
+}
+
+pub(in crate::windows) fn query_only_job(job: &OwnedHandle) -> OwnedHandle {
+    // Win32 的 JOB_OBJECT_QUERY；测试仅保留查询权限，不扩大产品依赖特性。
+    const JOB_OBJECT_QUERY: u32 = 0x0004;
+    let mut duplicate = HANDLE::default();
+    unsafe {
+        DuplicateHandle(
+            GetCurrentProcess(),
+            raw(job),
+            GetCurrentProcess(),
+            &mut duplicate,
+            JOB_OBJECT_QUERY,
+            false,
+            DUPLICATE_HANDLE_OPTIONS(0),
+        )
+    }
+    .unwrap();
+    owned(duplicate)
+}
+
+#[test]
+fn failed_abort_cannot_be_retried_after_its_job_becomes_terminable() {
+    let temporary = tempfile::tempdir().unwrap();
+    let job = owned(unsafe { CreateJobObjectW(None, None) }.unwrap());
+    let mut station = unstarted_station(temporary.path(), query_only_job(&job));
+
+    let failure = station.abort_and_reap().unwrap_err();
+
+    assert_eq!(
+        failure
+            .get_ref()
+            .unwrap()
+            .downcast_ref::<windows::core::Error>()
+            .unwrap()
+            .code(),
+        HRESULT::from_win32(5)
+    );
+    assert!(station.abort_attempted);
+    assert!(!station.reaped);
+    let receipt = temporary.path().join("aborted-cleanup.json");
+    let original = fs::read(&receipt).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    assert_eq!(value["ok"], false);
+    assert_eq!(value["hresult"], HRESULT::from_win32(5).0);
+
+    // 换回完整权限后，旧实现会再次终止空 Job 并错误地把本对象标为已回收。
+    station.job = job;
+    let repeated = station.abort_and_reap().unwrap_err();
+    assert_eq!(repeated.kind(), io::ErrorKind::Other);
+    assert_eq!(repeated.to_string(), "窗口站异常回收已失败");
+    assert!(!station.reaped);
+    drop(station);
+    assert_eq!(fs::read(receipt).unwrap(), original);
+    assert!(!temporary.path().join("cleanup.json").exists());
+    assert!(!temporary.path().join("aborted-release-state.json").exists());
+}
+
+#[test]
+fn successful_abort_is_idempotent_without_writing_a_normal_cleanup_receipt() {
+    let temporary = tempfile::tempdir().unwrap();
+    let job = owned(unsafe { CreateJobObjectW(None, None) }.unwrap());
+    let mut station = unstarted_station(temporary.path(), job);
+
+    station.abort_and_reap().unwrap();
+
+    assert!(station.abort_attempted);
+    assert!(station.reaped);
+    let receipt = temporary.path().join("aborted-cleanup.json");
+    let original = fs::read(&receipt).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    assert_eq!(value["ok"], true);
+    station.abort_and_reap().unwrap();
+    drop(station);
+    assert_eq!(fs::read(receipt).unwrap(), original);
+    assert!(!temporary.path().join("cleanup.json").exists());
+}
+
 #[test]
 fn application_path_normalizes_short_unicode_and_spaces_without_releasing_identity() {
     let temporary = tempfile::tempdir().unwrap();
@@ -169,6 +277,7 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
         nonce: request.nonce.clone(),
         process: second.clone(),
         station: first.station_name(),
+        station_created_explicitly: false,
         desktop: request.profile.clone(),
         device_map: device_binding(&second),
         device_map_verified_and_created: true,
@@ -195,6 +304,19 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
         );
     }
     validate_ready(&request, &first, &second, &ready).unwrap();
+    assert_eq!(
+        serde_json::to_value(&ready).unwrap()["station_created_explicitly"],
+        false
+    );
+    let explicitly_created = Ready {
+        station_created_explicitly: true,
+        ..ready.clone()
+    };
+    validate_ready(&request, &first, &second, &explicitly_created).unwrap();
+    assert_eq!(
+        serde_json::to_value(&explicitly_created).unwrap()["station_created_explicitly"],
+        true
+    );
     for changed in [
         Ready {
             nonce: "c".repeat(32),
@@ -210,6 +332,10 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
         Ready {
             station: request.caller_station.clone(),
             ..ready.clone()
+        },
+        Ready {
+            station: request.caller_station.clone(),
+            ..explicitly_created
         },
         Ready {
             desktop: "different".to_owned(),

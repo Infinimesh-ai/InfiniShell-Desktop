@@ -2,10 +2,71 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
 use std::io::Read as _;
 
+use uuid::Uuid;
 use windows::Win32::Foundation::{ERROR_BROKEN_PIPE, GetHandleInformation, HANDLE_FLAG_INHERIT};
 use windows::Win32::System::Pipes::PeekNamedPipe;
 
+use super::super::station_bootstrap::tests::{query_only_job, unstarted_station};
 use super::*;
+
+#[test]
+fn failed_station_abort_preserves_the_profile_when_the_probe_is_dropped() {
+    let directory = tempfile::tempdir().unwrap();
+    let station_job = owned(unsafe { CreateJobObjectW(None, None) }.unwrap());
+    let station = unstarted_station(directory.path(), query_only_job(&station_job));
+    let name = format!("InfiniShell.Version.{}", Uuid::new_v4());
+    let profile_name = wide(name.as_ref()).unwrap();
+    let sid = unsafe {
+        CreateAppContainerProfile(
+            PCWSTR(profile_name.as_ptr()),
+            PCWSTR(profile_name.as_ptr()),
+            PCWSTR(profile_name.as_ptr()),
+            None,
+        )
+    }
+    .unwrap();
+    let probe = AppContainerProbe {
+        profile_name: profile_name.clone(),
+        sid,
+        grants: Vec::new(),
+        job: owned(unsafe { CreateJobObjectW(None, None) }.unwrap()),
+        process: None,
+        confirmed_exit_code: None,
+        startup_failure: None,
+        thread: None,
+        process_id: 0,
+        cleaned: false,
+        private_station: Some(station),
+        profile_directories: None,
+        captured_output: None,
+        private_desktop: None,
+    };
+
+    drop(probe);
+
+    // 同名创建必须仍返回已存在；若外层把失败站当作 None，这里会错误地创建新 profile。
+    let existing = unsafe {
+        CreateAppContainerProfile(
+            PCWSTR(profile_name.as_ptr()),
+            PCWSTR(profile_name.as_ptr()),
+            PCWSTR(profile_name.as_ptr()),
+            None,
+        )
+    };
+    if let Ok(unexpected) = &existing {
+        unsafe { FreeSid(*unexpected) };
+    }
+    // 空 Job 从未启动进程；只清理本测试创建的 profile，断言前也不遗留失败现场。
+    unsafe { DeleteAppContainerProfile(PCWSTR(profile_name.as_ptr())) }.unwrap();
+    assert_eq!(existing.unwrap_err().code(), HRESULT::from_win32(183));
+    let receipt: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(directory.path().join("aborted-cleanup.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(receipt["ok"], false);
+    assert_eq!(receipt["hresult"], HRESULT::from_win32(5).0);
+    assert!(!directory.path().join("cleanup.json").exists());
+}
 
 fn stream_test_pipe() -> (File, File) {
     let mut read = HANDLE::default();

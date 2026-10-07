@@ -1,4 +1,368 @@
 {
+  "g09_station_publish_repairs_20261007": {
+    "base_commit": "aa3b314bc09022f87810a5718668fe299f4af3f8",
+    "working_tree_dirty": true,
+    "source_diff_sha256": "465d37db980606c8fba43b80a3f649d85ff01ba62a569eec26694969f3ec5dbe",
+    "status": "local_static_gates_passed_first_cmd_lsa_cleanup_failed",
+    "is_original_runner_run": false,
+    "witness": false,
+    "implemented_repairs": [
+      "FileRenameInfo明确UTF16 NUL并保持FileNameLength原语义",
+      "仅caller站匹配分支创建严格私有新LUID站",
+      "启动失败所有权转交与单次异常回收",
+      "公共PS程序和官方shim使用同对象安全Win32路径表示",
+      "验收驱动仅SYSTEMROOT使用同对象Win32表示"
+    ],
+    "local_gates": {
+      "python": {
+        "path": "local-station-publish-repair-b1/python.safe.json",
+        "bytes": 1019,
+        "sha256": "5f57e10a31d2ccbfcb273bda8de0f993496c1e35f5c066caabb0e6c3ebf9c394"
+      },
+      "command": {
+        "path": "local-station-publish-repair-b1/command.safe.json",
+        "bytes": 1146,
+        "sha256": "e28ca1a0ca9677dab9d287e1b86ae5c4ec553763e8bc228b895ab32eaec99d5e"
+      },
+      "focused": {
+        "path": "local-station-publish-repair-b1/focused.safe.json",
+        "bytes": 979,
+        "sha256": "42411e5da303c7f69ea67b407b00fc5d46736833b67c644079d774ecf410513d"
+      },
+      "i18n": {
+        "path": "local-station-publish-repair-b1/i18n.safe.json",
+        "bytes": 943,
+        "sha256": "08744cab41b155f911c67688677c27633c087e252a69b29a757c0a7ceb5a44c3"
+      },
+      "check": {
+        "path": "local-station-publish-repair-b1/check.safe.json",
+        "bytes": 914,
+        "sha256": "882fa74fcdedd1e0c2133ef0c648e2b0ab4c7531248ac146e3eaa6cf2cfd212e"
+      },
+      "build": {
+        "path": "local-station-publish-repair-b1/build.safe.json",
+        "bytes": 1030,
+        "sha256": "724b85f57f0b1821a9251cd1095a4e48341dbdbe4df4a5410e7d136b157977da"
+      },
+      "format": {
+        "path": "local-station-publish-repair-b1/format.safe.json",
+        "bytes": 1154,
+        "sha256": "4e6e661370eb68dd8bb5c3bbf491ce83ab1a91a5ca25de7963f5b31316b2b0a3"
+      }
+    },
+    "test_counts": {
+      "python_passed": 31,
+      "command_passed": 40,
+      "npm_passed": 52,
+      "npm_real_native_explicitly_ignored": 1,
+      "i18n_passed": 11
+    },
+    "source_files": 7198,
+    "source_freeze": {
+      "path": "local-station-publish-repair-b1/frozen-sources.safe.json",
+      "bytes": 1826416,
+      "sha256": "ed39d61dab0a0daec1ebb443397465dfecb4f9e4b74b161c2ba4894e33263e3a"
+    },
+    "ready": {
+      "path": "local-station-publish-repair-b1/ready.safe.json",
+      "bytes": 27373,
+      "sha256": "4f4d4c83c1697cc2f87df0515663fad66959bff77b4661f074bfc3d905094d09"
+    },
+    "normal_receipt": {
+      "path": "local-station-publish-repair-b1/normal.safe.json",
+      "bytes": 2506,
+      "sha256": "005766b9156f509cf4b5842d34bd094c6910742a4a993ece0b3d76ff11362469"
+    },
+    "source_and_input_audit_cutoff_utc": "2026-10-07T04:38:59.963135Z",
+    "audit": {
+      "path": "local-station-publish-repair-b1/local-matrix-b1-independent-audit.safe.json",
+      "bytes": 34797,
+      "sha256": "f44ae15e7a8927d9faa3b727a539fd24bbd77434ddae54c03b9a0742a22cad46"
+    },
+    "archive": {
+      "path": "local-station-publish-repair-b1/previous-binaries-20261007T043646Z-7a0bd933/archive.safe.json",
+      "bytes": 2989,
+      "sha256": "5a199a7eaacb8edd47a7407582464809961e52611c47a3ff24dbdc17a5e56cda"
+    },
+    "actual_case": "updated",
+    "worker_invocations": 1,
+    "candidate_generations": 1,
+    "candidate_generation": "ac14aa3c-ff34-4e87-a4c8-200c6f0b9465",
+    "driver_exit_code": 1,
+    "worker_exit_code": 101,
+    "worker_seconds": 63.34,
+    "product_result": {
+      "accepted": false,
+      "error": "RecoveryRequired",
+      "model_inputs_sent": 0
+    },
+    "cmd_result": {
+      "version": "0.156.1",
+      "stdout_bytes": 18,
+      "native_process_exit_codes": {
+        "cmd": 0,
+        "node": 0,
+        "codex": 0,
+        "console": 0
+      },
+      "events_received_validated_continued": 205,
+      "cleanup_confirmed": false
+    },
+    "station_cleanup": {
+      "explicit_station_created": true,
+      "helper_exit_codes": [
+        0,
+        0
+      ],
+      "job_empty": true,
+      "desktop_verified_and_closed": true,
+      "device_map_verified_and_removed": true,
+      "station_absent": true,
+      "logon_absent": false,
+      "query_errors": [
+        null,
+        null
+      ],
+      "normal_error": "TimedOut",
+      "abort_error": "TimedOut",
+      "profile_deleted_confirmed": false,
+      "retaining_object_identified": false
+    },
+    "transaction": {
+      "phase": "Prepared",
+      "probe_count": 1,
+      "observed_version": null,
+      "stage_exists": true,
+      "backup_exists": false,
+      "publication_reached": false,
+      "powershell_candidate_reached": false,
+      "public_post_update_version_queries_reached": false
+    },
+    "normal_five_cases_completed": false,
+    "independent_cold_recoveries": 0,
+    "final_same_source_dual_gate": false,
+    "g09_closed": false,
+    "cleanup_ready": false,
+    "a4": {
+      "source_diff_sha256": "a2160a939e44acd06962ad10de519f4221f97af0727b093dbf379ce90d9c51ba",
+      "audit": {
+        "path": "local-station-publish-repair-a4/local-frozen-a4-independent-audit.safe.json",
+        "bytes": 35714,
+        "sha256": "1ed4b1a0ed73945b4fe253605808b037dbee63f7d74fcfd2383afc664687ae0c"
+      },
+      "both_candidate_modes_exit_zero": true,
+      "both_native_cleanup_confirmed": true,
+      "publication_and_after_tree_reached": true,
+      "product_error": "CommandFailed",
+      "failure_boundary": "最终公共PowerShell版本查询",
+      "original_public_ps_native_exit_unknown": true,
+      "original_final_configuration_and_manager_checks_completed": false,
+      "published_checkpoint_durable_phase": "OldMoved"
+    },
+    "post_a4_path_differential": {
+      "audit": {
+        "path": "public-ps-presentation-independent-audit-a1.safe.json",
+        "bytes": 35624,
+        "sha256": "dfa4e9ff6e80468eea23bf0fcd1e05a30e56f78f8eb40bea461af92a9eaabee2"
+      },
+      "comparisons": 7,
+      "actual_final_public_ps_exit": 0,
+      "version": "0.156.1",
+      "stderr_bytes": 0,
+      "changed_fields": [
+        "PowerShell executable path presentation",
+        "official shim path presentation",
+        "SYSTEMROOT presentation"
+      ],
+      "execution_policy_modified": false,
+      "original_cwd_presentation_retained": true,
+      "not_original_a4_exit_code_evidence": true
+    },
+    "localization": "无需本地化变更：复核既有中英文错误语义，无界面文案或布局变化，i18n11项通过。",
+    "original_driver_final_source_binary_manager_checks_completed": false,
+    "final_controlled_exit_receipt": {
+      "exit_code": 1,
+      "cleanup_confirmed": false
+    }
+  },
+  "g09_original_native_rename_20261007": {
+    "run_id": 37556769074,
+    "job_id": 112584745958,
+    "runner_id": 22,
+    "source_commit": "430b8be416ed6593387dfebc7a93c836a4571cd9",
+    "run_conclusion": "failure",
+    "failed_steps": [
+      {
+        "number": 44,
+        "name": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "number": 62,
+        "name": "Verify fixed Windows Codex npm update transactions without credentials"
+      }
+    ],
+    "ordinary": {
+      "run": 1153,
+      "passed": 1152,
+      "failed": 1,
+      "skipped": 7108,
+      "command_passed": 93,
+      "command_skipped": 166,
+      "i18n_passed_included": 11,
+      "attempts": [
+        {
+          "attempt": 1,
+          "operation_log": "operation=rename hresult=0x80070003",
+          "stage": "inactive_rename",
+          "error": "PersistenceFailed",
+          "panic_line": 92
+        },
+        {
+          "attempt": 2,
+          "operation_log": "operation=open mutation=false os_error=Some(2)",
+          "stage": "inactive_rename",
+          "error": "SourceChanged",
+          "panic_line": 92
+        },
+        {
+          "attempt": 3,
+          "operation_log": "operation=rename hresult=0x8007007b",
+          "stage": "inactive_rename",
+          "error": "PersistenceFailed",
+          "panic_line": 92
+        }
+      ],
+      "summary_try3_not_fourth_attempt": true
+    },
+    "candidate_result": {
+      "accepted": false,
+      "case": "updated",
+      "error": "PersistenceFailed",
+      "model_inputs_sent": 0
+    },
+    "worker_invocation": {
+      "returncode": 101,
+      "passed": 0,
+      "failed": 1,
+      "filtered": 8260,
+      "seconds": 161.42
+    },
+    "actual_transaction_failure": {
+      "api": "SetFileInformationByHandle",
+      "information_class": "FileRenameInfo",
+      "hresult": "0x80070003",
+      "stage": "inactive_rename",
+      "returned_error": "PersistenceFailed",
+      "source_path": "app/src/terminal/cli_agent_updates/sources_npm_codex_windows_tree.rs",
+      "source_api_line": 370,
+      "caller_path": "app/src/terminal/cli_agent_updates/sources_npm_codex_windows.rs",
+      "caller_lines": [
+        767,
+        771
+      ],
+      "boundary": "实际日志operation映射到已绑定冻结源码的API返回错误处。结合execute/recover控制流定位execute首次旧包到backup阶段；不是原机调用栈或目标buffer内存取证，不能据错误码推断AV、权限、损坏或ACL首因。",
+      "journal_failure_log_observed": false,
+      "native_buffer_or_tail_bytes_observed": false
+    },
+    "target_geometry": [
+      {
+        "role": "backup",
+        "utf16_units": 226,
+        "utf16_sha256": "0dc0341b9260e99d640f72ba92168f87bbdcf08c054044e8810667e0c8a63ffb",
+        "extended_path_prefix": true,
+        "file_name_offset_x64": 20,
+        "file_name_length_bytes": 452,
+        "declared_buffer_bytes": 472,
+        "source_usize_allocation_bytes": 472,
+        "zero_padding_after_name_bytes": 0,
+        "explicit_nul_added_by_source": false
+      },
+      {
+        "role": "stage",
+        "utf16_units": 222,
+        "utf16_sha256": "465baa4e8e76624821fddc71a4289535e17d0bcf789be8f87abcbfa2ffa7f505",
+        "extended_path_prefix": true,
+        "file_name_offset_x64": 20,
+        "file_name_length_bytes": 444,
+        "declared_buffer_bytes": 464,
+        "source_usize_allocation_bytes": 464,
+        "zero_padding_after_name_bytes": 0,
+        "explicit_nul_added_by_source": false
+      },
+      {
+        "role": "package",
+        "utf16_units": 174,
+        "utf16_sha256": "41e9abb575a79fb146aa863e8335e8505528947a4bf4e92468ae535ad1d7e5cc",
+        "extended_path_prefix": true,
+        "file_name_offset_x64": 20,
+        "file_name_length_bytes": 348,
+        "declared_buffer_bytes": 368,
+        "source_usize_allocation_bytes": 368,
+        "zero_padding_after_name_bytes": 0,
+        "explicit_nul_added_by_source": false
+      }
+    ],
+    "processes": [
+      {
+        "mode": "cmd",
+        "generation": "1554f0d2-f5a2-4ad7-91e1-4ff2429d4c65",
+        "stdout_bytes": 18,
+        "stdout_sha256": "aa9540ba22e99a052cd2634f5de83f1fc2bf70e3f852e3f0743754be743734b9",
+        "exit_code": 0,
+        "exit_elapsed_ms": {
+          "codex": 6942,
+          "node": 7299,
+          "root": 7393,
+          "console": 7476
+        },
+        "events_received_validated_continued": 200,
+        "bounded_event_rows_dropped": 184,
+        "pending_event": null,
+        "cleanup_confirmed": true,
+        "profile_deleted_marker_verified": true,
+        "station_desktop_device_map_lsa_cleanup_verified": true,
+        "startup_path_alias_warning_present": true,
+        "manifest_sha256": "b9f4a31f25a5a19cbf62a0160a001743b49f22aa94d9b8deac680f9d914fbc3b"
+      },
+      {
+        "mode": "powershell",
+        "generation": "4524347c-6546-4d36-86d7-ca9bce9d0702",
+        "stdout_bytes": 19,
+        "stdout_sha256": "191cd2fdcf6eab5515260f30eea6f3a74c9009fa3ef81e681c0f61d45cd1a8fd",
+        "exit_code": 0,
+        "exit_elapsed_ms": {
+          "codex": 10590,
+          "node": 12046,
+          "root": 12805,
+          "console": 12888
+        },
+        "events_received_validated_continued": 370,
+        "bounded_event_rows_dropped": 354,
+        "pending_event": null,
+        "cleanup_confirmed": true,
+        "profile_deleted_marker_verified": true,
+        "station_desktop_device_map_lsa_cleanup_verified": true,
+        "startup_path_alias_warning_present": true,
+        "manifest_sha256": "33a9c2e1623bed54567b1373c9ccc822779eac2a629925d1b0b290dced73523d"
+      }
+    ],
+    "source_after_recheck_completed": false,
+    "final_binary_and_manager_recheck_completed": false,
+    "whole_repository_frozen": false,
+    "normal_five_cases_completed": false,
+    "remaining_four_cases_run": false,
+    "independent_cold_recoveries": 0,
+    "final_same_source_dual_gate": false,
+    "g09_closed": false,
+    "cleanup_ready": false,
+    "audit": "normal-five-37556769074/original-runner-native-error-and-rename-contract-independent-audit.safe.json",
+    "audit_sha256": "44c09747df1f1a3625121ee9885e072fbe58abd932b900184e33dd11d6c1e647",
+    "audit_check_count": 491,
+    "local_nul_contract_receipt": "rename-termination-contract-a1.safe.json",
+    "local_nul_contract_sha256": "f70fb6d3a872a64126ad4e600a4b003bf5335407aae1f9dfc4e76113cba92d70",
+    "current_candidate_state": "修复普通门禁通过；b1真实首CMD在LSA收尾失败；G09开放",
+    "localization": "无需本地化变更：沿用既有用户错误语义，内部API和资源生命周期修复不修改界面文案或布局。"
+  },
   "g09_local_station_classification_20261007": {
     "base_commit": "430b8be416ed6593387dfebc7a93c836a4571cd9",
     "working_tree_dirty": true,
@@ -1982,7 +2346,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过。430b8be41加本机诊断增量已确认第二段helper实际站名匹配caller而不匹配本次LUID预期站，原InvalidData校验在候选创建前返回；updated仍RecoveryRequired、root_pid=0、零调试事件，未到ACL修改、Ready或发布。异常清理TimedOut，预期station_absent=true但logon_absent=false，cleanup_confirmed=false。command29、npm46（1真实native忽略）、i18n11、cargo check及程序构建通过，7198份来源在各轮前后及文档更新前独审一致；这是本机诊断，不替代原runner或最终同源门禁。37556769074原runner22仍运行，已知step44失败，真实npm结果待定。私有站创建与失败所有权传递修复尚未实施；新增关闭0，PR草稿，原件保留。",
+  "status_zh": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过。原runner37556769074已失败，实际FileRenameInfo返回0x80070003，原机尾部字节与回滚终态未知。本轮修复显式NUL、caller分支私有站和失败所有权，另对公共PS程序/官方shim及驱动SYSTEMROOT采用同对象安全路径表示。b1 Python31、command40、npm52（1真实native忽略）、i18n11、cargo check及构建通过，7198份来源独审前后相同。正常五场景在首updated的第一CMD收尾RecoveryRequired停止：CMD/Node/Codex/console退出0、205事件继续、helper退出0且Job/桌面/DeviceMap/站已释放，但期限内LSA仍存在；未到PS、发布或冷恢复，实际持有者待定位。a4曾通过两候选及原生清理并到最终公共PS失败，后验PS差分对照不补写原失败码。新增关闭0、PR草稿；最终同源Linux/Windows门禁未完成，原件保留。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -3613,22 +3977,22 @@
     },
     "g09_progress": {
       "status": "open",
-      "audit_ref": "g09_local_station_classification_20261007",
+      "audit_ref": "g09_station_publish_repairs_20261007",
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过。430b8be41加本机诊断增量已确认第二段helper实际站名匹配caller而不匹配本次LUID预期站，原InvalidData校验在候选创建前返回；updated仍RecoveryRequired、root_pid=0、零调试事件，未到ACL修改、Ready或发布。异常清理TimedOut，预期station_absent=true但logon_absent=false，cleanup_confirmed=false。command29、npm46（1真实native忽略）、i18n11、cargo check及程序构建通过，7198份来源在各轮前后及文档更新前独审一致；这是本机诊断，不替代原runner或最终同源门禁。37556769074原runner22仍运行，已知step44失败，真实npm结果待定。私有站创建与失败所有权传递修复尚未实施；新增关闭0，PR草稿，原件保留。 特殊权限安装决定保持；无需本地化变更，cleanup_ready=false。",
+      "boundary": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过。原runner37556769074已失败，实际FileRenameInfo返回0x80070003，原机尾部字节与回滚终态未知。本轮修复显式NUL、caller分支私有站和失败所有权，另对公共PS程序/官方shim及驱动SYSTEMROOT采用同对象安全路径表示。b1 Python31、command40、npm52（1真实native忽略）、i18n11、cargo check及构建通过，7198份来源独审前后相同。正常五场景在首updated的第一CMD收尾RecoveryRequired停止：CMD/Node/Codex/console退出0、205事件继续、helper退出0且Job/桌面/DeviceMap/站已释放，但期限内LSA仍存在；未到PS、发布或冷恢复，实际持有者待定位。a4曾通过两候选及原生清理并到最终公共PS失败，后验PS差分对照不补写原失败码。新增关闭0、PR草稿；最终同源Linux/Windows门禁未完成，原件保留。 特殊权限安装决定保持；无需本地化变更，cleanup_ready=false。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
-      "latest_result_ref": "g09_local_station_classification_20261007",
-      "latest_result_source_commit": "430b8be416ed6593387dfebc7a93c836a4571cd9",
-      "latest_preparation_ref": "g09_local_station_classification_20261007",
+      "latest_result_ref": "g09_station_publish_repairs_20261007",
+      "latest_result_source_commit": "aa3b314bc09022f87810a5718668fe299f4af3f8",
+      "latest_preparation_ref": "g09_station_publish_repairs_20261007",
       "mac_platform_binding_regression_complete": true,
       "next_dynamic_observation_implemented": true,
       "both_public_candidate_modes_passed": true,
       "updated_transaction_complete": false,
-      "current_local_repair_ref": "g09_local_station_classification_20261007",
-      "current_diagnostic_ref": "g09_local_station_classification_20261007",
-      "latest_result_source_diff_sha256": "d6d603e00f275d08b903016549f2cbd0b9d8e724e5491d44c26a32eaf674771d",
+      "current_local_repair_ref": "g09_station_publish_repairs_20261007",
+      "current_diagnostic_ref": "g09_station_publish_repairs_20261007",
+      "latest_result_source_diff_sha256": "465d37db980606c8fba43b80a3f649d85ff01ba62a569eec26694969f3ec5dbe",
       "both_public_candidate_modes_passed_source_commit": "d131dd13f3ddb38713e17dd7258241ec901792be"
     },
     "g09_real_consumers_20261003": {

@@ -928,9 +928,11 @@ impl AppContainerProbe {
             ProbeDesktopMode::Inherited => {}
             ProbeDesktopMode::NewLogon(image, bind_job, output_directory) => {
                 result.captured_output = Some(CapturedOutput::create(output_directory)?);
-                result.private_station = Some(PrivateStation::create(
-                    image, cwd, name, result.sid, bind_job,
-                )?);
+                let (station, started) =
+                    PrivateStation::create(image, cwd, name, result.sid, bind_job)?;
+                // 原启动错误直接返回；未完成的站必须仍由外层按回收结果持有。
+                result.private_station = Some(station);
+                started?;
                 authorize = Some(bind_job);
             }
             #[cfg(any(test, feature = "test-util"))]

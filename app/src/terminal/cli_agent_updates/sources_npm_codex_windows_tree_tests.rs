@@ -18,6 +18,60 @@ fn package_at(root: &Path, name: &str) -> PathBuf {
 }
 
 #[test]
+fn rename_preserves_exact_target_and_identity_at_every_utf16_alignment() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let mut alignments = BTreeSet::new();
+    // 连续四种 UTF-16 长度覆盖 x64 usize 边界；代理对确保不把字符数当作 UTF-16 长度。
+    for name in ["目标🦀a", "目标🦀ab", "目标🦀abc", "目标🦀abcd"] {
+        let package = package_at(&root, "package");
+        let expected = snapshot(&package).unwrap();
+        let original = path_identity(&package).unwrap();
+        let destination = root.join(name);
+        alignments.insert(destination.as_os_str().encode_wide().count() % 4);
+
+        rename(&package, &destination, &expected).unwrap();
+
+        assert!(!package.exists());
+        assert_eq!(path_identity(&destination).unwrap(), original);
+        assert_eq!(snapshot(&destination).unwrap(), expected);
+    }
+    assert_eq!(alignments, BTreeSet::from([0, 1, 2, 3]));
+    let actual: BTreeSet<_> = fs::read_dir(&root)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(
+        actual,
+        BTreeSet::from([
+            OsString::from("目标🦀a"),
+            OsString::from("目标🦀ab"),
+            OsString::from("目标🦀abc"),
+            OsString::from("目标🦀abcd"),
+        ])
+    );
+}
+
+#[test]
+fn rename_preserves_both_trees_when_the_destination_already_exists() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let package = package_at(&root, "package");
+    let destination = package_at(&root, "目标🦀");
+    fs::write(destination.join("package.json"), b"external tree").unwrap();
+    let expected = snapshot(&package).unwrap();
+    let existing = snapshot(&destination).unwrap();
+
+    assert_eq!(
+        rename(&package, &destination, &expected),
+        Err(Error::SourceChanged)
+    );
+
+    assert_eq!(snapshot(&package).unwrap(), expected);
+    assert_eq!(snapshot(&destination).unwrap(), existing);
+}
+
+#[test]
 fn held_image_freeze_rejects_package_rename_without_changing_tree() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path().canonicalize().unwrap();
