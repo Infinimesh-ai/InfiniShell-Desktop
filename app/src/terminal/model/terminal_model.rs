@@ -3476,6 +3476,15 @@ impl ansi::Handler for TerminalModel {
         delegate!(self.on_reset_grid());
     }
 
+    fn on_portable_reset_grid(&mut self) {
+        // 系统 ConPTY 可能吞掉生成器的旧重置 OSC，不能让遗留标志跳过前台重置。
+        #[cfg(windows)]
+        {
+            self.ignore_reset_grid_after_in_band_generator = false;
+        }
+        self.on_reset_grid();
+    }
+
     fn start_completions_output(&mut self, data: CompletionsShellData) {
         self.is_receiving_completions_output = IsReceivingCompletionsOutput::Yes { pending: data };
     }

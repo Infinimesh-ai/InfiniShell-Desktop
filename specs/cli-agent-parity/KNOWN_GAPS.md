@@ -1,6 +1,16 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态（2026-10-07）：桌面对照未支持首因，原机正常验收已开始
+## 当前接续状态（2026-10-07）：观察对照未定首因，main 合并本地门禁通过
+
+e1 复用旧8e84测试程序，无stdio与无写入stdio各一次，原断言均exit101/candidate_independent_station；两代helper自然退出、Job和原句柄关闭后，原三秒及测试进程退出后LSA仍存在。独审SHA `349a2ebf95d91e8a7b0bc85961642fe32aa4bb88ac1d76c99c37d8aec2b5c0f5`。该stdio控制路径不是本轮残留的必要条件，未定位b1产品持有者。
+
+f1 早查询off/on各一次，终态分别50次/3031ms与50次/3015ms仍存在；B早查询返回已绑定LUID、free=0。exit0仅表示观测完成，不是LSA清理或G09通过；独审SHA `c7ea32060582bc7cff2904fb020db18c13398840bb4c6a90a251932bbe11fcd3`。off本身残留，无法给出早查询因果结论；d2 A单次成功不是稳定基线。f1 A还新增一次event98写盘，不声称与d2 A逐条原生调用相同。
+
+已整合main `4907ebd35eb4d60d11f387db4aca2a600f31d622`，保留ConPTY重置与terminal-binding安全路由，新增两项交错回归。索引树 `71f81cbdc329ba4159e645f9dccecfe1588db70c` 的7207份来源前后不变，check、i18n11及定向nextest20项通过。初次nextest因PATH无工具而未启动测试，原exit101保留；后续仅对子进程使用已有且与归档一致工具。无需本地化变更，无新增文案或布局。
+
+原runner22的[37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367)截至 `2026-10-07T06:57:19.399938+00:00` 为 `in_progress`，只验证8e84。完整收据见CURRENT_STATUS的 `g09_local_observer_controls_20261007`，最新产品结果仍为b1失败。10项关闭、G09开放、V01/V02/V05移交不计通过，PR草稿。正常五场景、三次独立冷恢复与最终同源Linux/Windows门禁尚未完成。仓外原句柄引用计数入口仅在准备，尚未执行；证据保留，cleanup_ready=false。
+
+## 历史记录：桌面对照与原机开始验收
 
 新增关闭0项：G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿。b1首CMD的LSA收尾失败和c3两项原生失败保持，不用后续诊断覆盖。
 

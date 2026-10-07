@@ -9279,12 +9279,8 @@ impl Workspace {
                 search_query: search_query.map(|s| s.to_owned()),
             }),
         })));
-        self.add_tab_with_pane_layout(
-            panes_layout,
-            Arc::new(HashMap::new()),
-            Some(crate::t!("settings-title")),
-            ctx,
-        );
+        // 默认标题由设置面板提供，避免把当前译文保存为用户自定义标签名。
+        self.add_tab_with_pane_layout(panes_layout, Arc::new(HashMap::new()), None, ctx);
     }
 
     /// Open a file from the given session as a notebook pane.

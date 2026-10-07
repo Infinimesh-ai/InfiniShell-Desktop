@@ -28,6 +28,7 @@ struct MockHandler {
     terminal_binding_challenges: Vec<TerminalBindingChallenge>,
     hyperlink_events: Vec<Option<Hyperlink>>,
     cwd_updates: Vec<String>,
+    reset_grid_count: usize,
     registered_session_ids: HashSet<SessionId>,
     should_validate_dcs_hook_session_id: bool,
 }
@@ -261,6 +262,10 @@ impl Handler for MockHandler {
         self.cwd_updates.push(path);
     }
 
+    fn on_reset_grid(&mut self) {
+        self.reset_grid_count += 1;
+    }
+
     fn set_keyboard_enhancement_flags(
         &mut self,
         _mode: KeyboardModes,
@@ -287,6 +292,7 @@ impl Default for MockHandler {
             terminal_binding_challenges: Vec::new(),
             hyperlink_events: Vec::new(),
             cwd_updates: Vec::new(),
+            reset_grid_count: 0,
             registered_session_ids: HashSet::new(),
             should_validate_dcs_hook_session_id: true,
         }
@@ -332,6 +338,52 @@ fn parse_control_attribute() {
     let (_, handler) = parse_bytes(BYTES);
 
     assert_eq!(handler.attr, Some(Attr::Bold));
+}
+
+#[test]
+fn conpty_reset_span_preserves_text_attributes() {
+    let (_, handler) = parse_bytes(
+        b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[1m\x1b]1337;InfiniShellResetGrid=End\x07",
+    );
+
+    assert_eq!(handler.attr, Some(Attr::Bold));
+}
+
+#[test]
+fn conpty_reset_end_notifies_the_grid_once_after_a_valid_begin() {
+    let (mut parser, mut handler) =
+        parse_bytes(b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[2J\x1b[H");
+    assert_eq!(handler.reset_grid_count, 0);
+
+    parser.parse_bytes(
+        &mut handler,
+        b"\x1b]1337;InfiniShellResetGrid=End\x07",
+        &mut io::sink(),
+    );
+    assert_eq!(handler.reset_grid_count, 1);
+
+    parser.parse_bytes(
+        &mut handler,
+        b"\x1b]1337;InfiniShellResetGrid=End\x07",
+        &mut io::sink(),
+    );
+    assert_eq!(handler.reset_grid_count, 1);
+}
+
+#[test]
+fn conpty_reset_end_without_begin_does_not_notify_the_grid() {
+    let (_, handler) = parse_bytes(b"\x1b]1337;InfiniShellResetGrid=End\x07");
+
+    assert_eq!(handler.reset_grid_count, 0);
+}
+
+#[test]
+fn conpty_reset_end_after_printable_output_does_not_notify_the_grid() {
+    let (_, handler) = parse_bytes(
+        b"\x1b]1337;InfiniShellResetGrid=Begin\x07actual output\x1b]1337;InfiniShellResetGrid=End\x07",
+    );
+
+    assert_eq!(handler.reset_grid_count, 0);
 }
 
 #[test]
@@ -1528,6 +1580,28 @@ fn terminal_binding_osc_routes_without_cli_notification_or_dcs_hook() {
 fn terminal_binding_osc_rejects_unregistered_session_even_without_dcs_validation() {
     let body = b"\x1b]9278;t;1;17;10000000-0000-4000-8000-000000000001;20000000-0000-4000-8000-000000000001\x1b\\";
     let (_, handler) = parse_bytes_with_registered_sessions_and_validation(body, [], false);
+    assert!(handler.terminal_binding_challenges.is_empty());
+    assert!(handler.d_proto_hooks.is_empty());
+    assert!(handler.pluggable_notifications.is_empty());
+}
+
+#[test]
+fn conpty_reset_span_ends_before_a_terminal_binding_challenge() {
+    let body = b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b]9278;t;1;17;10000000-0000-4000-8000-000000000001;20000000-0000-4000-8000-000000000001\x07\x1b]1337;InfiniShellResetGrid=End\x07";
+    let (_, handler) = parse_bytes_with_registered_sessions(body, [SessionId::from(17)]);
+
+    assert_eq!(handler.reset_grid_count, 0);
+    assert_eq!(handler.terminal_binding_challenges.len(), 1);
+    assert!(handler.d_proto_hooks.is_empty());
+    assert!(handler.pluggable_notifications.is_empty());
+}
+
+#[test]
+fn conpty_reset_span_ends_before_a_malformed_terminal_binding_challenge() {
+    let body = b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b]9278;t;2;17;not-a-uuid;secret\x07\x1b]1337;InfiniShellResetGrid=End\x07";
+    let (_, handler) = parse_bytes_with_registered_sessions(body, [SessionId::from(17)]);
+
+    assert_eq!(handler.reset_grid_count, 0);
     assert!(handler.terminal_binding_challenges.is_empty());
     assert!(handler.d_proto_hooks.is_empty());
     assert!(handler.pluggable_notifications.is_empty());

@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::sink;
 use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -219,6 +220,181 @@ fn is_cloud_agent_conversation_only_true_for_genuine_ambient_sessions() {
         ),
     ));
     assert!(model.is_cloud_agent_conversation());
+}
+
+#[test]
+fn iterm_set_mark_barrier_preserves_command_output_across_reads() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo probe", "before");
+    let block_count = terminal.block_list().blocks().len();
+    let block_id = terminal.block_list().active_block().id().clone();
+    let command = terminal.block_list().active_block().command_to_string();
+    let mut processor = Processor::new();
+
+    // Windows SSH 用该序列刷新 ConPTY；客户端不能把屏障变成正文或新命令块。
+    processor.parse_bytes(&mut terminal, b"\x1b]1337;Set", &mut sink());
+    processor.parse_bytes(&mut terminal, b"Mark\x07after", &mut sink());
+
+    assert_eq!(terminal.block_list().blocks().len(), block_count);
+    assert_eq!(terminal.block_list().active_block().id(), &block_id);
+    assert_eq!(
+        terminal.block_list().active_block().command_to_string(),
+        command
+    );
+    assert_eq!(
+        terminal.block_list().active_block().output_to_string(),
+        "beforeafter"
+    );
+}
+
+#[test]
+fn conpty_reset_span_preserves_completed_blocks_across_reads() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo history", "saved");
+    let completed_id = terminal.block_list().active_block().id().clone();
+    terminal.finish_block();
+    terminal.simulate_long_running_block("echo probe", "before");
+    let active_id = terminal.block_list().active_block().id().clone();
+    let mut processor = Processor::new();
+
+    processor.parse_bytes(
+        &mut terminal,
+        b"\x1b]1337;InfiniShellResetGrid=Beg",
+        &mut sink(),
+    );
+    processor.parse_bytes(
+        &mut terminal,
+        b"in\x1b\\\x1b[?25l\x1b[2J\x1b[K\r\n\x1b[2K\r\n\x1b[1;1H\x1b[m",
+        &mut sink(),
+    );
+    processor.parse_bytes(
+        &mut terminal,
+        b"\x1b[?25h\x1b]1337;InfiniShellResetGrid=End\x1b\\after",
+        &mut sink(),
+    );
+
+    assert_eq!(terminal.block_list().active_block().id(), &active_id);
+    assert_eq!(
+        terminal.block_list().active_block().output_to_string(),
+        "beforeafter"
+    );
+    assert_eq!(
+        terminal
+            .block_list()
+            .block_with_id(&completed_id)
+            .expect("重置帧不能删除已完成命令块")
+            .output_to_string(),
+        "saved"
+    );
+    assert!(terminal.is_term_mode_set(TermMode::SHOW_CURSOR));
+}
+
+#[test]
+fn conpty_reset_without_end_resumes_at_printable_output() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo probe", "before");
+    terminal.process_bytes(&b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[K\r\nafter\r\nnext"[..]);
+
+    assert_eq!(
+        terminal.block_list().active_block().output_to_string(),
+        "beforeafter\nnext"
+    );
+}
+
+#[test]
+fn conpty_reset_without_end_resumes_at_other_osc() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo probe", "before");
+    terminal.process_bytes(
+        &b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b]0;probe title\x07\r\nafter"[..],
+    );
+
+    assert_eq!(terminal.terminal_title().as_deref(), Some("probe title"));
+    assert_eq!(
+        terminal.block_list().active_block().output_to_string(),
+        "before\nafter"
+    );
+}
+
+#[test]
+fn conpty_reset_without_end_resumes_at_other_csi() {
+    let mut baseline = TerminalModel::mock(None, None);
+    baseline.simulate_long_running_block("echo probe", "before");
+    baseline.process_bytes(&b"\x1b[2Cafter"[..]);
+
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo probe", "before");
+    terminal.process_bytes(&b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[2Cafter"[..]);
+
+    assert_eq!(
+        terminal
+            .block_list()
+            .active_block()
+            .grid_handler()
+            .cursor_point(),
+        baseline
+            .block_list()
+            .active_block()
+            .grid_handler()
+            .cursor_point()
+    );
+    terminal.process_bytes(&b"\r\nnext"[..]);
+    baseline.process_bytes(&b"\r\nnext"[..]);
+
+    assert_eq!(
+        terminal.block_list().active_block().output_to_string(),
+        baseline.block_list().active_block().output_to_string()
+    );
+    assert!(
+        terminal
+            .block_list()
+            .active_block()
+            .output_to_string()
+            .ends_with("\nnext")
+    );
+}
+
+#[cfg(all(windows, debug_assertions))]
+#[test]
+#[should_panic(expected = "Grid has already received a Reset Grid OSC.")]
+fn conpty_reset_end_reaches_grid_after_generator_reset_was_swallowed() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo probe", "before");
+    // 合法载荷解码为 probe;;0；省略系统 ConPTY 不识别的生成器旧重置 OSC。
+    terminal.process_bytes(&b"\x1b]9277;A\x0716;70726f62653b3b30\x1b]9277;B\x07"[..]);
+    assert!(terminal.ignore_reset_grid_after_in_band_generator);
+    terminal
+        .block_list_mut()
+        .active_block_mut()
+        .grid_handler_mut()
+        .reset_received_osc();
+
+    terminal.process_bytes(
+        &b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[2J\x1b[H\x1b]1337;InfiniShellResetGrid=End\x07"[..],
+    );
+    assert!(!terminal.ignore_reset_grid_after_in_band_generator);
+
+    // End 必须已送达网格，因此同一网格的第二次重置应触发既有重复重置断言。
+    terminal.on_reset_grid();
+}
+
+#[test]
+fn conpty_reset_without_end_has_a_control_limit() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("echo probe", "before");
+    let mut processor = Processor::new();
+    processor.parse_bytes(
+        &mut terminal,
+        b"\x1b]1337;InfiniShellResetGrid=Begin\x07",
+        &mut sink(),
+    );
+    processor.parse_bytes(&mut terminal, &b"\r".repeat(4096), &mut sink());
+    processor.parse_bytes(&mut terminal, b"\r\nafter", &mut sink());
+
+    assert_eq!(
+        terminal.block_list().active_block().output_to_string(),
+        "before\nafter"
+    );
 }
 
 fn iterm_file_osc(name: &str, inline: bool, payload: &[u8]) -> String {
