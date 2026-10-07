@@ -29,6 +29,14 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
     # Byte used to signal the end of an OSC for Warp JSON messages.
     $oscEnd = "$([char]0x07)"
 
+    # 系统 ConPTY 会异步绘制，而 SSH 不加载随包的私有重置实现。
+    # 仅在已验证支持 OSC 1337 同步刷新的 Windows 11 24H2 及以后版本启用。
+    $usePortableConptyReset = $env:WARP_IS_SSH -eq '1' -and
+        [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and
+        [Environment]::OSVersion.Version.Build -ge 26100
+    $oscFlushConpty = "$([char]0x1b)]1337;SetMark$oscEnd"
+    $oscPortableResetGrid = "$([char]0x1b)]1337;InfiniShellResetGrid=Begin$oscEnd$([char]0x1b)[2J$([char]0x1b)[H$([char]0x1b)]1337;InfiniShellResetGrid=End$oscEnd"
+
     # Writes a hex-encoded JSON message to the PTY.
     function Warp-Send-JsonMessage([System.Collections.Hashtable]$table) {
         $json = ConvertTo-Json -InputObject $table -Compress
@@ -38,6 +46,10 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
         # unicode), we encode it as hexadecimal string to avoid prematurely calling unhook if
         # one of the bytes in JSON is 9c (ST) or other (CAN, SUB, ESC).
         $encodedMessage = Warp-Encode-HexString $json
+        # 先同步此前的正文，防止 Preexec/CommandFinished 越过仍在等待绘制的文本。
+        if ($usePortableConptyReset) {
+            Write-Host -NoNewline $oscFlushConpty
+        }
         Write-Host -NoNewline "$oscStart$oscJsonMarker$oscParamSeparator$encodedMessage$oscEnd"
     }
 
@@ -267,6 +279,15 @@ $script:WarpPwshInitShell = @'
         $global:WARP_BOOTSTRAPPED = 1
     }
 
+    # 仅在命令块边界重置系统屏幕，异步补全输出继续使用原有私有 OSC。
+    function Warp-Reset-CommandGrid {
+        if ($usePortableConptyReset) {
+            Write-Host -NoNewline $oscPortableResetGrid
+        } else {
+            Warp-Send-ResetGridOSC
+        }
+    }
+
     function Warp-Preexec([string]$command) {
         $HOST.UI.RawUI.WindowTitle = $command
         $preexecMsg = @{
@@ -277,7 +298,7 @@ $script:WarpPwshInitShell = @'
             }
         }
         Warp-Send-JsonMessage $preexecMsg
-        Warp-Send-ResetGridOSC
+        Warp-Reset-CommandGrid
 
         # If this preexec is called for user command, kill ongoing generator command jobs and clean
         # up the bookkeeping temp files used to bookkeep.
@@ -498,7 +519,7 @@ $script:WarpPwshInitShell = @'
             }
         }
         Warp-Send-JsonMessage $commandFinishedMsg
-        Warp-Send-ResetGridOSC
+        Warp-Reset-CommandGrid
 
         Warp-Configure-PSReadLine
 
@@ -885,8 +906,10 @@ $script:WarpPwshInitShell = @'
         # Wrap prompt in Prompt Marker OSCs
         $startPromptMarker = "$e]133;A$oscEnd"
         $startRPromptMarker = "$e]133;P;k=r$oscEnd"
-        if ("$env:WARP_HONOR_PS1" -eq '0') {
-            $endPromptMarker = "$e]133;B$oscEnd$oscResetGrid"
+        # 未设置时与 Precmd 一致使用内置提示符，不能留下原提示符的列偏移。
+        if ("$env:WARP_HONOR_PS1" -ne '1') {
+            $resetGrid = if ($usePortableConptyReset) { $oscPortableResetGrid } else { $oscResetGrid }
+            $endPromptMarker = "$e]133;B$oscEnd$resetGrid"
         } else {
             $endPromptMarker = "$e]133;B$oscEnd"
         }

@@ -340,6 +340,11 @@ pub trait Handler {
     /// Hook that gets called upon receiving a "Reset Grid" OSC from ConPTY.
     fn on_reset_grid(&mut self) {}
 
+    /// 有效的便携重置帧已完成；默认沿用普通网格重置处理。
+    fn on_portable_reset_grid(&mut self) {
+        self.on_reset_grid();
+    }
+
     /// Callback that tells the terminal that the shell is ready to receive
     /// the string to run completions for.
     fn send_completions_prompt(&mut self) {}

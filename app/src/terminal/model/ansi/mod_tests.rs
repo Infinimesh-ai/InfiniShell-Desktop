@@ -27,6 +27,7 @@ struct MockHandler {
     pluggable_notifications: Vec<(Option<String>, String)>,
     hyperlink_events: Vec<Option<Hyperlink>>,
     cwd_updates: Vec<String>,
+    reset_grid_count: usize,
     registered_session_ids: HashSet<SessionId>,
     should_validate_dcs_hook_session_id: bool,
 }
@@ -256,6 +257,10 @@ impl Handler for MockHandler {
         self.cwd_updates.push(path);
     }
 
+    fn on_reset_grid(&mut self) {
+        self.reset_grid_count += 1;
+    }
+
     fn set_keyboard_enhancement_flags(
         &mut self,
         _mode: KeyboardModes,
@@ -281,6 +286,7 @@ impl Default for MockHandler {
             pluggable_notifications: Vec::new(),
             hyperlink_events: Vec::new(),
             cwd_updates: Vec::new(),
+            reset_grid_count: 0,
             registered_session_ids: HashSet::new(),
             should_validate_dcs_hook_session_id: true,
         }
@@ -326,6 +332,52 @@ fn parse_control_attribute() {
     let (_, handler) = parse_bytes(BYTES);
 
     assert_eq!(handler.attr, Some(Attr::Bold));
+}
+
+#[test]
+fn conpty_reset_span_preserves_text_attributes() {
+    let (_, handler) = parse_bytes(
+        b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[1m\x1b]1337;InfiniShellResetGrid=End\x07",
+    );
+
+    assert_eq!(handler.attr, Some(Attr::Bold));
+}
+
+#[test]
+fn conpty_reset_end_notifies_the_grid_once_after_a_valid_begin() {
+    let (mut parser, mut handler) =
+        parse_bytes(b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b[2J\x1b[H");
+    assert_eq!(handler.reset_grid_count, 0);
+
+    parser.parse_bytes(
+        &mut handler,
+        b"\x1b]1337;InfiniShellResetGrid=End\x07",
+        &mut io::sink(),
+    );
+    assert_eq!(handler.reset_grid_count, 1);
+
+    parser.parse_bytes(
+        &mut handler,
+        b"\x1b]1337;InfiniShellResetGrid=End\x07",
+        &mut io::sink(),
+    );
+    assert_eq!(handler.reset_grid_count, 1);
+}
+
+#[test]
+fn conpty_reset_end_without_begin_does_not_notify_the_grid() {
+    let (_, handler) = parse_bytes(b"\x1b]1337;InfiniShellResetGrid=End\x07");
+
+    assert_eq!(handler.reset_grid_count, 0);
+}
+
+#[test]
+fn conpty_reset_end_after_printable_output_does_not_notify_the_grid() {
+    let (_, handler) = parse_bytes(
+        b"\x1b]1337;InfiniShellResetGrid=Begin\x07actual output\x1b]1337;InfiniShellResetGrid=End\x07",
+    );
+
+    assert_eq!(handler.reset_grid_count, 0);
 }
 
 #[test]
