@@ -351,8 +351,150 @@
       "g09_closed": false,
       "cleanup_ready": false
     },
+    "i19_actual_temporal_control": {
+      "prepared": {
+        "path": "local-h2-temporal-control-i19/prepared.safe.json",
+        "bytes": 48959,
+        "sha256": "6b6b74b5fbd38bfd45dd9eab9607a8725d47decae73e471fec5e53dfa6f2760f"
+      },
+      "pair": {
+        "path": "local-h2-temporal-control-i19/pair.safe.json",
+        "bytes": 38493,
+        "sha256": "255d17b2a56cc52b04ba419c6fc9a27944fe2bf2079eeb823a6a325a107ea0df"
+      },
+      "audit": {
+        "path": "local-h2-temporal-control-i19/audit.safe.json",
+        "bytes": 84307,
+        "sha256": "d7f04e55d95a77d91ccc0cc2343e287a206ac76a7c97623afa43aaa57841058d"
+      },
+      "root_execution": {
+        "path": "i19-root-execution.safe.json",
+        "bytes": 274,
+        "sha256": "c0ca68f4b64ed02d4d67b8fb12508ca4ed1450e773ab0d5354b6396660b0bdb3"
+      },
+      "frozen_inputs_excluding_prepared": 133,
+      "prepared_additional_input_count": 1,
+      "originals_stable": 162,
+      "case_files": 21,
+      "audit_assertions_not_product_tests": 212,
+      "started_utc": "2026-10-07T12:36:29.481859+00:00",
+      "finished_utc": "2026-10-07T12:36:29.879326+00:00",
+      "wrapper_exit_code": 0,
+      "retry_count": 0,
+      "single_case": "A",
+      "first_pid": 25944,
+      "second_pid": 9192,
+      "actual_shared_luid": {
+        "low": 2896382581,
+        "high": 0
+      },
+      "original_native_binary_paths_fileid_sha_equal_to_h2": true,
+      "original_binaries": {
+        "controller": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\local-user32-order-control-h2\\control.exe",
+          "bytes": 23552,
+          "sha256": "223dbb23ac5a46e8a132f0fba331ce4e87d983f789d6300fcc9b5442a602c54b",
+          "device": 14033226427907248377,
+          "file_id": 2533274792640987
+        },
+        "helper": {
+          "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\local-user32-order-control-h2\\order-helper.exe",
+          "bytes": 18432,
+          "sha256": "faee3e58093d8ac608b5f70eb856eb0cd3f59c91822666619e12b7c3ca678755",
+          "device": 14033226427907248377,
+          "file_id": 2533274792641002
+        }
+      },
+      "recorded_caller_token_and_session_identity_equal_to_h2": true,
+      "full_token_object_not_observed": true,
+      "first_metric": "原h2冻结代码不调用；原stage1零槽不是API返回0，本轮未新增called收据",
+      "second_order": "A",
+      "second_metric_value": 2560,
+      "explicit_private_station_and_nonce_desktop_verified": true,
+      "original_objects_restored": true,
+      "owned_object_handles_closed": true,
+      "both_processes_natural_exit_0": true,
+      "original_PI_closed_and_job_empty": true,
+      "measurement_complete": true,
+      "original_poll": {
+        "query_count": 1,
+        "ntstatus": "0xc000005f",
+        "buffer_returned": false,
+        "logon_absent": true,
+        "elapsed_ms": 15
+      },
+      "post_owner": {
+        "queried_utc": "2026-10-07T12:36:29.828494+00:00",
+        "ntstatus": "0xc000005f",
+        "exists": false,
+        "buffer_returned": false,
+        "free_ntstatus": null
+      },
+      "historical_boundary": "旧h2两臂各50次present/3047ms原件保持有效；旧post未观察、不回填。原映像字节/路径与已记录caller身份相同，但时间、系统状态、外部模块及新root/nonce未共同冻结。",
+      "causality_boundary": "原h2原二进制本次也清理，不能把i18清理归因其共同源码改动；不认定loader、first metric、某个持有者或产品b1首因。原首查已absent，不能归因后续singlepost。",
+      "deadline_boundary": "原WAIT_LIMIT/收据10000ms、first自然wait5000ms、LSA3000ms保持；已知absent提前结束，15ms为原粗tick。",
+      "g09_closed": false,
+      "cleanup_ready": false
+    },
+    "j1_capability": {
+      "capability": {
+        "path": "local-handle-query-capability-j1/capability.safe.json",
+        "bytes": 1930,
+        "sha256": "c520fbb482e7b9c456958216fdfc1c7d2a93ad26eb849b9b5325fdf3e85892e4"
+      },
+      "root_execution": {
+        "path": "j1-root-execution.safe.json",
+        "bytes": 1887,
+        "sha256": "6d47bc624d61281f5c65923054fefef23ed6da158427e746a1fd2906d5149831"
+      },
+      "script": {
+        "path": "local-handle-query-capability-j1/Inspect-OwnHandleCapability.ps1",
+        "bytes": 15540,
+        "sha256": "f54429ac216e879710f028b01d94fe210c58e4bbedc608478a0860f4ce0e11f0"
+      },
+      "started_utc": "2026-10-07T12:41:31.9332463Z",
+      "finished_utc": "2026-10-07T12:41:33.0509020Z",
+      "wrapper_exit_code": 0,
+      "purpose": "仅核本身份下class64通道能力，不是会话持有者普查",
+      "observer_pid": 29576,
+      "observer_birth_filetime": 134358504915653782,
+      "birth_revalidated": true,
+      "query_class": 64,
+      "attempts": [
+        {
+          "BufferBytes": 1048576,
+          "RequiredBytes": 5980896,
+          "NtStatus": "0xC0000004"
+        },
+        {
+          "BufferBytes": 6029312,
+          "RequiredBytes": 5980976,
+          "NtStatus": "0x00000000"
+        }
+      ],
+      "bounded_attempt_count": 2,
+      "successful_query_count": 1,
+      "matched_own_entries": 1,
+      "matched_nonzero_objects": 0,
+      "matched_object_type_indices": [
+        8
+      ],
+      "own_process_handle_closed": true,
+      "windows_version": {
+        "major": 10,
+        "minor": 0,
+        "build": 26300,
+        "source": "RtlGetVersion",
+        "ntstatus": "0x00000000"
+      },
+      "no_token_query_or_elevation": true,
+      "other_entry_details_written": false,
+      "boundary": "首次0xc0000004要求扩容，第二次0成功；自身唯一匹配项Object=0，只能说明本次通道未暴露其对象地址。不能据此称系统/目标没有持有者，也没有目标LUID扫描或归属证据。",
+      "g09_closed": false,
+      "cleanup_ready": false
+    },
     "product_boundary": "b1实际失败的冻结helper 7f3f77aa084adcf8761ef15d32884629fffbee0b10273b6a758ce575d3d6696e静态导入USER32、PE子系统3；i16 first为动态加载、GUI子系统2。产品second已调用GetSystemMetrics，first只有窗口站查询。静态及最小诊断差异尚不能直接移植为产品修复。",
-    "next_step": "仅授权仓外准备i19：复用h2原controller/helper精确字节、原A条件作单病例时间对照，不构建、不执行；待根审后另定唯一运行。i18无B结果，不能把first metric当修复；i15仍仅准备未执行。产品b1及最终同冻结源码Linux/Windows门禁继续待验。",
+    "next_step": "正在仅准备K1历史b1产品updated复核：真实detached工作树.worktrees/g09-b1-temporal-k1固定8e84b737eabeefe1ab082dc3be6b6c0fd5067c96；根与代理已只读核对67份相关来源与b1一致，但尚无本轮prepared收据，不称准备完成。worker改用已归档367a映像路径并单列相对原target路径的偏离，supervisor/helper保持原路径；witness=false、仅updated、新根C:\\Coding\\g09-b1t1，尚未执行。不是当前377d1028d3e05afe1e6b676ff29a436c9f0a8534的最终源码门禁；i15仍未执行，原b1/h2失败保留，最终同冻结源码Linux/Windows门禁继续待验。",
     "original_runner_success_ref": "g09_original_normal_matrix_and_local_handles_20261007",
     "local_product_failure_ref": "g09_station_publish_repairs_20261007",
     "g09_closed": false,
@@ -7660,7 +7802,7 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。i16 A已清理停止B；i17仅loader整组off残留/on清理；i18显式私有站A未调用first metric也原/post清理，B未运行，不能认metric有效或产品已修。旧h2/b1失败保留；i15未执行，i19仅准备原h2字节单病例时间对照。最终同源双平台未完成，新增关闭0。",
+      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。i19复用h2原映像字节/路径A本次原/post均清理，旧h2残留仍有效，不能归因i18共改或认定产品修复。j1两次有界class64尝试第二次成功，但自身唯一匹配Object=0，不等于没有持有者。K1仅准备历史8e84/b1来源的正常updated复核，worker归档路径偏离单列；尚未执行，不替代当前冻结源码最终双平台门禁。新增关闭0。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_original_normal_matrix_and_local_handles_20261007",
       "latest_result_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",

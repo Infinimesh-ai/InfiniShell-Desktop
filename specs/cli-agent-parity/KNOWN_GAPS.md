@@ -1,6 +1,16 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态（2026-10-07）：加载组差异与私有站A清理均已记录，产品仍未验证
+## 当前接续状态（2026-10-07）：原h2同映像本次清理，K1产品复核仅在准备
+
+i19唯一执行原h2的A，沿用原controller/helper绝对路径、FileID与字节；与旧两臂caller已记录的AuthenticationId、session、token类型、提升状态、完整性级别和SID一致，未记录的权限组/default DACL不外推相同。first25944、second9192实际同LUID2896382581/0；显式NULL+CWF_CREATE_ONLY私有站、nonce桌面、严格SD、原对象恢复和owned关闭、两代自然0/原PI关闭/Job空均核实。原首查0xc000005f/NULL、elapsed15ms；owner原柄关闭后的唯一post也absent。pair SHA `255d17b2a56cc52b04ba419c6fc9a27944fe2bf2079eeb823a6a325a107ea0df`；独审SHA `d7f04e55d95a77d91ccc0cc2343e287a206ac76a7c97623afa43aaa57841058d`，133输入另加prepared、162原件前后稳定、21病例文件；212为证据断言，不计测试或关闭。
+
+旧h2两臂各50次present/3047ms证据仍有效，历史post未观察、不回填。旧映像本次也清理，因此不能把i18清理归因其共同源码改动，更不能认定loader、first metric或产品b1首因；时间、系统状态与外部模块没有共同冻结。j1仅核class64通道：自身29576/birth134358504915653782，两次有界尝试中首次0xc0000004扩容、第二次0成功，自身唯一匹配Object=0/type8，原柄已关闭，RtlGetVersion为26300；无token查询、提权或其它条目详情落盘。这不是持有者为零的证据。capability SHA `c520fbb482e7b9c456958216fdfc1c7d2a93ad26eb849b9b5325fdf3e85892e4`，根回执SHA `6d47bc624d61281f5c65923054fefef23ed6da158427e746a1fd2906d5149831`。
+
+K1正在准备历史b1产品updated复核，尚无prepared收据或实际运行：真实detached工作树 `.worktrees/g09-b1-temporal-k1` 固定 `8e84b737eabeefe1ab082dc3be6b6c0fd5067c96`，根/代理已只读核对67份相关来源与b1一致；worker改用已归档367a映像路径，单列相对原target路径的偏离，supervisor/helper仍用原路径。限定正常witness=false、仅updated、新根 `C:\Coding\g09-b1t1`；它不等于当前 `377d1028d3e05afe1e6b676ff29a436c9f0a8534` 的最终门禁。i15未执行，原runner8e84正常5场景/3冷恢复通过与本机b1失败各自保留。
+
+G09开放、10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过，最终同冻结源码Linux/Windows门禁待完成。详见CURRENT_STATUS的 `g09_first_user32_load_baseline_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档来源仍按原check、i18n11和定向20项收据计证，未声称重跑。
+
+## 历史记录：加载组差异与私有站A清理
 
 i16只执行A：同一新first/原leaf、manual恢复、ACK/token/外部second观察off；first加载固定系统USER32、核路径并解析导出，持引用至second原PI关闭后FreeLibrary成功，但没有调用GetSystemMetrics，原172B收据明确attempted/returned=0、公开value=null。两代自然0、Resume1、原PI关闭与Job空；first PID6712/LUID2886566018/0，second PID15540的LUID仍未观察。
 
@@ -14,7 +24,7 @@ i17在同一新first中只切整组加载/路径/导出解析/持有释放，两
 
 i18保留h2显式私有站和second固定A顺序，仅first metric设为A/off；first12120、second10724实际同LUID2892079684/0。first未调用metric、公开value=null；second原A的metric2560、NULL+CWF_CREATE_ONLY新私有站与nonce桌面、严格SD、原对象恢复、owned句柄关闭、两代自然0/原PI关闭和Job空均核实。原首查0xc000005f/NULL、粗tick0；owner退出并关闭原柄后12:18:58.749715Z单post同样absent，无返回buffer或free调用。A测量完整但双present前置未成立，B未启动；wrapper1不是A清理失败。pair SHA `2dff3c0f1f70a2dc2e72789465a7c126cfd8dc34e9c4adad20791443be31cee6`；独审SHA `6d74a30fbbb3fa75ecacd1f4480766488a9889272a951018de04d067162316bd`，155原件稳定、129输入另加prepared、22病例文件；190项为证据断言，不计测试或缺口关闭。没有B结果，不能认first metric有效、推翻旧h2残留或称产品已修；共同收据I/O、环境键和重链等差异仍在，首查absence不能归因后续singlepost。
 
-i15创建者对照保持仅准备未执行，prepared SHA `c3e682da62a02733667c0d2f55488d39c15d1d0d5c4c0f1c5ca6dbe2a73bc888`。i18沿用h2原WAIT_LIMIT/收据10000ms、first自然wait5000ms和LSA3000ms，不冒称i12整体5秒；新增单post不回填旧h2。下一步仅准备i19：复用h2原controller/helper精确字节、原A条件的单病例时间对照，不构建、不执行，待根审后另定唯一运行。原runner8e84正常矩阵成功、本机b1失败和旧h2原件各自保留；本GUI静态USER32对照不等于console产品链，最终同一冻结源码Linux/Windows门禁仍待完成。
+i15仍仅准备未执行。i18原WAIT_LIMIT/收据10000ms、first自然wait5000ms和LSA3000ms保持；单post未回填旧h2。后续i19实际结果和K1准备边界见本文件顶部。
 
 G09开放、10项关闭、新增关闭0，PR22保持草稿；V01/V02/V05移交不计通过。详见CURRENT_STATUS的 `g09_first_user32_load_baseline_20261007`。全部证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11及定向20项来源。
 
