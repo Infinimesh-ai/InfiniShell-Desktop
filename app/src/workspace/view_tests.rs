@@ -1287,6 +1287,111 @@ fn test_tab_renaming_editor_reset() {
 }
 
 #[test]
+fn test_settings_tab_restores_current_default_title() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+
+        let snapshot = workspace.update(&mut app, |workspace, ctx| {
+            workspace.open_settings_pane(None, None, ctx);
+            // 只替换此面板的旧语言标题，避免修改进程级 locale 干扰并行测试。
+            workspace
+                .settings_pane
+                .as_ref(ctx)
+                .pane_configuration()
+                .update(ctx, |configuration, ctx| {
+                    configuration.set_title("上一种语言的设置标题", ctx);
+                });
+            assert_eq!(
+                workspace
+                    .active_tab_pane_group()
+                    .as_ref(ctx)
+                    .display_title(ctx),
+                "上一种语言的设置标题"
+            );
+            workspace.snapshot(ctx.window_id(), false, ctx)
+        });
+        assert_eq!(snapshot.tabs[snapshot.active_tab_index].custom_title, None);
+
+        let restored = restored_workspace(&mut app, snapshot);
+        restored.read(&app, |workspace, ctx| {
+            let pane_group = workspace.active_tab_pane_group().as_ref(ctx);
+            assert_eq!(pane_group.custom_title(ctx), None);
+            assert_eq!(pane_group.display_title(ctx), crate::t!("settings-title"));
+        });
+    });
+}
+
+#[test]
+fn test_settings_tab_custom_title_survives_restore() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+
+        let snapshot = workspace.update(&mut app, |workspace, ctx| {
+            workspace.open_settings_pane(None, None, ctx);
+            workspace.handle_action(
+                &WorkspaceAction::SetActiveTabName("我的偏好设置".to_string()),
+                ctx,
+            );
+            workspace.snapshot(ctx.window_id(), false, ctx)
+        });
+        let restored = restored_workspace(&mut app, snapshot);
+
+        restored.read(&app, |workspace, ctx| {
+            let pane_group = workspace.active_tab_pane_group().as_ref(ctx);
+            assert_eq!(
+                pane_group.custom_title(ctx).as_deref(),
+                Some("我的偏好设置")
+            );
+            assert_eq!(pane_group.display_title(ctx), "我的偏好设置");
+        });
+    });
+}
+
+#[test]
+fn test_settings_tab_legacy_title_is_preserved_until_reset() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+        let mut snapshot = workspace.update(&mut app, |workspace, ctx| {
+            workspace.open_settings_pane(None, None, ctx);
+            workspace.snapshot(ctx.window_id(), false, ctx)
+        });
+        // 旧默认名与用户手动输入的同名没有来源标记，恢复时不能擅自清除。
+        snapshot.tabs[snapshot.active_tab_index].custom_title = Some("Settings".to_string());
+        let restored = restored_workspace(&mut app, snapshot);
+
+        let reset_snapshot = restored.update(&mut app, |workspace, ctx| {
+            assert_eq!(
+                workspace
+                    .active_tab_pane_group()
+                    .as_ref(ctx)
+                    .custom_title(ctx)
+                    .as_deref(),
+                Some("Settings")
+            );
+            workspace.handle_action(
+                &WorkspaceAction::ResetTabName(workspace.active_tab_index),
+                ctx,
+            );
+            assert_eq!(
+                workspace
+                    .active_tab_pane_group()
+                    .as_ref(ctx)
+                    .display_title(ctx),
+                crate::t!("settings-title")
+            );
+            workspace.snapshot(ctx.window_id(), false, ctx)
+        });
+        assert_eq!(
+            reset_snapshot.tabs[reset_snapshot.active_tab_index].custom_title,
+            None
+        );
+    });
+}
+
+#[test]
 fn test_set_active_tab_name() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);

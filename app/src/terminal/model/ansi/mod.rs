@@ -55,6 +55,9 @@ const WARP_OSC_MARKER: &[u8] = b"9278";
 /// of checks ensuring that Zap's grids and ConPTY's grid are in sync.
 const WARP_RESET_GRID_OSC_MARKER: &[u8] = b"9279";
 
+// 限制缺失结束标记时可忽略的重置控制操作，不能无限隐藏后续空行。
+const CONPTY_RESET_MAX_CONTROLS: usize = 4096;
+
 /// The amount of time a single synchronized update can take from the time the corresponding
 /// 'Set Mode' escape sequence is processed before a redraw is forced.
 ///
@@ -364,6 +367,7 @@ struct ProcessorState {
     dcs_data: DcsData,
     apc_data: Vec<u8>,
     sync_output: SyncOutputState,
+    conpty_reset_controls_remaining: usize,
 }
 
 /// The processor wraps a [`VteParser`] to ultimately call methods on a Handler.
@@ -380,6 +384,7 @@ impl Default for Processor {
                 dcs_data: DcsData::default(),
                 apc_data: vec![],
                 sync_output: SyncOutputState::Inactive,
+                conpty_reset_controls_remaining: 0,
             },
             parser: VteParser::new(),
         }
@@ -735,12 +740,21 @@ where
 {
     #[inline]
     fn print(&mut self, c: char) {
+        // 重置帧不含正文；一旦出现可打印字符，立即恢复正常处理。
+        self.state.conpty_reset_controls_remaining = 0;
         self.handler.input(c);
         self.state.preceding_char = Some(c);
     }
 
     #[inline]
     fn execute(&mut self, byte: u8) {
+        if self.state.conpty_reset_controls_remaining > 0 {
+            if matches!(byte, C0::CR | C0::LF) {
+                self.state.conpty_reset_controls_remaining -= 1;
+                return;
+            }
+            self.state.conpty_reset_controls_remaining = 0;
+        }
         match byte {
             C0::HT => self.handler.put_tab(1),
             C0::BS => self.handler.backspace(),
@@ -758,6 +772,7 @@ where
 
     #[inline]
     fn hook(&mut self, _params: &Params, intermediates: &[u8], _ignore: bool, c: char) {
+        self.state.conpty_reset_controls_remaining = 0;
         self.state.dcs_data.on_hook(intermediates, c);
     }
 
@@ -790,6 +805,26 @@ where
     // TODO replace OSC parsing with parser combinators.
     #[inline]
     fn osc_dispatch(&mut self, params: &[&[u8]], bell_terminated: bool) {
+        if params.len() == 2 && params[0] == b"1337" {
+            match params[1] {
+                b"InfiniShellResetGrid=Begin" => {
+                    self.state.conpty_reset_controls_remaining = CONPTY_RESET_MAX_CONTROLS;
+                    return;
+                }
+                b"InfiniShellResetGrid=End" => {
+                    let completed_reset = self.state.conpty_reset_controls_remaining > 0;
+                    self.state.conpty_reset_controls_remaining = 0;
+                    if completed_reset {
+                        self.handler.on_portable_reset_grid();
+                    }
+                    return;
+                }
+                _ => {}
+            }
+        }
+        // 其他 OSC（含命令生命周期消息）必须正常处理，不能被缺失的 End 截断。
+        self.state.conpty_reset_controls_remaining = 0;
+
         let writer = &mut self.writer;
         let terminator = if bell_terminated { "\x07" } else { "\x1b\\" };
 
@@ -1273,6 +1308,41 @@ where
         has_ignored_intermediates: bool,
         action: char,
     ) {
+        if self.state.conpty_reset_controls_remaining > 0 {
+            let mut reset_params = params.iter();
+            let first = reset_params.next().unwrap_or(&[0]);
+            let second = reset_params.next();
+            let has_more = reset_params.next().is_some();
+            let single = first.len() == 1 && second.is_none();
+            let home = first.len() == 1
+                && first[0] <= 1
+                && second.is_none_or(|value| value.len() == 1 && value[0] <= 1)
+                && !has_more;
+            let suppress = !has_ignored_intermediates
+                && intermediates.is_empty()
+                && match action {
+                    'J' => single && first[0] == 2,
+                    'K' => single && first[0] <= 2,
+                    'H' => home,
+                    _ => false,
+                };
+            // 保留属性和光标显隐，避免重置完成后正文继承错误的颜色或光标状态。
+            let preserve = !has_ignored_intermediates
+                && ((action == 'm' && intermediates.is_empty())
+                    || (matches!(action, 'h' | 'l')
+                        && intermediates == b"?"
+                        && single
+                        && first[0] == 25));
+            if suppress || preserve {
+                self.state.conpty_reset_controls_remaining -= 1;
+                if suppress {
+                    return;
+                }
+            } else {
+                self.state.conpty_reset_controls_remaining = 0;
+            }
+        }
+
         macro_rules! unhandled {
             () => {{
                 debug!(
@@ -1523,6 +1593,10 @@ where
 
     #[inline]
     fn esc_dispatch(&mut self, intermediates: &[u8], _ignore: bool, byte: u8) {
+        // OSC 也可使用 ST 结束；其 ESC \\ 不代表新的屏幕操作。
+        if byte != b'\\' || !intermediates.is_empty() {
+            self.state.conpty_reset_controls_remaining = 0;
+        }
         macro_rules! unhandled {
             () => {{
                 debug!(
@@ -1579,6 +1653,7 @@ where
     }
 
     fn apc_start(&mut self) {
+        self.state.conpty_reset_controls_remaining = 0;
         self.state.apc_data.clear();
     }
 
