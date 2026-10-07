@@ -43,6 +43,17 @@ pub(super) struct Snapshot {
     pub(super) members: BTreeMap<PathBuf, Identity>,
 }
 
+fn log_identity_change(operation: &'static str, before: &Identity, actual: &Identity) {
+    let object_matches = actual.volume == before.volume && actual.index == before.index;
+    let kind_matches = actual.directory == before.directory;
+    let contents_match = actual.length == before.length && actual.digest == before.digest;
+    let security_matches = actual.security == before.security;
+    // 只记录失配维度，不输出路径、文件内容、对象编号或安全描述符。
+    log::warn!(
+        "cli_agent_updates.windows_codex_npm_tree_failed operation={operation} object_matches={object_matches} kind_matches={kind_matches} contents_match={contents_match} security_matches={security_matches}"
+    );
+}
+
 struct Security {
     allocation: PSECURITY_DESCRIPTOR,
     owner: PSID,
@@ -137,7 +148,13 @@ fn open(path: &Path, mutation: bool) -> Result<File, Error> {
         })
         .custom_flags((FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS).0)
         .open(path)
-        .map_err(|_| Error::SourceChanged)
+        .map_err(|failure| {
+            let os_error = failure.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_tree_failed operation=open mutation={mutation} os_error={os_error:?}"
+            );
+            Error::SourceChanged
+        })
 }
 
 fn information(file: &File) -> Result<BY_HANDLE_FILE_INFORMATION, Error> {
@@ -210,6 +227,13 @@ fn identity(file: &File) -> Result<Identity, Error> {
             && (before.ftLastWriteTime.dwHighDateTime != after.ftLastWriteTime.dwHighDateTime
                 || before.ftLastWriteTime.dwLowDateTime != after.ftLastWriteTime.dwLowDateTime)
     {
+        let attributes_match = before.dwFileAttributes == after.dwFileAttributes;
+        let write_time_matches = before.ftLastWriteTime.dwHighDateTime
+            == after.ftLastWriteTime.dwHighDateTime
+            && before.ftLastWriteTime.dwLowDateTime == after.ftLastWriteTime.dwLowDateTime;
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed operation=identity changed_during_read=true attributes_match={attributes_match} write_time_matches={write_time_matches}"
+        );
         return Err(Error::SourceChanged);
     }
     Ok(Identity {
@@ -271,7 +295,14 @@ pub(super) fn snapshot(root: &Path) -> Result<Snapshot, Error> {
                 pending.push(child);
             }
         }
-        if identity(&opened)? != before || path_identity(&path)? != before {
+        let after = identity(&opened)?;
+        if after != before {
+            log_identity_change("snapshot_handle", &before, &after);
+            return Err(Error::SourceChanged);
+        }
+        let at_path = path_identity(&path)?;
+        if at_path != before {
+            log_identity_change("snapshot_path", &before, &at_path);
             return Err(Error::SourceChanged);
         }
         members.insert(relative, before);
@@ -292,7 +323,13 @@ pub(super) fn parents(path: &Path) -> Result<Vec<File>, Error> {
                 .share_mode((FILE_SHARE_READ | FILE_SHARE_WRITE).0)
                 .custom_flags((FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS).0)
                 .open(path)
-                .map_err(|_| Error::SourceChanged)?;
+                .map_err(|failure| {
+                    let os_error = failure.raw_os_error();
+                    log::warn!(
+                        "cli_agent_updates.windows_codex_npm_tree_failed operation=parent_open os_error={os_error:?}"
+                    );
+                    Error::SourceChanged
+                })?;
             if !identity(&file)?.directory {
                 return Err(Error::SourceChanged);
             }
@@ -337,7 +374,13 @@ pub(super) fn rename(root: &Path, destination: &Path, expected: &Snapshot) -> Re
             length as u32,
         )
     }
-    .map_err(|_| Error::PersistenceFailed)?;
+    .map_err(|failure| {
+        let hresult = failure.code().0;
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed operation=rename hresult={hresult:#x}"
+        );
+        Error::PersistenceFailed
+    })?;
     if snapshot(destination)? != *expected {
         return Err(Error::RecoveryRequired);
     }
@@ -397,13 +440,24 @@ pub(super) fn freeze_images(root: &Path, expected: &Snapshot) -> Result<Vec<File
             .share_mode((FILE_SHARE_READ | FILE_SHARE_DELETE).0)
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
             .open(path)
-            .map_err(|_| Error::SourceChanged)?;
-        if identity(&file)? != *before {
+            .map_err(|failure| {
+                let os_error = failure.raw_os_error();
+                log::warn!(
+                    "cli_agent_updates.windows_codex_npm_tree_failed operation=freeze_open os_error={os_error:?}"
+                );
+                Error::SourceChanged
+            })?;
+        let actual = identity(&file)?;
+        if actual != *before {
+            log_identity_change("freeze_identity", before, &actual);
             return Err(Error::SourceChanged);
         }
         held.push(file);
     }
     if snapshot(root)? != *expected {
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed operation=freeze_snapshot expected_tree_matches=false"
+        );
         return Err(Error::SourceChanged);
     }
     Ok(held)
@@ -414,13 +468,30 @@ pub(super) fn rename_inactive_images(
     destination: &Path,
     expected: &Snapshot,
 ) -> Result<Vec<File>, Error> {
-    let _parents = parents(root)?;
+    let _parents = parents(root).inspect_err(|failure| {
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed stage=inactive_parents error={failure:?}"
+        );
+    })?;
     // Windows 拒绝改名仍含打开子文件的目录，包括这里自己的冻结句柄。
-    drop(freeze_images(root, expected)?);
-    rename(root, destination, expected)?;
+    drop(freeze_images(root, expected).inspect_err(|failure| {
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed stage=inactive_initial_freeze error={failure:?}"
+        );
+    })?);
+    rename(root, destination, expected).inspect_err(|failure| {
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed stage=inactive_rename error={failure:?}"
+        );
+    })?;
     // 释放到改名之间仍可能出现映像映射；重新冻结成功后才允许发布下一棵树。
     // 此时目录已经移动，失败必须保持恢复及启动保护。
-    freeze_images(destination, expected).map_err(|_| Error::RecoveryRequired)
+    freeze_images(destination, expected).map_err(|failure| {
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_tree_failed stage=inactive_refreeze error={failure:?}"
+        );
+        Error::RecoveryRequired
+    })
 }
 
 #[cfg(test)]

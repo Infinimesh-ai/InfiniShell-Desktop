@@ -271,14 +271,39 @@ fn journal_path(root: &Path) -> PathBuf {
 }
 
 fn save(root: &Path, journal: &Journal) -> Result<(), Error> {
-    let mut file = NamedTempFile::new_in(root).map_err(|_| Error::PersistenceFailed)?;
+    let phase = journal.phase;
+    let mut file = NamedTempFile::new_in(root).map_err(|failure| {
+        let os_error = failure.raw_os_error();
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_journal_failed operation=create phase={phase:?} os_error={os_error:?}"
+        );
+        Error::PersistenceFailed
+    })?;
     file.write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
-        .map_err(|_| Error::PersistenceFailed)?;
+        .map_err(|failure| {
+            let os_error = failure.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_journal_failed operation=write phase={phase:?} os_error={os_error:?}"
+            );
+            Error::PersistenceFailed
+        })?;
     file.as_file()
         .sync_all()
-        .map_err(|_| Error::PersistenceFailed)?;
+        .map_err(|failure| {
+            let os_error = failure.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_journal_failed operation=sync phase={phase:?} os_error={os_error:?}"
+            );
+            Error::PersistenceFailed
+        })?;
     file.persist(journal_path(root))
-        .map_err(|_| Error::PersistenceFailed)?;
+        .map_err(|failure| {
+            let os_error = failure.error.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_journal_failed operation=persist phase={phase:?} os_error={os_error:?}"
+            );
+            Error::PersistenceFailed
+        })?;
     super::sync_config_directory(root)
 }
 

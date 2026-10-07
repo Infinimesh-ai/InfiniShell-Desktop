@@ -1,6 +1,20 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：持久化修复局部门禁通过，原机待验
+## 当前接续状态（2026-10-07）：原机恢复与事务仍失败，安全日志本机门禁通过、原机待验
+
+提交 `d131dd13f3ddb38713e17dd7258241ec901792be` 的原runner22正常验收[37553787071](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37553787071)失败。step44运行1153项，1152通过、1失败、7108跳过；新增恢复测试 `inactive_image_recovery_keeps_stage_frozen_until_backup_is_restored` 在第92行实际三次返回SourceChanged，汇总重复的TRY3不计第四次。step53的command93项通过、166跳过；i18n11项包含在默认普通测试中，不能因此把整个普通门禁记为通过。
+
+step62首个updated仍为 `PersistenceFailed`：0通过、1失败、8260过滤、110.37秒，退出101。CMD与PowerShell候选均输出 `codex-cli 0.156.1` 并退出0，原字节分别为18B/LF与19B/CRLF；201／372个事件全部继续，根进程等到Node/Codex退出，Job、profile、station、desktop、DeviceMap与LSA均有清理成功收据。探测成功不等于更新事务或回滚成功；后续四场景和三次独立冷恢复均未运行。
+
+可用原件只有Prepared前态checkpoint，没有当前持久化journal、OldMoved、Published或after-tree。只读CMD0.155.1和npm prefix来自更新前准备，不能证明回滚后版本。失败可能处于PS observed日志保存、首次rename或OldMoved日志保存，具体API与原生错误码均未知；不能认定首次rename为首因，也不将控制流推论计为动态回滚验收。67份来源仅完成执行前绑定，末尾源码、二进制与manager复核未到，仍不是最终全仓冻结。
+
+独审 `normal-five-37553787071/normal-updated-failure-boundary-independent-audit.safe.json` SHA为 `17c553fbf0b960423d2ddfa1fdcb642dfc8f69f6f7f27a4a08673e483c630d18`：重算56个所用ZIP成员、67份源码及4个官方SRI，1513项为审计检查数。候选工件11453324653共77成员，SHA `287194e0ebc528581e062b3436eb901eaa893929771195241e4bef7bb1358ec2`；官方日志ZIP SHA `ac62da6ff52c80d538de4aa1b2baf175241ca8a48de16cea2961c9a6245d329d`。证据根仍为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`，当前指针及细项见CURRENT_STATUS.json的 `g09_normal_publish_failure_37553787071_20261007`。
+
+当前工作区仅对两份产品文件补充有限安全日志：journal create/write/sync/persist的phase与原os_error；tree open、parent、freeze、rename原错误，身份失配维度及inactive阶段。原返回值、身份校验和guard生命周期保持；这是定位缺失证据的改动，不是已验证的修复。本轮格式检查、focused46通过（1项真实native显式忽略、8214过滤、0.07秒）与i18n11通过（8250过滤、5.68秒）均有exit0收据，7份来源与Cargo输入前后相同；`npm-publish-errors-check-a1`的cargo check已exit0（1分37秒、14条既有warnings），7份来源与Cargo输入前后一致；收据SHA为 `ec964b1c3b6d2ea1cf5a99510c52138d1eecdf9858cb2976b390f49d804f4356`。本轮安全日志的本机门禁通过，原机仍待验证，不预填后续提交或运行结果。本机真实负例已显示freeze_open原os_error32及rename HRESULT 0x80070005，证明日志可见，不将这些本机负例错误码当作原机失败码。main的38fb011已在本次运行前合入，既有本机合同、504cf65及a4a6等历史证据全部保留。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成；V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：仅增加内部安全日志，既有用户错误语义与界面布局不变；本轮i18n11项已通过。原件保留，cleanup_ready=false。
+
+## 历史记录：持久化修复局部门禁通过，原机待验
 
 提交 `504cf6595f600cff6d351313ea83c55565f6ab60` 的原runner22正常验收[37548517669](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37548517669)按witness=false、scope=all运行，仍为failure。首个updated结果由原ProbeFailed转为 `PersistenceFailed`，accepted=false、model_inputs_sent=0。两个公开候选均输出 `codex-cli 0.156.1` 并退出0：CMD保留18B/LF，PowerShell保留19B/CRLF。PS的Codex在10674ms退出、Node在11024ms退出、PS根在11841ms退出，已正常等到Node结束；这证明本轮版本探测通过，不等于updated事务通过，也不补证旧267候选的freshness或原PSI.WorkingDirectory精确值。
 
