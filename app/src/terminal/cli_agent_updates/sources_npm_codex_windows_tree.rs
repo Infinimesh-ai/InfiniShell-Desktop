@@ -378,7 +378,7 @@ pub(super) fn remove_matching(root: &Path, expected: &Snapshot) -> Result<(), Er
 }
 
 /// 写入访问只用于排除已经映射或即将映射的 PE，不向任何文件写数据。
-/// 与应用启动预约同时持有，直至两步目录切换结束；占用时禁止目录切换。
+/// 与应用启动预约配合；目录改名前须释放自有子文件句柄，改名后重新冻结目标。
 pub(super) fn freeze_images(root: &Path, expected: &Snapshot) -> Result<Vec<File>, Error> {
     let mut held = Vec::new();
     for (relative, before) in &expected.members {
@@ -408,3 +408,21 @@ pub(super) fn freeze_images(root: &Path, expected: &Snapshot) -> Result<Vec<File
     }
     Ok(held)
 }
+
+pub(super) fn rename_inactive_images(
+    root: &Path,
+    destination: &Path,
+    expected: &Snapshot,
+) -> Result<Vec<File>, Error> {
+    let _parents = parents(root)?;
+    // Windows 拒绝改名仍含打开子文件的目录，包括这里自己的冻结句柄。
+    drop(freeze_images(root, expected)?);
+    rename(root, destination, expected)?;
+    // 释放到改名之间仍可能出现映像映射；重新冻结成功后才允许发布下一棵树。
+    // 此时目录已经移动，失败必须保持恢复及启动保护。
+    freeze_images(destination, expected).map_err(|_| Error::RecoveryRequired)
+}
+
+#[cfg(test)]
+#[path = "sources_npm_codex_windows_tree_tests.rs"]
+mod tests;

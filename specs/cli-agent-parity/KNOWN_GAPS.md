@@ -1,6 +1,24 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态（2026-10-07）：原机双阶段实证CreateProcess回退，产品验收仍失败
+## 当前接续状态（2026-10-07）：持久化修复局部门禁通过，原机待验
+
+提交 `504cf6595f600cff6d351313ea83c55565f6ab60` 的原runner22正常验收[37548517669](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37548517669)按witness=false、scope=all运行，仍为failure。首个updated结果由原ProbeFailed转为 `PersistenceFailed`，accepted=false、model_inputs_sent=0。两个公开候选均输出 `codex-cli 0.156.1` 并退出0：CMD保留18B/LF，PowerShell保留19B/CRLF。PS的Codex在10674ms退出、Node在11024ms退出、PS根在11841ms退出，已正常等到Node结束；这证明本轮版本探测通过，不等于updated事务通过，也不补证旧267候选的freshness或原PSI.WorkingDirectory精确值。
+
+可用原件保存了首个Prepared前态快照，未见后续OldMoved记录；上传工件没有持久化事务journal，不能凭这一缺失指定失败API、宣称根因已确定或回滚已完成。原机冻结句柄相关解释仍未确认；下述本机合同证据和已实现的修复不能补证原失败点。下一步合入main后在原机验证修复，完成正常五场景和三次独立冷恢复；不将探测成功或文档更新计作关闭。
+
+本机针对发布/恢复时映像句柄与目录改名的合同补充了真实文件系统基线：4/4通过，保留SEC_IMAGE但原File已关闭时，底层rename实际返回Ok，freeze仍拒绝。因此修复不能只释放句柄后直接改名。基线收据 `npm-publish-tree-baseline-a1.safe.json` SHA为 `4565162a82810fbdb2170b77c9215708e92a4c7c3096c45afd5c6b4e69da76e1`；这是本机合同证据，不证明原37548517669的具体失败API。
+
+当前工作区已实现 `tree::rename_inactive_images`：父目录租约覆盖freeze/drop、原有不覆盖目标且校验完整身份的rename、目标重新freeze；重新freeze失败返回RecoveryRequired。execute把backup映像guard保留到第二棵树发布后；recover把反向移动后的stage guard保留到旧包恢复后，并在删除stage前释放。已有待恢复事务的recover失败统一为RecoveryRequired，继续保持启动保护。新增6项树测试和1项pending目录日志错误回归均包含在focused实际通过的46项中（1项真实native显式忽略、8214过滤、0.07秒）；另有19项启动保护回归（0.20秒）和11项i18n（7.15秒）通过。三轮均exit0，7份变更来源与Cargo输入前后摘要一致。`npm-publish-check-a1`的cargo check已exit0（1分38秒、14条既有warnings），7份变更来源与Cargo输入前后摘要一致；收据SHA为 `4ad6d5631ef47b1d307e7ef5c2ab7bc1d00a75b9920a7b4ce8a7680080fff021`。本轮局部门禁通过，原机修复仍待验证。格式检查已通过，收据 `npm-publish-format-a1.safe.json` SHA为 `e4ba78e7c4bea16e92917dd4df4ae8f33977cb5a70626e04ab439382a09f62c8`。本机增量、收据和验收边界见CURRENT_STATUS.json的 `g09_npm_publish_local_repair_20261007`。
+
+main已前进到 `38fb011d9c374f37016fd31a88c86c974cd04969`（PR23仅修改macOS ARM64发布架构名校验）；计划局部门禁后合入，在最终源码冻结前完成，当前不记为已合入或最终门禁通过。
+
+本轮默认nextest1146项（含i18n11）与command93项通过，没有运行witness组。CMD的200个、PS的380个调试事件全部继续，两个候选cleanup及station清理通过。67份来源仅完成执行前Git字节绑定；首个事务失败后，末尾源码、二进制和manager复核未到，不能称全仓冻结或最终同源门禁通过。本轮没有新增运行时模块或异常对象取证，原失败与原双阶段证据继续保留。
+
+权威独审为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/normal-five-37548517669/normal-candidate-failure-audit.safe.json`，SHA `2dc2baca500720c6ca8663e95ac36c6957f97956c0677946f818bcd3c8efb136`，149项审计检查不计为测试数。原件摘要、版本输出字节/摘要、生命周期及当前指针见CURRENT_STATUS.json的 `g09_normal_candidate_persistence_failure_20261007`。此前a4a6固定能力、实际CreateProcess回退、PATHEXT单键未解决原故障及所有历史失败均保留，不重写为通过。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 正常witness=false五场景、三次独立冷恢复和最终同一冻结源码Linux/Windows门禁均未完成。V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示使用原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：本轮发布/恢复失败沿用既有settings-cli-updates-recovery英文与简体中文语义，已复核适用，无UI尺寸变化；本轮i18n11项已通过。仓外原件保留，cleanup_ready=false。
+
+## 历史记录：原机双阶段实证CreateProcess回退，产品验收仍失败
 
 同一提交 `a4a6b4ebd8ff03679f2e1c5e4822ce26c2293c08` 在原runner22完成两轮独审。固定能力[37537472413](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37537472413)通过151项普通测试和唯一native一次（1.694秒、无重试），独审263项检查全部通过；263是审计检查数，不是测试数。准备范围13份来源执行前后逐字节一致，原CLR/DAC身份匹配。该固定轮未触发pre-Start异常，也未触发late延迟重放，不能将这两条原生路径记为本轮通过。
 
@@ -158,7 +176,7 @@ G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台�
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放 | a4a6原runner固定37537472413通过151普通及唯一native；真实37538211705首updated仍ProbeFailed，已实证初始PSI=false→CreateProcess抛出→晚期PSI=true回退，267仅LastThrown候选、freshness未证。工作区已加入Set-Location到已绑定映射根，本机门禁及原机待验。正常witness=false五场景／三次独立冷恢复及最终同源双平台门禁未完成。74dd/r-f6ta9tcm Mac显式空ACL两场景／一次独立冷恢复等历史结果保留，不替代新增路径、GUI或完整重跑。特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持；历史超时和失败不抹除 |
+| G09 | 开放 | 504cf65原runner正常37548517669的CMD/PS探测均输出codex-cli 0.156.1并退出0，PS已等Node；首updated仍PersistenceFailed。Prepared前态快照后未见OldMoved记录，工件缺事务journal不能证明具体失败API或回滚，原机冻结句柄假设未确认。本机4项FS基线和格式检查通过，已实现改名前后映像冻结及恢复保护，focused46（含7项新增）／启动保护19／i18n11通过，cargo check通过、原机待验。正常五场景／三次独立冷恢复及最终同源双平台门禁未完成。a4a6原机固定/回退证据、74dd/r-f6ta9tcm Mac显式空ACL两场景／一次独立冷恢复及其他历史结果保留；特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”及“范围待用户决定”均为历史阶段判断；当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准，安全属性范围以 G09 下的2026-10-05用户决定为准。各轮源码、平台、失败和未验边界不变。
@@ -411,6 +429,10 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-07 本机发布/恢复合同修复，局部门禁通过、原机待验**：4项真实FS基线证明仅保留SEC_IMAGE时底层rename可成功、freeze仍拒绝；不能只drop后rename。当前实现父租约贯穿freeze/drop→完整身份且不覆盖的rename→目标重新freeze，execute持backup guard至第二树发布后，recover持stage guard至旧包恢复后，失败保持RecoveryRequired启动保护。格式检查、focused46（含新增6树+1日志错误回归）／启动保护19／i18n11通过，cargo check通过、原机待验；原37548517669具体失败API未知。计划门禁后合入main的38fb011，再做最终冻结。**新增关闭0项，G09仍开放，PR草稿。**
+
+- **2026-10-07 原机正常版本探测通过，事务持久化失败**：`504cf65`的37548517669按witness=false、scope=all运行，CMD与PS均输出codex-cli 0.156.1并退出0，PS等到Node结束；首updated仍为PersistenceFailed。Prepared前态快照及缺失的事务journal不能证明确切失败API或回滚，冻结句柄假设未确认。最新审计及边界见本文件顶部和CURRENT_STATUS.json的 `g09_normal_candidate_persistence_failure_20261007`；旧失败与证据保留。**新增关闭0项；G09、正常五场景／三冷恢复及最终同源双门禁未完成，PR草稿。**
 
 - **2026-10-07 原机两阶段值已实证，候选仍失败**：`a4a6b4e`的固定37537472413通过151普通及唯一native；真实37538211705取得pre179→initial181（PSI=false）→原System.StartWithCreateProcess抛出182→Node188→late189（PSI=true），对应ShellExecute回退。267仅LastThrown候选，32帧局部栈不等于完整栈；具体失败输入和最终首因尚未证实。工作区已加入Set-Location到已绑定映射根，本机门禁及原机待验；随后直接验证正常witness=false五场景和三次独立冷恢复，不重复诊断候选。最新审计、清理和源码绑定边界见本文件顶部及CURRENT_STATUS.json的 `g09_two_stage_original_result_20261007`；历史记录继续保留。**新增关闭0项；G09、正常五场景／三冷恢复及最终同源双门禁仍开放，PR草稿。**
 

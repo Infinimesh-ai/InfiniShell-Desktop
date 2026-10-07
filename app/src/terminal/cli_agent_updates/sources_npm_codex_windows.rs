@@ -734,13 +734,16 @@ pub(super) async fn execute(
         verified_exit(root, &journal, true)?;
         journal.owner.verify()?;
         unchanged(&journal, false)?;
-        let _images = tree::freeze_images(&journal.owner.package, &journal.original)?;
         if tree::snapshot(&journal.stage)?
             != *journal.prepared.as_ref().ok_or(Error::RecoveryRequired)?
         {
             return Err(Error::SourceChanged);
         }
-        tree::rename(&journal.owner.package, &journal.backup, &journal.original)?;
+        let images = tree::rename_inactive_images(
+            &journal.owner.package,
+            &journal.backup,
+            &journal.original,
+        )?;
         journal.phase = Phase::OldMoved;
         save(root, &journal)?;
         #[cfg(test)]
@@ -754,7 +757,7 @@ pub(super) async fn execute(
         live_tests::checkpoint(live_tests::Point::Published).await;
         journal.phase = Phase::Published;
         save(root, &journal)?;
-        drop(_images);
+        drop(images);
         if let Some(progress) = progress {
             progress.enter().await;
         }
@@ -810,6 +813,11 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     {
         return Ok(None);
     }
+    // 未收敛的事务日志仍在时，恢复失败不能解除应用内的启动保护。
+    recover_pending(entry, root).map_err(|_| Error::RecoveryRequired)
+}
+
+fn recover_pending(entry: &Path, root: &Path) -> Result<Option<String>, Error> {
     let mut journal: Journal =
         serde_json::from_slice(&read_limited(&journal_path(root), 12 * MAX_CONFIG)?)
             .map_err(|_| Error::RecoveryRequired)?;
@@ -847,9 +855,10 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         if tree::snapshot(&journal.backup)? != journal.original {
             return Err(Error::RecoveryRequired);
         }
-        let _images = tree::freeze_images(&journal.owner.package, prepared)?;
-        tree::rename(&journal.owner.package, &journal.stage, prepared)?;
+        let images =
+            tree::rename_inactive_images(&journal.owner.package, &journal.stage, prepared)?;
         tree::rename(&journal.backup, &journal.owner.package, &journal.original)?;
+        drop(images);
     }
     if tree::snapshot(&journal.owner.package)? != journal.original {
         return Err(Error::RecoveryRequired);
@@ -883,6 +892,10 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     super::sync_config_directory(root)?;
     Ok(None)
 }
+
+#[cfg(test)]
+#[path = "sources_npm_codex_windows_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "sources_codex_npm_windows_live_tests.rs"]
