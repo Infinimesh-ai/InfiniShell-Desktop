@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：取消ACK写读等待后仍有残留
+## 当前接续状态（2026-10-07）：省去second令牌观察后仍有残留
+
+i9 v2两臂同一新first及原leaf，均ACKoff、controller不观察second；只切换first经原second PI的OpenProcessToken/TokenStatistics/Close整组。A first20440/leaf26188、LUID2861719682/0，open/query56B/close均原BOOL1/error0且同LUID。A完整自然测量与原/post present后才B。B first18056、已绑定first LUID2861735663/0；leaf16744的AuthenticationId与same_luid明确null，三API not_performed，未把原0槽或first身份当成second观察。
+
+两臂124B handoff v2与324B completion v3保留原PI PID/birth/TID、Resume1、自然0、原thread/process关闭。各50条原LSA样本均status0、Size272、匹配对应first LUID及free0，elapsed3031/3016ms；owner自然退出并关闭原柄后的唯一查询仍present/free0。外部second实际映像、精确Job及外柄终态均not_observed。省去令牌查询整组仍有本次残留，没有识别单API或系统持有者。
+
+pair SHA `6a4f2a23a9f02b97bbb8f3f3d5a8bdffc17518c97a16d06718cbe8217060e705`；独审SHA `bc5389b2213c85a68dbe6e60fcd4e683e06436dbaad995247975644269f33923`，146份原件稳定。未执行的v1共43文件已归档，v2只修复解析器在查询失败时仍将auth槽标成meaningful的问题，native字节未改；该失败分支本次未动态覆盖。wrapper0是测量完整，不是清理成功。
+
+下一项仅仓外准备leaf嵌入Windows清单的有界对照，计划保持i9原控制器/first字节、native arm B和token off，并在同一路径一次切换、保全A实际文件；尚未执行，不预判PCA首因或修改服务。原runner8e84正常五场景/三次冷恢复通过但均自动站，本机b1实际失败及d2清理反例保持。最终同源Linux/Windows门禁未完成，G09开放、共10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。
+
+详见CURRENT_STATUS的 `g09_second_token_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码匹配本地check、i18n11和定向20项已通过来源。
+
+## 历史记录：取消ACK写读等待后仍有残留
 
 i8共用本轮新first和原leaf，两臂均为两段、controller均不打开second。A保留ACK写入、读取、等待和逐字比对；其原及owner退出后查询均present、完整自然测量后才启动B。B省去ACK整组，268B completion v2明确记录mode/read_attempted/matched均0，实际无ACK文件或event31；结合完整原PI生命周期才记not_performed。
 
