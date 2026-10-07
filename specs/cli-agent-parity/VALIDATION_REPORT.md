@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：省去外层二代观察仍有残留
+## 当前接续状态（2026-10-07）：取消ACK写读等待后仍有残留
+
+i8共用本轮新first和原leaf，两臂均为两段、controller均不打开second。A保留ACK写入、读取、等待和逐字比对；其原及owner退出后查询均present、完整自然测量后才启动B。B省去ACK整组，268B completion v2明确记录mode/read_attempted/matched均0，实际无ACK文件或event31；结合完整原PI生命周期才记not_performed。
+
+A first21864/leaf8744、LUID2858694979/0；B first15512/leaf7768、LUID2858706723/0。两臂原PI均Resume1、leaf自然0、thread/process关闭，controller自然0、Job空且原柄关闭。各50条原LSA样本均status0、Size272、正确LUID及free0，elapsed3016/3015ms；owner退出并关闭原柄后的唯一查询仍present/free0。两臂外部second的独立身份、实际映像、精确Job及外柄终态均not_observed，不能用父Job空补证。
+
+pair SHA `ae705dca971e7de7869676661e791ea6e1ae562a6ddcbb71fc2f834f71f16594`；独审SHA `cc451ad7569e052fafc5df956c894bff44a0bc0df1f598733453d60170aaf101`，102份原件前后稳定。wrapper0仅表示测量完整；取消ACK文件写/读、等待和恢复时序整组没有消除本次残留，尚未识别单API或系统持有者。原i6/i7时间窗内已有应用兼容性日志无事件；这不能排除兼容性服务，未改日志或服务配置。
+
+下一项仅在仓外准备second原PI令牌查询整组开关，尚未执行；B身份缺测将明确记录，不补查或回填。原runner8e84正常五场景/三次冷恢复通过但均自动站，本机b1实际产品失败与d2曾清理的反例保持。最终同一冻结源码Linux/Windows门禁仍待完成。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_ack_wait_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：省去外层二代观察仍有残留
 
 i7共用冻结i6 first/leaf，first始终两段并保留原PI身份、相同ACK及自然退出/关闭；只有controller对second的额外观察开关不同。A观察开启，在原及owner退出后查询均present、测量完整后才启动B；B省去外部second OpenProcess、完整token/image/精确Job查询及其句柄后续操作。两臂原各50条LSA样本均status0、非空、Size272、返回本臂LUID、free调用及返回0，原elapsed3031/3015ms；owner自然退出并关闭原柄后的唯一查询仍present、free0。
 
