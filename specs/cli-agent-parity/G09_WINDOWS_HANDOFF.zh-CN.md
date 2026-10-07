@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：历史b1产品updated复核通过，当前同源门禁待完成
+## 当前接续状态（2026-10-07）：完整本地矩阵通过，最终冻结前快照
+
+K3于UTC 13:39:35.2614050–13:47:54.2204332唯一执行当前产品正常witness=false完整矩阵，wrapper/driver均0。五场景为updated、old_moved、published_receipt_missing、external_change_preserved、candidate_changed_preserved；中间三场景各由新的worker调用完成冷恢复，共8次worker调用、8代CMD/PowerShell候选，最后一场景在候选启动前拒绝。updated发布0.156.1；前两种冷恢复回到0.155.1；外部变更场景保留0.156.1并返回RecoveryRequired；候选变更场景保留0.155.1并返回RecoveryRequired。
+
+8代实际Ready均station_created_explicitly=true，release-state均station_absent/logon_absent=true且无查询错误，原helper退出、Job空、桌面/DeviceMap关闭及profile标记均通过原件核验。四组CMD/PowerShell继续事件数分别为207/379、207/379、207/381、207/379；候选stdout保留CMD 18B LF、PowerShell 19B CRLF的codex-cli 0.156.1。三次冷恢复的独立性由冻结driver及8组调用/started/result/stdout支持，未归档worker PID/birth，不补造该证据；安全摘要/ACL结论限原收据及成功运行时断言。
+
+K2构建来源d1b4208468459f40c5b0b6023ab8f93fcb1475b7与K3运行来源3ec5d80ea5569b20f5c5e390dfd8096d599cd1d4仅4份状态文档不同，7203份非文档来源逐字相同，三产品和67份运行来源已绑定。K2原Cargo成功、默认产物包装artifact_hardlink失败与补包装通过分别保留；不把wrapper1改为0，不重复Cargo。K1仍只代表历史b1字节的时间对照；原PowerShell真实分类/同停点CLR证据、后续原机修复验证、旧b1/h2失败全部保留，LSA首因仍unknown。本次正常矩阵通过不证明某项诊断或新代码修复了该首因，也不另设永久持有者定位门槛。
+
+权威原件位于仓外local-current-matrix-k3：result.safe.json（1936B，SHA d344cfde978a226889b42d136c5a1483b38b8e35c3a8384a3f6d61ec2e07a42f）、k3-root-execution.safe.json（328B，SHA f6e4ffea1cd1707470e18f363afc9e00fce72fe57c2c6cf00e6814b4836de4c8）、audit.safe.json（57812B，SHA e67e1b13ae468610b8702e9126a367b56e0b29df3730b3c1f863d6bd85945f30）；实际C:/Coding/g09-current3/summary.safe.json为486975B、SHA f0bf6a619288390edc55ef869efdb5d169f597f55aca29c5c180e97a9d05528f。独审10175份原件前后稳定，57840仅为证据一致性断言，不计测试数或缺口关闭。
+
+这是最终冻结前快照：仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR保持草稿、merge_allowed=false、cleanup_ready=false，新增关闭0。提交本轮文档后形成最终源码S；同一S的正常Windows矩阵及Linux/Windows最终门禁全部完成并独审后，关闭结果用仓外签收和PR正文记录，冻结后不改S；此处不预填未来S或通过结果。无需本地化变更；仅同步证据文档，不重跑或冒称重跑普通门禁。
+
+## 历史记录：K1历史产品updated与K2构建
 
 K1于UTC 13:08:39.2350182–13:10:30.8182575唯一执行正常witness=false的updated，wrapper/driver均0，原worker测试1项通过、82.13秒。CMD与PowerShell两代实际均为显式私有站：原helper身份分别28788→10196/LUID2904591524、29068→20760/LUID2904631389；两代received/validated/continued分别205/379，root/node/codex/console均退出0。原stdout分别为18字节LF与19字节CRLF的codex-cli 0.156.1；helper自然0、Job空、desktop/DeviceMap关闭、station/logon absent且无查询错误、profile删除标记齐备。
 
