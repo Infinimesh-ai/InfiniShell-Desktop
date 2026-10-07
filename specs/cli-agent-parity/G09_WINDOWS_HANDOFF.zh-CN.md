@@ -1,6 +1,16 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：USER32 顺序对照未解决本机 LSA 残留
+## 当前接续状态（2026-10-07）：最小单段基线可清理，产品缺口仍开放
+
+i1仓外最小基线只执行一次：child静态仅导入KERNEL32!ExitProcess，无CRT、USER32、TLS、CLR、子进程文件收据、TokenQuery或第二段。实际child9676/birth425602446-31282741、新LUID2837222244/0自然退出0，Job为空、原thread/process/Job句柄关闭后，原首次LSA查询即0xc000005f/null、elapsed0；owner23956/birth424940179-31282741自然退出并关闭原柄后的唯一查询同样不存在。wrapper独立收据为0，无强杀、超时或重试。
+
+pair SHA `27fad4f9999ed4ce6bb5e6963752a46d3258fceb8ea6f037528d9683bf1d184b`，独审SHA `4072ae73206aa49f0ce3ec992e20c668d0b25c9af69fbd5ec24513a972c24c1a`，82份所读原件前后稳定。该结果仅说明本次最小新登录会话可清理，不是稳定成功基线或b1首因结论；controller仍有文件I/O和TokenQuery，不能与child同名操作混淆。null返回没有实测返回Size/LUID/free成功路径，coarse tick0不等于绝对零耗时；静态导入也不排除系统加载或外部注入。
+
+下一步仅准备同一child两臂的系统USER32加载对照，尚未执行：A不加载，B仅加载已绑定DLL、核路径并释放本次引用，不调用USER32函数。A原LSA及owner退出后结果都必须已知不存在且测量完整，才启动B。原runner8e84正常五场景/三次冷恢复已通过，但均自动站；b1本机显式站失败、h1失败和h2残留均保持，最终同一冻结源码Linux/Windows门禁仍待完成。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_minimal_single_logon_baseline_20261007`；证据保留，cleanup_ready=false。无需本地化变更：本轮只有证据文档，7203份非文档源码继续匹配本地check、i18n11与定向20项的冻结来源。
+
+## 历史记录：USER32顺序对照未解决本机LSA残留
 
 原runner22在8e84的正常witness=false五场景、三次独立冷恢复和八代候选清理已通过，全部走自动站；本机b1显式建站后的LSA失败仍是阻塞，最终同一冻结源码Linux/Windows门禁尚未完成。原验收和失败证据均保持，不用后续诊断覆盖产品结果。
 
