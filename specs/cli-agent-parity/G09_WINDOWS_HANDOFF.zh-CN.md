@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：观察对照未定首因，main 合并本地门禁通过
+## 当前接续状态（2026-10-07）：原机正常矩阵通过，本机显式站 LSA 仍开放
+
+原runner22的[37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367)在冻结提交 `8e84b737eabeefe1ab082dc3be6b6c0fd5067c96` 正式成功，独审确认正常witness=false五场景、三次独立冷恢复和八代CMD/PowerShell候选的输出、退出及清理。updated为0.156.1；old_moved与published_receipt_missing恢复0.155.1；external_change_preserved保留0.156.1并返回RecoveryRequired；candidate_changed_preserved保留0.155.1并在spawn前拒绝。普通warp1159项、command102项通过，i18n11包含在普通回归内。
+
+候选原ZIP为1099138993B、364成员，官方SHA `e0c38d0a8724506b14d5bd2900ef3771d4e63193f610fdf0fa6901886d50c787`；正式审计SHA `4408a9a9997167f4da3ea598c6511278af332a9ec9833981b78bde6af94e3030`，边界复核SHA `228e60e33646b93214f2cf780f76ba9a781bf35d98432a3fff43adba84350c6e`。67份来源绑定实际Git字节，三组独立execute/recover由冻结subprocess调用链及8次调用原件支持；未归档worker PID/birth，不声称逐PID核验。原ZIP/SRI/所用成员可离线复核；未上传的全部二进制、manager树、完整ACL和配置后态依靠成功的运行时断言与摘要，不冒称原件齐全。readonly-*为公共只读命令，不是独立只读ACL场景。
+
+八份ready均 `station_created_explicitly=false`，自动站路径的成功不能覆盖b1普通交互用户显式建站的LSA残留。原b1失败继续保留为本机阻塞，未用原机通过认定本机首因；当前合并HEAD `60c099990f9672af8175fa459ab07252aaa15856` 的最终同源Linux/Windows门禁仍待完成。
+
+g1仓外原句柄观测已执行一次、无重试：三次NTSTATUS0/56B，HandleCount均1，PointerCount原值32762/32768/32754；在原53/54/55关闭前取样、原90之后写盘。原句柄、Job与私有桌面关闭、两代自然退出0后，50次LSA查询仍存在，原预算观测3046ms。独审SHA `b9471968776fef5afb500a367b0c1aafbdf4666eb6cf490bcd8994772422ec31`，72份所读原件前后稳定。此结果只排除三个采样对象当时的额外打开句柄，不解释PointerCount为泄漏量，未定位其他token、内核引用或b1首因；测量完成不是清理通过。
+
+10项关闭、G09开放、V01/V02/V05移交不计通过，PR22保持草稿，新增关闭0。下一项仅在仓外准备第二段USER32调用顺序的有界对照，尚未执行，不据静态顺序修改产品。详见CURRENT_STATUS.json的 `g09_original_normal_matrix_and_local_handles_20261007`；所有原失败及证据保留，cleanup_ready=false。无需本地化变更：本轮只更新证据文档，无产品文案或布局改动，原main合并check/i18n11/定向20项收据继续有效。
+
+## 历史记录：观察对照与main合并本地门禁
 
 e1 复用旧8e84测试程序，无stdio与无写入stdio各一次，原断言均exit101/candidate_independent_station；两代helper自然退出、Job和原句柄关闭后，原三秒及测试进程退出后LSA仍存在。独审SHA `349a2ebf95d91e8a7b0bc85961642fe32aa4bb88ac1d76c99c37d8aec2b5c0f5`。该stdio控制路径不是本轮残留的必要条件，未定位b1产品持有者。
 
