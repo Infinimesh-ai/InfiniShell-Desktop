@@ -1,4 +1,193 @@
 {
+  "g09_minimal_two_stage_difference_20261007": {
+    "recorded_utc": "2026-10-07T09:23:31.149291+00:00",
+    "repository_head_unchanged": "d213d433ae6330d2c13c7546ca66f6ce2d381903",
+    "scope": "仓外i5自身令牌查询仍可清理；i6单段清理而最小两段及身份握手残留，不是单API首因或产品验收",
+    "i5": {
+      "prepared": {
+        "path": "local-child-token-control-i5/prepared.safe.json",
+        "bytes": 24882,
+        "sha256": "657974f3ff1cd6a002bc48f89f20e93ea786d6564babdf177257a6a1257a0460"
+      },
+      "pair": {
+        "path": "local-child-token-control-i5/pair.safe.json",
+        "bytes": 33280,
+        "sha256": "7993478bf8c7d3f595e047a936a962082cfd365af9c068cfd3c8e2cd12b19abe"
+      },
+      "audit": {
+        "path": "local-child-token-control-i5/audit.safe.json",
+        "bytes": 58347,
+        "sha256": "d34beb3855c3b06f3f820ee7ebaefb570038414009dbad30d61dff78a2939119"
+      },
+      "root_execution": {
+        "path": "i5-root-execution.safe.json",
+        "bytes": 274,
+        "sha256": "b60b40cdc3d89747d3083c93f7559efec23eb0bf3bcf3606896bbfed2e0c659b"
+      },
+      "both_original_and_post_absent": true,
+      "originals_stable": 93,
+      "boundary": "共同ADVAPI32导入；B0与冻结源码支持自身OpenProcessToken/TokenStatistics/精确长度/唯一关闭，但未记录child返回统计字段或LUID，外层身份不得冒充这些字段。"
+    },
+    "i6": {
+      "prepared": {
+        "path": "local-two-stage-minimal-i6/prepared-v2.safe.json",
+        "bytes": 25115,
+        "sha256": "2d7ed824ca7588e98279d781b7008acd4cc6a1b98cc2c5ac7a8313d449d6dbef"
+      },
+      "pair": {
+        "path": "local-two-stage-minimal-i6/pair.safe.json",
+        "bytes": 75077,
+        "sha256": "a1016c60e9a1d1e3dcac2e882889a72ee0779737f6f35b6fd4fc658504996d0a"
+      },
+      "audit": {
+        "path": "local-two-stage-minimal-i6/audit.safe.json",
+        "bytes": 121324,
+        "sha256": "43d8e91bae340838a821779d58d2088638f1c8f833e45d76d314958847260d64"
+      },
+      "root_execution": {
+        "path": "i6-root-execution.safe.json",
+        "bytes": 274,
+        "sha256": "f0dc92c2a3e756f094dfed74847d942f3ce587ee54e3034e79c69a595ba77249"
+      },
+      "v1_unexecuted_archive": {
+        "path": "local-two-stage-minimal-i6/preparation-v1/archive.safe.json",
+        "bytes": 29027,
+        "sha256": "cf49a02eb946edc4f038bf921b28d35c453d04ca2e570c41bfec761021d42fcf"
+      },
+      "started_utc": "2026-10-07T09:16:25.558270+00:00",
+      "finished_utc": "2026-10-07T09:16:29.060624+00:00",
+      "wrapper_exit_code": 0,
+      "originals_stable": 168,
+      "v1_archived_originals": 42,
+      "frozen_inputs": 72,
+      "retry_count": 0,
+      "cases": [
+        {
+          "arm": "A",
+          "processes": {
+            "caller": {
+              "pid": 23584,
+              "created_low": 2267144798,
+              "created_high": 31282748,
+              "auth_low": 464401601,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "first-created": {
+              "pid": 15804,
+              "created_low": 2267801808,
+              "created_high": 31282748,
+              "auth_low": 2849550670,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            }
+          },
+          "original_query_count": 1,
+          "original_lsa_absent": true,
+          "elapsed_ms": 0,
+          "post_owner_exists": false,
+          "post_owner_ntstatus": 3221225567,
+          "post_owner_size": null,
+          "post_owner_free_ntstatus": null,
+          "two_stage_receipts_bound": true,
+          "natural_exit_confirmed": true
+        },
+        {
+          "arm": "B",
+          "processes": {
+            "caller": {
+              "pid": 28976,
+              "created_low": 2268890112,
+              "created_high": 31282748,
+              "auth_low": 464401601,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "first-created": {
+              "pid": 3472,
+              "created_low": 2269458504,
+              "created_high": 31282748,
+              "auth_low": 2849551984,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "second-created": {
+              "pid": 2512,
+              "created_low": 2269694691,
+              "created_high": 31282748,
+              "auth_low": 2849551984,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            }
+          },
+          "original_query_count": 50,
+          "original_lsa_absent": false,
+          "elapsed_ms": 3031,
+          "post_owner_exists": true,
+          "post_owner_ntstatus": 0,
+          "post_owner_size": 272,
+          "post_owner_free_ntstatus": 0,
+          "two_stage_receipts_bound": true,
+          "natural_exit_confirmed": true
+        }
+      ],
+      "B_original_success_buffers": {
+        "count": 50,
+        "ntstatus": 0,
+        "size": 272,
+        "returned_luid_matches": true,
+        "every_buffer_freed": true,
+        "every_free_ntstatus": 0
+      },
+      "B_original_first_to_last_query_tick_ms": 3016,
+      "B_elapsed_ms": 3031,
+      "baseline_A_gate_before_B": true,
+      "measurement_complete": true,
+      "cleanup_passed": false,
+      "v2_signaled_final_read_branch_dynamically_covered": false,
+      "boundary": "A/B共享first binary；B增加暂停leaf及first原PI身份/文件授权、controller额外second OpenProcess/完整token/image/精确Job观察。两代自然0、原PI和controller原柄全关、Job空后B仍残留；不把整体增量归因CreateProcessW或任何单查询。静态PE/无显式USER32调用不排除系统依赖或外部注入；不同于产品b1整条候选路径。d2曾两段清理的单次反例仍有效。"
+    },
+    "next_step": "仅准备i7外层second观察整组on/off，两臂复用冻结i6 first/leaf和相同ACK；A完整复现present后才B。off缺少外层独立second身份/实际映像/精确Job成员观察，必须标not_observed，不能用父Job空补足。未执行。",
+    "original_runner_success_ref": "g09_original_normal_matrix_and_local_handles_20261007",
+    "local_product_failure_ref": "g09_station_publish_repairs_20261007",
+    "final_acl_gate_boundary": "保留已有Unix有界只读ACL支持与Mac验收；同S Linux逐名确认内核roundtrip/原ACL保持/新节点继承/变更拒绝清理。Windows正常矩阵核owner_and_acl_preserved；readonly-*只是公共只读命令，Windows专项只读ACL未独立实测，不扩称已验。",
+    "g09_closed": false,
+    "closed_count": 10,
+    "pr_draft": true,
+    "final_same_source_linux_windows_complete": false,
+    "platform_handoff_not_passed": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "cleanup_ready": false,
+    "localization": "无需本地化变更；只有证据文档，无产品、用户文案或布局改动。"
+  },
   "g09_single_child_controls_20261007": {
     "recorded_utc": "2026-10-07T08:55:35.912983+00:00",
     "repository_head_unchanged": "0f8f9434ad338dfe20561f36f110f4d2557d3634",
@@ -5366,17 +5555,17 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner8e84正常矩阵通过，本机b1显式站LSA失败仍有效。i2/i3/i4三组单段对照六代均清理，不是产品修复或一般因果排除；i5自身token查询仅准备。最终同源双平台门禁未完成，新增关闭0。",
+      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner8e84正常矩阵通过，本机b1显式站LSA失败保持。i5两臂清理；i6A单段清理、B最小两段加身份握手在自然退出/原柄关闭后仍LSA残留，尚非单API首因或产品修复。i7外层观察开关仅准备，最终同源双平台未完成，新增关闭0。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_original_normal_matrix_and_local_handles_20261007",
       "latest_result_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
-      "latest_preparation_ref": "g09_single_child_controls_20261007",
+      "latest_preparation_ref": "g09_minimal_two_stage_difference_20261007",
       "mac_platform_binding_regression_complete": true,
       "next_dynamic_observation_implemented": true,
       "both_public_candidate_modes_passed": true,
       "updated_transaction_complete": false,
       "current_local_repair_ref": "g09_station_publish_repairs_20261007",
-      "current_diagnostic_ref": "g09_single_child_controls_20261007",
+      "current_diagnostic_ref": "g09_minimal_two_stage_difference_20261007",
       "latest_result_source_diff_sha256": null,
       "both_public_candidate_modes_passed_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
       "latest_local_failure_ref": "g09_station_publish_repairs_20261007",

@@ -1,6 +1,20 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：三组单段对照可清理，产品缺口仍开放
+## 当前接续状态（2026-10-07）：最小两段及身份握手出现残留差分
+
+i5自身TokenStatistics对照两臂自然退出，原首次LSA及owner退出后唯一查询均不存在；独审SHA `d34beb3855c3b06f3f820ee7ebaefb570038414009dbad30d61dff78a2939119`。B的冻结流程与退出0支持open/query/精确长度/关闭成功，但没有child统计字段或返回LUID原件，不以外层身份补写。
+
+i6 v2两臂仅各一次：A单段first15804、新LUID2849550670/0原首查0xc000005f/null、elapsed0，postowner也不存在；其清理门槛满足后才B。B first3472/birth2269458504-31282748与leaf2512/birth2269694691-31282748，同LUID2849551984/0；120B交接与ACK一致，260B原终态确认Resume1、leaf自然0及原thread/process关闭。controller确认两代自然0、Job空、原second/first/thread/Job关闭后，原50条LSA样本均status0、Size272、返回同LUID，逐条free调用及返回0，elapsed3031ms仍存在；owner自然退出并关闭原柄后的唯一后验也存在且free0。
+
+pair SHA `a1016c60e9a1d1e3dcac2e882889a72ee0779737f6f35b6fd4fc658504996d0a`；独审SHA `43d8e91bae340838a821779d58d2088638f1c8f833e45d76d314958847260d64`，168份原件前后稳定，含未执行v1的42份归档。wrapper0仅表示测量完整，B清理未通过。首末query tick差3016ms，3031包含原日志和粗时钟，不是额外查询；v2快速退出最终读取分支本轮没有动态覆盖。
+
+本轮将复现范围缩到最小两段及必要身份交接，没有显式USER32或窗口对象操作；未排除系统依赖/外部注入。增量仍包含controller对second的独立打开、完整身份/镜像/Job观察及ACK，不能直接归因某个API或持有者，也不能替代b1产品同源复现。d2曾两段清理的反例保留。下一步只准备i7外层second观察整组on/off，复用相同first/leaf及ACK，尚未执行；off缺少的外层second独立观察明确记not_observed。
+
+原runner8e84正常五场景/三次冷恢复已通过但均自动站，本机b1产品失败保持，最终同一冻结源码Linux/Windows门禁仍待完成。已有Unix有界只读ACL支持和Mac验收保持；最终Linux逐名核现有ACL回归，Windows核owner/DACL保持，readonly命令不冒充Windows专项只读ACL验收。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_minimal_two_stage_difference_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍与已通过本地check、i18n11和定向20项来源一致。
+
+## 历史记录：三组单段对照可清理，产品缺口仍开放
 
 i2的A不加载、B加载系统USER32并核路径后释放自有引用；i3两臂共同加载并解析GetSystemMetrics，只有B调用一次SM_CXSCREEN；i4的A不写，B唯一新建文件并写入一个字节、flush及关闭。每组共用其冻结child二进制、各臂仅一次，A原LSA和owner退出后查询均确认不存在后才启动B。六代均自然退出0、Job为空、原thread/process/Job关闭，原第一次LSA即0xc000005f/null，owner退出并关闭原柄后的唯一后验也不存在。三份wrapper独立收据均0，没有重试或强杀。
 
