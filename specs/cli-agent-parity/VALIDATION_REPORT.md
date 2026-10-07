@@ -10,7 +10,7 @@
 
 当前工作区已实现 `tree::rename_inactive_images`：父目录租约覆盖freeze/drop、原有不覆盖目标且校验完整身份的rename、目标重新freeze；重新freeze失败返回RecoveryRequired。execute把backup映像guard保留到第二棵树发布后；recover把反向移动后的stage guard保留到旧包恢复后，并在删除stage前释放。已有待恢复事务的recover失败统一为RecoveryRequired，继续保持启动保护。新增6项树测试和1项pending目录日志错误回归均包含在focused实际通过的46项中（1项真实native显式忽略、8214过滤、0.07秒）；另有19项启动保护回归（0.20秒）和11项i18n（7.15秒）通过。三轮均exit0，7份变更来源与Cargo输入前后摘要一致。`npm-publish-check-a1`的cargo check已exit0（1分38秒、14条既有warnings），7份变更来源与Cargo输入前后摘要一致；收据SHA为 `4ad6d5631ef47b1d307e7ef5c2ab7bc1d00a75b9920a7b4ce8a7680080fff021`。本轮局部门禁通过，原机修复仍待验证。格式检查已通过，收据 `npm-publish-format-a1.safe.json` SHA为 `e4ba78e7c4bea16e92917dd4df4ae8f33977cb5a70626e04ab439382a09f62c8`。本机增量、收据和验收边界见CURRENT_STATUS.json的 `g09_npm_publish_local_repair_20261007`。
 
-main已前进到 `38fb011d9c374f37016fd31a88c86c974cd04969`（PR23仅修改macOS ARM64发布架构名校验）；计划局部门禁后合入，在最终源码冻结前完成，当前不记为已合入或最终门禁通过。
+main已前进到 `38fb011d9c374f37016fd31a88c86c974cd04969`（PR23仅修改macOS ARM64发布架构名校验）；已在局部门禁通过后合入。本次合并未变更 Rust 产品或测试输入，原机正常验收和最终同源门禁仍待完成。
 
 本轮默认nextest1146项（含i18n11）与command93项通过，没有运行witness组。CMD的200个、PS的380个调试事件全部继续，两个候选cleanup及station清理通过。67份来源仅完成执行前Git字节绑定；首个事务失败后，末尾源码、二进制和manager复核未到，不能称全仓冻结或最终同源门禁通过。本轮没有新增运行时模块或异常对象取证，原失败与原双阶段证据继续保留。
 

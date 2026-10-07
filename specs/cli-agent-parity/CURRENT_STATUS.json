@@ -1,5 +1,6 @@
 {
   "g09_npm_publish_local_repair_20261007": {
+    "implementation_commit": "2271fc97781281f690a7120bdab62c503d35b4c2",
     "base_commit": "504cf6595f600cff6d351313ea83c55565f6ab60",
     "status": "local_gates_passed_original_runner_pending",
     "scope": "当前工作区Windows包树发布/恢复增量；本机合同证据不等于原37548517669具体失败API已证",
@@ -87,8 +88,8 @@
     "main_integration": {
       "target_commit": "38fb011d9c374f37016fd31a88c86c974cd04969",
       "change": "PR23仅修改macOS ARM64发布架构名校验",
-      "status": "planned_after_local_gates_before_final_freeze",
-      "merged": false
+      "status": "integrated_after_local_gates_before_original_runner_validation",
+      "merged": true
     },
     "original_runner_repair_verified": false,
     "normal_five_cases_completed": false,
@@ -1792,7 +1793,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "G01–G08、G10、V03共10项关闭，G09开放；V01/V02/V05移交不计通过。504cf65原runner37548517669按witness=false、scope=all运行；CMD/PS均输出codex-cli 0.156.1并退出0，PS已等Node，但首updated仍PersistenceFailed。Prepared前态快照后未见OldMoved记录，工件缺事务journal不能证明具体失败API或回滚，冻结句柄假设未确认。普通1146项（含i18n11）及command93项通过，无witness组，两个候选清理通过。67来源仅执行前绑定，末尾复核未到，不称全仓冻结。新增关闭0项，正常五场景、三次独立冷恢复及最终同源双平台门禁未完成，PR草稿、禁止合并，原失败及证据保留。 本机4项真实FS基线已通过：仅保留SEC_IMAGE时底层rename可成功但freeze仍拒绝；当前已实现改名前后映像冻结、父租约及恢复启动保护，不能据此补证原机失败API。格式检查、focused46（含6树+1日志错误新增回归，1真实native显式忽略）／启动保护19／i18n11均通过，7份来源与Cargo输入前后摘要一致；npm-publish-check-a1已exit0（1分38秒、14既有warnings），局部门禁通过、原机待验。计划局部门禁后合入main的38fb011再完成最终冻结。",
+  "status_zh": "G01–G08、G10、V03共10项关闭，G09开放；V01/V02/V05移交不计通过。504cf65原runner37548517669按witness=false、scope=all运行；CMD/PS均输出codex-cli 0.156.1并退出0，PS已等Node，但首updated仍PersistenceFailed。Prepared前态快照后未见OldMoved记录，工件缺事务journal不能证明具体失败API或回滚，冻结句柄假设未确认。普通1146项（含i18n11）及command93项通过，无witness组，两个候选清理通过。67来源仅执行前绑定，末尾复核未到，不称全仓冻结。新增关闭0项，正常五场景、三次独立冷恢复及最终同源双平台门禁未完成，PR草稿、禁止合并，原失败及证据保留。 本机4项真实FS基线已通过：仅保留SEC_IMAGE时底层rename可成功但freeze仍拒绝；当前已实现改名前后映像冻结、父租约及恢复启动保护，不能据此补证原机失败API。格式检查、focused46（含6树+1日志错误新增回归，1真实native显式忽略）／启动保护19／i18n11均通过，7份来源与Cargo输入前后摘要一致；npm-publish-check-a1已exit0（1分38秒、14既有warnings），局部门禁通过、原机待验。已在局部门禁通过后合入main的38fb011；原机正常验收和最终同源门禁待完成。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -3427,7 +3428,7 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "G01–G08、G10、V03共10项关闭，G09开放；V01/V02/V05移交不计通过。504cf65原runner37548517669按witness=false、scope=all运行；CMD/PS均输出codex-cli 0.156.1并退出0，PS已等Node，但首updated仍PersistenceFailed。Prepared前态快照后未见OldMoved记录，工件缺事务journal不能证明具体失败API或回滚，冻结句柄假设未确认。普通1146项（含i18n11）及command93项通过，无witness组，两个候选清理通过。67来源仅执行前绑定，末尾复核未到，不称全仓冻结。新增关闭0项，正常五场景、三次独立冷恢复及最终同源双平台门禁未完成，PR草稿、禁止合并，原失败及证据保留。 特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持；a4a6诊断和其他历史结果不重写。 本机4项真实FS基线已通过：仅保留SEC_IMAGE时底层rename可成功但freeze仍拒绝；当前已实现改名前后映像冻结、父租约及恢复启动保护，不能据此补证原机失败API。格式检查、focused46（含6树+1日志错误新增回归，1真实native显式忽略）／启动保护19／i18n11均通过，7份来源与Cargo输入前后摘要一致；npm-publish-check-a1已exit0（1分38秒、14既有warnings），局部门禁通过、原机待验。计划局部门禁后合入main的38fb011再完成最终冻结。",
+      "boundary": "G01–G08、G10、V03共10项关闭，G09开放；V01/V02/V05移交不计通过。504cf65原runner37548517669按witness=false、scope=all运行；CMD/PS均输出codex-cli 0.156.1并退出0，PS已等Node，但首updated仍PersistenceFailed。Prepared前态快照后未见OldMoved记录，工件缺事务journal不能证明具体失败API或回滚，冻结句柄假设未确认。普通1146项（含i18n11）及command93项通过，无witness组，两个候选清理通过。67来源仅执行前绑定，末尾复核未到，不称全仓冻结。新增关闭0项，正常五场景、三次独立冷恢复及最终同源双平台门禁未完成，PR草稿、禁止合并，原失败及证据保留。 特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级保持；a4a6诊断和其他历史结果不重写。 本机4项真实FS基线已通过：仅保留SEC_IMAGE时底层rename可成功但freeze仍拒绝；当前已实现改名前后映像冻结、父租约及恢复启动保护，不能据此补证原机失败API。格式检查、focused46（含6树+1日志错误新增回归，1真实native显式忽略）／启动保护19／i18n11均通过，7份来源与Cargo输入前后摘要一致；npm-publish-check-a1已exit0（1分38秒、14既有warnings），局部门禁通过、原机待验。已在局部门禁通过后合入main的38fb011；原机正常验收和最终同源门禁待完成。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_normal_candidate_persistence_failure_20261007",
       "latest_result_source_commit": "504cf6595f600cff6d351313ea83c55565f6ab60",
