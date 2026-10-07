@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：两代分别嵌入清单仍有残留
+## 当前接续状态（2026-10-07）：省去second挂起及恢复仍有残留
+
+i12同一新first及原无清单leaf，两臂ACK/token/外部second观察off；仅切second的CREATE_SUSPENDED/ResumeThread整组。A first14016/leaf26768、LUID2870368909/0，Resume返回1/error0；原/post双present且完整自然测量后才B。B first15828/leaf15812、first LUID2870377014/0，second直接运行，Resume明确not_performed、result/error为null。second LUID均未观察，不由first身份补写。
+
+128B handoff v3与332B completion v4独立绑定恢复mode；两臂保留原PI PID/birth/TID、自然wait/exit0与原柄关闭。各50条原LSA均status0、Size272、对应first LUID且free0，elapsed3016/3015ms；owner自然退出并关闭原柄后的唯一查询仍present/free0。first的CPWLW挂起、身份/Job前置及Resume1、原5秒/3秒未变，B快速退出也只使用原PI继续核验。
+
+pair SHA `2875cf2398daab474f1911d4beb382a7740fe8389a46f776d69503bc82fddab2`；独审SHA `002e63487259f11de71d097598b9eee104396acea7fe20695c2519740246208c`，103份原件稳定。wrapper0仅表示测量完整，清理仍失败。second挂起/恢复整组不是本轮残留必要条件；未定位CreateProcessW内部或外部持有者，不支持移除产品安全前置。
+
+继续依据最小两段差异与d2曾清理反例选择有界对照，不修改系统服务或清理期限。原runner8e84正常五场景/三次冷恢复通过但均自动站，本机b1实际失败保持；产品未修复，最终同一冻结源码Linux/Windows门禁未完成。G09开放、共10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。
+
+详见CURRENT_STATUS的 `g09_second_suspend_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：两代分别嵌入清单仍有残留
 
 i10只改变leaf的Windows清单（asInvoker/uiAccess=false及Windows10 supportedOS），固定另一代与原控制器，native两臂均B且ACK/token/外部second观察off。A原与post均present后封存收据、保全实际A文件，再在同一路径CREATE_NEW B。两臂自然0、Resume1、原PI关闭；各50条原LSA均status0、Size272、匹配first LUID且free0，elapsed3032/3016ms，owner自然退出并关闭原柄后的唯一查询也present/free0。pair SHA `fa3ce4b7ab603491e036241ca8b39282c64560ffd177cbd1eaf4b1a869247f9b`；独审SHA `3f692db05a5dc03fa3596cefb3aa9c8b9e6789f82ad170d5b4986488ade05e51`，113份原件稳定。
 
