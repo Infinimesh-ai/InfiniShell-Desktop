@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：完整本地矩阵通过，最终冻结前快照
+## 当前接续状态：旧S最终门禁失败，测试与CI修正已具备再冻结条件
+
+冻结9271da36e6ced849ab71e536d83e76aeebb648f5的正常Windows run37633797777成功并经独审：witness=false五场景、三次独立冷恢复、8次worker与8代候选，实际8代自动站。audit.safe.json为78246B、SHA 8ee830c58da31308478e5a1a08faee9809b71de47e7d70ace4189a0668bc45db。随后同S dual37639377834失败：Linux APP3861运行/3860通过/1失败；Windows APP3443运行/3442通过/1失败。同一迁移测试将最新版本20261007000000误当目标20260916000001；Windows实际三次尝试，摘要重复不是第四次。本机旧S广筛3443/3442/1复现且来源不变。旧S正常成功不能抵消双平台失败。
+
+自动source-gate-audit-v2.safe.json保留automated_checks_passed=false与11个失败断言（SHA cb2de103fa6deadce51eeb55208fe1efdc975371aca0fc892f5ed59134795aef）；这些不是11项独立产品测试失败。两平台APP各自i18n实际逐名11通过，自动i18n两个false以独立原日志复核分层说明。Linux旧ACL15清单误含2个macOS限定项，实际适用13项全通过；旧错误清单保留，macOS2标不适用，不伪记PASS。Linux fixed Node glibc因APP失败未执行，需新门禁补齐；hook第一组23通过，第二组23通过/2因fish、zsh缺依赖SKIP，旧SKIP不计通过。
+
+当前只改两处非产品范围：local_cli_tasks_tests.rs精确选择20260916000001进行revert/run/revert，保留数据不重写和索引约束断言；cross-platform-preflight.yml在既有hook步骤用有界非交互apt补fish/zsh，显式检查bash/zsh/fish/tmux，步骤期限3→8分钟，原48项测试不变。local-migration-fix-a1实际111运行/111通过/8184跳过、cargo check退出0、i18n11通过/8284筛选，三门禁来源前后不变；之后逐7207来源核对仅workflow改变。ci-hook-dependency-check-a1仅Bash -n通过，真实Linux安装与原48项执行仍待新冻结门禁。没有产品或受管配置变化，无需本地化变更。
+
+明确原件：Windows独审SHA 72292dd7aa6b0de99a56ec33863d12b3a5ce3319eba6c66356df4e28e2edbce1；Linux独审SHA 215e9f74ff67cb468189b51da33aaaf50614debab10c49ccef9af68ab75ad725；本地三门禁汇总SHA f5faf1c9f715ae719991425a8269e6aa2e92328ef46ca64e40e6b0eff8ebc6e5；CI语法/来源边界收据SHA 246d94ba92d9a0a80a5d8466e742ad4a0768dc71936d08ea370ef9e9615d5143。路径与逐项摘要见CURRENT_STATUS.g09_final_gate_migration_followup_20261007。原K3、真实CLR/分类、后续原机修复、K1时间对照、旧b1/h2失败原件不改；LSA首因unknown不改写为已修，也不恢复永久诊断前置。
+
+仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR草稿、merge_allowed=false、cleanup_ready=false，新增关闭0。提交当前修正与四文档形成新冻结源码后，必须在同一源码重新执行正常Windows完整矩阵及Linux/Windows最终门禁并独审；此处不预填未来SHA或通过结果。最终签收仍仓外及PR正文记录，冻结后不改S。
+
+## 历史记录：K3完整本地矩阵与9271冻结前快照
 
 K3于UTC 13:39:35.2614050–13:47:54.2204332唯一执行当前产品正常witness=false完整矩阵，wrapper/driver均0。五场景为updated、old_moved、published_receipt_missing、external_change_preserved、candidate_changed_preserved；中间三场景各由新的worker调用完成冷恢复，共8次worker调用、8代CMD/PowerShell候选，最后一场景在候选启动前拒绝。updated发布0.156.1；前两种冷恢复回到0.155.1；外部变更场景保留0.156.1并返回RecoveryRequired；候选变更场景保留0.155.1并返回RecoveryRequired。
 

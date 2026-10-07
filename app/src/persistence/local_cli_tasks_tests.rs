@@ -1,4 +1,6 @@
 use diesel::connection::SimpleConnection;
+use diesel::migration::MigrationSource;
+use diesel::sqlite::Sqlite;
 use diesel_migrations::MigrationHarness;
 use futures::executor::block_on;
 use serde_json::json;
@@ -774,8 +776,13 @@ fn local_cli_future_unknown_still_rejects_messages_and_receipts() {
 #[test]
 fn local_cli_unconfirmed_index_migration_upgrades_existing_rows_without_rewriting_them() {
     let mut connection = connection();
+    let migration = MigrationSource::<Sqlite>::migrations(&::persistence::MIGRATIONS)
+        .unwrap()
+        .into_iter()
+        .find(|migration| migration.name().version().to_string() == "20260916000001")
+        .expect("未确认 CLI 会话索引迁移必须存在");
     let reverted = connection
-        .revert_last_migration(::persistence::MIGRATIONS)
+        .revert_migration(migration.as_ref())
         .unwrap();
     assert_eq!(reverted.to_string(), "20260916000001");
     parent_and_child(&mut connection);
@@ -784,10 +791,9 @@ fn local_cli_unconfirmed_index_migration_upgrades_existing_rows_without_rewritin
     let before_messages = read_messages(&mut connection, "child", 1).unwrap();
 
     let applied = connection
-        .run_pending_migrations(::persistence::MIGRATIONS)
+        .run_migration(migration.as_ref())
         .unwrap();
-    assert_eq!(applied.len(), 1);
-    assert_eq!(applied[0].to_string(), "20260916000001");
+    assert_eq!(applied.to_string(), "20260916000001");
     assert_eq!(read_tasks(&mut connection, false).unwrap(), before);
     assert_eq!(
         read_messages(&mut connection, "child", 1).unwrap(),
@@ -804,7 +810,7 @@ fn local_cli_unconfirmed_index_migration_upgrades_existing_rows_without_rewritin
     assert!(checkpoint(&mut connection, duplicate, None).is_err());
     assert!(
         connection
-            .revert_last_migration(::persistence::MIGRATIONS)
+            .revert_migration(migration.as_ref())
             .is_err()
     );
     assert_eq!(read_task(&mut connection, "child").unwrap(), Some(child));

@@ -856,9 +856,21 @@ jobs:
       - name: Test installed Grok hook through the native notification worker
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' && steps.notify_trace_worker.outcome == 'success' }}
         shell: bash
-        timeout-minutes: 3
+        timeout-minutes: 8
         run: |
           set -euo pipefail
+          # 补齐已定义的真实 shell 回归依赖，避免缺少解释器时静默跳过。
+          if ! command -v fish >/dev/null || ! command -v zsh >/dev/null; then
+            apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=30)
+            timeout 120s sudo -n apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update
+            timeout 180s sudo -n env DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install --no-install-recommends -y fish zsh
+          fi
+          for dependency in bash zsh fish tmux; do
+            command -v "$dependency"
+          done
+          zsh --version
+          fish --version
+          tmux -V
           export INFINISHELL_TEST_NOTIFY_WORKER="$RUNNER_TEMP/infinishell-test-notify-worker"
           export INFINISHELL_TEST_NOTIFY_TRACE_REQUIRED=1
           python3 -B script/cli-agent-parity/run_installed_grok_hook_tests.py -v
