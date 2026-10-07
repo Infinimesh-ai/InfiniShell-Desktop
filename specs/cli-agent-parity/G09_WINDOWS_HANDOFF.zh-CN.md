@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：合并main本地门禁通过，LSA持有者仍待定位
+## 当前接续状态（2026-10-07）：桌面对照未支持首因，原机正常验收已开始
+
+新增关闭0项：G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿。b1首CMD的LSA收尾失败和c3两项原生失败保持，不用后续诊断覆盖。
+
+d1在原caller预创建NULL/CWF_CREATE_ONLY窗口站时返回183、controller exit1；未启动helper、未产生候选新LUID、未到LSA测量，B未执行。不能由此推断新LUID第一段创建同样失败。d2 v1因第二段空lpDesktop不能保证私有桌面干预而未执行并保全；v2使用同一派生helper，两臂各一次、无重试。A两代实际为WinSta0/Default，B两代为WinSta0/本轮nonce桌面；原句柄/Job关闭后，首次LSA查询均为0xc000005f/null、elapsed0ms，controller和两个helper自然退出0。
+
+A本身没有残留，因此该结果仅反对“连接Default足以导致残留”，不是B修复A。与c3相比，controller、stdio keeper/借管道、预建桌面、派生helper及进程时序不同，不能认定单一首因或产品修复；原子新建desktop及对象销毁未分别证明，cleanup_ready=false。只读引用审查未找到新的自有token/process/receipt句柄泄漏正证，不据静态调用顺序更改产品。
+
+d1独审SHA `b99d8bba2c3e11b391b703b55b08b71d778c68233e87e81e4749aa72e347c673`；d2 pair SHA `70498f71a4739f456d6752eb9f23faa29d4ad2d0d58404de13e2329238472969`、独审SHA `ddaab9b25a43b9c6ff7b25f76be90f078dbfd56fe3ec81cbd29b3f5c4cfd8597`。证据根 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/`，细项见CURRENT_STATUS.json的 `g09_local_window_object_controls_20261007`，最新产品结果仍指向b1。
+
+截至 `2026-10-07T06:10:41.427719+00:00`，原runner22的 [37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367) 为 `in_progress`，固定验证8e84，不替代合并main后的最终冻结源码。仓外e1正在准备复用原8e84测试程序，比较已有无stdio/无写入stdio两项；尚未执行，原断言和三秒预算不变。当前7203份非文档来源与通过check/i18n11的合并内容一致，本次仅更新证据文档、未重跑门禁。正常五场景、三次独立冷恢复和最终同源Linux/Windows门禁均未完成；无需本地化变更。
+
+## 历史记录：合并main本地门禁与c3原始失败
 
 本轮新增关闭0项：G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿。正常 witness=false 五场景、三次独立冷恢复和最终同一冻结源码 Linux/Windows 门禁尚未完成；普通安装、已支持只读ACL自动升级及特殊权限安装的既有决定保持。
 
