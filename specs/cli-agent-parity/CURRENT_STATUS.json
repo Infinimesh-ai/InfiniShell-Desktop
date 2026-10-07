@@ -493,8 +493,182 @@
       "g09_closed": false,
       "cleanup_ready": false
     },
+    "k1_actual_product_temporal_control": {
+      "prepared": {
+        "path": "local-b1-temporal-control-k1/prepared.safe.json",
+        "bytes": 1335224,
+        "sha256": "75162b4fb40c04b661be77ecee1f00fc16c02add6dbcb2e951d1f1fffa89ae07"
+      },
+      "wrapper_result": {
+        "path": "local-b1-temporal-control-k1/result.safe.json",
+        "bytes": 1939,
+        "sha256": "baae3985df3caa8410eaa936d99e1c14ff9f8dfabfde675d31e891c089c1d8e2"
+      },
+      "root_execution": {
+        "path": "local-b1-temporal-control-k1/k1-root-execution.safe.json",
+        "bytes": 373,
+        "sha256": "83dfd576d66373a1b1bacbbca9ed822fab4c8f8c4c14649b39392666df5c1c16"
+      },
+      "audit": {
+        "path": "local-b1-temporal-control-k1/audit.safe.json",
+        "bytes": 131624,
+        "sha256": "aec9c15fbf27d6b098021e305e56411a6ce406a2352909cfe2e27be3064e996d"
+      },
+      "journal_boundary_audit": {
+        "path": "local-b1-temporal-control-k1/audit-journal-boundary.safe.json",
+        "bytes": 1037,
+        "sha256": "a3ccc9b524dfa34588f6533ae0f16a5607d4aff2a1c1559ede8d27652f319428"
+      },
+      "started_utc": "2026-10-07T13:08:39.2350182Z",
+      "finished_utc": "2026-10-07T13:10:30.8182575Z",
+      "normal_witness_false": true,
+      "case": "updated",
+      "wrapper_exit_code": 0,
+      "driver_exit_code": 0,
+      "worker_test_passed": 1,
+      "worker_elapsed_seconds": 82.13,
+      "retry_count": 0,
+      "frozen_inputs_excluding_prepared": 2474,
+      "prepared_additional_input_count": 1,
+      "originals_stable": 2736,
+      "case_originals_stable": 237,
+      "audit_assertions_not_product_tests": 13894,
+      "source_scope": {
+        "historical_build_base": "aa3b314bc09022f87810a5718668fe299f4af3f8",
+        "historical_build_dirty_diff": "465d37db980606c8fba43b80a3f649d85ff01ba62a569eec26694969f3ec5dbe",
+        "historical_build_sources": 7198,
+        "source_view_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
+        "bound_source_count": 67,
+        "current_workspace_at_execution": "d1b4208468459f40c5b0b6023ab8f93fcb1475b7",
+        "worker_path_change": {
+          "old": {
+            "path": "C:\\Coding\\InfiniShell-Desktop\\target\\debug\\deps\\warp-fc89e500d2d1c917.exe",
+            "bytes": 493248512,
+            "sha256": "367a39eaf7a0c377d08a7e5c131654e625dd0c6cb9f6a9da88028435584e96a7",
+            "device": 14033226427907248377,
+            "file_id": 1125899908891290,
+            "links": 1
+          },
+          "new": {
+            "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\local-station-publish-repair-b1\\previous-binaries-20261007T043646Z-7a0bd933\\test-binary.exe",
+            "bytes": 493248512,
+            "sha256": "367a39eaf7a0c377d08a7e5c131654e625dd0c6cb9f6a9da88028435584e96a7",
+            "device": 14033226427907248377,
+            "file_id": 2814749769348789,
+            "links": 1
+          },
+          "bytes_equal": true,
+          "original_target_must_not_be_restored": true
+        },
+        "current_same_source_final_gate": false
+      },
+      "generations": [
+        {
+          "mode": "cmd",
+          "generation": "72c62745-d932-4dc0-9772-fe85211664c5",
+          "first_helper": {
+            "pid": 28788,
+            "created": 134358521896778148,
+            "auth_low": 2904591524,
+            "auth_high": 0,
+            "session": 2,
+            "elevated": 0,
+            "token_type": 1,
+            "user_sid_sha256": "3db052baf3af36daba58295d90d7f247121adfbfe8ac0b5b36af5723b0d164ba",
+            "integrity_sid_sha256": "92b50d7a8aad9f6aab0eaa749730edf84640ede7214ba8f8a4e275be7e5264e4"
+          },
+          "second_helper": {
+            "pid": 10196,
+            "created": 134358521899139696,
+            "auth_low": 2904591524,
+            "auth_high": 0,
+            "session": 2,
+            "elevated": 0,
+            "token_type": 1,
+            "user_sid_sha256": "3db052baf3af36daba58295d90d7f247121adfbfe8ac0b5b36af5723b0d164ba",
+            "integrity_sid_sha256": "92b50d7a8aad9f6aab0eaa749730edf84640ede7214ba8f8a4e275be7e5264e4"
+          },
+          "actual_shared_luid": {
+            "low": 2904591524,
+            "high": 0
+          },
+          "station_created_explicitly": true,
+          "candidate_root_pid": 13516,
+          "received_validated_continued": 205,
+          "all_four_role_exit_codes": 0,
+          "stdout_escaped": "codex-cli 0.156.1\n",
+          "station_logon_absent_no_query_error": true,
+          "helpers_exit_zero_job_empty": true,
+          "desktop_map_closed": true,
+          "appcontainer_profile_deleted_marker": true
+        },
+        {
+          "mode": "powershell",
+          "generation": "a3067f79-f348-4440-a38d-b05de5c83a6b",
+          "first_helper": {
+            "pid": 29068,
+            "created": 134358521993907944,
+            "auth_low": 2904631389,
+            "auth_high": 0,
+            "session": 2,
+            "elevated": 0,
+            "token_type": 1,
+            "user_sid_sha256": "3db052baf3af36daba58295d90d7f247121adfbfe8ac0b5b36af5723b0d164ba",
+            "integrity_sid_sha256": "92b50d7a8aad9f6aab0eaa749730edf84640ede7214ba8f8a4e275be7e5264e4"
+          },
+          "second_helper": {
+            "pid": 20760,
+            "created": 134358521996214275,
+            "auth_low": 2904631389,
+            "auth_high": 0,
+            "session": 2,
+            "elevated": 0,
+            "token_type": 1,
+            "user_sid_sha256": "3db052baf3af36daba58295d90d7f247121adfbfe8ac0b5b36af5723b0d164ba",
+            "integrity_sid_sha256": "92b50d7a8aad9f6aab0eaa749730edf84640ede7214ba8f8a4e275be7e5264e4"
+          },
+          "actual_shared_luid": {
+            "low": 2904631389,
+            "high": 0
+          },
+          "station_created_explicitly": true,
+          "candidate_root_pid": 29936,
+          "received_validated_continued": 379,
+          "all_four_role_exit_codes": 0,
+          "stdout_escaped": "codex-cli 0.156.1\r\n",
+          "station_logon_absent_no_query_error": true,
+          "helpers_exit_zero_job_empty": true,
+          "desktop_map_closed": true,
+          "appcontainer_profile_deleted_marker": true
+        }
+      ],
+      "publication": {
+        "old_version": "0.155.1",
+        "target_version": "0.156.1",
+        "transaction_id": "16ebdd1e-24a6-402a-a66e-fe67b580629d",
+        "updated_driver_passed": true,
+        "target_files": 50,
+        "prepared_identity_members_equal_published": 63,
+        "owner_acl_equal_common_members": 21,
+        "shims_exact": 3,
+        "config_exact_bytes": 44,
+        "npm_manager_files_bound": 2324,
+        "public_cmd_and_powershell_version": "codex-cli 0.156.1",
+        "checkpoint_boundary": "Published回调位于stage→package rename之后、Published journal save之前；文件内OldMoved为原合同，不以文件名冒充已持久化Published。执行成功、最终50文件/原准备身份与公开复验共同支持发布完成。",
+        "pending_journal_boundary": "原审计初始absence表达式为codex.json；独立补收据核历史生产实际codex-npm-windows.json不存在，原审计保留不覆盖。"
+      },
+      "directory_view_boundary": "代理对两个祖先目录的stat视图与prepared不一致原件保留；根同目录原生查询、663目录前置核验和2474文件运行租约通过。原因unknown，不声称目录被替换或放宽前置。",
+      "historical_boundary": "原b1失败、原h2残留保持有效；本轮时间/新root/worker归档路径变化，不是代码修复或首因归属。未新增LSA/窗口站查询或改原证据。",
+      "observation_boundary": "helper原PID/birth/LUID齐备；候选root只保存PID，Node/Codex/console只保存角色退出，未补造未归档的birth/LUID。原CODEX_HOME路径告警保留，不写为零告警。",
+      "full_matrix_covered": false,
+      "cold_recovery_process": false,
+      "final_same_source_linux_windows_complete": false,
+      "g09_closed": false,
+      "closed_gap_delta": 0,
+      "cleanup_ready": false
+    },
     "product_boundary": "b1实际失败的冻结helper 7f3f77aa084adcf8761ef15d32884629fffbee0b10273b6a758ce575d3d6696e静态导入USER32、PE子系统3；i16 first为动态加载、GUI子系统2。产品second已调用GetSystemMetrics，first只有窗口站查询。静态及最小诊断差异尚不能直接移植为产品修复。",
-    "next_step": "正在仅准备K1历史b1产品updated复核：真实detached工作树.worktrees/g09-b1-temporal-k1固定8e84b737eabeefe1ab082dc3be6b6c0fd5067c96；根与代理已只读核对67份相关来源与b1一致，但尚无本轮prepared收据，不称准备完成。worker改用已归档367a映像路径并单列相对原target路径的偏离，supervisor/helper保持原路径；witness=false、仅updated、新根C:\\Coding\\g09-b1t1，尚未执行。不是当前377d1028d3e05afe1e6b676ff29a436c9f0a8534的最终源码门禁；i15仍未执行，原b1/h2失败保留，最终同冻结源码Linux/Windows门禁继续待验。",
+    "next_step": "当前d1源码的K2 worker --no-run和默认products Cargo均成功，7207来源前后不变。原包装因Cargo正常2硬链接被拒绝，原wrapper1保留；补充逐一核target/debug与deps原别名、同柄复制为单链接独立产物后通过，未重跑Cargo。补包装收据SHA 20242c1596136df3458e183843175055c0d6385c4015e92ac8376f14080677cb。接下来将K2实际产物绑定当前源码，执行正常witness=false完整五场景、三次独立冷恢复，再完成最终同一冻结源码Linux/Windows门禁。K1仅历史b1来源的单updated复核通过；旧b1/h2失败与首因unknown保留，i15仍未执行。",
     "original_runner_success_ref": "g09_original_normal_matrix_and_local_handles_20261007",
     "local_product_failure_ref": "g09_station_publish_repairs_20261007",
     "g09_closed": false,
@@ -7802,7 +7976,7 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。i19复用h2原映像字节/路径A本次原/post均清理，旧h2残留仍有效，不能归因i18共改或认定产品修复。j1两次有界class64尝试第二次成功，但自身唯一匹配Object=0，不等于没有持有者。K1仅准备历史8e84/b1来源的正常updated复核，worker归档路径偏离单列；尚未执行，不替代当前冻结源码最终双平台门禁。新增关闭0。",
+      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。K1历史b1字节本次updated正常通过，CMD/PowerShell实际均显式私有站并完成清理、发布和公共版本复验；7198构建来源、8e84源码视图67项与当前d1三者分开，归档worker路径偏离单列。旧b1/h2失败有效，首因unknown；K2当前源码Cargo构建与独立产物复制已完成，原包装硬链接拒绝收据保留；正常5场景/3冷恢复/最终同S双平台门禁待完成，新增关闭0。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_original_normal_matrix_and_local_handles_20261007",
       "latest_result_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
