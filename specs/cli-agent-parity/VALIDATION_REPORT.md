@@ -1,6 +1,20 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态：旧S最终门禁失败，测试与CI修正已具备再冻结条件
+## 当前接续状态：S2门禁因Windows泄漏拒收，测试夹具已修正待再冻结
+
+冻结 `97acad05bc36f1bca1139c8a24d56699d676216f` 的正常Windows [37648615429](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37648615429)已独审通过：witness=false五场景、三次独立冷恢复、8次worker与8代候选，实际8代自动站，严格退出与清理通过。该成功仅归属S2，不能转记为未来冻结源码的验收。
+
+随后同S2双平台 [37657666912](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37657666912)虽被Actions标为success，最终门禁仍拒收：Windows桌面组实际673项干净PASS、1项LEAK，原摘要为674 passed (1 leaky)。异常是 `terminal::input::tests::test_ai_context_menu_closes_when_space_immediately_after_at_symbol`，原日志9916行；未取得可归属该测试的PID或输出持有者，首因仍unknown。Windows APP3443通过；Linux APP3861、桌面674、hook48/48、适用ACL13及固定Node glibc1均通过，2项macOS ACL不适用不算通过。两平台APP和桌面组的i18n分别11项通过，其他平台限定SKIP仍保留。API绿色不能抵消真实LEAK。
+
+本轮仅修正模拟测试依赖和失败判定：`TerminalView::new_for_test_with_cloud_mode` 在cfg(test)内通过既有接口注入NoOpCommandExecutor，避免模拟bootstrap隐式启动真实shell查询；原输入、菜单、补全和显式executor断言未删改。NoOp返回Err，不伪造真实查询成功。nextest保持固定版本既有200ms检测时限，将泄漏和重试后通过设为失败，未增加超时或放宽重试。静态缺陷和夹具隔离不等于已证明旧LEAK持有者。
+
+本地扩大桌面/TUI与输入回归817项通过，原菜单用例PASS一次；cargo check退出0，独立i18n11项通过。扩大轮误写的装饰筛选未命中对应模块，随后准确 `terminal::input::decorations::tests::` 补跑1项通过，不回填旧轮覆盖。原i18n编译在取得终态前执行句柄失效且进程已不存在，部分日志保留；只续跑未完成门禁。各轮源码前后逐7207文件一致。本地nextest0.9.146与原CI0.9.143不同，仍须原runner复验。本地总审收据SHA `11554d8096067c35afee57561d77392aa197d7db95823a8937e564410fbb9025`。无需本地化变更：仅测试夹具、nextest判定和证据文档，无用户文案或布局变化。
+
+仓外v4审计器增加严格短状态、重试次数和异常摘要拒绝；128项纯解析检查保留真实S1 FAIL/S2 LEAK拒绝，检查数不是产品测试数。正式G09条件、原45项在55/151项中的保留覆盖和原PowerShell/CLR同停点证据已逐项复核；Mac证据沿用已接受历史范围，不冒称本轮重跑。详细原件路径与SHA见CURRENT_STATUS.g09_final_gate_input_leak_followup_20261008。旧失败、K3、原26异常及b1/h2保留；LSA首因unknown不改写为已修，不新增永久诊断前置。
+
+仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR保持草稿，merge_allowed=false、cleanup_ready=false。本次提交将形成新冻结S；必须在同一S重跑正常Windows完整矩阵及最终Linux/Windows门禁并独审。最终关闭仍由仓外签收与PR正文记录，冻结后不改S；不预填未来SHA或通过结果。
+
+## 历史记录：S1迁移失败与S2冻结前快照
 
 冻结9271da36e6ced849ab71e536d83e76aeebb648f5的正常Windows run37633797777成功并经独审：witness=false五场景、三次独立冷恢复、8次worker与8代候选，实际8代自动站。audit.safe.json为78246B、SHA 8ee830c58da31308478e5a1a08faee9809b71de47e7d70ace4189a0668bc45db。随后同S dual37639377834失败：Linux APP3861运行/3860通过/1失败；Windows APP3443运行/3442通过/1失败。同一迁移测试将最新版本20261007000000误当目标20260916000001；Windows实际三次尝试，摘要重复不是第四次。本机旧S广筛3443/3442/1复现且来源不变。旧S正常成功不能抵消双平台失败。
 

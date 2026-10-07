@@ -1,4 +1,122 @@
 {
+  "g09_final_gate_input_leak_followup_20261008": {
+    "snapshot_kind": "S2 Windows LEAK拒收后的再冻结前快照",
+    "base_frozen_source": "97acad05bc36f1bca1139c8a24d56699d676216f",
+    "future_frozen_source": null,
+    "normal_windows": {
+      "run_id": 37648615429,
+      "status": "success_independently_audited",
+      "witness": false,
+      "case_count": 5,
+      "cold_recoveries": 3,
+      "worker_invocations": 8,
+      "candidate_generations": 8,
+      "automatic_stations": 8,
+      "strict_cleanup_passed": true
+    },
+    "dual_platform": {
+      "run_id": 37657666912,
+      "api_conclusion": "success",
+      "accepted": false,
+      "linux_accepted": true,
+      "linux_app_passed": 3861,
+      "linux_desktop_passed": 674,
+      "linux_hook_passed": 48,
+      "linux_hook_skipped": 0,
+      "linux_acl_passed": 13,
+      "macos_acl_not_applicable": 2,
+      "linux_fixed_node_glibc_passed": 1,
+      "windows_app_passed": 3443,
+      "windows_desktop_passed_clean": 673,
+      "windows_desktop_leak": 1,
+      "test": "terminal::input::tests::test_ai_context_menu_closes_when_space_immediately_after_at_symbol",
+      "original_leak_holder": "unknown"
+    },
+    "patch": {
+      "files": [
+        "app/src/terminal/view/testing.rs",
+        ".config/nextest.toml"
+      ],
+      "test_fixture": "仅cfg(test)模拟TerminalView注入既有NoOpCommandExecutor，保留输入/菜单断言；返回Err而非伪造shell查询成功。",
+      "strict_policy": "leak-timeout保持200ms但result=fail；flaky-result=fail；不改变既有重试或超时。",
+      "production_runtime_changed": false,
+      "localization": "无需本地化变更"
+    },
+    "local_gates": {
+      "desktop_input_passed": 817,
+      "decoration_supplement_passed": 1,
+      "check_exit_code": 0,
+      "i18n_passed": 11,
+      "sources_unchanged": true,
+      "selector_correction": "原817项筛选误写 terminal::decorations::tests；本次准确路径独立1项通过，旧轮不补记此项。",
+      "interrupted_i18n_preserved": {
+        "bytes": 934,
+        "sha256": "ce4865e11ab3cf7fa8fd86d9a3305a1903ccca3db42702d1c9da1943bb6b9fb7"
+      },
+      "local_nextest": "0.9.146",
+      "previous_ci_nextest": "0.9.143",
+      "original_runner_cause_proven": false
+    },
+    "references": {
+      "normal": {
+        "path": "final-normal-37648615429/audit.safe.json",
+        "bytes": 78255,
+        "sha256": "252071f93ff6120bdee2eedb7ca6e80e6c8c46e776c886871c98f2be06d32635"
+      },
+      "windows": {
+        "path": "final-s2-windows-direct-review/review.safe.json",
+        "bytes": 65745,
+        "sha256": "3f651fb179aa70c0ce9f88b56338ee18692f4205f482b354199395a220040fd5"
+      },
+      "linux": {
+        "path": "final-dual-37657666912/linux-review.safe.json",
+        "bytes": 134721,
+        "sha256": "eabcc032c8c9b8b058c52ee207a592673e67ef2fe24e00fcc2950f94e5912a5f"
+      },
+      "dual_rejected": {
+        "path": "final-s2-gates/dual-review-rejected.safe.json",
+        "bytes": 2015,
+        "sha256": "92467d2c99a12247ef747d2fa5f6751da7d8774b9d33f2b64db64d4514c370c3"
+      },
+      "formal_conditions": {
+        "path": "final-s2-gates/g09-condition-coverage.safe.json",
+        "bytes": 61780,
+        "sha256": "f880ce892782834c3b39ae90e7770c015d4f28cdee6cea2894962ac25a44da72"
+      },
+      "original_tests": {
+        "path": "final-s2-gates/fixed-ordinary-test-coverage.safe.json",
+        "bytes": 261658,
+        "sha256": "d14c713853c88dff4c27482d62b16376b6245131cd1ea2adf82ed72036393c94"
+      },
+      "original_history": {
+        "path": "final-s2-gates/preclosure-history-audit.safe.json",
+        "bytes": 22987,
+        "sha256": "2ee54f7065fe648cc2b2d7d1079efea23062b0d40c4b00caf69b3ec4b941f80b"
+      },
+      "local_gates": {
+        "path": "final-s3-gates/local-gates-review.safe.json",
+        "bytes": 3321,
+        "sha256": "11554d8096067c35afee57561d77392aa197d7db95823a8937e564410fbb9025"
+      },
+      "code_and_auditor": {
+        "path": "final-s3-gates/tool-and-code-review.safe.json",
+        "bytes": 1424,
+        "sha256": "345ed0c9303b43e888b0a8e214b9f0a3d0a1137690f19b4fe57b34b93cbd510d"
+      }
+    },
+    "historical_scope": "正式G09条件和原45项保留覆盖已逐项核对。Mac为已有独立审计的历史范围，不冒称S2/S3重跑；旧26异常、b1/h2及LSA首因unknown均保留。",
+    "next_required": "提交形成新冻结S；同一S重跑正常Windows五场景三次冷恢复，再串行执行Linux/Windows最终门禁并独审。冻结后的关闭只写仓外签收与PR正文。",
+    "closed_gap_count": 10,
+    "g09_closed": false,
+    "deferred_not_passed": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "pr_draft": true,
+    "merge_allowed": false,
+    "cleanup_ready": false
+  },
   "g09_final_gate_migration_followup_20261007": {
     "snapshot_kind": "旧S最终门禁失败后的再冻结前快照",
     "base_frozen_source": "9271da36e6ced849ab71e536d83e76aeebb648f5",
