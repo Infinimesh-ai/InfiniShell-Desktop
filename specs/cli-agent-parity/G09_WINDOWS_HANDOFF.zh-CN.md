@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：原机正常矩阵通过，本机显式站 LSA 仍开放
+## 当前接续状态（2026-10-07）：USER32 顺序对照未解决本机 LSA 残留
+
+原runner22在8e84的正常witness=false五场景、三次独立冷恢复和八代候选清理已通过，全部走自动站；本机b1显式建站后的LSA失败仍是阻塞，最终同一冻结源码Linux/Windows门禁尚未完成。原验收和失败证据均保持，不用后续诊断覆盖产品结果。
+
+h1只执行A：新站创建成功，step11错误5；原收据不能唯一分辨UOI_FLAGS与GetUserObjectSecurity。句柄遗漏读取OWNER/DACL所需READ_CONTROL是诊断入口缺口，但不补造错误子API。second退出3、控制器实际强制回收，原wrapper因object_sd_bound记unknown；B未启动，50次LSA查询/3031ms仍存在。独审SHA `c121fa1819b72b5b8248f5b15567d127f9cf14f70edeb37bd46c58d4fda68a79`，原失败不回填成完整测量。
+
+h2修正该诊断入口后，两臂各执行一次、无重试，共用同一helper，仅改变second的GetSystemMetrics位于共同创建/选择块之前或之后。实际站和桌面ACE分别0x000f037f/0x000f01ff；两代自然退出0、Job为空、原句柄关闭及原站/桌面恢复均确认。两臂各50次LSA返回0/非空，原观测均3047ms，LSA终态未观察到差异；metric自身为2560/3840。pair SHA `83f45ced4659a9894fcae423cd86878504aa25a98416107c461eac033ce88c24`，独审SHA `bc21a715a22d3ae2c7e5502aff5274ce542f3d72e624c9116859057c4402d7ea`。这只完成有界测量，未通过清理，也未定位或排除一般性首因。
+
+下一步仅仓外准备单段、child仅静态导入kernel32 ExitProcess的最小新登录会话基线，尚未执行。h2 first仍读取WinSta0，DLL/TLS及外部系统引用未知；不从静态导入、单对结果或原机自动站成功推定本机修复。产品超时、严格清理、普通安装及已支持只读ACL自动升级要求不变。
+
+G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿，新增关闭0。详见CURRENT_STATUS的 `g09_user32_order_controls_20261007`。仓外证据保留，cleanup_ready=false。无需本地化变更：本轮只有证据文档，7203份非文档源码与已通过本地check、i18n11及定向20项的冻结来源一致。
+
+## 历史记录：原机正常矩阵通过，本机显式站LSA仍开放
 
 原runner22的[37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367)在冻结提交 `8e84b737eabeefe1ab082dc3be6b6c0fd5067c96` 正式成功，独审确认正常witness=false五场景、三次独立冷恢复和八代CMD/PowerShell候选的输出、退出及清理。updated为0.156.1；old_moved与published_receipt_missing恢复0.155.1；external_change_preserved保留0.156.1并返回RecoveryRequired；candidate_changed_preserved保留0.155.1并在spawn前拒绝。普通warp1159项、command102项通过，i18n11包含在普通回归内。
 

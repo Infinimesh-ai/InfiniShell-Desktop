@@ -1,4 +1,182 @@
 {
+  "g09_user32_order_controls_20261007": {
+    "recorded_utc": "2026-10-07T08:06:35.717514+00:00",
+    "scope": "仅仓外 USER32 顺序定位；不是产品验收或 G09 关闭",
+    "repository_head_unchanged": "98aefec42725c5b46cf6215c3f281eea76244231",
+    "h1": {
+      "prepared": {
+        "path": "local-user32-order-control-h1/prepared-v2.safe.json",
+        "bytes": 23718,
+        "sha256": "322e505f45ddb94bf9a4e7ed20667d3cd59e0b808fb7a00741ffc16b7e375ae5"
+      },
+      "pair": {
+        "path": "local-user32-order-control-h1/pair.safe.json",
+        "bytes": 3274,
+        "sha256": "c017faa3560b4e54bab607e2c60239d83bec72bed41ad3aa73480fa0f6f955d6"
+      },
+      "audit": {
+        "path": "local-user32-order-control-h1/audit.safe.json",
+        "bytes": 75703,
+        "sha256": "c121fa1819b72b5b8248f5b15567d127f9cf14f70edeb37bd46c58d4fda68a79"
+      },
+      "measurement_complete": false,
+      "arms_started": [
+        "A"
+      ],
+      "retry_count": 0,
+      "original_observation_unknown": true,
+      "B_not_started": true,
+      "actual_station_create_succeeded": true,
+      "step11_error": 5,
+      "native_api_candidates": [
+        "GetUserObjectInformationW(UOI_FLAGS)",
+        "GetUserObjectSecurity"
+      ],
+      "missing_read_control_is_static_diagnostic_defect": true,
+      "actual_second_exit": 3,
+      "native_controller_forced_cleanup": true,
+      "original_lsa_queries": 50,
+      "original_elapsed_ms": 3031,
+      "lsa_absent": false,
+      "boundary": "没有完整对照；未唯一定位错误5子API。原wrapper object_sd_bound/unknown保持，后验解析不回填原测量。控制器确实强制回收，不称两代自然退出。"
+    },
+    "h2": {
+      "prepared": {
+        "path": "local-user32-order-control-h2/prepared.safe.json",
+        "bytes": 30704,
+        "sha256": "35ef373b6c4ba192352828075968b9c6f0c86185292372813abebf99d693eddf"
+      },
+      "pair": {
+        "path": "local-user32-order-control-h2/pair.safe.json",
+        "bytes": 68086,
+        "sha256": "83f45ced4659a9894fcae423cd86878504aa25a98416107c461eac033ce88c24"
+      },
+      "audit": {
+        "path": "local-user32-order-control-h2/audit.safe.json",
+        "bytes": 97297,
+        "sha256": "bc21a715a22d3ae2c7e5502aff5274ce542f3d72e624c9116859057c4402d7ea"
+      },
+      "measurement_complete": true,
+      "retry_count": 0,
+      "cases": [
+        {
+          "arm": "A",
+          "bound_second": {
+            "pid": 19096,
+            "created_low": 3763486638,
+            "created_high": 31282737,
+            "auth_low": 2804083780,
+            "auth_high": 0,
+            "session": 2,
+            "token_type": 1,
+            "elevated": 0,
+            "integrity": 8192,
+            "sid_length": 28,
+            "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+          },
+          "metric": 2560,
+          "order_codes": [
+            1,
+            2,
+            3,
+            19,
+            10,
+            11,
+            12,
+            13,
+            15,
+            16,
+            17,
+            18,
+            26,
+            27,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "order_complete": true,
+          "natural_exit_and_owned_cleanup": true,
+          "lsa_query_count": 50,
+          "lsa_all_status": 0,
+          "lsa_all_nonnull": true,
+          "original_elapsed_ms": 3047,
+          "lsa_absent": false
+        },
+        {
+          "arm": "B",
+          "bound_second": {
+            "pid": 8292,
+            "created_low": 3796898361,
+            "created_high": 31282737,
+            "auth_low": 2804187389,
+            "auth_high": 0,
+            "session": 2,
+            "token_type": 1,
+            "elevated": 0,
+            "integrity": 8192,
+            "sid_length": 28,
+            "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+          },
+          "metric": 3840,
+          "order_codes": [
+            1,
+            2,
+            3,
+            10,
+            11,
+            12,
+            13,
+            15,
+            16,
+            17,
+            18,
+            19,
+            26,
+            27,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "order_complete": true,
+          "natural_exit_and_owned_cleanup": true,
+          "lsa_query_count": 50,
+          "lsa_all_status": 0,
+          "lsa_all_nonnull": true,
+          "original_elapsed_ms": 3047,
+          "lsa_absent": false
+        }
+      ],
+      "diagnostic_changes": [
+        "station句柄补READ_CONTROL；ACE映射值与句柄请求分开校验",
+        "仅当次snapshot失败保留子阶段",
+        "partial对象不阻断order/trace解析，但整体测量仍失败"
+      ],
+      "actual_station_ace_mask": "0x000f037f",
+      "actual_desktop_ace_mask": "0x000f01ff",
+      "boundary": "本次两臂均残留，未观察到LSA终态差异；metric自身2560/3840有差异。不能从单对结果排除一般性因果，也不能据此修复或认定产品b1首因。first仍读WinSta0；DLL/TLS、外部注入或系统引用未被排除。无AppContainer、Node、DeviceMap，且显式选择线程桌面，不等同产品b1。",
+      "acceptance_passed": false
+    },
+    "remaining": {
+      "original_runner_success_ref": "g09_original_normal_matrix_and_local_handles_20261007",
+      "local_product_failure_ref": "g09_station_publish_repairs_20261007",
+      "next_step": "仅仓外准备单段、child仅静态导入kernel32 ExitProcess的最小新登录会话基线，尚未执行；先核绑定、自然退出与原三秒判据，再决定是否需要更窄对照。",
+      "final_same_source_linux_windows_complete": false,
+      "g09_closed": false,
+      "closed_count": 10,
+      "pr_draft": true,
+      "platform_handoff_not_passed": [
+        "V01",
+        "V02",
+        "V05"
+      ],
+      "cleanup_ready": false,
+      "localization": "无需本地化变更；本轮仅证据和状态文档，产品与用户文案及布局无改动。"
+    }
+  },
   "g09_original_normal_matrix_and_local_handles_20261007": {
     "recorded_utc": "2026-10-07T07:31:21.193771+00:00",
     "scope": "原runner旧冻结源码正常矩阵通过；本机显式建站LSA失败和最终同源门禁仍开放",
@@ -4705,17 +4883,17 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner22的8e84正常witness=false五场景、三次独立冷恢复及八代清理独审通过；八代均自动站，不能覆盖b1普通交互用户显式建站LSA失败。g1三个原对象HandleCount均1，仍有LSA残留，未定位其他token/内核引用或首因。合并main后的最终同源Linux/Windows门禁未完成；新增关闭0。",
+      "boundary": "10项关闭、G09开放、PR草稿；V01/V02/V05移交不计通过。原runner8e84正常五场景及三次冷恢复已通过，但均自动站，b1本机显式站LSA失败仍有效。h1入口测量失败并保留；h2两臂完整测量但均LSA残留，未定位首因。下一最小单段基线仅准备；最终同源双平台门禁未完成，新增关闭0。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_original_normal_matrix_and_local_handles_20261007",
       "latest_result_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
-      "latest_preparation_ref": "g09_original_normal_matrix_and_local_handles_20261007",
+      "latest_preparation_ref": "g09_user32_order_controls_20261007",
       "mac_platform_binding_regression_complete": true,
       "next_dynamic_observation_implemented": true,
       "both_public_candidate_modes_passed": true,
       "updated_transaction_complete": false,
       "current_local_repair_ref": "g09_station_publish_repairs_20261007",
-      "current_diagnostic_ref": "g09_original_normal_matrix_and_local_handles_20261007",
+      "current_diagnostic_ref": "g09_user32_order_controls_20261007",
       "latest_result_source_diff_sha256": null,
       "both_public_candidate_modes_passed_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
       "latest_local_failure_ref": "g09_station_publish_repairs_20261007",
