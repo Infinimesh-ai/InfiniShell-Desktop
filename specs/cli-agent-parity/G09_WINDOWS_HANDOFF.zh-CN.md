@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：省去second挂起及恢复仍有残留
+## 当前接续状态（2026-10-07）：未恢复诊断终止及无原poll仍有后验残留
+
+i13两臂second均挂起创建：A恢复后自然0；B本入口未Resume，仅通过原PI一次诊断Terminate，BOOL1/error0、实际退出码53523和原柄关闭均确认。B的first自然0、second非自然退出及全体natural=false明确分开，post资格独立核验。两臂各50条原LSA均status0、Size272、正确first LUID/free0，elapsed3031/3016ms，退出后单次post仍present/free0。pair SHA `0f0487987ed3b31bdab1968e395ae28bfbcc47dcd75ce9aa63a0b67478fbc241`；独审SHA `5a2741549b4925b07c8d75c8eb9dcbe0b4ffdc3fcb7551ee552059eac5cb58e3`，103份原件稳定。该诊断终止不计自然清理或产品验收，也不能证明没有创建期系统行为、注入或外部恢复。
+
+i14复用i12 first/leaf并固定manual，仅切原LSA poll与同预算静默。A原50条匹配first LUID/free0，窗口3032ms；B在原句柄关闭点起静默3016ms，3080B v2收据count0、全零样本槽、无80–82事件，原状态明确not_observed/null。两臂自然0、原PI关闭、Job空；退出后的唯一post仍present/free0。窗口后事件开销15/16ms单记；post不能回填B原窗口状态。pair SHA `6bb6cf842edbc73b7a3db7982b7dc8ae7719bc28c7bf1b78a97c29778e645809`；独审SHA `bedec23c81256d582d85e3c810de2521cf6ae6e0b1524fbc55b5db30419fcd43`，100份原件稳定，72输入另加prepared一份。
+
+两组A均先完成原/post双present才B，ACK/token/外部second观察off，second LUID及外部实际映像/精确Job仍未观察。结果分别表明本入口恢复后的运行及自然退出、原重复poll不是各自本轮残留的必要条件；未确定单API或持有者，不是产品修复。原5秒/3秒及单post未放宽，wrapper0仅测量完整。
+
+先只读评估API调用方替代与现有权限下的精确持有者证据，暂无新病例执行授权；显式nonce命名站需管理员的方案不准备。保留d2清理反例、b1实际产品失败和原runner8e84正常矩阵成功的不同边界。最终同一冻结源码Linux/Windows门禁未完成，G09开放、10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。
+
+详见CURRENT_STATUS的 `g09_lifecycle_and_postpoll_controls_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：省去second挂起及恢复仍有残留
 
 i12同一新first及原无清单leaf，两臂ACK/token/外部second观察off；仅切second的CREATE_SUSPENDED/ResumeThread整组。A first14016/leaf26768、LUID2870368909/0，Resume返回1/error0；原/post双present且完整自然测量后才B。B first15828/leaf15812、first LUID2870377014/0，second直接运行，Resume明确not_performed、result/error为null。second LUID均未观察，不由first身份补写。
 

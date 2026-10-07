@@ -1,4 +1,320 @@
 {
+  "g09_lifecycle_and_postpoll_controls_20261007": {
+    "recorded_utc": "2026-10-07T11:13:06.436336+00:00",
+    "repository_head_unchanged": "2a5a9b410850573b93a7ddb5eeba5c0be5e0cd10",
+    "scope": "仓外分别隔离second恢复后自然运行/退出和原LSA重复poll；两组退出后单次查询仍残留",
+    "controls": [
+      {
+        "id": "i13",
+        "prepared": {
+          "path": "local-second-unresumed-control-i13/prepared.safe.json",
+          "bytes": 27227,
+          "sha256": "734ace56b997a29b505ebfd6855d5e2619ff6f67fed89f9fd2ed1069e0e4bf34"
+        },
+        "pair": {
+          "path": "local-second-unresumed-control-i13/pair.safe.json",
+          "bytes": 105208,
+          "sha256": "0f0487987ed3b31bdab1968e395ae28bfbcc47dcd75ce9aa63a0b67478fbc241"
+        },
+        "audit": {
+          "path": "local-second-unresumed-control-i13/audit.safe.json",
+          "bytes": 62135,
+          "sha256": "5a2741549b4925b07c8d75c8eb9dcbe0b4ffdc3fcb7551ee552059eac5cb58e3"
+        },
+        "root_execution": {
+          "path": "i13-root-execution.safe.json",
+          "bytes": 274,
+          "sha256": "66997bd2ad7c1a0729fcfe130bb3bc0eeae5bef32f5eb250dd50e329479dca69"
+        },
+        "frozen_inputs_excluding_prepared": 73,
+        "prepared_additional_input_count": 1,
+        "originals_stable": 103,
+        "started_utc": "2026-10-07T11:00:47.096307+00:00",
+        "finished_utc": "2026-10-07T11:00:53.575439+00:00",
+        "cases": [
+          {
+            "arm": "A",
+            "first_controller_observation": {
+              "pid": 21488,
+              "created_low": 458601999,
+              "created_high": 31282763,
+              "auth_low": 2873813366,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "second_first_original_pi_observation": {
+              "pid": 17516,
+              "created_low": 458896560,
+              "created_high": 31282763,
+              "auth_low": null,
+              "auth_high": null
+            },
+            "second_resume": {
+              "mode": "natural_resume",
+              "attempted": true,
+              "status": "performed",
+              "result": 1,
+              "win32_error": 0
+            },
+            "diagnostic_termination": {
+              "requested": false,
+              "attempted": false,
+              "ok": null,
+              "win32_error": null,
+              "expected_exit_code": null,
+              "confirmed": false,
+              "second_natural_exit": true
+            },
+            "all_natural_exit_confirmed": true,
+            "original_pi_actual_exit_code": 0,
+            "original_pi_handles_closed": true,
+            "original_poll": {
+              "status": "observed",
+              "logon_absent": false,
+              "query_count": 50
+            },
+            "original_query_count": 50,
+            "every_observed_query_status_zero_size_272_first_luid_matches_free_zero": true,
+            "original_logon_absent": false,
+            "elapsed_ms": 3031,
+            "post_window_events_ms": null,
+            "post_owner_exists": true,
+            "post_owner_utc": "2026-10-07T11:00:50.343129+00:00",
+            "post_owner_free_ntstatus": 0
+          },
+          {
+            "arm": "B",
+            "first_controller_observation": {
+              "pid": 30108,
+              "created_low": 490625958,
+              "created_high": 31282763,
+              "auth_low": 2873818645,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "second_first_original_pi_observation": {
+              "pid": 13892,
+              "created_low": 490863177,
+              "created_high": 31282763,
+              "auth_low": null,
+              "auth_high": null
+            },
+            "second_resume": {
+              "mode": "unresumed_diagnostic_termination",
+              "attempted": false,
+              "status": "not_performed",
+              "result": null,
+              "win32_error": null
+            },
+            "diagnostic_termination": {
+              "requested": true,
+              "attempted": true,
+              "ok": true,
+              "win32_error": 0,
+              "expected_exit_code": 53523,
+              "confirmed": true,
+              "second_natural_exit": false
+            },
+            "all_natural_exit_confirmed": false,
+            "original_pi_actual_exit_code": 53523,
+            "original_pi_handles_closed": true,
+            "original_poll": {
+              "status": "observed",
+              "logon_absent": false,
+              "query_count": 50
+            },
+            "original_query_count": 50,
+            "every_observed_query_status_zero_size_272_first_luid_matches_free_zero": true,
+            "original_logon_absent": false,
+            "elapsed_ms": 3016,
+            "post_window_events_ms": null,
+            "post_owner_exists": true,
+            "post_owner_utc": "2026-10-07T11:00:53.534732+00:00",
+            "post_owner_free_ntstatus": 0
+          }
+        ],
+        "A_post_before_B_start": true,
+        "wrapper_exit_code": 0,
+        "retry_count": 0,
+        "measurement_complete": true,
+        "cleanup_acceptance_passed": false,
+        "product_acceptance_passed": false,
+        "g09_closed": false,
+        "cleanup_ready": false
+      },
+      {
+        "id": "i14",
+        "prepared": {
+          "path": "local-postpoll-control-i14/prepared.safe.json",
+          "bytes": 24671,
+          "sha256": "7533346e930b1f6adb842094cdb50777de9f3ee39bdf7c88ad12ef8e9a57450d"
+        },
+        "pair": {
+          "path": "local-postpoll-control-i14/pair.safe.json",
+          "bytes": 78624,
+          "sha256": "6bb6cf842edbc73b7a3db7982b7dc8ae7719bc28c7bf1b78a97c29778e645809"
+        },
+        "audit": {
+          "path": "local-postpoll-control-i14/audit.safe.json",
+          "bytes": 58814,
+          "sha256": "bedec23c81256d582d85e3c810de2521cf6ae6e0b1524fbc55b5db30419fcd43"
+        },
+        "root_execution": {
+          "path": "i14-root-execution.safe.json",
+          "bytes": 274,
+          "sha256": "5a26f503af0441f9f4fc1c751d5e25af6971ad9a976a4f7f7e924dc3c8288c7d"
+        },
+        "frozen_inputs_excluding_prepared": 72,
+        "prepared_additional_input_count": 1,
+        "originals_stable": 100,
+        "started_utc": "2026-10-07T11:08:04.913559+00:00",
+        "finished_utc": "2026-10-07T11:08:11.401758+00:00",
+        "cases": [
+          {
+            "arm": "A",
+            "first_controller_observation": {
+              "pid": 18780,
+              "created_low": 541924217,
+              "created_high": 31282764,
+              "auth_low": 2876697506,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "second_first_original_pi_observation": {
+              "pid": 25688,
+              "created_low": 542199923,
+              "created_high": 31282764,
+              "auth_low": null,
+              "auth_high": null
+            },
+            "second_resume": {
+              "mode": "manual",
+              "attempted": true,
+              "status": "performed",
+              "result": 1,
+              "win32_error": 0
+            },
+            "diagnostic_termination": null,
+            "all_natural_exit_confirmed": true,
+            "original_pi_actual_exit_code": 0,
+            "original_pi_handles_closed": true,
+            "original_poll": {
+              "mode": "poll",
+              "status": "observed",
+              "attempted": true,
+              "logon_absent": false,
+              "query_count": 50,
+              "budget_ms": 3000,
+              "observation_interval_ms": 3032,
+              "quiet_completed": null,
+              "cleanup_passed": false
+            },
+            "original_query_count": 50,
+            "every_observed_query_status_zero_size_272_first_luid_matches_free_zero": true,
+            "original_logon_absent": false,
+            "elapsed_ms": 3032,
+            "post_window_events_ms": 15,
+            "post_owner_exists": true,
+            "post_owner_utc": "2026-10-07T11:08:08.176157+00:00",
+            "post_owner_free_ntstatus": 0
+          },
+          {
+            "arm": "B",
+            "first_controller_observation": {
+              "pid": 2580,
+              "created_low": 574030073,
+              "created_high": 31282764,
+              "auth_low": 2876704605,
+              "auth_high": 0,
+              "session": 2,
+              "token_type": 1,
+              "elevated": 0,
+              "integrity": 8192,
+              "sid_length": 28,
+              "user_sid_sha256": "e1eb815dfc040785bb49031009d61742c303b8e885c5b7563ccddc542f7b0c2e"
+            },
+            "second_first_original_pi_observation": {
+              "pid": 3640,
+              "created_low": 574259794,
+              "created_high": 31282764,
+              "auth_low": null,
+              "auth_high": null
+            },
+            "second_resume": {
+              "mode": "manual",
+              "attempted": true,
+              "status": "performed",
+              "result": 1,
+              "win32_error": 0
+            },
+            "diagnostic_termination": null,
+            "all_natural_exit_confirmed": true,
+            "original_pi_actual_exit_code": 0,
+            "original_pi_handles_closed": true,
+            "original_poll": {
+              "mode": "quiet",
+              "status": "not_observed",
+              "attempted": false,
+              "logon_absent": null,
+              "query_count": 0,
+              "budget_ms": 3000,
+              "observation_interval_ms": 3016,
+              "quiet_completed": true,
+              "cleanup_passed": false
+            },
+            "original_query_count": 0,
+            "every_observed_query_status_zero_size_272_first_luid_matches_free_zero": null,
+            "original_logon_absent": null,
+            "elapsed_ms": 3016,
+            "post_window_events_ms": 16,
+            "post_owner_exists": true,
+            "post_owner_utc": "2026-10-07T11:08:11.361783+00:00",
+            "post_owner_free_ntstatus": 0
+          }
+        ],
+        "A_post_before_B_start": true,
+        "wrapper_exit_code": 0,
+        "retry_count": 0,
+        "measurement_complete": true,
+        "cleanup_acceptance_passed": false,
+        "product_acceptance_passed": false,
+        "g09_closed": false,
+        "cleanup_ready": false
+      }
+    ],
+    "i13_boundary": "B始终CREATE_SUSPENDED且本入口未Resume，仅原second.hProcess一次计划内TerminateProcess(0xd113)，原wait/实际exit53523/原PI关闭均确认。first自然0与second非自然退出、全体natural=false分离；post资格独立验证，不以诊断完整冒充自然清理。只支持本入口恢复后运行及自然退出不是本次残留必要条件，未排除创建期系统行为、注入线程或外部恢复。",
+    "i14_boundary": "固定原i12 first/leaf、second manual，B在原句柄关闭点起同3000ms预算静默；v2汇总count0、样本全零且无80–82事件，原状态not_observed/null。实际静默3016ms，窗口后事件15/16ms单列，post仍present不能回填原窗口。重复原poll不是本次残留必要条件，唯一post自身仍是观察边界。",
+    "shared_boundary": "两组均固定ACK/token/外部second观察off，second LUID、外部实际映像和精确Job仍未观察；原first身份与Job、自然等待预算、安全前置未弱化。所有返回缓冲区均按原件释放，没有确定单API或系统持有者，不能作为产品修复。",
+    "next_step": "停止扩大病例准备，先只读评估API调用方替代与当前权限下的精确持有者证据；没有授权执行新对照。显式nonce命名windowstation需管理员的方案不准备，不重复其权限失败；原产品暂停期安全检查及清理期限保持。",
+    "original_runner_success_ref": "g09_original_normal_matrix_and_local_handles_20261007",
+    "local_product_failure_ref": "g09_station_publish_repairs_20261007",
+    "g09_closed": false,
+    "closed_count": 10,
+    "pr_draft": true,
+    "final_same_source_linux_windows_complete": false,
+    "platform_handoff_not_passed": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "cleanup_ready": false,
+    "localization": "无需本地化变更；仅证据文档，无产品、用户文案或布局改动。"
+  },
   "g09_second_suspend_control_20261007": {
     "recorded_utc": "2026-10-07T10:49:58.349233+00:00",
     "repository_head_unchanged": "deec9025f508f5141fddcfe2d1ed3337de4ff02f",
@@ -6976,17 +7292,17 @@
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner8e84正常矩阵通过，本机b1产品失败保持。i12省去second挂起/Resume仍原/post present；B Resume明确未执行。未识别持有者，产品未修复，最终同源双平台未完成，新增关闭0。",
+      "boundary": "10项关闭、G09开放、PR草稿，V01/V02/V05移交不计通过。原runner8e84正常矩阵通过，本机b1产品失败保持。i13未Resume后诊断终止仍残留；i14原poll未观察而退出后仍present。未识别持有者，产品未修复，最终同源双平台未完成，新增关闭0；下一步先只读评估，无新增病例执行授权。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_original_normal_matrix_and_local_handles_20261007",
       "latest_result_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
-      "latest_preparation_ref": "g09_second_suspend_control_20261007",
+      "latest_preparation_ref": "g09_lifecycle_and_postpoll_controls_20261007",
       "mac_platform_binding_regression_complete": true,
       "next_dynamic_observation_implemented": true,
       "both_public_candidate_modes_passed": true,
       "updated_transaction_complete": false,
       "current_local_repair_ref": "g09_station_publish_repairs_20261007",
-      "current_diagnostic_ref": "g09_second_suspend_control_20261007",
+      "current_diagnostic_ref": "g09_lifecycle_and_postpoll_controls_20261007",
       "latest_result_source_diff_sha256": null,
       "both_public_candidate_modes_passed_source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
       "latest_local_failure_ref": "g09_station_publish_repairs_20261007",
