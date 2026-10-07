@@ -1,4 +1,211 @@
 {
+  "g09_local_stdio_control_and_posthoc_tokens_20261007": {
+    "status": "two_original_stdio_tests_failed_before_rust_read_and_impersonation",
+    "source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
+    "source_files": 7198,
+    "original_wrapper_source_before_after_equal": true,
+    "original_wrapper_finished_utc": "2026-10-07T05:13:12.923270Z",
+    "audit_cutoff_utc": "2026-10-07T05:16:52.949648Z",
+    "audited_original_files": 45,
+    "is_original_runner_run": false,
+    "c1": {
+      "failure_stage": "private_directory",
+      "error": "CouldNotAutoloadMatchingModule: Microsoft.PowerShell.Security / Set-Acl",
+      "stderr_encoding": "cp936",
+      "selected_module_path_unknown": true,
+      "helper_build_started": false,
+      "tests_executed": 0,
+      "receipt": "local-logon-stdio-control-c1/control.safe.json",
+      "sha256": "b8b916ec7ddc952598a9348cad767d51defa3492c0496d419bc7122eef0f0cfe"
+    },
+    "c2": {
+      "failure_stage": "build_environment",
+      "error": "CMD环境入口语法错误；后续同文件路径表示差分在脚本首标记前复现错误",
+      "helper_build_started": false,
+      "tests_executed": 0,
+      "receipt": "local-logon-stdio-control-c2/control.safe.json",
+      "sha256": "b0ba5fcc2ecf8e8e15bf595110e9a41b749ed3f61d54dd1bea48c935565b7137",
+      "system_module_readonly_import_receipt": "local-logon-stdio-control-c2/module-check.safe.json",
+      "system_module_readonly_import_sha256": "bc4132e3ac8d5812c375299374c748faa407385fff9bbf4a39211af39e63140f"
+    },
+    "cmd_presentation_control": {
+      "sole_change": "cmd.exe argv[0] 使用samefile确认的原生反斜杠表示",
+      "vcvars_exit_code": 0,
+      "candidate_environment_changed": false,
+      "receipt": "local-logon-stdio-control-c3/environment-native-cmd.safe.json",
+      "sha256": "92398f2b7173f8ccf1a65c6ab46186078963f370f9634ece3d23908a59bd1e8d"
+    },
+    "c3": {
+      "receipt": "local-logon-stdio-control-c3/control.safe.json",
+      "sha256": "244a7d0947660582b449cb26a70f27da27dc47a74cfa4842e5e211e8ffbdc3e4",
+      "audit": "local-logon-stdio-control-c3/audit.safe.json",
+      "audit_sha256": "1233929f9b61628afbd5f084d4d2a0ffdac720ce9a3d78dcdc37c19f0d6eaf8b",
+      "test_binary_sha256": "9addc4d3d2bf2a0cbb134f2eff75114b46b4c3fdac6c87bc00b89bd7d65052e5",
+      "helper_sha256": "3597bce87bcab717f3391fe8940967f1dbf6f3c19507027816a53b9e433148eb",
+      "cases": [
+        {
+          "name": "stdio-without-write",
+          "attempts": 1,
+          "exit_code": 101,
+          "native_completion_stage": 81,
+          "native_bytes_written": 0
+        },
+        {
+          "name": "stdio-with-write",
+          "attempts": 1,
+          "exit_code": 101,
+          "native_completion_stage": 82,
+          "native_bytes_written": 44
+        }
+      ],
+      "both_scenario_errors": "candidate_independent_station",
+      "raw_receipts_per_case": 13,
+      "native_writer_pipe_closed_each": true,
+      "rust_keeper_observe_reached": false,
+      "rust_marker_read_and_verified": false,
+      "pipe_context_impersonation_reached": false,
+      "complete_stdio_control_passed": false,
+      "both_helpers_naturally_exited_zero_each": true,
+      "original_job_empty_handles_and_pipes_closed_each": true,
+      "keeper_naturally_exited_each": true,
+      "caller_objects_unchanged_each": true,
+      "actual_helper_objects_match_caller_each": true,
+      "station_gone_only_for_prediction_absent_before_launch": true,
+      "new_luid_present_original_three_second_endpoint_each": true,
+      "new_luid_present_after_pipe_close_each": true,
+      "new_luid_present_after_test_exit_each": true,
+      "node_codex_appcontainer_executed": false,
+      "product_root_cause_established": false
+    },
+    "a4_b1_comparison": {
+      "receipt": "a4-b1-first-cmd-comparison.safe.json",
+      "sha256": "1619d1367a3e20d99d849ad361f25392bd8e858bf3161580425ae75588ee546e",
+      "normalized_recorded_manifest_and_content_contracts_equal": true,
+      "station_bootstrap_bytes_equal": true,
+      "worker_and_supervisor_bytes_differ": true,
+      "actual_environment_blocks_recorded": false,
+      "only_systemroot_changed_proven": false,
+      "retaining_object_identified": false
+    },
+    "post_b1_snapshots": [
+      {
+        "kind": "primary_process_tokens",
+        "observed_utc": "2026-10-07T04:45:18.133218Z",
+        "receipt": "post-b1-logon-snapshot-a1/result.safe.json",
+        "sha256": "603cc227b19b5698cb388c9e14425e925d6d723e29face0a61bc4e3b52238675",
+        "luid_exists": true,
+        "station_exists": false,
+        "same_user_processes": 196,
+        "matching_tokens": 0,
+        "process_access_denied": 194,
+        "token_access_denied": 2,
+        "unobserved_scope_remains_unknown": true
+      },
+      {
+        "kind": "accessible_same_user_process_threads",
+        "observed_utc": "2026-10-07T04:52:38.834033Z",
+        "receipt": "post-b1-thread-token-snapshot-a1/result.safe.json",
+        "sha256": "61a2bfb5f5c42c454418e94b94c5de3079344d9d040c7db25d7ca8ea3ad87743",
+        "luid_exists_before_and_after": true,
+        "same_user_processes": 191,
+        "threads_attempted": 2390,
+        "error_no_token": 2390,
+        "matching_tokens": 0,
+        "process_access_denied": 193,
+        "primary_token_access_denied": 3,
+        "unobserved_scope_remains_unknown": true
+      }
+    ],
+    "posthoc_zero_matches_prove_no_holder": false,
+    "posthoc_queries_replace_original_stop_evidence": false,
+    "main_integration": {
+      "base_head": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
+      "merge_head": "cc855835428b8585baed50d3015f314a4f2848ea",
+      "status": "merged_source_local_gates_passed",
+      "gate_index_tree": "8854d87d3b52ec0d0456314b7accbf8efa40185d",
+      "frozen_source_files": 7207,
+      "check": {
+        "receipt": "merge-main-cc8558-a1\\cargo-check.safe.json",
+        "sha256": "133758523d911d86d2e7d8eb31a971a0a81e4b0c1129257d0794f920d24515c8",
+        "started_utc": "2026-10-07T05:16:59.154516+00:00",
+        "finished_utc": "2026-10-07T05:19:49.460187+00:00",
+        "argv": [
+          "cargo",
+          "check",
+          "-p",
+          "warp"
+        ],
+        "exit_code": 0,
+        "index_tree": "8854d87d3b52ec0d0456314b7accbf8efa40185d",
+        "source_files": 7207,
+        "sources_unchanged": true,
+        "log": {
+          "bytes": 7079,
+          "sha256": "825e04e4529aa0cb48238daeab5cce1468083f3a8294de7e3288a09e2af18d32"
+        },
+        "cleanup_ready": false
+      },
+      "i18n": {
+        "receipt": "merge-main-cc8558-a1\\i18n.safe.json",
+        "sha256": "38c133feab43ca3fd6073cd0d59c8e27d88d22fb4ae809aa93fa266d9fd27c68",
+        "started_utc": "2026-10-07T05:19:50.663122+00:00",
+        "finished_utc": "2026-10-07T05:28:16.504115+00:00",
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "warp",
+          "--lib",
+          "i18n::tests"
+        ],
+        "exit_code": 0,
+        "index_tree": "8854d87d3b52ec0d0456314b7accbf8efa40185d",
+        "source_files": 7207,
+        "sources_unchanged": true,
+        "log": {
+          "bytes": 10027,
+          "sha256": "d7a6191877e32a9f7bc5eb977fb76f6153018cf65bc6eb630b4111ca68099cd3"
+        },
+        "cleanup_ready": false,
+        "passed": 11,
+        "failed": 0,
+        "filtered_out": 8268
+      },
+      "english_original_keys_preserved": 5425,
+      "chinese_original_keys_preserved": 5425,
+      "new_keys_from_main_per_language": 15,
+      "message_variable_sets_equal": true,
+      "historical_c3_source_binding_unchanged": true,
+      "final_same_source_dual_platform_gate": false
+    },
+    "original_runner": {
+      "run_id": 37573125367,
+      "source_commit": "8e84b737eabeefe1ab082dc3be6b6c0fd5067c96",
+      "last_saved_status": "queued",
+      "last_saved_status_utc": "2026-10-07T05:28:33.888035+00:00",
+      "receipt": "normal-five-37573125367-before-main-commit.safe.json",
+      "sha256": "c937b7b59fd14523da6714daa5970727dafbe84ac9c73fe316289a0d3e1eafb0",
+      "conclusion": null
+    },
+    "d1": {
+      "status": "external_two_arm_entry_in_preparation_not_executed",
+      "acceptance_pass_recorded": false
+    },
+    "new_gap_closures": 0,
+    "closed_count": 10,
+    "g09_closed": false,
+    "deferred_not_passed": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "pr_draft": true,
+    "normal_five_cases_completed": false,
+    "independent_cold_recoveries_completed": 0,
+    "final_same_source_linux_windows_gate_completed": false,
+    "cleanup_ready": false,
+    "localization": "本轮G09证据无需本地化变更；合并保留双方中英文文案，新增15键逐项对应、变量一致，i18n11通过，无额外用户文案或布局改动。"
+  },
   "g09_station_publish_repairs_20261007": {
     "base_commit": "aa3b314bc09022f87810a5718668fe299f4af3f8",
     "working_tree_dirty": true,
@@ -2346,7 +2553,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过。原runner37556769074已失败，实际FileRenameInfo返回0x80070003，原机尾部字节与回滚终态未知。本轮修复显式NUL、caller分支私有站和失败所有权，另对公共PS程序/官方shim及驱动SYSTEMROOT采用同对象安全路径表示。b1 Python31、command40、npm52（1真实native忽略）、i18n11、cargo check及构建通过，7198份来源独审前后相同。正常五场景在首updated的第一CMD收尾RecoveryRequired停止：CMD/Node/Codex/console退出0、205事件继续、helper退出0且Job/桌面/DeviceMap/站已释放，但期限内LSA仍存在；未到PS、发布或冷恢复，实际持有者待定位。a4曾通过两候选及原生清理并到最终公共PS失败，后验PS差分对照不补写原失败码。新增关闭0、PR草稿；最终同源Linux/Windows门禁未完成，原件保留。",
+  "status_zh": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR草稿。b1首CMD收尾LSA未消失仍未修复。两次后验token查询未定位持有者；c3两项原生对照各一次exit101，实际helper使用调用方交互站，在独立站合同失败，未到Rust读取/模拟，原3秒、关管道及测试进程退出后LSA均存在，不能归因管道或认定产品首因。main cc855已整合，7207份源码冻结的cargo check和i18n11通过；正常五场景、三冷恢复和最终同源Linux/Windows门禁仍未完成。原runner37573125367固定8e84，截至本记录仍排队。新增关闭0，保留原件及cleanup_ready=false。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -3977,21 +4184,21 @@
     },
     "g09_progress": {
       "status": "open",
-      "audit_ref": "g09_station_publish_repairs_20261007",
+      "audit_ref": "g09_local_stdio_control_and_posthoc_tokens_20261007",
       "mac_consumer_and_homebrew_acceptance_complete": true,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过。原runner37556769074已失败，实际FileRenameInfo返回0x80070003，原机尾部字节与回滚终态未知。本轮修复显式NUL、caller分支私有站和失败所有权，另对公共PS程序/官方shim及驱动SYSTEMROOT采用同对象安全路径表示。b1 Python31、command40、npm52（1真实native忽略）、i18n11、cargo check及构建通过，7198份来源独审前后相同。正常五场景在首updated的第一CMD收尾RecoveryRequired停止：CMD/Node/Codex/console退出0、205事件继续、helper退出0且Job/桌面/DeviceMap/站已释放，但期限内LSA仍存在；未到PS、发布或冷恢复，实际持有者待定位。a4曾通过两候选及原生清理并到最终公共PS失败，后验PS差分对照不补写原失败码。新增关闭0、PR草稿；最终同源Linux/Windows门禁未完成，原件保留。 特殊权限安装决定保持；无需本地化变更，cleanup_ready=false。",
+      "boundary": "G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR草稿。b1首CMD收尾LSA未消失仍未修复。两次后验token查询未定位持有者；c3两项原生对照各一次exit101，实际helper使用调用方交互站，在独立站合同失败，未到Rust读取/模拟，原3秒、关管道及测试进程退出后LSA均存在，不能归因管道或认定产品首因。main cc855已整合，7207份源码冻结的cargo check和i18n11通过；正常五场景、三冷恢复和最终同源Linux/Windows门禁仍未完成。原runner37573125367固定8e84，截至本记录仍排队。新增关闭0，保留原件及cleanup_ready=false。",
       "security_attributes_scope_ref": "g09_security_attributes_scope_decision_20261005",
       "latest_result_ref": "g09_station_publish_repairs_20261007",
       "latest_result_source_commit": "aa3b314bc09022f87810a5718668fe299f4af3f8",
-      "latest_preparation_ref": "g09_station_publish_repairs_20261007",
+      "latest_preparation_ref": "g09_local_stdio_control_and_posthoc_tokens_20261007",
       "mac_platform_binding_regression_complete": true,
       "next_dynamic_observation_implemented": true,
       "both_public_candidate_modes_passed": true,
       "updated_transaction_complete": false,
       "current_local_repair_ref": "g09_station_publish_repairs_20261007",
-      "current_diagnostic_ref": "g09_station_publish_repairs_20261007",
+      "current_diagnostic_ref": "g09_local_stdio_control_and_posthoc_tokens_20261007",
       "latest_result_source_diff_sha256": "465d37db980606c8fba43b80a3f649d85ff01ba62a569eec26694969f3ec5dbe",
       "both_public_candidate_modes_passed_source_commit": "d131dd13f3ddb38713e17dd7258241ec901792be"
     },

@@ -81,13 +81,13 @@ impl<C: GistOps> SyncEngine<C> {
             .client
             .find_gist(platform, token_owned.clone())
             .await
-            .map_err(|e| SyncEngineError::Gist(e.to_string()))?
+            .map_err(SyncEngineError::Gist)?
         {
             let remote_content = self
                 .client
                 .get_gist_content(platform, token_owned.clone(), gist_id.clone())
                 .await
-                .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+                .map_err(SyncEngineError::Gist)?;
             let remote_data: SyncData = serde_json::from_str(&remote_content)
                 .map_err(|e| SyncEngineError::Serialization(e.to_string()))?;
 
@@ -127,7 +127,7 @@ impl<C: GistOps> SyncEngine<C> {
             self.client
                 .update_gist(platform, token_owned, gist_id, content)
                 .await
-                .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+                .map_err(SyncEngineError::Gist)?;
 
             tokio::task::block_in_place(|| {
                 version_store.commit_sync_version(local_version, upload_version)
@@ -144,7 +144,7 @@ impl<C: GistOps> SyncEngine<C> {
             self.client
                 .create_gist(platform, token_owned, content)
                 .await
-                .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+                .map_err(SyncEngineError::Gist)?;
         }
 
         tokio::task::block_in_place(|| {
@@ -173,14 +173,14 @@ impl<C: GistOps> SyncEngine<C> {
             .client
             .find_gist(platform, token_owned.clone())
             .await
-            .map_err(|e| SyncEngineError::Gist(e.to_string()))?
-            .ok_or_else(|| SyncEngineError::Gist("Gist 未找到".to_string()))?;
+            .map_err(SyncEngineError::Gist)?
+            .ok_or_else(|| SyncEngineError::Gist(crate::GistClientError::NotFound))?;
 
         let remote_content = self
             .client
             .get_gist_content(platform, token_owned.clone(), gist_id.clone())
             .await
-            .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+            .map_err(SyncEngineError::Gist)?;
         let remote_data: SyncData = serde_json::from_str(&remote_content)
             .map_err(|e| SyncEngineError::Serialization(e.to_string()))?;
 
@@ -210,7 +210,7 @@ impl<C: GistOps> SyncEngine<C> {
             self.client
                 .update_gist(platform, token_owned, gist_id, content)
                 .await
-                .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+                .map_err(SyncEngineError::Gist)?;
             version
         } else {
             remote_data.version
@@ -245,7 +245,7 @@ impl<C: GistOps> SyncEngine<C> {
             .client
             .find_gist(platform, token_owned.clone())
             .await
-            .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+            .map_err(SyncEngineError::Gist)?;
 
         // 确定远程版本号
         let remote_version = if let Some(ref gid) = gist_id {
@@ -253,7 +253,7 @@ impl<C: GistOps> SyncEngine<C> {
                 .client
                 .get_gist_content(platform, token_owned.clone(), gid.clone())
                 .await
-                .map_err(|e| SyncEngineError::Gist(e.to_string()))?;
+                .map_err(SyncEngineError::Gist)?;
             let remote_data: SyncData = serde_json::from_str(&remote_content)
                 .map_err(|e| SyncEngineError::Serialization(e.to_string()))?;
             reconcile_provider_sections(token, providers, &remote_data)?;
@@ -278,7 +278,7 @@ impl<C: GistOps> SyncEngine<C> {
         };
 
         if let Err(e) = upload_result {
-            return Err(SyncEngineError::Gist(e.to_string()));
+            return Err(SyncEngineError::Gist(e));
         }
 
         tokio::task::block_in_place(|| {

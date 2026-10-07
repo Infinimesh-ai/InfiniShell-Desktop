@@ -589,6 +589,7 @@ fn render_grid_without_ligatures<'a>(
 
         if !foreground_image_ids.is_empty() {
             ctx.scene.start_layer(warpui::ClipBounds::ActiveLayer);
+            ctx.scene.set_active_layer_click_through();
             for image_placement in foreground_image_ids {
                 if let Some((image_metadata, image_placement_data)) = image_metadata
                     .get(&image_placement.image_id)
@@ -1092,6 +1093,7 @@ fn render_grid_with_ligatures<'a>(
 
         if !foreground_image_ids.is_empty() {
             ctx.scene.start_layer(warpui::ClipBounds::ActiveLayer);
+            ctx.scene.set_active_layer_click_through();
             for image_placement in foreground_image_ids {
                 if let Some((image_metadata, image_placement_data)) = image_metadata
                     .get(&image_placement.image_id)

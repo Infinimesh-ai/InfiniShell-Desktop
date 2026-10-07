@@ -5997,3 +5997,20 @@ cli-agent-tmux-owned-unknown = tmux 启动状态尚未确认。请使用“恢�
 cli-agent-tmux-owned-exited = 此 tmux CLI 会话已结束。如需继续，请启动新的 tmux 窗格。
 
 cli-agent-tmux-restored-text-unconfirmed = 当前会话状态尚未确认。请在原生终端输入文字；图片仍可发送到原生图片队列。
+
+# Plan 保存提示与云同步错误：操作指导在应用层按界面语言渲染。
+ai-plan-saved-locally-tooltip = 计划已自动保存到本地。
+cloud-sync-error-encrypt = 无法加密同步数据：{ $error }
+cloud-sync-error-decrypt = 无法解密同步数据：{ $error }
+cloud-sync-error-provider = 无法访问本地同步数据：{ $error }
+cloud-sync-error-serialization = 无法读写同步数据格式：{ $error }
+cloud-sync-error-version-store = 无法访问本地同步版本：{ $error }
+cloud-sync-gist-error-request = 同步请求失败。请检查网络连接后重试。{ $error }
+cloud-sync-gist-error-not-found = 未找到云端同步数据。请先上传配置，再下载。
+cloud-sync-gist-error-no-token = 未配置同步令牌。请在“设置 → 云同步”中添加令牌后重试。
+cloud-sync-gist-error-api = 同步服务返回 HTTP { $status }：{ $body }
+cloud-sync-gist-error-missing-login = 服务响应未包含账号信息，无法验证令牌。请检查令牌以及网络或代理设置后重试。
+cloud-sync-error-read-secret = 无法读取 { $node }（{ $kind }）的凭据：{ $error }。凭据存储可能被锁定，或当前环境没有可用的后端。请解锁凭据存储，或启用 secret-service / Credential Manager 后重试上传。若该服务器不需要密码同步，可在 SSH 管理器中清除相应字段。
+cloud-sync-error-read-previous-secret = 无法读取 { $node }（{ $kind }）的旧凭据：{ $error }。已回滚 { $count } 项凭据变更。请确认凭据存储可用后重试下载。
+cloud-sync-error-write-secret = 无法写入 { $node }（{ $kind }）的凭据：{ $error }。请检查凭据存储权限后重试下载。
+cloud-sync-error-write-database = 无法保存下载的配置：{ $error }。已回滚 { $count } 项凭据变更。

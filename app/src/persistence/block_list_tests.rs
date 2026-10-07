@@ -56,6 +56,8 @@ fn restoration_ignores_legacy_visible_bootstrap_blocks() {
             vertical_tabs_panel_open: None,
             theme_override: None,
             team_uid: None,
+            cli_subagent_width: None,
+            cli_subagent_height: None,
         })
         .execute(&mut conn)
         .expect("window should be inserted");

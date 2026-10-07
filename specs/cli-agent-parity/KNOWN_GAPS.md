@@ -1,6 +1,20 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态（2026-10-07）：局部修复通过普通门禁，真实 CMD 收尾仍失败
+## 当前接续状态（2026-10-07）：合并main本地门禁通过，LSA持有者仍待定位
+
+本轮新增关闭0项：G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿。正常 witness=false 五场景、三次独立冷恢复和最终同一冻结源码 Linux/Windows 门禁尚未完成；普通安装、已支持只读ACL自动升级及特殊权限安装的既有决定保持。
+
+本机 c3 使用固定 `8e84b737e` 的原测试二进制，两项 stdio 原生测试各一次、均 exit101。实际两级 helper 使用调用方的交互站，在 `candidate_independent_station` 合同失败；写例原生写入44字节，但均未到 Rust 读取、nonce内容核验或模拟检查。helper自然退出0、Job及原句柄/管道关闭、keeper自然退出且caller对象未变；原三秒、关管道后和测试进程退出后的新LUID仍存在。预测站原本不存在，其 gone 不是实际站已回收的证明。该局部现象无需 Node/Codex/AppContainer 即可出现，但尚不能归因于管道或定位 b1 的持有者。
+
+已整合 `main` 的 `cc855835428b8585baed50d3015f314a4f2848ea`。合并内容的7207份来源绑定 index tree `8854d87d3b52ec0d0456314b7accbf8efa40185d`，`cargo check -p warp` 和 i18n11项通过、来源前后不变。中英文各5425个原键与main新增15键完整保留，变量一致；本轮G09证据无需本地化变更，无额外文案或布局改动。本轮状态文档在门禁之后更新，最终冻结同源双平台门禁仍待完成。
+
+原 runner22 的 [37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367) 固定验证8e84；截至 `2026-10-07T05:28:33.888035+00:00` 仍为queued，不能记通过或替代合并后验证。下一项d1仅在仓外准备默认/私有首次窗口站两臂入口，尚未执行。证据根为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/`；详细摘要见 CURRENT_STATUS.json 的 `g09_local_stdio_control_and_posthoc_tokens_20261007`，原失败保留，cleanup_ready=false。
+
+a4/b1 首CMD比较的59份原件表明归一化manifest/内容合同及station bootstrap字节相同，但worker/supervisor字节不同；两轮实际environment block未保存，不能宣称仅SYSTEMROOT改变。收据 `a4-b1-first-cmd-comparison.safe.json` SHA256为 `1619d1367a3e20d99d849ad361f25392bd8e858bf3161580425ae75588ee546e`。
+
+04:45主token后验快照有196个已核同用户进程、0匹配，194个进程及2个token查询拒绝；04:52线程快照有191个已核同用户进程的2390条线程均ERROR_NO_TOKEN，193个进程及3个主token查询拒绝，两端LSA仍存在。两次范围不同，不能相加成全覆盖，零匹配不证明没有持有者，也不补写原停点。
+
+## 历史记录：局部修复通过普通门禁，真实 CMD 收尾仍失败
 
 原 runner22 的 [37556769074](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37556769074) 已结束为 failure。首个 updated 的实际错误已由冻结源码对应到 `SetFileInformationByHandle(FileRenameInfo)` 返回 `0x80070003`，阶段为 inactive_rename；CMD/PS 候选均输出新版本、退出0并完成原生清理。普通测试1153项中1152通过、1失败；失败测试三次真实尝试的错误依次为 rename 0x80070003、open os_error2、rename 0x8007007b。只归档到 Prepared，原机尾部 buffer 字节及回滚终态仍未知，不能以静态几何认定唯一首因。
 

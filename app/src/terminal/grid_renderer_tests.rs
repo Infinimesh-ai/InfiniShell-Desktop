@@ -1,4 +1,7 @@
 use std::any::Any;
+use std::collections::HashMap;
+use std::iter::Empty;
+use std::ops::RangeInclusive;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -6,14 +9,33 @@ use anyhow::Result;
 use futures::FutureExt as _;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{Vector2F, Vector2I, vec2f};
+use warp_core::features::FeatureFlag;
+use warpui::assets::asset_cache::AssetCache;
+use warpui::elements::{Point as ScreenPoint, Rect, ZIndex};
+use warpui::event::DispatchedEvent;
 use warpui::fonts::{Cache as FontCache, FamilyId, FontId, GlyphId, Metrics, Properties};
+use warpui::image_cache::ImageType;
 use warpui::platform::{self, LoadedSystemFonts, TextLayoutSystem};
 use warpui::text_layout::{ClipConfig, Line, TextAlignment, TextFrame};
 use warpui::units::{IntoLines, Lines, Pixels};
+use warpui::{
+    AfterLayoutContext, App, AppContext, Element, Entity, EntityIdSet, EventContext, LayoutContext,
+    PaintContext, Presenter, SingletonEntity, SizeConstraint, TypedActionView, View,
+    WindowInvalidation,
+};
 
 use super::{CachedBackgroundColor, active_or_next_match};
+use crate::appearance::Appearance;
+use crate::settings::EnforceMinimumContrast;
+use crate::terminal::color;
 use crate::terminal::grid_size_util::calculate_grid_baseline_position;
+use crate::terminal::model::ObfuscateSecrets;
+use crate::terminal::model::ansi::Handler;
+use crate::terminal::model::grid::RespectDisplayedOutput;
+use crate::terminal::model::grid::grid_handler::GridHandler;
+use crate::terminal::model::image_map::StoredImageMetadata;
 use crate::terminal::model::index::Point;
+use crate::terminal::model::iterm_image::{ITermImage, ITermImageMetadata};
 use crate::terminal::model::selection::SelectionPoint;
 use crate::terminal::{SizeInfo, grid_renderer};
 
@@ -432,4 +454,167 @@ fn test_calculate_selection_bounds() {
     assert_selection_bounds(5.into_lines()); // Without scroll clipping
     assert_selection_bounds(10.into_lines()); // Without scroll clipping (but on the cusp of clipping)
     assert_selection_bounds(80.into_lines()); // With scroll clipping
+}
+
+struct ForegroundImageView {
+    use_ligatures: bool,
+}
+
+impl Entity for ForegroundImageView {
+    type Event = ();
+}
+
+impl TypedActionView for ForegroundImageView {
+    type Action = ();
+}
+
+impl View for ForegroundImageView {
+    fn ui_name() -> &'static str {
+        "foreground_image_test_view"
+    }
+
+    fn render(&self, _: &AppContext) -> Box<dyn Element> {
+        let metadata = ITermImageMetadata {
+            id: 7,
+            image_size: vec2f(2., 2.),
+            ..Default::default()
+        };
+        let mut grid = GridHandler::new_for_test(4, 4);
+        grid.handle_completed_iterm_image(ITermImage {
+            metadata: metadata.clone(),
+            data: Vec::new(),
+        });
+        ForegroundImageElement {
+            rect: Rect::new(),
+            grid,
+            image_metadata: HashMap::from([(7, StoredImageMetadata::ITerm(metadata))]),
+            use_ligatures: self.use_ligatures,
+        }
+        .finish()
+    }
+}
+
+struct ForegroundImageElement {
+    rect: Rect,
+    grid: GridHandler,
+    image_metadata: HashMap<u32, StoredImageMetadata>,
+    use_ligatures: bool,
+}
+
+impl Element for ForegroundImageElement {
+    fn layout(
+        &mut self,
+        constraint: SizeConstraint,
+        ctx: &mut LayoutContext,
+        app: &AppContext,
+    ) -> Vector2F {
+        self.rect.layout(constraint, ctx, app)
+    }
+
+    fn after_layout(&mut self, ctx: &mut AfterLayoutContext, app: &AppContext) {
+        self.rect.after_layout(ctx, app);
+    }
+
+    fn paint(&mut self, origin: Vector2F, ctx: &mut PaintContext, app: &AppContext) {
+        self.rect.paint(origin, ctx, app);
+        let theme = Appearance::as_ref(app).theme();
+        grid_renderer::render_grid(
+            &self.grid,
+            0,
+            4,
+            &color::List::from(&color::Colors::from(theme.clone())),
+            &color::OverrideList::empty(),
+            theme,
+            Properties::default(),
+            FamilyId(0),
+            1.,
+            1.,
+            vec2f(1., 1.),
+            Pixels::zero(),
+            origin,
+            &mut grid_renderer::CellGlyphCache::default(),
+            255,
+            None,
+            None,
+            None::<Empty<&RangeInclusive<Point>>>,
+            None,
+            EnforceMinimumContrast::Never,
+            ObfuscateSecrets::No,
+            None,
+            self.use_ligatures,
+            None,
+            RespectDisplayedOutput::No,
+            &self.image_metadata,
+            None,
+            false,
+            ctx,
+            app,
+        );
+    }
+
+    fn size(&self) -> Option<Vector2F> {
+        self.rect.size()
+    }
+
+    fn origin(&self) -> Option<ScreenPoint> {
+        self.rect.origin()
+    }
+
+    fn dispatch_event(
+        &mut self,
+        event: &DispatchedEvent,
+        ctx: &mut EventContext,
+        app: &AppContext,
+    ) -> bool {
+        self.rect.dispatch_event(event, ctx, app)
+    }
+}
+
+fn assert_foreground_image_does_not_cover_terminal(use_ligatures: bool) {
+    let _images = FeatureFlag::ITermImages.override_enabled(true);
+    App::test((), move |mut app| async move {
+        app.add_singleton_model(|_| Appearance::mock());
+        app.update(|ctx| {
+            AssetCache::handle(ctx).update(ctx, |cache, ctx| {
+                cache.insert_raw_asset_bytes::<ImageType>(
+                    "7".into(),
+                    b"warp-img:rgba:2:2:\xff\x00\x00\xff\xff\x00\x00\xff\xff\x00\x00\xff\xff\x00\x00\xff",
+                    ctx,
+                );
+            });
+        });
+        let (window_id, _view) = app.add_window(platform::WindowStyle::NotStealFocus, |_| {
+            ForegroundImageView { use_ligatures }
+        });
+        app.update(|ctx| {
+            let mut presenter = Presenter::new(window_id);
+            let mut updated = EntityIdSet::default();
+            updated.insert(ctx.root_view_id(window_id).unwrap());
+            presenter.invalidate(
+                WindowInvalidation {
+                    updated,
+                    ..Default::default()
+                },
+                ctx,
+            );
+            let scene = presenter.build_scene(vec2f(4., 4.), 1., None, ctx);
+            let image_layer = scene.layers().nth(1).expect("前景图片必须绘制在高层");
+            assert_eq!(image_layer.images.len(), 1);
+            assert_eq!(
+                image_layer.images[0].bounds,
+                RectF::new(vec2f(0., 0.), vec2f(2., 2.))
+            );
+            assert!(!scene.is_covered(ScreenPoint::new(1., 1., ZIndex::Normal(0))));
+        });
+    });
+}
+
+#[test]
+fn foreground_image_does_not_cover_terminal_without_ligatures() {
+    assert_foreground_image_does_not_cover_terminal(false);
+}
+
+#[test]
+fn foreground_image_does_not_cover_terminal_with_ligatures() {
+    assert_foreground_image_does_not_cover_terminal(true);
 }
