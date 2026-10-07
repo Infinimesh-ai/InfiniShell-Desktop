@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::{CryptoError, GistClientError};
+
 /// 同步平台
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncPlatform {
@@ -82,15 +84,15 @@ pub struct SyncData {
 /// 同步引擎错误
 #[derive(Debug, Error)]
 pub enum SyncEngineError {
-    #[error("加密错误: {0}")]
-    Crypto(String),
-    #[error("Gist 错误: {0}")]
-    Gist(String),
-    #[error("数据提供者错误: {0}")]
-    Provider(String),
-    #[error("序列化错误: {0}")]
+    #[error("Encryption error: {0}")]
+    Crypto(#[from] CryptoError),
+    #[error("Gist error: {0}")]
+    Gist(#[from] GistClientError),
+    #[error("Data provider error: {0}")]
+    Provider(#[source] anyhow::Error),
+    #[error("Serialization error: {0}")]
     Serialization(String),
-    #[error("版本存储错误: {0}")]
+    #[error("Version store error: {0}")]
     VersionStore(String),
 }
 
@@ -193,19 +195,26 @@ mod tests {
 
     #[test]
     fn test_sync_engine_error_display() {
-        let err = SyncEngineError::Crypto("bad key".to_string());
-        assert_eq!(format!("{err}"), "加密错误: bad key");
+        let err = SyncEngineError::Crypto(CryptoError::Decrypt("bad key".to_string()));
+        assert_eq!(
+            format!("{err}"),
+            "Encryption error: Decryption failed: bad key"
+        );
 
-        let err = SyncEngineError::Gist("not found".to_string());
-        assert_eq!(format!("{err}"), "Gist 错误: not found");
+        let err = SyncEngineError::Gist(GistClientError::NotFound);
+        assert_eq!(format!("{err}"), "Gist error: Gist not found");
 
-        let err = SyncEngineError::Provider("db fail".to_string());
-        assert_eq!(format!("{err}"), "数据提供者错误: db fail");
+        let err = SyncEngineError::Provider(anyhow::anyhow!("db fail"));
+        assert_eq!(format!("{err}"), "Data provider error: db fail");
 
         let err = SyncEngineError::Serialization("parse err".to_string());
-        assert_eq!(format!("{err}"), "序列化错误: parse err");
+        assert_eq!(format!("{err}"), "Serialization error: parse err");
 
         let err = SyncEngineError::VersionStore("io err".to_string());
-        assert_eq!(format!("{err}"), "版本存储错误: io err");
+        assert_eq!(format!("{err}"), "Version store error: io err");
     }
 }
+
+#[cfg(test)]
+#[path = "types_error_tests.rs"]
+mod error_tests;

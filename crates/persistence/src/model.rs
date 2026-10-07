@@ -47,6 +47,8 @@ pub struct Window {
     pub vertical_tabs_panel_open: Option<bool>,
     pub theme_override: Option<String>,
     pub team_uid: Option<String>,
+    pub cli_subagent_width: Option<f32>,
+    pub cli_subagent_height: Option<f32>,
 }
 
 #[derive(Identifiable, Insertable, Queryable)]
@@ -310,6 +312,8 @@ pub struct NewWindow {
     pub vertical_tabs_panel_open: Option<bool>,
     pub theme_override: Option<String>,
     pub team_uid: Option<String>,
+    pub cli_subagent_width: Option<f32>,
+    pub cli_subagent_height: Option<f32>,
 }
 
 #[derive(Identifiable, Queryable, Associations)]

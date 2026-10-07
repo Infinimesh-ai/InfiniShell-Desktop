@@ -2468,11 +2468,15 @@ fn build_chat_request_with_agent_message_fingerprint(
                 skill, user_query, ..
             } => {
                 let mut composed = format!(
-                    "请按下面的技能 \"{}\" 指引执行任务:\n\n{}\n\n---\n",
-                    skill.name, skill.content,
+                    "Perform the task following the guidance of the skill \"{name}\" below:\n\n{content}\n\n---\n",
+                    name = skill.name,
+                    content = skill.content,
                 );
                 if let Some(uq) = user_query {
-                    composed.push_str(&format!("用户进一步指令: {}", uq.query));
+                    composed.push_str(&format!(
+                        "Further user instructions: {query}",
+                        query = uq.query
+                    ));
                 }
                 messages.push(ChatMessage::user(composed));
             }

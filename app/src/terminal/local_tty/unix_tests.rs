@@ -12,6 +12,33 @@ fn env_value(command: &Command, key: &str) -> Option<Option<String>> {
 }
 
 #[test]
+fn host_graphical_terminal_scales_respect_session_overrides() {
+    let command = build_host_shell_command(
+        shell_starter(ShellType::Zsh, "/bin/zsh"),
+        None,
+        HashMap::from([
+            ("TERMINAL_BROWSER_DISPLAY_SCALE".into(), "3".into()),
+            ("PIXEL_DISPLAY_SCALE".into(), "1.25".into()),
+        ]),
+        None,
+        false,
+        false,
+        false,
+        false,
+        true,
+    );
+
+    assert_eq!(
+        env_value(&command, "TERMINAL_BROWSER_DISPLAY_SCALE"),
+        Some(Some("3".to_owned()))
+    );
+    assert_eq!(
+        env_value(&command, "PIXEL_DISPLAY_SCALE"),
+        Some(Some("1.25".to_owned()))
+    );
+}
+
+#[test]
 fn host_bash_command_sets_history_size_sentinels() {
     let command = build_host_shell_command(
         shell_starter(ShellType::Bash, "/bin/bash"),

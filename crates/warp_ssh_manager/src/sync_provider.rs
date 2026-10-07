@@ -13,12 +13,13 @@ use infinishell_sync::{
     ApplyDataOutcome, SyncDataProvider, SyncEngineError, SyncVersionStore, crypto,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use zeroize::Zeroizing;
 
 use crate::db::with_conn;
 use crate::memory::{MAX_MEMORY_CHARS, MachineMemory, MachineMemoryRepository};
 use crate::repository::{SshRepository, SyncMetaRepository};
-use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore};
+use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore, SshSecretStoreError};
 use crate::types::{NodeKind, OneKeyCredentialKind, SshRoute};
 
 /// keychain 三种凭据 kind,用于 collect/apply/orphan-cleanup 时统一遍历
@@ -28,6 +29,37 @@ const ALL_SECRET_KINDS: [SecretKind; 4] = [
     SecretKind::RootPassword,
     SecretKind::OneKeyPassword,
 ];
+
+/// 保留操作类型及诊断来源，供应用层按用户语言给出恢复指导。
+#[derive(Debug, Error)]
+pub enum SshSyncProviderError {
+    #[error("Failed to read the keychain ({node_id}, {kind:?}): {source}")]
+    ReadSecret {
+        node_id: String,
+        kind: SecretKind,
+        source: SshSecretStoreError,
+    },
+    #[error(
+        "Failed to read the previous keychain value ({node_id}, {kind:?}): {source}; rolled back {rolled_back} entries"
+    )]
+    ReadPreviousSecret {
+        node_id: String,
+        kind: SecretKind,
+        rolled_back: usize,
+        source: SshSecretStoreError,
+    },
+    #[error("Failed to write to the keychain ({node_id}, {kind:?}): {source}")]
+    WriteSecret {
+        node_id: String,
+        kind: SecretKind,
+        source: SshSecretStoreError,
+    },
+    #[error("Database write failed: {source}; rolled back {rolled_back} keychain writes")]
+    WriteDatabase {
+        rolled_back: usize,
+        source: anyhow::Error,
+    },
+}
 
 /// SSH 同步用的节点数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,7 +161,7 @@ impl SyncDataProvider for SshSyncProvider {
 
     fn collect_data(&self, token: &str) -> Result<serde_json::Value, SyncEngineError> {
         let nodes = with_conn(|conn| Ok(SshRepository::list_nodes(conn)?))
-            .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+            .map_err(SyncEngineError::Provider)?;
 
         let mut sync_nodes = Vec::new();
         let mut sync_servers = Vec::new();
@@ -137,14 +169,14 @@ impl SyncDataProvider for SshSyncProvider {
 
         let machine_memories =
             with_conn(|conn| Ok(MachineMemoryRepository::list_all_for_sync(conn)?))
-                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+                .map_err(SyncEngineError::Provider)?;
         let sync_machine_memories = encrypt_machine_memories(token, &machine_memories)?;
         let routes = with_conn(|conn| Ok(SshRepository::list_routes(conn)?))
-            .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+            .map_err(SyncEngineError::Provider)?;
 
         let onekey_credentials =
             with_conn(|conn| Ok(SshRepository::list_onekey_credentials(conn)?))
-                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+                .map_err(SyncEngineError::Provider)?;
         for credential in onekey_credentials {
             let secret_kind = onekey_secret_kind(credential.kind);
             let password = read_secret(self.secret_store.as_ref(), &credential.id, secret_kind)?;
@@ -171,7 +203,7 @@ impl SyncDataProvider for SshSyncProvider {
             if node.kind == NodeKind::Server {
                 let server_result =
                     with_conn(|conn| Ok(SshRepository::get_server(conn, &node.id)?))
-                        .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+                        .map_err(SyncEngineError::Provider)?;
                 if let Some(server) = server_result {
                     // 区分 keychain 错误与"用户没设密码":
                     // - Ok(Some) = 有密码,加密上传
@@ -251,8 +283,7 @@ impl SyncDataProvider for SshSyncProvider {
             ] {
                 match enc {
                     Some(enc) => {
-                        let value = crypto::decrypt(token, enc)
-                            .map_err(|e| SyncEngineError::Crypto(e.to_string()))?;
+                        let value = crypto::decrypt(token, enc).map_err(SyncEngineError::Crypto)?;
                         pending_secrets.push(PendingSecret {
                             node_id: server.node_id.clone(),
                             kind,
@@ -272,8 +303,7 @@ impl SyncDataProvider for SshSyncProvider {
             );
             match &credential.password_encrypted {
                 Some(enc) => {
-                    let value = crypto::decrypt(token, enc)
-                        .map_err(|e| SyncEngineError::Crypto(e.to_string()))?;
+                    let value = crypto::decrypt(token, enc).map_err(SyncEngineError::Crypto)?;
                     pending_secrets.push(PendingSecret {
                         node_id: credential.id.clone(),
                         kind: secret_kind,
@@ -300,13 +330,13 @@ impl SyncDataProvider for SshSyncProvider {
                 .select(persistence::schema::ssh_nodes::id)
                 .load::<String>(conn)?)
         })
-        .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+        .map_err(SyncEngineError::Provider)?;
         let existing_credential_ids: Vec<String> = with_conn(|conn| {
             Ok(persistence::schema::ssh_onekey_credentials::table
                 .select(persistence::schema::ssh_onekey_credentials::id)
                 .load::<String>(conn)?)
         })
-        .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
+        .map_err(SyncEngineError::Provider)?;
         existing_secret_owner_ids.extend(existing_credential_ids);
 
         // ---- 阶段 1 ---- 先写 keychain。任一失败 → 立即中止,不动 DB。
@@ -325,20 +355,27 @@ impl SyncDataProvider for SshSyncProvider {
                 Err(e) => {
                     // 与 read_secret 同等严格:keychain 任何错误都中止,避免无法 rollback
                     rollback_keychain_writes(self.secret_store.as_ref(), &written_secrets);
-                    return Err(SyncEngineError::Provider(format!(
-                        "读取 keychain 旧值失败 ({}, {:?}): {e}。已回滚 {} 项,请确认密钥库可用后重试下载",
-                        s.node_id,
-                        s.kind,
-                        written_secrets.len()
-                    )));
+                    return Err(SyncEngineError::Provider(
+                        SshSyncProviderError::ReadPreviousSecret {
+                            node_id: s.node_id.clone(),
+                            kind: s.kind,
+                            rolled_back: written_secrets.len(),
+                            source: e,
+                        }
+                        .into(),
+                    ));
                 }
             };
             if let Err(e) = self.secret_store.set(&s.node_id, s.kind, &s.value) {
                 rollback_keychain_writes(self.secret_store.as_ref(), &written_secrets);
-                return Err(SyncEngineError::Provider(format!(
-                    "写入 keychain 失败 ({}, {:?}): {e},请检查密钥库权限后重试下载",
-                    s.node_id, s.kind
-                )));
+                return Err(SyncEngineError::Provider(
+                    SshSyncProviderError::WriteSecret {
+                        node_id: s.node_id.clone(),
+                        kind: s.kind,
+                        source: e,
+                    }
+                    .into(),
+                ));
             }
             written_secrets.push(WrittenSecret {
                 node_id: s.node_id.clone(),
@@ -510,9 +547,13 @@ impl SyncDataProvider for SshSyncProvider {
                 // DB 失败 → 回滚刚写入的 keychain,避免长期残留指向不存在 node 的密钥
                 let rolled = written_secrets.len();
                 rollback_keychain_writes(self.secret_store.as_ref(), &written_secrets);
-                return Err(SyncEngineError::Provider(format!(
-                    "DB 写入失败 ({e});已回滚 {rolled} 项 keychain 写入"
-                )));
+                return Err(SyncEngineError::Provider(
+                    SshSyncProviderError::WriteDatabase {
+                        rolled_back: rolled,
+                        source: e,
+                    }
+                    .into(),
+                ));
             }
         };
 
@@ -567,7 +608,7 @@ impl SyncDataProvider for SshSyncProvider {
                 merge_and_persist_memories(conn, &remote_memories)
             })
         })
-        .map_err(|e| SyncEngineError::Provider(e.to_string()))
+        .map_err(SyncEngineError::Provider)
     }
 }
 
@@ -604,10 +645,7 @@ fn encrypt_machine_memories(
             let content_encrypted = if memory.deleted_at.is_some() {
                 None
             } else {
-                Some(
-                    crypto::encrypt(token, &memory.content)
-                        .map_err(|e| SyncEngineError::Crypto(e.to_string()))?,
-                )
+                Some(crypto::encrypt(token, &memory.content).map_err(SyncEngineError::Crypto)?)
             };
             Ok(SyncMachineMemory {
                 machine_key: memory.machine_key.clone(),
@@ -652,8 +690,7 @@ fn decrypt_machine_memories(
             .transpose()?;
 
         let mut content = match &memory.content_encrypted {
-            Some(content) => crypto::decrypt(token, content)
-                .map_err(|e| SyncEngineError::Crypto(e.to_string()))?,
+            Some(content) => crypto::decrypt(token, content).map_err(SyncEngineError::Crypto)?,
             None if deleted_at.is_some() => String::new(),
             None => {
                 return Err(SyncEngineError::Serialization(format!(
@@ -793,12 +830,14 @@ fn read_secret(
 ) -> Result<Option<String>, SyncEngineError> {
     match store.get(node_id, kind) {
         Ok(opt) => Ok(opt.map(|z| z.to_string())),
-        Err(e) => Err(SyncEngineError::Provider(format!(
-            "读取 keychain 失败 ({node_id}, {kind:?}): {e}。\
-             keychain 可能被锁定或当前环境无 backend(headless Linux / WSL 等)。\
-             请解锁 keychain 或启用 secret-service / Credential Manager 后重试上传。\
-             若该服务器确实不需要密码同步,可在 SSH 管理器中清除该字段。"
-        ))),
+        Err(e) => Err(SyncEngineError::Provider(
+            SshSyncProviderError::ReadSecret {
+                node_id: node_id.to_string(),
+                kind,
+                source: e,
+            }
+            .into(),
+        )),
     }
 }
 
@@ -808,7 +847,7 @@ fn encrypt_optional(token: &str, value: Option<&str>) -> Result<Option<String>, 
         // 空字符串视为"无密码",不上传(与既往行为兼容,避免空字符串密文污染)
         Some(s) if s.is_empty() => Ok(None),
         Some(s) => Ok(Some(
-            crypto::encrypt(token, s).map_err(|e| SyncEngineError::Crypto(e.to_string()))?,
+            crypto::encrypt(token, s).map_err(SyncEngineError::Crypto)?,
         )),
     }
 }
@@ -1498,3 +1537,7 @@ mod tests {
         assert!(!outcome.local_changed);
     }
 }
+
+#[cfg(test)]
+#[path = "sync_provider_error_tests.rs"]
+mod error_tests;

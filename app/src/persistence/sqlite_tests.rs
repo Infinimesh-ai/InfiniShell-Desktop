@@ -33,6 +33,7 @@ use crate::tab::SelectedTabColor;
 use crate::terminal::ShellLaunchData;
 use crate::terminal::model::block::SerializedBlock;
 use crate::terminal::model::session::SessionId;
+use crate::terminal::resizable_data::ModalSizes;
 use crate::themes::theme::AnsiColorIdentifier;
 use crate::workspace::tab_group::TabGroupId;
 use crate::workspaces::user_profiles::UserProfileWithUID;
@@ -356,10 +357,86 @@ fn test_terminal_window_snapshot(vertical_tabs_panel_open: bool) -> WindowSnapsh
         vertical_tabs_panel_open,
         left_panel_width: None,
         right_panel_width: None,
+        cli_subagent_width: None,
+        cli_subagent_height: None,
         agent_management_filters: None,
         theme_override: None,
         tab_groups: vec![],
     }
+}
+
+#[test]
+fn test_sqlite_round_trips_cli_subagent_sizes_per_window() {
+    let tempdir = tempfile::tempdir().expect("临时目录应创建成功");
+    let database_path = tempdir.path().join("warp.sqlite");
+    let mut conn = setup_database(&database_path).expect("数据库应初始化成功");
+    let mut first_window = test_terminal_window_snapshot(false);
+    first_window.cli_subagent_width = Some(640.);
+    first_window.cli_subagent_height = Some(480.);
+    let mut second_window = test_terminal_window_snapshot(true);
+    second_window.cli_subagent_width = Some(720.);
+    second_window.cli_subagent_height = Some(420.);
+    let app_state = AppState {
+        windows: vec![first_window, second_window],
+        active_window_index: Some(0),
+        block_lists: Default::default(),
+        running_mcp_servers: Default::default(),
+    };
+
+    save_app_state(&mut conn, &app_state).expect("窗口状态应保存成功");
+    drop(conn);
+    let mut reopened = setup_database(&database_path).expect("数据库应重新打开成功");
+    let restored = read_sqlite_data(&mut reopened, None, PersistedDataScope::Full)
+        .expect("窗口状态应读取成功")
+        .app_state
+        .expect("完整读取应包含窗口状态");
+
+    assert_eq!(restored.windows.len(), 2);
+    assert_eq!(restored.windows[0].cli_subagent_width, Some(640.));
+    assert_eq!(restored.windows[0].cli_subagent_height, Some(480.));
+    assert_eq!(restored.windows[1].cli_subagent_width, Some(720.));
+    assert_eq!(restored.windows[1].cli_subagent_height, Some(420.));
+    let first_sizes = ModalSizes::from_restored(&restored.windows[0], 240., 480.);
+    assert_eq!(first_sizes.cli_subagent_width, 640.);
+    assert_eq!(first_sizes.cli_subagent_height, 480.);
+    let second_sizes = ModalSizes::from_restored(&restored.windows[1], 240., 480.);
+    assert_eq!(second_sizes.cli_subagent_width, 720.);
+    assert_eq!(second_sizes.cli_subagent_height, 420.);
+}
+
+#[test]
+fn test_sqlite_restores_default_cli_subagent_sizes_for_legacy_windows() {
+    let tempdir = tempfile::tempdir().expect("临时目录应创建成功");
+    let database_path = tempdir.path().join("warp.sqlite");
+    let mut conn = setup_database(&database_path).expect("数据库应初始化成功");
+    let app_state = AppState {
+        windows: vec![test_terminal_window_snapshot(false)],
+        active_window_index: Some(0),
+        block_lists: Default::default(),
+        running_mcp_servers: Default::default(),
+    };
+    save_app_state(&mut conn, &app_state).expect("旧窗口状态应保存成功");
+
+    // 在临时库中还原新增尺寸列之前的结构，检查真实升级后的 NULL 默认行为。
+    conn.batch_execute(
+        "ALTER TABLE windows DROP COLUMN cli_subagent_width;
+         ALTER TABLE windows DROP COLUMN cli_subagent_height;
+         DELETE FROM __diesel_schema_migrations WHERE version = '20261007000000';",
+    )
+    .expect("临时库应还原为旧结构");
+    drop(conn);
+    let mut upgraded = setup_database(&database_path).expect("旧数据库应升级成功");
+    let restored = read_sqlite_data(&mut upgraded, None, PersistedDataScope::Full)
+        .expect("旧窗口状态应读取成功")
+        .app_state
+        .expect("完整读取应包含旧窗口状态");
+
+    assert_eq!(restored.windows.len(), 1);
+    assert_eq!(restored.windows[0].cli_subagent_width, None);
+    assert_eq!(restored.windows[0].cli_subagent_height, None);
+    let sizes = ModalSizes::from_restored(&restored.windows[0], 240., 480.);
+    assert_eq!(sizes.cli_subagent_width, 360.);
+    assert_eq!(sizes.cli_subagent_height, 320.);
 }
 
 #[test]
@@ -472,6 +549,8 @@ fn test_sqlite_round_trips_custom_vertical_tabs_title() {
             vertical_tabs_panel_open: false,
             left_panel_width: None,
             right_panel_width: None,
+            cli_subagent_width: None,
+            cli_subagent_height: None,
             agent_management_filters: None,
             theme_override: None,
             tab_groups: vec![],
@@ -552,6 +631,8 @@ fn test_sqlite_round_trips_code_pane_with_multiple_tabs() {
             vertical_tabs_panel_open: false,
             left_panel_width: None,
             right_panel_width: None,
+            cli_subagent_width: None,
+            cli_subagent_height: None,
             agent_management_filters: None,
             theme_override: None,
             tab_groups: vec![],
@@ -672,6 +753,8 @@ fn test_sqlite_round_trips_tab_groups() {
             vertical_tabs_panel_open: false,
             left_panel_width: None,
             right_panel_width: None,
+            cli_subagent_width: None,
+            cli_subagent_height: None,
             agent_management_filters: None,
             theme_override: None,
             tab_groups: vec![TabGroupSnapshot {
@@ -825,6 +908,8 @@ fn test_sqlite_round_trips_pinned_state() {
             vertical_tabs_panel_open: false,
             left_panel_width: None,
             right_panel_width: None,
+            cli_subagent_width: None,
+            cli_subagent_height: None,
             agent_management_filters: None,
             theme_override: None,
             tab_groups: vec![

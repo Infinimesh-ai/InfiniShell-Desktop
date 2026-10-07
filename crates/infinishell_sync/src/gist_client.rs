@@ -31,14 +31,16 @@ fn sync_file(detail: &serde_json::Value) -> Option<&serde_json::Value> {
 /// Gist API 客户端错误
 #[derive(Debug, Error)]
 pub enum GistClientError {
-    #[error("网络请求失败: {0}")]
+    #[error("Network request failed: {0}")]
     Request(#[from] reqwest::Error),
-    #[error("Gist 未找到")]
+    #[error("Gist not found")]
     NotFound,
-    #[error("Token 未配置")]
+    #[error("Token is not configured")]
     NoToken,
-    #[error("API 错误: {status} {body}")]
+    #[error("API error: {status} {body}")]
     Api { status: u16, body: String },
+    #[error("The response is missing the login field; the token was not validated")]
+    MissingLogin,
 }
 
 /// Gist 操作 trait，支持真实客户端和测试 mock
@@ -137,10 +139,9 @@ impl GistClient {
         let user: serde_json::Value = resp.json().await?;
         // 真实成功响应必须含 login 字段;若不含说明响应不是预期的 GitHub/Gitee
         // /user(可能是 SSO 拦截页 / 代理伪造 200),不能误判为验证通过
-        let login = user["login"].as_str().ok_or_else(|| GistClientError::Api {
-            status: 200,
-            body: "响应缺少 login 字段,Token 未真正通过验证".to_string(),
-        })?;
+        let login = user["login"]
+            .as_str()
+            .ok_or(GistClientError::MissingLogin)?;
         Ok(login.to_string())
     }
 
