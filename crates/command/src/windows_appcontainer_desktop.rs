@@ -80,6 +80,60 @@ pub(in crate::windows) fn diagnostic_code(error: &io::Error) -> Option<(&'static
         .map(|error| (error.stage, error.hresult))
 }
 
+#[derive(Debug)]
+struct DesktopCheckError {
+    stage: &'static str,
+    message: &'static str,
+    caller_station_matched: Option<bool>,
+}
+impl std::fmt::Display for DesktopCheckError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.message)
+    }
+}
+impl std::error::Error for DesktopCheckError {}
+fn check_error(stage: &'static str, message: &'static str) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        DesktopCheckError {
+            stage,
+            message,
+            caller_station_matched: None,
+        },
+    )
+}
+pub(in crate::windows) fn diagnostic_check(error: &io::Error) -> Option<&'static str> {
+    error
+        .get_ref()?
+        .downcast_ref::<DesktopCheckError>()
+        .map(|error| error.stage)
+}
+pub(in crate::windows) fn diagnostic_caller_station_matched(error: &io::Error) -> Option<bool> {
+    error
+        .get_ref()?
+        .downcast_ref::<DesktopCheckError>()
+        .and_then(|error| error.caller_station_matched)
+}
+
+pub(in crate::windows) fn verify_expected_station_name(
+    name: &str,
+    expected_station: &str,
+    caller_station: &str,
+) -> io::Result<()> {
+    if !name.eq_ignore_ascii_case(expected_station) {
+        // 只在原首项失败后比较已读取的名称，不查询对象或继续后续安全校验。
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            DesktopCheckError {
+                stage: "new_logon_station_name_mismatch",
+                message: "新登录窗口站或 AppContainer SID 不匹配",
+                caller_station_matched: Some(name.eq_ignore_ascii_case(caller_station)),
+            },
+        ));
+    }
+    Ok(())
+}
+
 // NULL token 查询本次调用线程的有效身份，不安装 token 或启用权限。
 #[cfg(any(test, feature = "test-util"))]
 fn calling_thread_administrator_membership() -> Result<bool, u32> {
@@ -109,6 +163,7 @@ fn administrator_membership_json(result: Result<bool, u32>) -> String {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 fn invalid(stage: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, stage)
 }
@@ -117,7 +172,8 @@ fn sid_text(sid: PSID) -> io::Result<String> {
     let mut text = PWSTR::null();
     unsafe { ConvertSidToStringSidW(sid, &mut text) }
         .map_err(|error| api_error("sid_string", error))?;
-    let result = unsafe { text.to_string() }.map_err(|_| invalid("私有桌面 SID 编码无效"));
+    let result = unsafe { text.to_string() }
+        .map_err(|_| check_error("sid_encoding", "私有桌面 SID 编码无效"));
     unsafe { LocalFree(Some(HLOCAL(text.0.cast()))) };
     result
 }
@@ -140,14 +196,14 @@ fn current_user_sid() -> io::Result<String> {
     }
     .map_err(|error| api_error("token_user", error))?;
     if !(size_of::<TOKEN_USER>()..=size_of_val(&storage)).contains(&(used as usize)) {
-        return Err(invalid("私有桌面 token 长度无效"));
+        return Err(check_error("token_user_length", "私有桌面 token 长度无效"));
     }
     let user = unsafe { &*storage.as_ptr().cast::<TOKEN_USER>() };
     let bytes = unsafe { std::slice::from_raw_parts(storage.as_ptr().cast::<u8>(), used as usize) };
     let offset = (user.User.Sid.0 as usize)
         .checked_sub(bytes.as_ptr() as usize)
         .filter(|offset| *offset >= size_of::<TOKEN_USER>())
-        .ok_or_else(|| invalid("私有桌面 token SID 越界"))?;
+        .ok_or_else(|| check_error("token_user_sid_bounds", "私有桌面 token SID 越界"))?;
     bounded_sid(bytes, offset)?;
     sid_text(user.User.Sid)
 }
@@ -225,19 +281,30 @@ impl NewLogonDesktop {
         let derived_text = sid_text(derived);
         unsafe { FreeSid(derived) };
         if derived_text? != container {
-            return Err(invalid("新站授权 SID 与本轮 profile 不匹配"));
+            return Err(check_error(
+                "new_logon_profile_sid_mismatch",
+                "新站授权 SID 与本轮 profile 不匹配",
+            ));
         }
         // 在第二段显式触发 USER32 连接，再核对内核返回的新站；不推断 DLL/TLS 前置行为。
         unsafe { GetSystemMetrics(SM_CXSCREEN) };
         let station = unsafe { GetProcessWindowStation() }
             .map_err(|error| api_error("new_logon_station", error))?;
         let name = object_name(HANDLE(station.0), "new_logon_station_name")?;
-        let name = String::from_utf16(&name).map_err(|_| invalid("新站名称编码无效"))?;
-        if !name.eq_ignore_ascii_case(expected_station)
-            || name.eq_ignore_ascii_case(caller_station)
-            || !station_is_noninteractive(station)?
-        {
-            return Err(invalid("新登录窗口站或 AppContainer SID 不匹配"));
+        let name = String::from_utf16(&name)
+            .map_err(|_| check_error("new_logon_station_name_encoding", "新站名称编码无效"))?;
+        verify_expected_station_name(&name, expected_station, caller_station)?;
+        if name.eq_ignore_ascii_case(caller_station) {
+            return Err(check_error(
+                "new_logon_caller_station_reused",
+                "新登录窗口站或 AppContainer SID 不匹配",
+            ));
+        }
+        if !station_is_noninteractive(station)? {
+            return Err(check_error(
+                "new_logon_station_interactive",
+                "新登录窗口站或 AppContainer SID 不匹配",
+            ));
         }
         let owner = current_user_sid()?;
         let mut storage = vec![0u32; SD_WORDS];
@@ -253,7 +320,10 @@ impl NewLogonDesktop {
         }
         .map_err(|error| api_error("new_logon_station_owner", error))?;
         if used as usize > SD_WORDS * 4 {
-            return Err(invalid("新站 owner 描述符长度越界"));
+            return Err(check_error(
+                "new_logon_owner_descriptor_bounds",
+                "新站 owner 描述符长度越界",
+            ));
         }
         let mut actual_owner = PSID::default();
         let mut defaulted = BOOL::default();
@@ -265,8 +335,23 @@ impl NewLogonDesktop {
             )
         }
         .map_err(|error| api_error("new_logon_station_owner_sid", error))?;
-        if actual_owner.0.is_null() || sid_text(actual_owner)? != owner || owner == container {
-            return Err(invalid("新站不属于本次本地用户"));
+        if actual_owner.0.is_null() {
+            return Err(check_error(
+                "new_logon_owner_missing",
+                "新站不属于本次本地用户",
+            ));
+        }
+        if sid_text(actual_owner)? != owner {
+            return Err(check_error(
+                "new_logon_owner_mismatch",
+                "新站不属于本次本地用户",
+            ));
+        }
+        if owner == container {
+            return Err(check_error(
+                "new_logon_owner_is_container",
+                "新站不属于本次本地用户",
+            ));
         }
         let station_sd = Descriptor::new(
             &owner,
@@ -312,7 +397,10 @@ impl NewLogonDesktop {
             .map_err(|error| api_error("new_logon_desktop_create", error))?,
         );
         if result.desktop == Some(original_desktop) {
-            return Err(invalid("新建桌面不得复用 helper 初始桌面"));
+            return Err(check_error(
+                "new_logon_original_desktop_reused",
+                "新建桌面不得复用 helper 初始桌面",
+            ));
         }
         result.restore()?;
         result.verify()?;
@@ -324,7 +412,10 @@ impl NewLogonDesktop {
             .map_err(|error| api_error("new_logon_restore_station", error))?
             != self.station
         {
-            return Err(invalid("新站桌面恢复前窗口站已变化"));
+            return Err(check_error(
+                "new_logon_restore_station_changed",
+                "新站桌面恢复前窗口站已变化",
+            ));
         }
         let current = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
             .map_err(|error| api_error("new_logon_current_desktop", error))?;
@@ -336,7 +427,10 @@ impl NewLogonDesktop {
             .map_err(|error| api_error("new_logon_restored_desktop", error))?
             != self.original_desktop
         {
-            return Err(invalid("新站 helper 原桌面恢复未确认"));
+            return Err(check_error(
+                "new_logon_original_desktop_not_restored",
+                "新站 helper 原桌面恢复未确认",
+            ));
         }
         Ok(())
     }
@@ -346,17 +440,23 @@ impl NewLogonDesktop {
             .map_err(|error| api_error("new_logon_station_recheck", error))?
             != self.station
         {
-            return Err(invalid("新站持有者切换了窗口站"));
+            return Err(check_error(
+                "new_logon_station_changed",
+                "新站持有者切换了窗口站",
+            ));
         }
         verify_object(HANDLE(self.station.0), &self.station_sd, true)?;
-        let desktop = self.desktop.ok_or_else(|| invalid("新登录桌面已关闭"))?;
+        let desktop = self
+            .desktop
+            .ok_or_else(|| check_error("new_logon_desktop_closed", "新登录桌面已关闭"))?;
         verify_object(HANDLE(desktop.0), &self.desktop_sd, false)
     }
 
     #[cfg(feature = "native-probe-witness")]
     pub(in crate::windows) fn witness_handle(&self) -> io::Result<HDESK> {
         self.verify()?;
-        self.desktop.ok_or_else(|| invalid("取证桌面已关闭"))
+        self.desktop
+            .ok_or_else(|| check_error("witness_desktop_closed", "取证桌面已关闭"))
     }
 
     pub(in crate::windows) fn close(&mut self) -> io::Result<()> {
@@ -382,57 +482,66 @@ fn bounded_sid(bytes: &[u8], start: usize) -> io::Result<&[u8]> {
     let header = bytes
         .get(start..)
         .and_then(|tail| tail.get(..8))
-        .ok_or_else(|| invalid("私有桌面 SID 头越界"))?;
+        .ok_or_else(|| check_error("sid_header_bounds", "私有桌面 SID 头越界"))?;
     if header[0] != 1 || header[1] > 15 {
-        return Err(invalid("私有桌面 SID 结构无效"));
+        return Err(check_error("sid_structure", "私有桌面 SID 结构无效"));
     }
     bytes
         .get(start..start + 8 + usize::from(header[1]) * 4)
-        .ok_or_else(|| invalid("私有桌面 SID 越界"))
+        .ok_or_else(|| check_error("sid_bounds", "私有桌面 SID 越界"))
 }
 
 fn bounded_acl(bytes: &[u8], start: usize, kind: u8, count: u16) -> io::Result<&[u8]> {
     let tail = bytes
         .get(start..)
-        .ok_or_else(|| invalid("私有桌面 ACL 越界"))?;
+        .ok_or_else(|| check_error("acl_bounds", "私有桌面 ACL 越界"))?;
     let header = tail
         .get(..8)
-        .ok_or_else(|| invalid("私有桌面 ACL 头越界"))?;
+        .ok_or_else(|| check_error("acl_header_bounds", "私有桌面 ACL 头越界"))?;
     let length = u16::from_le_bytes([header[2], header[3]]) as usize;
     if header[0] != 2 || u16::from_le_bytes([header[4], header[5]]) != count || length < 8 {
-        return Err(invalid("私有桌面 ACL 结构无效"));
+        return Err(check_error("acl_structure", "私有桌面 ACL 结构无效"));
     }
     let acl = tail
         .get(..length)
-        .ok_or_else(|| invalid("私有桌面 ACL 长度越界"))?;
+        .ok_or_else(|| check_error("acl_length_bounds", "私有桌面 ACL 长度越界"))?;
     let mut offset = 8;
     for _ in 0..count {
         let ace = acl
             .get(offset..)
             .and_then(|tail| tail.get(..4))
-            .ok_or_else(|| invalid("私有桌面 ACE 头越界"))?;
+            .ok_or_else(|| check_error("ace_header_bounds", "私有桌面 ACE 头越界"))?;
         let size = u16::from_le_bytes([ace[2], ace[3]]) as usize;
         if ace[0] != kind || ace[1] != 0 || size < 16 {
-            return Err(invalid("私有桌面 ACE 类型无效"));
+            return Err(check_error("ace_type", "私有桌面 ACE 类型无效"));
         }
         let ace = acl
             .get(offset..offset + size)
-            .ok_or_else(|| invalid("私有桌面 ACE 长度越界"))?;
+            .ok_or_else(|| check_error("ace_length_bounds", "私有桌面 ACE 长度越界"))?;
         let sid = bounded_sid(ace, 8)?;
         if 8 + sid.len() != size {
-            return Err(invalid("私有桌面 ACE SID 长度不匹配"));
+            return Err(check_error(
+                "ace_sid_length_mismatch",
+                "私有桌面 ACE SID 长度不匹配",
+            ));
         }
         offset += size;
     }
     if offset != length {
-        return Err(invalid("私有桌面 ACL 存在额外内容"));
+        return Err(check_error(
+            "acl_trailing_content",
+            "私有桌面 ACL 存在额外内容",
+        ));
     }
     Ok(acl)
 }
 
 fn relative_parts(bytes: &[u8]) -> io::Result<(&[u8], &[u8], &[u8])> {
     if !(size_of::<SECURITY_DESCRIPTOR_RELATIVE>()..=SD_WORDS * 4).contains(&bytes.len()) {
-        return Err(invalid("私有桌面安全描述符长度无效"));
+        return Err(check_error(
+            "descriptor_length",
+            "私有桌面安全描述符长度无效",
+        ));
     }
     let header =
         unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<SECURITY_DESCRIPTOR_RELATIVE>()) };
@@ -441,12 +550,18 @@ fn relative_parts(bytes: &[u8]) -> io::Result<(&[u8], &[u8], &[u8])> {
             & (SE_SELF_RELATIVE | SE_DACL_PROTECTED | SE_DACL_PRESENT | SE_SACL_PRESENT)
             != (SE_SELF_RELATIVE | SE_DACL_PROTECTED | SE_DACL_PRESENT | SE_SACL_PRESENT)
     {
-        return Err(invalid("私有桌面安全描述符控制位无效"));
+        return Err(check_error(
+            "descriptor_control",
+            "私有桌面安全描述符控制位无效",
+        ));
     }
     let offset = |value: u32| {
         let value = value as usize;
         if value < size_of::<SECURITY_DESCRIPTOR_RELATIVE>() || value >= bytes.len() {
-            Err(invalid("私有桌面安全描述符偏移越界"))
+            Err(check_error(
+                "descriptor_offset_bounds",
+                "私有桌面安全描述符偏移越界",
+            ))
         } else {
             Ok(value)
         }
@@ -463,8 +578,23 @@ fn relative_parts(bytes: &[u8]) -> io::Result<(&[u8], &[u8], &[u8])> {
 fn verify_descriptor(actual: &[u8], expected: &[u8]) -> io::Result<()> {
     let actual_parts = relative_parts(actual)?;
     let expected_parts = relative_parts(expected)?;
-    if actual_parts != expected_parts {
-        return Err(invalid("私有桌面 owner、DACL 或低完整性标签读回不匹配"));
+    if actual_parts.0 != expected_parts.0 {
+        return Err(check_error(
+            "descriptor_owner_mismatch",
+            "私有桌面 owner、DACL 或低完整性标签读回不匹配",
+        ));
+    }
+    if actual_parts.1 != expected_parts.1 {
+        return Err(check_error(
+            "descriptor_dacl_mismatch",
+            "私有桌面 owner、DACL 或低完整性标签读回不匹配",
+        ));
+    }
+    if actual_parts.2 != expected_parts.2 {
+        return Err(check_error(
+            "descriptor_label_mismatch",
+            "私有桌面 owner、DACL 或低完整性标签读回不匹配",
+        ));
     }
     Ok(())
 }
@@ -485,13 +615,16 @@ fn verify_object(object: HANDLE, expected: &Descriptor, station: bool) -> io::Re
     }
     .map_err(|error| api_error("read_sd", error))?;
     if used as usize > SD_WORDS * 4 {
-        return Err(invalid("私有桌面安全描述符读回越界"));
+        return Err(check_error(
+            "descriptor_readback_bounds",
+            "私有桌面安全描述符读回越界",
+        ));
     }
     let bytes = unsafe { std::slice::from_raw_parts(storage.as_ptr().cast(), used as usize) };
     verify_descriptor(bytes, expected.bytes())?;
     let descriptor = PSECURITY_DESCRIPTOR(storage.as_mut_ptr().cast());
     if !unsafe { IsValidSecurityDescriptor(descriptor) }.as_bool() {
-        return Err(invalid("私有桌面安全描述符无效"));
+        return Err(check_error("descriptor_invalid", "私有桌面安全描述符无效"));
     }
     let mut control = 0;
     let mut revision = 0;
@@ -509,11 +642,23 @@ fn verify_object(object: HANDLE, expected: &Descriptor, station: bool) -> io::Re
         )
     }
     .map_err(|error| api_error("read_object_flags", error))?;
-    if needed as usize != size_of_val(&flags)
-        || flags.fInherit.as_bool()
-        || station && flags.dwFlags & WSF_VISIBLE as u32 != 0
-    {
-        return Err(invalid("私有桌面继承或可见状态不匹配"));
+    if needed as usize != size_of_val(&flags) {
+        return Err(check_error(
+            "object_flags_length",
+            "私有桌面继承或可见状态不匹配",
+        ));
+    }
+    if flags.fInherit.as_bool() {
+        return Err(check_error(
+            "object_inheritable",
+            "私有桌面继承或可见状态不匹配",
+        ));
+    }
+    if station && flags.dwFlags & WSF_VISIBLE as u32 != 0 {
+        return Err(check_error(
+            "object_station_visible",
+            "私有桌面继承或可见状态不匹配",
+        ));
     }
     Ok(())
 }
@@ -532,7 +677,10 @@ fn object_name(object: HANDLE, stage: &'static str) -> io::Result<Vec<u16>> {
     }
     .map_err(|error| api_error(stage, error))?;
     if used as usize % size_of::<u16>() != 0 {
-        return Err(invalid("私有桌面对象名称长度无效"));
+        return Err(check_error(
+            "object_name_length",
+            "私有桌面对象名称长度无效",
+        ));
     }
     let units = used as usize / size_of::<u16>();
     if !(2..=name.len()).contains(&units)
@@ -541,7 +689,7 @@ fn object_name(object: HANDLE, stage: &'static str) -> io::Result<Vec<u16>> {
             .iter()
             .any(|unit| *unit == 0 || *unit == b'\\' as u16)
     {
-        return Err(invalid("私有桌面对象名称无效"));
+        return Err(check_error("object_name_invalid", "私有桌面对象名称无效"));
     }
     Ok(name[..units - 1].to_vec())
 }
@@ -560,7 +708,10 @@ fn station_is_noninteractive(station: HWINSTA) -> io::Result<bool> {
     }
     .map_err(|error| api_error("read_existing_station_flags", error))?;
     if used as usize != size_of_val(&flags) {
-        return Err(invalid("现有窗口站标志长度无效"));
+        return Err(check_error(
+            "station_flags_length",
+            "现有窗口站标志长度无效",
+        ));
     }
     Ok(flags.dwFlags & WSF_VISIBLE as u32 == 0)
 }

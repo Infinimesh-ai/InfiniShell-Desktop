@@ -1,6 +1,18 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态（2026-10-07）：原机恢复与事务仍失败，安全日志本机门禁通过、原机待验
+## 当前接续状态（2026-10-07）：本机确认第二段使用调用方站，修复待实施
+
+`430b8be416ed6593387dfebc7a93c836a4571cd9` 加内部诊断增量在受控本机入口执行一次正常 `witness=false` 的 updated：第二段返回 `new_logon_station_name_mismatch`／`InvalidData`，`caller_station_matched=true`。实际名称匹配调用方而不匹配预期新LUID站；不能仅凭同名认定继承或自动选择机制。候选root_pid=0、调试事件0，尚未查询站的非交互属性/owner、修改站ACL、发送Ready或执行发布；产品仍为RecoveryRequired，driver退出1、libtest退出101。它没有复现原runner的PersistenceFailed。
+
+本轮异常清理仍失败：aborted-cleanup为TimedOut，两个helper退出码为1；预期站查询已不存在但LSA查询仍存在，两侧无查询错误，cleanup_confirmed=false，缺少first-child-exit收据。退出码1不能区分自然失败与异常终止，预期站不存在不能泛化为全部窗口站回收。旧baseline及a1失败原件保留，不将其结果覆盖为本轮通过。静态审查另发现启动失败的station尚未转交外层即析构，清理错误未传递；拟先保留所有权，再返回原启动错误，并避免析构开启第二轮异常等待。
+
+诊断仅保留固定check_stage、error_kind与已读名称的匹配布尔；不输出站名/SID，不新增原生查询、不改变原校验或返回。command29项、npm46项（1项真实native显式忽略）、i18n11项、cargo check及默认程序构建通过。7198份来源在五个门禁、实际运行前后及文档更新前独审均相同，dirty差异SHA为 `d6d603e00f275d08b903016549f2cbd0b9d8e724e5491d44c26a32eaf674771d`；这不是最终合并源码门禁。独审 `local-station-diagnostic-a2/station-name-failure-audit.safe.json` SHA为 `9710dcfee6aea38f2f83e1ed2451c1c2ca9818fe679dbb6e18e600cb211032c6`，三程序原字节已独立归档。细项、各门禁与归档摘要见CURRENT_STATUS.json的 `g09_local_station_classification_20261007`。
+
+原runner22的[37556769074](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37556769074)仍验证提交430b8be41，已知step44普通回归失败，真实npm结果待定，不预填结论。下一步仅对已观察到的caller站分支显式创建严格私有站，保留服务身份已成功的自动站路径，完成失败所有权修复后再验。本机CLR4.8.9345.0与原runner4.8.9310.0不同，未伪造GITHUB_ACTIONS，也不以换机结果补证原失败。
+
+**新增关闭0项；G09开放，PR22保持草稿。** 正常五场景、三次独立冷恢复、最终同一冻结源码Linux/Windows门禁仍未完成；V01/V02/V05移交不计通过。特殊权限安装可提示原安装工具，普通安装与已支持只读ACL自动升级要求不变。无需本地化变更：仅内部诊断，原用户错误语义、双语资源及布局不变；本轮i18n11项通过。证据保留，cleanup_ready=false。
+
+## 历史记录：原机恢复与事务仍失败，安全日志本机门禁通过、原机待验
 
 提交 `d131dd13f3ddb38713e17dd7258241ec901792be` 的原runner22正常验收[37553787071](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37553787071)失败。step44运行1153项，1152通过、1失败、7108跳过；新增恢复测试 `inactive_image_recovery_keeps_stage_frozen_until_backup_is_restored` 在第92行实际三次返回SourceChanged，汇总重复的TRY3不计第四次。step53的command93项通过、166跳过；i18n11项包含在默认普通测试中，不能因此把整个普通门禁记为通过。
 

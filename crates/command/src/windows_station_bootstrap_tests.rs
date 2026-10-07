@@ -1,3 +1,4 @@
+use super::super::appcontainer::desktop::verify_expected_station_name;
 use super::*;
 
 #[test]
@@ -359,9 +360,169 @@ fn failure_receipt_keeps_native_code_without_error_body() {
         serde_json::from_slice(&fs::read(temp.path().join("failure.json")).unwrap()).unwrap();
     assert_eq!(value["ok"], false);
     assert_eq!(value["hresult"], HRESULT::from_win32(5).0);
+    assert_eq!(value["error_kind"], "Other");
+    assert!(value["check_stage"].is_null());
+    assert!(value["caller_station_matched"].is_null());
+    assert!(value["native_phase"].is_null());
     assert_eq!(value["first_exit_code"], 1);
     assert_eq!(value["second_exit_code"], 2);
     assert!(value.get("message").is_none());
+}
+
+#[test]
+fn failure_receipt_keeps_profile_check_without_station_access_or_private_values() {
+    let temp = tempfile::tempdir().unwrap();
+    let failure = NewLogonDesktop::create(
+        "PRIVATE_EXPECTED_STATION",
+        "InfiniShell.Version.fixed-diagnostic-test",
+        "PRIVATE_CONTAINER_SID",
+        "PRIVATE_CALLER_STATION",
+    )
+    .err()
+    .unwrap();
+    assert_eq!(failure.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(failure.to_string(), "新站授权 SID 与本轮 profile 不匹配");
+    let result: io::Result<()> = Err(failure);
+    diagnostic(
+        temp.path(),
+        "failure.json",
+        "station_acl_and_desktop",
+        &result,
+        None,
+        None,
+    );
+
+    let bytes = fs::read(temp.path().join("failure.json")).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["phase"], "station_acl_and_desktop");
+    assert_eq!(value["error_kind"], "InvalidData");
+    assert_eq!(value["check_stage"], "new_logon_profile_sid_mismatch");
+    assert!(value["caller_station_matched"].is_null());
+    assert!(value["os_error"].is_null());
+    assert!(value["hresult"].is_null());
+    assert!(value["native_phase"].is_null());
+    assert!(!String::from_utf8(bytes).unwrap().contains("PRIVATE_"));
+    assert!(value.get("message").is_none());
+}
+
+#[test]
+fn station_name_failure_receipt_keeps_only_the_true_caller_comparison() {
+    let temp = tempfile::tempdir().unwrap();
+    let result =
+        verify_expected_station_name("PRIVATE_CALLER", "PRIVATE_EXPECTED", "private_caller");
+    diagnostic(
+        temp.path(),
+        "failure.json",
+        "station_acl_and_desktop",
+        &result,
+        None,
+        None,
+    );
+
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("failure.json")).unwrap()).unwrap();
+    assert_eq!(value["error_kind"], "InvalidData");
+    assert_eq!(value["check_stage"], "new_logon_station_name_mismatch");
+    assert_eq!(value["caller_station_matched"], true);
+    assert!(value["os_error"].is_null());
+    assert!(value["hresult"].is_null());
+    assert!(value["native_phase"].is_null());
+    assert!(!value.to_string().contains("PRIVATE_"));
+    assert!(!value.to_string().contains("private_caller"));
+}
+
+#[test]
+fn station_name_failure_receipt_preserves_false_without_claiming_a_station_category() {
+    let temp = tempfile::tempdir().unwrap();
+    let result =
+        verify_expected_station_name("PRIVATE_OTHER", "PRIVATE_EXPECTED", "PRIVATE_CALLER");
+    diagnostic(
+        temp.path(),
+        "failure.json",
+        "station_acl_and_desktop",
+        &result,
+        None,
+        None,
+    );
+
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("failure.json")).unwrap()).unwrap();
+    assert_eq!(value["caller_station_matched"], false);
+    assert_eq!(value["check_stage"], "new_logon_station_name_mismatch");
+    assert!(value["os_error"].is_null());
+    assert!(value["hresult"].is_null());
+    assert!(value["native_phase"].is_null());
+    assert!(!value.to_string().contains("PRIVATE_"));
+    assert!(value.get("station_category").is_none());
+}
+
+#[test]
+fn ready_send_receipt_keeps_unclassified_failure_unknown_without_its_body() {
+    let temp = tempfile::tempdir().unwrap();
+    let result: io::Result<()> = Err(io::Error::other("PRIVATE_ERROR_BODY"));
+    diagnostic(
+        temp.path(),
+        "failure.json",
+        "station_ready_send",
+        &result,
+        None,
+        None,
+    );
+
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("failure.json")).unwrap()).unwrap();
+    assert_eq!(value["phase"], "station_ready_send");
+    assert_eq!(value["error_kind"], "Other");
+    assert!(value["check_stage"].is_null());
+    assert!(value["os_error"].is_null());
+    assert!(value["hresult"].is_null());
+    assert!(value["native_phase"].is_null());
+    assert!(!value.to_string().contains("PRIVATE_ERROR_BODY"));
+}
+
+#[test]
+fn failure_receipt_keeps_original_os_error_without_inventing_hresult() {
+    let temp = tempfile::tempdir().unwrap();
+    let result: io::Result<()> = Err(io::Error::from_raw_os_error(5));
+    diagnostic(
+        temp.path(),
+        "failure.json",
+        "station_ready_send",
+        &result,
+        None,
+        None,
+    );
+
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("failure.json")).unwrap()).unwrap();
+    assert_eq!(value["error_kind"], "PermissionDenied");
+    assert_eq!(value["os_error"], 5);
+    assert!(value["hresult"].is_null());
+    assert!(value["check_stage"].is_null());
+    assert!(value["native_phase"].is_null());
+}
+
+#[test]
+fn successful_receipt_does_not_invent_failure_fields() {
+    let temp = tempfile::tempdir().unwrap();
+    diagnostic(
+        temp.path(),
+        "success.json",
+        "desktop_lifetime",
+        &Ok(()),
+        Some(0),
+        Some(0),
+    );
+
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("success.json")).unwrap()).unwrap();
+    assert_eq!(value["ok"], true);
+    assert!(value["caller_station_matched"].is_null());
+    assert!(value["error_kind"].is_null());
+    assert!(value["check_stage"].is_null());
+    assert!(value["os_error"].is_null());
+    assert!(value["hresult"].is_null());
+    assert!(value["native_phase"].is_null());
 }
 
 #[test]

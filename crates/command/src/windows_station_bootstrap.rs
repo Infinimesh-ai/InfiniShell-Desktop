@@ -937,11 +937,14 @@ fn diagnostic<T>(
         .and_then(|error| error.downcast_ref::<windows::core::Error>())
         .map(|error| error.code().0);
     let desktop = error.and_then(super::appcontainer::desktop::diagnostic_code);
+    let check = error.and_then(super::appcontainer::desktop::diagnostic_check);
+    let caller_station_matched =
+        error.and_then(super::appcontainer::desktop::diagnostic_caller_station_matched);
     // 正文、路径和请求参数均不进入失败收据；不存在的 code 保留 null。
     let _ = save(
         root,
         name,
-        &serde_json::json!({"schema":1,"phase":phase,"ok":result.is_ok(),"os_error":error.and_then(io::Error::raw_os_error),"hresult":native.or(desktop.map(|value| value.1)),"native_phase":desktop.map(|value| value.0),"first_exit_code":first_exit,"second_exit_code":second_exit}),
+        &serde_json::json!({"schema":1,"phase":phase,"ok":result.is_ok(),"error_kind":error.map(|error| format!("{:?}", error.kind())),"check_stage":check,"caller_station_matched":caller_station_matched,"os_error":error.and_then(io::Error::raw_os_error),"hresult":native.or(desktop.map(|value| value.1)),"native_phase":desktop.map(|value| value.0),"first_exit_code":first_exit,"second_exit_code":second_exit}),
     );
 }
 
@@ -1707,7 +1710,7 @@ fn helper_second(
         &request.container_sid,
         &request.caller_station,
     )?;
-    pipe.send(&Ready {
+    let ready = Ready {
         nonce: request.nonce.clone(),
         process: identity.clone(),
         station: binding.first.station_name(),
@@ -1723,7 +1726,9 @@ fn helper_second(
                     .map(|handle| handle.0 as usize as u64)
             })
             .transpose()?,
-    })?;
+    };
+    *phase = "station_ready_send";
+    pipe.send(&ready)?;
     *phase = "desktop_lifetime";
     let deadline = Instant::now() + LIFETIME;
     let mut debugger = debugger::Server::new()?;
