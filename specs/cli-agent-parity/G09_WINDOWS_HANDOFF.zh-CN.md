@@ -1,6 +1,18 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：省去second令牌观察后仍有残留
+## 当前接续状态（2026-10-07）：两代分别嵌入清单仍有残留
+
+i10只改变leaf的Windows清单（asInvoker/uiAccess=false及Windows10 supportedOS），固定另一代与原控制器，native两臂均B且ACK/token/外部second观察off。A原与post均present后封存收据、保全实际A文件，再在同一路径CREATE_NEW B。两臂自然0、Resume1、原PI关闭；各50条原LSA均status0、Size272、匹配first LUID且free0，elapsed3032/3016ms，owner自然退出并关闭原柄后的唯一查询也present/free0。pair SHA `fa3ce4b7ab603491e036241ca8b39282c64560ffd177cbd1eaf4b1a869247f9b`；独审SHA `3f692db05a5dc03fa3596cefb3aa9c8b9e6789f82ad170d5b4986488ade05e51`，113份原件稳定。
+
+i11只改变first的Windows清单（asInvoker/uiAccess=false及Windows10 supportedOS），固定另一代与原控制器，native两臂均B且ACK/token/外部second观察off。A原与post均present后封存收据、保全实际A文件，再在同一路径CREATE_NEW B。两臂自然0、Resume1、原PI关闭；各50条原LSA均status0、Size272、匹配first LUID且free0，elapsed3031/3032ms，owner自然退出并关闭原柄后的唯一查询也present/free0。pair SHA `a6f91e57b648071edf5da39faf813dcafd4e3c3f13f92d73e16cb39c01748195`；独审SHA `8208fed5e6d7c32e069f57ca6f554cd5dc2e1f4b26db101ad17b07c536fb870b`，117份原件稳定。
+
+两组均未重编原生程序；SDK mt只改新B副本，完整PE头/资源字节差异已保存，原节、imports与入口保持。i11每臂first磁盘SHA正确贯穿started、原件解析及post输入；FileID来自磁盘槽租约，不能当进程映像对象或内存哈希。second LUID、实际映像及外部精确Job仍未观察，不用first身份或父Job补写。A同FileID/SHA改名保全已核实，但未排除同用户路径竞态，改名成功不证明全部内核引用释放。
+
+结果只说明这两项清单干预没有消除本轮残留，未定位PCA或其他持有者，不是产品修复。下一组仅仓外准备second挂起创建/恢复整组开关，尚未执行；B的Resume将记not_performed，原PI身份、自然等待、5秒/3秒及单post保持。即使出现差分，也不能直接删除产品暂停期间的身份、Job及授权检查。保留d2清理反例与b1实际产品失败，不改系统服务或清理期限。原runner8e84正常五场景/三次冷恢复通过但均自动站；最终同一冻结源码Linux/Windows门禁仍未完成。
+
+G09开放、共10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。详见CURRENT_STATUS的 `g09_manifest_controls_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过的本地check、i18n11和定向20项来源。
+
+## 历史记录：省去second令牌观察后仍有残留
 
 i9 v2两臂同一新first及原leaf，均ACKoff、controller不观察second；只切换first经原second PI的OpenProcessToken/TokenStatistics/Close整组。A first20440/leaf26188、LUID2861719682/0，open/query56B/close均原BOOL1/error0且同LUID。A完整自然测量与原/post present后才B。B first18056、已绑定first LUID2861735663/0；leaf16744的AuthenticationId与same_luid明确null，三API not_performed，未把原0槽或first身份当成second观察。
 
