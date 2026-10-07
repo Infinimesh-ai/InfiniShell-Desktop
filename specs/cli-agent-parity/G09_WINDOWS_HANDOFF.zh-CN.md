@@ -1,6 +1,24 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态（2026-10-07）：未恢复诊断终止及无原poll仍有后验残留
+## 当前接续状态（2026-10-07）：加载组差异与私有站A清理均已记录，产品仍未验证
+
+i16只执行A：同一新first/原leaf、manual恢复、ACK/token/外部second观察off；first加载固定系统USER32、核路径并解析导出，持引用至second原PI关闭后FreeLibrary成功，但没有调用GetSystemMetrics，原172B收据明确attempted/returned=0、公开value=null。两代自然0、Resume1、原PI关闭与Job空；first PID6712/LUID2886566018/0，second PID15540的LUID仍未观察。
+
+原LSA首个样本即0xc000005f/NULL，无Size、返回LUID或free调用；粗tick elapsed0不表示绝对零时长，也不是等待满三秒。owner原句柄关闭后的唯一post于11:54:25.313766Z同样absent。A测量完整且清理成功，因A必须原/post均present的前置不成立，B未启动。wrapper1表示两臂实验未完成，不是A清理失败。pair SHA `26a6d1effb8f2a8c284008c32859dd7684f710985d4ea1558752f8854e7366a6`；独审SHA `bb30e9ea013291e509bdbe4b5cd73aaad3eb0727a16efffdba97b5d5f08df063`，108原件稳定，91输入另加prepared一份；98项断言是证据一致性检查，不计产品测试。
+
+本轮没有metric-on结果，不能归因metric、某单API或持有者。相对旧最小基线还增加了共同加载/路径/导出解析/持有释放及补充收据；USER32预加载、映射对象身份和完全卸载未知，second外部映像/精确Job仍未观察。通用post字段original_logon_after_exit在本轮实际承载logon_absent，不能把true误解为会话存在。
+
+i17在同一新first中只切整组加载/路径/导出解析/持有释放，两臂均不调用metric。A first23204/LUID2889137854/0，原50样本均status0、Size272、正确first LUID/free0，窗口3016ms，post仍present；B first29984/LUID2889142370/0，原首查0xc000005f/NULL、粗tick0，post也absent，无返回缓冲区或free调用。两代自然0、Resume1、原PI关闭与Job空；Apost12:05:55.958273Z先于Bstart55.967500Z。pair SHA `41293fa8e785326e512089b96261ce234f81d04750ebf179d614b25cb8585d38`；独审SHA `61b08a06350645e66eb3590a889324ba1a505411b94fb4903b91645061d8332b`。93输入另加prepared，wrapper0只表示两臂测量完整；该结果最多关联本GUI小程序的整组差异，不能称单API首因或产品修复。
+
+旧原件复核发现d2 first实际metric两臂均2560，h2 first未调用、零槽不是API返回0；h2已覆盖env=NULL继承，尚未覆盖first调用与其显式私有站组合。产品b1 helper静态导入USER32且为console子系统3，i16为动态加载的GUI子系统2；产品second已有metric，first仅查询站。因此仍需产品相关对照，不能直接改产品或宣称修复。
+
+i18保留h2显式私有站和second固定A顺序，仅first metric设为A/off；first12120、second10724实际同LUID2892079684/0。first未调用metric、公开value=null；second原A的metric2560、NULL+CWF_CREATE_ONLY新私有站与nonce桌面、严格SD、原对象恢复、owned句柄关闭、两代自然0/原PI关闭和Job空均核实。原首查0xc000005f/NULL、粗tick0；owner退出并关闭原柄后12:18:58.749715Z单post同样absent，无返回buffer或free调用。A测量完整但双present前置未成立，B未启动；wrapper1不是A清理失败。pair SHA `2dff3c0f1f70a2dc2e72789465a7c126cfd8dc34e9c4adad20791443be31cee6`；独审SHA `6d74a30fbbb3fa75ecacd1f4480766488a9889272a951018de04d067162316bd`，155原件稳定、129输入另加prepared、22病例文件；190项为证据断言，不计测试或缺口关闭。没有B结果，不能认first metric有效、推翻旧h2残留或称产品已修；共同收据I/O、环境键和重链等差异仍在，首查absence不能归因后续singlepost。
+
+i15创建者对照保持仅准备未执行，prepared SHA `c3e682da62a02733667c0d2f55488d39c15d1d0d5c4c0f1c5ca6dbe2a73bc888`。i18沿用h2原WAIT_LIMIT/收据10000ms、first自然wait5000ms和LSA3000ms，不冒称i12整体5秒；新增单post不回填旧h2。下一步仅准备i19：复用h2原controller/helper精确字节、原A条件的单病例时间对照，不构建、不执行，待根审后另定唯一运行。原runner8e84正常矩阵成功、本机b1失败和旧h2原件各自保留；本GUI静态USER32对照不等于console产品链，最终同一冻结源码Linux/Windows门禁仍待完成。
+
+G09开放、10项关闭、新增关闭0，PR22保持草稿；V01/V02/V05移交不计通过。详见CURRENT_STATUS的 `g09_first_user32_load_baseline_20261007`。全部证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11及定向20项来源。
+
+## 历史记录：未恢复诊断终止及无原poll仍有后验残留
 
 i13两臂second均挂起创建：A恢复后自然0；B本入口未Resume，仅通过原PI一次诊断Terminate，BOOL1/error0、实际退出码53523和原柄关闭均确认。B的first自然0、second非自然退出及全体natural=false明确分开，post资格独立核验。两臂各50条原LSA均status0、Size272、正确first LUID/free0，elapsed3031/3016ms，退出后单次post仍present/free0。pair SHA `0f0487987ed3b31bdab1968e395ae28bfbcc47dcd75ce9aa63a0b67478fbc241`；独审SHA `5a2741549b4925b07c8d75c8eb9dcbe0b4ffdc3fcb7551ee552059eac5cb58e3`，103份原件稳定。该诊断终止不计自然清理或产品验收，也不能证明没有创建期系统行为、注入或外部恢复。
 
