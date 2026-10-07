@@ -1,6 +1,18 @@
 # CLI 支持与能力对齐：验证结论
 
-## 当前接续状态（2026-10-07）：最小单段基线可清理，产品缺口仍开放
+## 当前接续状态（2026-10-07）：三组单段对照可清理，产品缺口仍开放
+
+i2的A不加载、B加载系统USER32并核路径后释放自有引用；i3两臂共同加载并解析GetSystemMetrics，只有B调用一次SM_CXSCREEN；i4的A不写，B唯一新建文件并写入一个字节、flush及关闭。每组共用其冻结child二进制、各臂仅一次，A原LSA和owner退出后查询均确认不存在后才启动B。六代均自然退出0、Job为空、原thread/process/Job关闭，原第一次LSA即0xc000005f/null，owner退出并关闭原柄后的唯一后验也不存在。三份wrapper独立收据均0，没有重试或强杀。
+
+i2 pair SHA `ae9666f68bfbfa52487e9c0b7806e53f19b011b2d04d31ef98f43a1c4fad611b`，独审SHA `ec689ebc0b13fb8716f6e88b62d75514ed5803636835d811e96d47f9503d4b97`；i3 pair SHA `0f0e18b15a6a069397942297f97dec0920beea38f8dce285046c38b34b5ba0ab`，独审SHA `6f16a9e7163bd486f41a835a0b8a99bce0c691b5c1ea58a04ab747c266f7b029`；i4 pair SHA `e524c565011b3183778bf425c60f4f5369c038cf65bed955fb953bf79519c880`，独审SHA `2b543281e84340ece6fcf773bdf05dfb6e6d446cbe3f342a80f0afe8ea9d0e95`。i4单字节0x49及文件身份只在原LSA和postowner之后核验，原文件保留。
+
+三组结果只缩小本次单段路径范围，不是b1产品修复或一般性因果排除。i2的退出0与冻结流程支持加载/路径/释放成功，但不证明模块彻底卸载或运行时映像哈希；i3没有捕获metric具体数值；i4后态FileID不冒称子进程原句柄身份，也不将整体I/O拆成单API首因。静态导入不排除系统或外部加载；null返回没有实测LSA成功buffer路径。
+
+下一步只准备i5子进程自身TokenStatistics查询对照，尚未执行，继续要求A双absence和完整测量后才B。原runner8e84正常witness=false五场景/三次冷恢复已通过但均自动站；本机b1显式站失败及h2等残留证据保留，最终同一冻结源码Linux/Windows门禁待完成。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_single_child_controls_20261007`。证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码继续匹配已通过的本地check、i18n11和定向20项来源。
+
+## 历史记录：最小单段基线可清理，产品缺口仍开放
 
 i1仓外最小基线只执行一次：child静态仅导入KERNEL32!ExitProcess，无CRT、USER32、TLS、CLR、子进程文件收据、TokenQuery或第二段。实际child9676/birth425602446-31282741、新LUID2837222244/0自然退出0，Job为空、原thread/process/Job句柄关闭后，原首次LSA查询即0xc000005f/null、elapsed0；owner23956/birth424940179-31282741自然退出并关闭原柄后的唯一查询同样不存在。wrapper独立收据为0，无强杀、超时或重试。
 
