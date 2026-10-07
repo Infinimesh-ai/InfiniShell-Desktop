@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import selectors
 import stat
 import struct
@@ -122,6 +123,155 @@ class NativeWorkerTrace:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+
+def linux_timeout_snapshot(pid, starttime, diagnostic_fd):
+    # 仅在原调用已经超时后读取；不暂停进程，也不给业务调用新的成功窗口。
+    started = time.monotonic_ns()
+    result = {"status": "unavailable", "started_monotonic_ns": started,
+              "thread_limit": 8, "read_byte_limit": 65536, "soft_budget_ns": 50000000}
+    consumed = 0
+
+    def budget():
+        if consumed >= 65536 or time.monotonic_ns() - started >= 50000000:
+            raise TimeoutError()
+
+    def read(path):
+        nonlocal consumed
+        budget()
+        if consumed + 2049 > 65536:
+            raise TimeoutError()
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0))
+        try:
+            value = os.read(descriptor, 2049)
+            consumed += len(value)
+        finally:
+            os.close(descriptor)
+        if len(value) > 2048:
+            raise OverflowError()
+        return value
+
+    def process_stat(path, expected_pid):
+        raw = read(path / "stat")
+        number, rest = raw.split(b" ", 1)
+        fields = rest.rsplit(b")", 1)[1].split()
+        if int(number) != expected_pid or fields[0] not in (b"R", b"S", b"D", b"Z", b"T", b"t", b"X", b"I"):
+            raise ValueError()
+        # 不导出 comm；其中可能含有用户数据或括号。
+        values = {name: int(fields[index]) for name, index in (
+            ("ppid", 1), ("pgrp", 2), ("session", 3), ("minor_faults", 7),
+            ("major_faults", 9), ("user_ticks", 11), ("system_ticks", 12),
+            ("threads", 17), ("starttime_ticks", 19))}
+        return {"pid": expected_pid, "state": fields[0].decode("ascii"), **values}
+
+    def identity(info):
+        return {"device": info.st_dev, "inode": info.st_ino, "type": stat.S_IFMT(info.st_mode)}
+
+    def observe(operation):
+        try:
+            budget()
+            return {"status": "observed", "value": operation()}
+        except TimeoutError:
+            return {"status": "budget_exhausted"}
+        except OSError as error:
+            return {"status": "unavailable", "errno": error.errno}
+        except (ValueError, IndexError, OverflowError, UnicodeError):
+            return {"status": "invalid"}
+
+    def numbers(path, count):
+        fields = read(path).split()
+        if len(fields) != count:
+            raise ValueError()
+        return [int(value, 0) if value.startswith(b"0x") else int(value) for value in fields]
+
+    def wchan(path):
+        value = read(path).strip()
+        if not re.fullmatch(rb"[A-Za-z0-9_.]{1,128}", value):
+            raise ValueError()
+        return value.decode("ascii")
+
+    def syscall(path):
+        fields = read(path).split()
+        if fields == [b"running"]:
+            return {"running": True}
+        # 内核只给出系统调用号、参数数值和寄存器地址；不解引用或读取内存。
+        if len(fields) not in (3, 9):
+            raise ValueError()
+        values = [int(value, 0) if value.startswith(b"0x") else int(value) for value in fields]
+        if len(values) == 3 and values[0] != -1:
+            raise ValueError()
+        return {"number": values[0], "numeric_fields": values[1:]}
+
+    root = Path(f"/proc/{pid}")
+    try:
+        before = process_stat(root, pid)
+        if before["starttime_ticks"] != starttime:
+            result["status"] = "instance_changed"
+            return result
+        result["clock_ticks_per_second"] = os.sysconf("SC_CLK_TCK")
+        result["root_before"] = before
+        executable = observe(lambda: identity((root / "exe").stat()))
+        result["executable_before"] = executable
+        parent_fd = os.fstat(diagnostic_fd)
+        result["parent_diagnostic_fd"] = {**identity(parent_fd), "size": parent_fd.st_size}
+        child_fd = observe(lambda: (root / "fd" / str(diagnostic_fd)).stat())
+        if child_fd["status"] == "observed":
+            info = child_fd["value"]
+            child_fd["value"] = {**identity(info), "size": info.st_size,
+                                 "matches_parent": identity(info) == identity(parent_fd)}
+        result["child_diagnostic_fd"] = child_fd
+        tids = [pid]
+        hit_thread_limit = False
+        with os.scandir(root / "task") as entries:
+            for entry in entries:
+                budget()
+                if entry.name == str(pid):
+                    continue
+                if len(tids) == 8:
+                    hit_thread_limit = True
+                    break
+                tids.append(int(entry.name))
+        result["threads_truncated"] = hit_thread_limit or before["threads"] > len(tids)
+        result["tasks"] = []
+        for tid in tids:
+            path = root / "task" / str(tid)
+            first = observe(lambda: process_stat(path, tid))
+            if first["status"] != "observed":
+                result["tasks"].append({"tid": tid, "status": "binding_unconfirmed", "before": first})
+                continue
+            task = {"tid": tid, "before": first,
+                    "schedstat": observe(lambda: numbers(path / "schedstat", 3)),
+                    "wchan": observe(lambda: wchan(path / "wchan")),
+                    "syscall": observe(lambda: syscall(path / "syscall")),
+                    "after": observe(lambda: process_stat(path, tid))}
+            task["same_instance"] = (first["status"] == task["after"]["status"] == "observed"
+                                     and first["value"]["starttime_ticks"] == task["after"]["value"]["starttime_ticks"])
+            if not task["same_instance"]:
+                task = {"tid": tid, "status": "binding_unconfirmed", "before": first, "after": task["after"]}
+            else:
+                task["status"] = "bound"
+            result["tasks"].append(task)
+        after = observe(lambda: process_stat(root, pid))
+        result["root_after"] = after
+        result["executable_after"] = observe(lambda: identity((root / "exe").stat()))
+        result["status"] = ("bound" if after["status"] == "observed"
+                            and after["value"]["starttime_ticks"] == starttime
+                            and executable["status"] == "observed"
+                            and result["executable_after"] == executable else "binding_unconfirmed")
+        if result["status"] != "bound":
+            result.pop("tasks", None)
+            result.pop("child_diagnostic_fd", None)
+    except TimeoutError:
+        result["status"] = "budget_exhausted"
+    except OSError as error:
+        result["errno"] = error.errno
+    except (ValueError, IndexError, OverflowError, UnicodeError):
+        result["status"] = "invalid"
+    finally:
+        # proc 读取没有严格墙钟保证；真实额外耗时必须留下，不能声称仍在原截止点。
+        result["read_bytes"] = consumed
+        result["finished_monotonic_ns"] = time.monotonic_ns()
+    return result
 
 
 def diagnostic_preload(worker, descriptor, native_trace=None):

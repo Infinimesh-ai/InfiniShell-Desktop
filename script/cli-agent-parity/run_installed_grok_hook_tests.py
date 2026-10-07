@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, call, patch
 import installed_grok_hook_tests as detached
 from run_installed_grok_hook import DIAGNOSTIC_LIMIT, hook_failure, verify_installed_hook, worker_diagnostics
 from run_installed_grok_hook import (NATIVE_TRACE_LIMIT, NATIVE_TRACE_RECORD, NativeWorkerTrace,
-                                     native_worker_diagnostics)
+                                     linux_timeout_snapshot, native_worker_diagnostics)
 
 
 def row(stage, **values):
@@ -258,6 +258,7 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
                 with patch.object(detached.subprocess, "Popen", side_effect=spawn) as run, \
                         patch.object(detached.sys, "platform", "linux"), \
                         patch.object(detached.Path, "open", autospec=True) as birth_open, \
+                        patch.object(detached, "linux_timeout_snapshot", return_value={"status": "fixture"}) as snapshot, \
                         patch.object(detached.time, "monotonic_ns", return_value=123456789):
                     birth_file = birth_open.return_value.__enter__.return_value
                     birth_file.read.return_value = b"12345 (node) private) R " + b"0 " * 18 + b"98765 0\n"
@@ -274,11 +275,17 @@ class DetachedWorkerDiagnosticTests(unittest.TestCase):
                 self.assertEqual(process.wait.call_args_list, [call(), call()])
                 for stream in (process.stdin, process.stdout, process.stderr):
                     stream.close.assert_called_once_with()
-                self.assertEqual(self.case.hook_diagnostics[-1]["node_diagnostics"], {
+                expected = {
                     "pid": 12345, "linux_starttime_ticks": 98765, "timeout_poll_monotonic_ns": 123456789,
                     "timeout_poll_succeeded": True, "timeout_returncode": returncode,
                     "timeout_stdout_bytes": None if output is None else len(output),
-                    "timeout_stderr_bytes": None if stderr is None else len(stderr)})
+                    "timeout_stderr_bytes": None if stderr is None else len(stderr)}
+                if returncode is None:
+                    snapshot.assert_called_once_with(12345, 98765, descriptors[0])
+                    expected.update(timeout_snapshot={"status": "fixture"}, kill_requested_monotonic_ns=123456789)
+                else:
+                    snapshot.assert_not_called()
+                self.assertEqual(self.case.hook_diagnostics[-1]["node_diagnostics"], expected)
                 self.assertIs(error.stdout, output)
                 self.assertIs(error.stderr, stderr)
                 self.assertIn('"stage":"preload"', error.__notes__[0])
@@ -492,6 +499,210 @@ class NativeWorkerDiagnosticTests(unittest.TestCase):
             self.assertIsNone(created[0].reader)
             self.assertIsNone(created[0].writer)
             self.assertEqual(list(root.iterdir()), [])
+
+
+class LinuxTimeoutSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        clock = patch("run_installed_grok_hook.time.monotonic_ns", return_value=1000000)
+        clock.start()
+        self.addCleanup(clock.stop)
+        temporary = tempfile.TemporaryDirectory(prefix="hook-proc-fixture-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.proc = self.root / "12345"
+        self.proc.mkdir()
+        (self.proc / "exe").write_bytes(b"fixture-not-executable")
+        (self.proc / "stat").write_bytes(self.stat_bytes(12345, 98765))
+        for tid in (12345, 12346):
+            task = self.proc / "task" / str(tid)
+            task.mkdir(parents=True)
+            (task / "stat").write_bytes(self.stat_bytes(tid, 98765 + tid - 12345))
+            (task / "schedstat").write_bytes(b"1000000 2000000 3\n")
+            (task / "wchan").write_bytes(b"futex_wait_queue_me\n")
+            (task / "syscall").write_bytes(b"202 0x123 0 0 0 0 0 0x456 0x789\n")
+        self.diagnostic = (self.root / "diagnostic").open("w+b")
+        self.addCleanup(self.diagnostic.close)
+        self.original_stat = Path.stat
+
+    @staticmethod
+    def stat_bytes(pid, birth, threads=2):
+        fields = ["0"] * 20
+        for index, value in {0: "S", 1: "12", 2: "12345", 3: "12345", 7: "6", 9: "1",
+                             11: "2", 12: "3", 17: str(threads), 19: str(birth)}.items():
+            fields[index] = value
+        return f"{pid} (private-sentinel ) name) {' '.join(fields)}\n".encode()
+
+    def capture(self):
+        child_path = self.proc / "fd" / str(self.diagnostic.fileno())
+
+        def safe_stat(path, *args, **kwargs):
+            if path == child_path:
+                return os.fstat(self.diagnostic.fileno())
+            return self.original_stat(path, *args, **kwargs)
+
+        with patch("run_installed_grok_hook.Path", return_value=self.proc), \
+                patch("run_installed_grok_hook.os.sysconf", return_value=100, create=True), \
+                patch.object(Path, "stat", safe_stat):
+            return linux_timeout_snapshot(12345, 98765, self.diagnostic.fileno())
+
+    def test_numeric_wait_state_is_bound_without_exporting_comm_or_pipe_contents(self):
+        result = self.capture()
+        self.assertEqual(result["status"], "bound")
+        self.assertTrue(result["child_diagnostic_fd"]["value"]["matches_parent"])
+        self.assertEqual(result["child_diagnostic_fd"]["value"]["size"], 0)
+        self.assertEqual(result["clock_ticks_per_second"], 100)
+        self.assertFalse(result["threads_truncated"])
+        self.assertEqual(len(result["tasks"]), 2)
+        for task in result["tasks"]:
+            self.assertTrue(task["same_instance"])
+            self.assertEqual(task["syscall"]["value"]["number"], 202)
+            self.assertEqual(task["schedstat"]["value"], [1000000, 2000000, 3])
+        self.assertNotIn("private-sentinel", json.dumps(result))
+        self.assertLessEqual(result["read_bytes"], 65536)
+        self.assertGreaterEqual(result["finished_monotonic_ns"], result["started_monotonic_ns"])
+
+    def test_birth_mismatch_prevents_reading_thread_or_descriptor_state(self):
+        (self.proc / "stat").write_bytes(self.stat_bytes(12345, 98766))
+        result = self.capture()
+        self.assertEqual(result["status"], "instance_changed")
+        self.assertNotIn("tasks", result)
+        self.assertNotIn("parent_diagnostic_fd", result)
+
+    def test_process_reuse_during_snapshot_invalidates_group(self):
+        original_open = os.open
+        reads = 0
+
+        def open_with_reuse(path, *args, **kwargs):
+            nonlocal reads
+            if path == self.proc / "stat":
+                reads += 1
+                if reads == 2:
+                    path.write_bytes(self.stat_bytes(12345, 98766))
+            return original_open(path, *args, **kwargs)
+
+        with patch("run_installed_grok_hook.os.open", side_effect=open_with_reuse):
+            result = self.capture()
+        self.assertEqual(result["status"], "binding_unconfirmed")
+        self.assertEqual(reads, 2)
+        self.assertNotIn("tasks", result)
+
+    def test_reused_thread_discards_its_wait_observations(self):
+        original_open = os.open
+        reads = 0
+
+        def open_with_reuse(path, *args, **kwargs):
+            nonlocal reads
+            if path == self.proc / "task/12346/stat":
+                reads += 1
+                if reads == 2:
+                    path.write_bytes(self.stat_bytes(12346, 88888))
+            return original_open(path, *args, **kwargs)
+
+        with patch("run_installed_grok_hook.os.open", side_effect=open_with_reuse):
+            result = self.capture()
+        task = next(task for task in result["tasks"] if task["tid"] == 12346)
+        self.assertEqual(task["status"], "binding_unconfirmed")
+        self.assertNotIn("syscall", task)
+        self.assertNotIn("wchan", task)
+
+    def test_unavailable_and_invalid_fields_stay_unknown_without_raw_error(self):
+        (self.proc / "task/12345/syscall").unlink()
+        (self.proc / "task/12346/wchan").write_bytes(b"private-sentinel with spaces")
+        result = self.capture()
+        tasks = {task["tid"]: task for task in result["tasks"]}
+        self.assertEqual(tasks[12345]["syscall"]["status"], "unavailable")
+        self.assertEqual(tasks[12346]["wchan"]["status"], "invalid")
+        self.assertNotIn("private-sentinel", json.dumps(result))
+
+    def test_read_bytes_remain_counted_when_close_reports_an_error(self):
+        original_close = os.close
+
+        def close_with_error(descriptor):
+            original_close(descriptor)
+            raise OSError(5, "private-sentinel")
+
+        with patch("run_installed_grok_hook.os.close", side_effect=close_with_error):
+            result = self.capture()
+        self.assertEqual(result["errno"], 5)
+        self.assertGreater(result["read_bytes"], 0)
+        self.assertNotIn("private-sentinel", json.dumps(result))
+
+    def test_soft_budget_stops_before_new_read_and_records_elapsed_time(self):
+        with patch("run_installed_grok_hook.time.monotonic_ns", side_effect=[1, 60000001, 60000002]):
+            result = self.capture()
+        self.assertEqual(result["status"], "budget_exhausted")
+        self.assertEqual(result["read_bytes"], 0)
+        self.assertEqual(result["finished_monotonic_ns"] - result["started_monotonic_ns"], 60000001)
+
+    def test_oversize_stat_is_rejected_without_exporting_partial_contents(self):
+        (self.proc / "stat").write_bytes(b"private-sentinel" * 200)
+        result = self.capture()
+        self.assertEqual(result["status"], "invalid")
+        self.assertEqual(result["read_bytes"], 2049)
+        self.assertNotIn("private-sentinel", json.dumps(result))
+
+    def test_thread_limit_is_explicit_and_does_not_expand_descendants(self):
+        (self.proc / "stat").write_bytes(self.stat_bytes(12345, 98765, threads=2))
+        for tid in range(12347, 12365):
+            (self.proc / "task" / str(tid)).mkdir()
+        result = self.capture()
+        self.assertEqual(result["status"], "bound")
+        self.assertEqual(len(result["tasks"]), 8)
+        self.assertTrue(result["threads_truncated"])
+
+    def test_total_read_budget_stops_without_accepting_an_unbound_group(self):
+        (self.proc / "stat").write_bytes(self.stat_bytes(12345, 98765, threads=8))
+        for tid in range(12347, 12353):
+            task = self.proc / "task" / str(tid)
+            task.mkdir()
+            (task / "stat").write_bytes(self.stat_bytes(tid, 98765 + tid - 12345))
+            (task / "schedstat").write_bytes(b"1 2 3")
+            (task / "wchan").write_bytes(b"0")
+            (task / "syscall").write_bytes(b"running")
+        # 合法字段后补空白，令多个限长读取累计到总预算；不扩大单次读取。
+        for path in self.proc.rglob("*"):
+            if path.is_file() and path.name != "exe":
+                path.write_bytes(path.read_bytes().ljust(2048, b" "))
+        result = self.capture()
+        self.assertEqual(result["status"], "binding_unconfirmed")
+        self.assertGreater(result["read_bytes"], 60000)
+        self.assertLessEqual(result["read_bytes"], 65536)
+        self.assertNotIn("tasks", result)
+
+    def test_collector_exception_or_interrupt_keeps_original_timeout_and_cleanup(self):
+        for collector_error in (RuntimeError("private-sentinel"), KeyboardInterrupt(), SystemExit(3)):
+            with self.subTest(kind=type(collector_error).__name__):
+                case = detached.DetachedGrokHookTests()
+                case.root = self.root
+                case.node, case.worker, case.hook = self.root / "node", self.root / "worker", self.root / "hook"
+                case.env, case.payload, case.hook_diagnostics = {}, b"fixture", []
+                original = subprocess.TimeoutExpired("fixture-no-execution", 8)
+                process = MagicMock()
+                process.pid = 12345
+                process.__enter__.return_value = process
+                # 保存原上下文释放方法，随后只替换派生入口。
+                process_exit = subprocess.Popen.__exit__
+                process.__exit__.side_effect = lambda *args: process_exit(process, *args)
+                process.poll.return_value = None
+                process.communicate.side_effect = original
+                with patch.object(detached.subprocess, "Popen", return_value=process) as spawn, \
+                        patch.object(detached.sys, "platform", "linux"), \
+                        patch.object(detached.Path, "open", autospec=True) as birth_open, \
+                        patch.object(detached.os, "pread", return_value=b"", create=True), \
+                        patch.object(detached, "linux_timeout_snapshot", side_effect=collector_error) as capture:
+                    birth_open.return_value.__enter__.return_value.read.return_value = self.stat_bytes(12345, 98765)
+                    with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                        case.run_hook({})
+                self.assertIs(failure.exception, original)
+                spawn.assert_called_once()
+                capture.assert_called_once()
+                process.communicate.assert_called_once_with(b"fixture", timeout=8)
+                process.kill.assert_called_once_with()
+                self.assertEqual(process.wait.call_count, 2)
+                observed = case.hook_diagnostics[-1]["node_diagnostics"]
+                self.assertEqual(observed["timeout_snapshot"], {"status": "collector_failed"})
+                self.assertIsInstance(observed["kill_requested_monotonic_ns"], int)
+                self.assertNotIn("private-sentinel", original.__notes__[0])
 
 
 if __name__ == "__main__":

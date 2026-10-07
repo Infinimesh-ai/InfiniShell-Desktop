@@ -1,4 +1,115 @@
 {
+  "g09_final_gate_linux_node_timeout_followup_20261008": {
+    "updated_utc": "2026-10-07T21:51:19.033427+00:00",
+    "status": "s3_dual_rejected_linux_node_timeout_diagnostics_ready_pending_next_freeze",
+    "base_frozen_source": "0a9529ec74750bc15225860e679935d88f623197",
+    "base_frozen_tree": "a220fde83ba190fe8f507ccc4c3c60b34af2e67e",
+    "normal_windows": {
+      "run": 37672049090,
+      "accepted": true,
+      "scenarios": 5,
+      "cold_recoveries": 3,
+      "worker_calls": 8,
+      "candidate_generations": 8,
+      "automatic_stations": 8,
+      "receipt": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-s3-gates\\normal-review-accepted.safe.json",
+        "bytes": 2948,
+        "sha256": "5748ad6e1948229df53116224ec9a8a87e55c2b15120177d764858129896f61c"
+      }
+    },
+    "dual": {
+      "run": 37682281738,
+      "conclusion": "failure",
+      "accepted": false,
+      "receipt": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-s3-gates\\dual-rejected.safe.json",
+        "bytes": 2304,
+        "sha256": "05b6b7e57b1a56737982616ee35d44719453c0a012d4f253affd3337ac17f6d2"
+      },
+      "windows_pass_records": 5211,
+      "windows_app": 3443,
+      "windows_desktop": 674,
+      "linux_app": 3861,
+      "linux_desktop": 674,
+      "linux_glibc": 1,
+      "linux_hook_diagnostics": 23,
+      "linux_hook_actual_pass": 24,
+      "linux_hook_actual_error": 1,
+      "failed_test": "test_failed_tmux_query_never_falls_back_to_outer_terminal",
+      "pid": 1112290,
+      "starttime_ticks": 437861130,
+      "prekill_alive": true,
+      "preload": "missing",
+      "native_trace": "missing",
+      "exception_output_fields": null,
+      "fallback_assertions_executed": false,
+      "cause": "unknown",
+      "historical_same_failure": 37267752920,
+      "logs": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-dual-37682281738\\37682281738.logs.zip",
+        "bytes": 1284613,
+        "sha256": "a09fceb215b4a40923bc6626c3ea79238fcc9d0fc954d2749ea2ecf994c96115"
+      }
+    },
+    "change": "仅在原TimeoutExpired之后新增同身份内核状态与匿名诊断FD只读快照；原8秒、调用次数、kill/wait、失败及所有断言不变。采样延迟与读取失败明确记录。不是产品修复或首因结论。",
+    "snapshot_limits": {
+      "threads": 8,
+      "total_read_bytes": 65536,
+      "single_read_bytes": 2049,
+      "soft_budget_ms": 50,
+      "hard_wall_clock_bound": false,
+      "records_kill_request_time": true
+    },
+    "local": {
+      "offline_run": 23,
+      "passed": 22,
+      "skipped": 1,
+      "new_fixture_tests": 11,
+      "cargo_check": "passed",
+      "source_files_unchanged_across_gates": 7207,
+      "result": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-hook-timeout-state-a1\\result.safe.json",
+        "bytes": 324,
+        "sha256": "881c64ec3caf4ef6713d9f0fad203fc48dd4fb507bc18ef4a7aef0f859103cb5"
+      },
+      "sources": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-hook-timeout-state-a1\\sources.safe.json",
+        "bytes": 1206142,
+        "sha256": "be996e1bf13edf46504a67e1a58d01f95af4ed8aedc548283195bec2867409cd"
+      },
+      "diagnostics": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-hook-timeout-state-a1\\diagnostic-tests.safe.json",
+        "bytes": 705,
+        "sha256": "5209089690ec9c08a5a443a9e2265eba41bd56c8731113bd046bbf1cc73559a2"
+      },
+      "check": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-hook-timeout-state-a1\\cargo-check.safe.json",
+        "bytes": 542,
+        "sha256": "e515d2fad31ef3d1730bf6ab9f5a81d7368220a7f7381e6b69d078c6cf6194b6"
+      },
+      "first_windows_unix_suite_failure": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-hook-timeout-state-a1\\diagnostic-tests-first.log",
+        "bytes": 7651,
+        "sha256": "d6b419b06e93dcd6ffff30d1adf1ffc86350acf71b2dc1f25c9ee22288de0495"
+      },
+      "linux_native_verified": false,
+      "i18n_rerun": false
+    },
+    "localization": "无需本地化变更",
+    "closed_gaps": [],
+    "closed_count": 10,
+    "g09_closed": false,
+    "deferred_not_passed": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "pr_draft": true,
+    "merge_allowed": false,
+    "cleanup_ready": false,
+    "next_step": "形成新的冻结S并在同一S执行完整正常Windows五场景/三次冷恢复及Linux/Windows最终门禁；原25项真实hook与筛选期限不变。若未复现旧Linux失败如实保留unknown，不以诊断通过推定首因或缺口关闭。最终签收用仓外与PR正文，冻结后不改S。"
+  },
   "g09_final_gate_input_leak_followup_20261008": {
     "snapshot_kind": "S2 Windows LEAK拒收后的再冻结前快照",
     "base_frozen_source": "97acad05bc36f1bca1139c8a24d56699d676216f",

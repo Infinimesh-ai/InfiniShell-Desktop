@@ -1,6 +1,20 @@
 # CLI 能力缺项与验收缺口
 
-## 当前接续状态：S2门禁因Windows泄漏拒收，测试夹具已修正待再冻结
+## 当前接续状态：S3因Linux真实hook超时拒收，补充同进程超时后状态
+
+冻结 `0a9529ec74750bc15225860e679935d88f623197` 的正常Windows [37672049090](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37672049090) 已独审通过：正常witness=false五场景、三次独立冷恢复、8次worker、8代候选与8个自动站，CMD/PowerShell输出及严格退出清理通过；签收SHA `5748ad6e1948229df53116224ec9a8a87e55c2b15120177d764858129896f61c`。它仅归属S3。
+
+同S3双平台 [37682281738](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37682281738) 整体failure，最终门禁拒收（签收SHA `05b6b7e57b1a56737982616ee35d44719453c0a012d4f253affd3337ac17f6d2`）。Windows原件独审：11个nextest步骤共5211条单次PASS，APP3443、桌面674；原LEAK菜单用例本次仅一次PASS 0.374s，无泄漏/重试。Linux APP3861、桌面674、固定Node glibc单项通过；hook诊断23项通过，真实25项中24通过/1 ERROR。
+
+唯一失败是 `test_failed_tmux_query_never_falls_back_to_outer_terminal` 的原Node超过8秒。PID1112290、starttime437861130已绑定，kill前poll仍存活；preload和native trace都missing，异常输出字段为null，后续两个PTY零fallback断言未执行。原成功PID1112495的阶段不能补证失败者。旧run37267752920同名零诊断超时保留；现有源码和原件不支持preexec回调死锁、tmux故障或诊断背压的原因性修复，首因unknown。
+
+本次仅扩展原超时失败分支：在同一存活Node的原kill前，读取最多8个TID的stat/schedstat/wchan/syscall数值和匿名诊断FD身份；前后复核PID/TID出生身份，失配废弃观察值，缺权限保持unknown。不读环境、原始命令行、内存、业务管道或后代，不增加Node/worker调用、预热、重试或期限。累计读取最多64KiB、每次最多2049B、50ms软预算；proc读取不具有硬墙钟保证，采样起止及kill请求时刻均记录，承认额外清理延迟。采样异常或中断仍保持原TimeoutExpired与kill→wait，不能把超时改判通过。这补充的是此前缺失的内核等待类别，不是首因结论或产品修复。
+
+本地Windows可适用离线23项中22通过、1项既有Unix权限测试跳过；新增11项覆盖身份复用、读取总预算、线程上限、采样异常/中断及原失败清理。首次直接跑完整Unix诊断套件在既有os.pread调用失败的日志保留，不改成通过，不以模拟字段冒称Linux现场。`cargo check --locked -p warp`退出0；7207份来源在两项门禁前后保持一致。普通fixture固定单调时钟，实际50ms分支单独测试。没有产品文案、语义或布局变化，无需本地化变更。原先通过的Rust/i18n不冒称本轮重跑。
+
+仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR草稿、merge_allowed=false、cleanup_ready=false。提交这3份测试诊断源码与4份状态文档形成下一冻结S，再在同一S执行完整正常Windows矩阵和Linux/Windows最终门禁。原25项真实hook、全套筛选和所有期限保持，新增11项诊断测试只能验证取证合同。后续若未复现，按未复现记录，不回填旧首因；G09只能由全部正式条件和同源门禁共同签收，不能以探针或文档关闭。失败原件继续保留，冻结后关闭签收写仓外与PR正文，不预填未来SHA或结果。
+
+## 历史记录：S2泄漏与S3冻结前快照
 
 冻结 `97acad05bc36f1bca1139c8a24d56699d676216f` 的正常Windows [37648615429](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37648615429)已独审通过：witness=false五场景、三次独立冷恢复、8次worker与8代候选，实际8代自动站，严格退出与清理通过。该成功仅归属S2，不能转记为未来冻结源码的验收。
 

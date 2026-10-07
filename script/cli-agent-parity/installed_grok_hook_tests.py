@@ -17,7 +17,7 @@ from unittest.mock import patch
 import unittest
 
 from run_installed_grok_hook import (DIAGNOSTIC_LIMIT, NativeWorkerTrace, diagnostic_preload, plain_file,
-                                     verify_installed_hook, worker_diagnostics)
+                                     linux_timeout_snapshot, verify_installed_hook, worker_diagnostics)
 
 
 NOTIFICATION_PREFIX = b"\x1b]777;notify;warp://cli-agent;"
@@ -255,9 +255,24 @@ class DetachedGrokHookTests(unittest.TestCase):
                                 node_diagnostics["timeout_poll_succeeded"] = True
                             except OSError:
                                 node_diagnostics["timeout_poll_succeeded"] = False
-                            # 保留 subprocess.run 的 POSIX 清理与原异常；不再 communicate 或终止进程组。
-                            process.kill()
-                            process.wait()
+                            try:
+                                if (sys.platform == "linux" and node_diagnostics["timeout_poll_succeeded"]
+                                        and node_diagnostics["timeout_returncode"] is None
+                                        and node_diagnostics["linux_starttime_ticks"] is not None):
+                                    node_diagnostics["timeout_snapshot"] = linux_timeout_snapshot(
+                                        process.pid, node_diagnostics["linux_starttime_ticks"], diagnostic_file.fileno())
+                            except BaseException:
+                                # 原超时已经发生；即使诊断被中断也必须保留原失败并立即清理。
+                                node_diagnostics["timeout_snapshot"] = {"status": "collector_failed"}
+                            finally:
+                                if "timeout_snapshot" in node_diagnostics:
+                                    try:
+                                        node_diagnostics["kill_requested_monotonic_ns"] = time.monotonic_ns()
+                                    except BaseException:
+                                        node_diagnostics["kill_requested_monotonic_ns"] = None
+                                # 保留原 kill→wait→重抛；不再次 communicate 或终止进程组。
+                                process.kill()
+                                process.wait()
                             raise
                         except BaseException:
                             process.kill()
