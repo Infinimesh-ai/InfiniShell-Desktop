@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import selectors
 import shutil
 import tempfile
@@ -84,6 +85,23 @@ def setUpModule():
     if result.stdout != b'{"protocol":1,"maxFrameBytes":4096}\n' or result.stderr:
         raise ValueError("原生 worker 冷启动协议不匹配")
     print(f"原生 worker 冷启动协议预检：{(time.monotonic() - started):.3f} 秒；后续只验已就绪路径")
+    # 散列和实际执行都会预热 Node；单列准备结果，不把它计作冷 hook 或通知投递。
+    node = shutil.which("node")
+    if node is None:
+        raise ValueError("Node 运行时缺失")
+    node = Path(node).resolve(strict=True)
+    node_sha = hashlib.sha256(node.read_bytes()).hexdigest()
+    plain_file(node, node_sha, executable=True)
+    started = time.monotonic()
+    result = subprocess.run([str(node), "-p", "process.versions.node"],
+                            env=environment, capture_output=True, timeout=15, check=True)
+    elapsed = time.monotonic() - started
+    if (not re.fullmatch(rb"[0-9]+\.[0-9]+\.[0-9]+\n", result.stdout)
+            or int(result.stdout.split(b".", 1)[0]) < 18 or result.stderr):
+        raise ValueError("Node 运行时就绪收据不匹配")
+    plain_file(node, node_sha, executable=True)
+    version = result.stdout.decode("ascii").strip()
+    print(f"Node 运行时就绪预检：版本 {version}，SHA256 {node_sha}，版本探测执行耗时 {elapsed:.3f} 秒；不计 hook 投递")
 
 
 @unittest.skipUnless(os.name == "posix", "Windows CONOUT$ 需要独立原生验证")

@@ -1,4 +1,114 @@
 {
+  "g09_linux_node_readiness_precondition_20261008": {
+    "updated_utc": "2026-10-08T00:19:32.764711+00:00",
+    "status": "s4_dual_rejected_node_readiness_precondition_locally_checked_pending_next_freeze",
+    "base_frozen_source": "5b4ad5538825918d0492916781278c8a37a8cd1d",
+    "base_frozen_tree": "0f734c9fbcaca87512fb17bbbcc9c6b47591ad0b",
+    "normal_windows": {
+      "run": 37692547122,
+      "accepted": true,
+      "witness": false,
+      "scenarios": 5,
+      "cold_recoveries": 3,
+      "workers": 8,
+      "candidate_generations": 8,
+      "automatic_stations": 8,
+      "receipt": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-s4-gates\\normal-review-accepted.safe.json",
+        "bytes": 3482,
+        "sha256": "0a0aed5b6a9731f3d6760d4b4b909f62bc191b291ddebad2858447c8b1e3888d"
+      }
+    },
+    "dual": {
+      "run": 37700566049,
+      "accepted": false,
+      "conclusion": "failure",
+      "windows": "success",
+      "linux": "failure",
+      "hook_diagnostics_passed": 34,
+      "installed_terminal_suite_passed": 24,
+      "installed_terminal_suite_errors": 1,
+      "failed_test": "test_failed_tmux_query_never_falls_back_to_outer_terminal",
+      "node_pid": 1290760,
+      "starttime_ticks": 438823138,
+      "snapshot_status": "bound",
+      "root_and_tid_state": "D",
+      "wchan": "wait_on_page_bit_common",
+      "major_faults": 163,
+      "diagnostic_fd_identity_matched": true,
+      "diagnostic_fd_size": 0,
+      "snapshot_elapsed_ns": 1751775,
+      "poll_to_kill_requested_ns": 1822439,
+      "preload": "missing",
+      "native_trace": "missing",
+      "fallback_assertions_executed": false,
+      "specific_file_device_or_cause": "unknown",
+      "logs": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-dual-37700566049\\37700566049.logs.zip",
+        "bytes": 1286846,
+        "sha256": "31e84f85be6133f8df147a98d9027256b72b9343a09b02c818aae2b4edcff087"
+      },
+      "rejection": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-s4-gates\\dual-rejected.safe.json",
+        "bytes": 6861,
+        "sha256": "fd5956c480669a5ad958cbf4210dfc15d52a18aba00d89bd88facdf14088860a"
+      },
+      "independent_reviews": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-s4-gates\\dual-independent-reviews-accepted.safe.json",
+        "bytes": 1953,
+        "sha256": "c2d1fc954423da31e28dea5a5893405d8d613b8ecfb3fb547e881481cf156328"
+      }
+    },
+    "change": "在既有worker预检后单独核验Node摘要、实际JS版本命令及前后摘要；15秒、自然exit0、精确版本输出和空stderr，失败即停止，无重试。",
+    "coverage_boundary": "预检新增一次Node启动，散列及执行都会预热Node。原25项正文、8秒、终端断言和失败诊断不变，但不再覆盖此处首次冷Node组合；它不是冷hook或旧首因修复证据。",
+    "formal_scope_review": {
+      "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\final-dual-37700566049\\independent-platform-review\\node-readiness-scope.safe.json",
+      "bytes": 42330,
+      "sha256": "7abf2cb19ef8589da4d7c618049e88a84619f1a8061706b1815efd220f12eae3"
+    },
+    "local": {
+      "run": 28,
+      "passed": 27,
+      "skipped": 1,
+      "new_contract_tests": 5,
+      "cargo_check": "passed",
+      "sources_unchanged": true,
+      "result": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-node-readiness-a2\\result.safe.json",
+        "bytes": 324,
+        "sha256": "ed6e34bcc60146424eb4629fe42cb68de57ec3531f7e6fe4e964cdf092916633"
+      },
+      "sources": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-node-readiness-a2\\sources.safe.json",
+        "bytes": 1206141,
+        "sha256": "de33274a2549e73da562c16f3eefc0eb258cdcad403d9aa8bd448d93f68be371"
+      },
+      "diagnostic_tests": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-node-readiness-a2\\diagnostic-tests.safe.json",
+        "bytes": 778,
+        "sha256": "7546f0cafa6f384793fef543b98748e76044693edd8aa7b762c03323807ec820"
+      },
+      "check": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-node-readiness-a2\\cargo-check.safe.json",
+        "bytes": 564,
+        "sha256": "4ea73ad1e96e94feafbc810e917c3d1d6cf3372d2ad5e5689bc82c3f8aed5fca"
+      },
+      "prior_a1_pass_retained": {
+        "path": "C:\\Coding\\InfiniShell-Evidence\\g09-20261006-a\\linux-node-readiness-a1\\result.safe.json",
+        "bytes": 324,
+        "sha256": "bcb524ac1682075b99eeff142c32e8341f77b8e122ce0c68f5608f30313fd9aa"
+      },
+      "timing_label_review_fix": "a2将耗时明确为版本命令执行耗时，不包含散列与整个准备过程；两轮结果分别保留。",
+      "linux_native_verified": false,
+      "i18n_rerun": false
+    },
+    "localization": "无需本地化变更",
+    "closed_gaps": [],
+    "g09_closed": false,
+    "pr_must_remain_draft": true,
+    "next": "提交冻结新源码，再完成同SHA正常Windows五场景三冷恢复及Linux/Windows门禁；旧失败保留。",
+    "cleanup_ready": false
+  },
   "g09_final_gate_linux_node_timeout_followup_20261008": {
     "updated_utc": "2026-10-07T21:51:19.033427+00:00",
     "status": "s3_dual_rejected_linux_node_timeout_diagnostics_ready_pending_next_freeze",

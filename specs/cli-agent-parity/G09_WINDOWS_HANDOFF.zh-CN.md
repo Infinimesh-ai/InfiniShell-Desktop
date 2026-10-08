@@ -1,6 +1,20 @@
 # G09：转 Windows 继续开发
 
-## 当前接续状态：S3因Linux真实hook超时拒收，补充同进程超时后状态
+## 当前接续状态：S4双平台拒收，明确Node就绪前置条件
+
+冻结 `5b4ad5538825918d0492916781278c8a37a8cd1d` 的正常Windows [37692547122](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37692547122)已独审通过：witness=false、五场景、三次独立冷恢复、8次worker/8代候选/8自动站，严格输出、四角色自然退出0及清理通过。签收SHA `0a0aed5b6a9731f3d6760d4b4b909f62bc191b291ddebad2858447c8b1e3888d`；该结果只归属S4。
+
+同S4 [双平台37700566049](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37700566049)整体failure并拒收：Windows原件独审5211条nextest PASS（APP3443/桌面674），Linux除hook外5568条PASS（APP3861/桌面674）；两平台无LEAK/flaky/retry被算通过，过滤及跳过另列。Linux hook诊断34项通过；25项安装/终端套件24通过、1 ERROR。该25项含Installed6、Detached12和模拟终端读取7，不是25次真实Node调用。
+
+失败仍为 `test_failed_tmux_query_never_falls_back_to_outer_terminal` 原8秒超时。PID1290760/starttime438823138的同身份快照前后，根与唯一线程均为D态、wchan=`wait_on_page_bit_common`、major fault163；父子匿名诊断FD身份一致且size0，preload/native记录missing。采样1.751775ms、poll到kill请求1.822439ms；两个PTY零fallback及data不存在断言未执行。只证明观察时刻的页等待，具体文件/设备、持续时长及旧失败首因未知；不能据此直接认定runner故障重试。日志ZIP SHA `31e84f85be6133f8df147a98d9027256b72b9343a09b02c818aae2b4edcff087`，独审签收SHA `c2d1fc954423da31e28dea5a5893405d8d613b8ecfb3fb547e881481cf156328`；失败原件保留。
+
+原G09正式条件涉及真实升级/恢复；本hook门禁历史已明确“仅验已就绪路径，不称冷hook启动”。当前增量在既有worker预检后增加**独立Node就绪准备**：同路径摘要检查、一次 `-p process.versions.node` 实际JS执行、15秒、正常退出0、Node18+精确版本输出/空stderr及执行后摘要核验，任何失败直接失败，无重试。版本命令执行耗时单列，不含散列和整个准备过程。此准备新增一次Node启动，散列与执行都会预热Node；原25项正文/8秒/全部终端保护断言不变，但不能声称整个suite派生次数不变、全冷Node+hook组合覆盖或旧故障已修复。正式范围独审SHA `7abf2cb19ef8589da4d7c618049e88a84619f1a8061706b1815efd220f12eae3`，历史依据为 `84a174f9ecf142c286fc97d3f17664d232dce1c9` 的独立worker预检及既有已就绪边界。
+
+本机最终增量门禁：离线28项中27通过、1项既有Unix权限测试跳过，包含新增5项Node准备合同；`cargo check --locked -p warp`通过，7207份来源前后未变，收据SHA `ed6e34bcc60146424eb4629fe42cb68de57ec3531f7e6fe4e964cdf092916633`。首轮a1也通过，仅日志耗时标签随后澄清，两个结果分别保留。本机没有执行真实Linux Node/worker或重跑i18n，不冒称现场验收。**无需本地化变更**：只改测试准备及证据日志，没有产品界面语义/文案/布局变化。
+
+**新增关闭0项；G01–G08、G10、V03共10项关闭，G09开放，PR22保持草稿。** 下一冻结源码仍须自身通过正常Windows五场景/三次独立冷恢复与最终Linux/Windows门禁，不拼接旧SHA。V01/V02/V05后续平台实机验收不计通过；已确认的特殊权限安装决定、普通安装及只读ACL自动升级要求保持。cleanup_ready=false。
+
+## 历史记录：S3因Linux真实hook超时拒收，补充同进程超时后状态
 
 冻结 `0a9529ec74750bc15225860e679935d88f623197` 的正常Windows [37672049090](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37672049090) 已独审通过：正常witness=false五场景、三次独立冷恢复、8次worker、8代候选与8个自动站，CMD/PowerShell输出及严格退出清理通过；签收SHA `5748ad6e1948229df53116224ec9a8a87e55c2b15120177d764858129896f61c`。它仅归属S3。
 

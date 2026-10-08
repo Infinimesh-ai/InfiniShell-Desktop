@@ -27,6 +27,87 @@ def encode(*rows):
     return ("\n".join(json.dumps(value) for value in rows) + "\n").encode()
 
 
+class RuntimeReadinessTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="infinishell-readiness-contract-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        self.worker, self.node = root / "worker", root / "node"
+        self.worker.write_bytes(b"fixture-worker-not-executable")
+        self.node.write_bytes(b"fixture-node-not-executable")
+        self.node_sha = hashlib.sha256(self.node.read_bytes()).hexdigest()
+        environment = {"PATH": str(root), "HOME": str(root), "TMPDIR": str(root),
+                       "INFINISHELL_TEST_NOTIFY_WORKER": str(self.worker),
+                       "NODE_OPTIONS": "fixture-must-not-be-inherited"}
+        for name, value in (
+                ("os", SimpleNamespace(name="posix", environ=environment)),
+                ("plain_file", MagicMock()),
+                ("subprocess", SimpleNamespace(run=MagicMock())),
+                ("time", SimpleNamespace(monotonic=MagicMock(side_effect=[0, 0.1, 0.2, 0.3]))),
+                ("shutil", SimpleNamespace(which=MagicMock(return_value=str(self.node))))):
+            replacement = patch.object(detached, name, value)
+            replacement.start()
+            self.addCleanup(replacement.stop)
+        output = patch("builtins.print")
+        self.printed = output.start()
+        self.addCleanup(output.stop)
+        self.worker_result = SimpleNamespace(stdout=b'{"protocol":1,"maxFrameBytes":4096}\n', stderr=b"")
+        self.node_result = SimpleNamespace(stdout=b"20.9.0\n", stderr=b"")
+        detached.subprocess.run.side_effect = [self.worker_result, self.node_result]
+
+    def test_node_readiness_is_separate_and_keeps_isolated_environment_and_identity(self):
+        detached.setUpModule()
+        calls = detached.subprocess.run.call_args_list
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0].args[0], [str(self.worker), "cli-agent-notify", "--protocol-version"])
+        self.assertEqual(calls[1].args[0], [str(self.node), "-p", "process.versions.node"])
+        self.assertEqual(calls[1].kwargs, {
+            "env": {"PATH": str(self.node.parent), "HOME": str(self.node.parent), "TMPDIR": str(self.node.parent)},
+            "capture_output": True, "timeout": 15, "check": True})
+        self.assertEqual(detached.plain_file.call_args_list[1:], [
+            call(self.node, self.node_sha, executable=True), call(self.node, self.node_sha, executable=True)])
+        self.assertIn("不计 hook 投递", self.printed.call_args.args[0])
+
+    def test_invalid_node_receipt_fails_without_retry(self):
+        for stdout, stderr in ((b"17.9.0\n", b""), (b"20.9.0\nextra", b""),
+                               (b"20.9.0\r\n", b""), (b"\xff\n", b""),
+                               (b"", b""), (b"20.9.0\n", b"unexpected")):
+            with self.subTest(stdout=stdout, stderr=stderr):
+                detached.subprocess.run.reset_mock()
+                detached.time.monotonic.side_effect = [0, 0.1, 0.2, 0.3]
+                detached.subprocess.run.side_effect = [self.worker_result, SimpleNamespace(stdout=stdout, stderr=stderr)]
+                with self.assertRaisesRegex(ValueError, "Node 运行时就绪收据不匹配"):
+                    detached.setUpModule()
+                self.assertEqual(detached.subprocess.run.call_count, 2)
+
+    def test_node_timeout_and_nonzero_exit_preserve_failure_without_retry(self):
+        for error in (subprocess.TimeoutExpired("fixture-node", 15),
+                      subprocess.CalledProcessError(1, "fixture-node")):
+            with self.subTest(error=type(error).__name__):
+                detached.subprocess.run.reset_mock()
+                detached.time.monotonic.side_effect = [0, 0.1, 0.2]
+                detached.subprocess.run.side_effect = [self.worker_result, error]
+                with self.assertRaises(type(error)) as observed:
+                    detached.setUpModule()
+                self.assertIs(observed.exception, error)
+                self.assertEqual(detached.subprocess.run.call_count, 2)
+
+    def test_worker_failure_never_starts_node(self):
+        detached.subprocess.run.side_effect = [SimpleNamespace(stdout=b"invalid", stderr=b"")]
+        with self.assertRaisesRegex(ValueError, "原生 worker 冷启动协议不匹配"):
+            detached.setUpModule()
+        self.assertEqual(detached.subprocess.run.call_count, 1)
+        detached.shutil.which.assert_not_called()
+
+    def test_changed_node_after_readiness_fails_the_identity_check(self):
+        error = ValueError("hook_file_identity_invalid")
+        detached.plain_file.side_effect = [self.worker, self.node, error]
+        with self.assertRaisesRegex(ValueError, "hook_file_identity_invalid"):
+            detached.setUpModule()
+        self.assertEqual(detached.subprocess.run.call_count, 2)
+        self.assertEqual(self.printed.call_count, 1)
+
+
 class WorkerDiagnosticTests(unittest.TestCase):
     def test_guarded_send_has_no_synthetic_protocol_stage(self):
         rows = [row("preload"), row("send", exit_code=0, elapsed_ms=2.5,
