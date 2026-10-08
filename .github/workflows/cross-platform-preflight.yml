@@ -581,6 +581,7 @@ jobs:
           git("config", "--local", "core.hooksPath", str(root / "empty-hooks"))
           git("remote", "add", "origin", "https://github.com/Infinimesh-ai/InfiniShell-Desktop.git")
           git("-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never",
+              "-c", "http.version=HTTP/1.1", "-c", "http.lowSpeedLimit=1024", "-c", "http.lowSpeedTime=90",
               "fetch", "--no-tags", "--depth", "1", "origin", sha)
           git("checkout", "--detach", "FETCH_HEAD")
           actual = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], env=environment, text=True).strip()
@@ -1862,7 +1863,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw '隔离 Git hook 配置失败' }
           & git -C $source remote add origin 'https://github.com/Infinimesh-ai/InfiniShell-Desktop.git'
           if ($LASTEXITCODE -ne 0) { throw '隔离 Git remote 配置失败' }
-          & git -C $source -c protocol.file.allow=never -c protocol.ext.allow=never fetch --no-tags --depth 1 origin $env:GITHUB_SHA
+          & git -C $source -c protocol.file.allow=never -c protocol.ext.allow=never -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1024 -c http.lowSpeedTime=90 fetch --no-tags --depth 1 origin $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { throw '完整提交获取失败' }
           & git -C $source checkout --detach FETCH_HEAD
           if ($LASTEXITCODE -ne 0) { throw '隔离 checkout 失败' }

@@ -50,3 +50,5 @@ PowerShell 私有启动只有本地 Windows 会话显式设置 `WARP_POWERSHELL_
 | 工作流 YAML、内嵌脚本语法、隔离范围、23 项契约测试 | 通过；actionlint 仍有 11 项基线诊断，新增 0 | `workflow-static.safe.json` |
 
 首次定向回归因缺少 nextest 未执行测试，原失败收据 `app-focused-01.json` 保留。其后在证据目录私有安装并校验 nextest 0.9.148 后重跑通过。Linux/Windows 同提交源码门禁以独立 PR 关联运行的最终结果为准。
+
+首次远端门禁 [37735758340](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37735758340) 绑定 `b66af9761a85bd9cb02de9acae14b7360ebc34bd`，两平台都在获取源码时失败：Linux 报 HTTP/2 CANCEL，Windows 报传输提前关闭，均出现 `early EOF`；编译未开始。完整日志和终态已保留为 `ci-initial-full.log`、`ci-initial-final.safe.json`。后续仅对本轮隔离 fetch 显式指定 HTTP/1.1 和低速超时，不修改全局 Git 配置，产品源码不变。
