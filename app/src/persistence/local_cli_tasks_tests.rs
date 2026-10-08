@@ -1,4 +1,6 @@
 use diesel::connection::SimpleConnection;
+use diesel::migration::MigrationSource;
+use diesel::sqlite::Sqlite;
 use diesel_migrations::MigrationHarness;
 use futures::executor::block_on;
 use serde_json::json;
@@ -774,8 +776,13 @@ fn local_cli_future_unknown_still_rejects_messages_and_receipts() {
 #[test]
 fn local_cli_unconfirmed_index_migration_upgrades_existing_rows_without_rewriting_them() {
     let mut connection = connection();
+    let migration = MigrationSource::<Sqlite>::migrations(&::persistence::MIGRATIONS)
+        .unwrap()
+        .into_iter()
+        .find(|migration| migration.name().version().to_string() == "20260916000001")
+        .expect("未确认 CLI 会话索引迁移必须存在");
     let reverted = connection
-        .revert_last_migration(::persistence::MIGRATIONS)
+        .revert_migration(migration.as_ref())
         .unwrap();
     assert_eq!(reverted.to_string(), "20260916000001");
     parent_and_child(&mut connection);
@@ -784,10 +791,9 @@ fn local_cli_unconfirmed_index_migration_upgrades_existing_rows_without_rewritin
     let before_messages = read_messages(&mut connection, "child", 1).unwrap();
 
     let applied = connection
-        .run_pending_migrations(::persistence::MIGRATIONS)
+        .run_migration(migration.as_ref())
         .unwrap();
-    assert_eq!(applied.len(), 1);
-    assert_eq!(applied[0].to_string(), "20260916000001");
+    assert_eq!(applied.to_string(), "20260916000001");
     assert_eq!(read_tasks(&mut connection, false).unwrap(), before);
     assert_eq!(
         read_messages(&mut connection, "child", 1).unwrap(),
@@ -804,7 +810,7 @@ fn local_cli_unconfirmed_index_migration_upgrades_existing_rows_without_rewritin
     assert!(checkpoint(&mut connection, duplicate, None).is_err());
     assert!(
         connection
-            .revert_last_migration(::persistence::MIGRATIONS)
+            .revert_migration(migration.as_ref())
             .is_err()
     );
     assert_eq!(read_task(&mut connection, "child").unwrap(), Some(child));
@@ -1218,6 +1224,459 @@ fn local_cli_result_claim_is_atomic_and_rejects_ordinary_or_modified_messages() 
         read_message(&mut connection, &claimed.message_id).unwrap(),
         Some(claimed)
     );
+}
+
+fn claude_completed_result_claim_fixture() -> (
+    SqliteConnection,
+    LocalCliTask,
+    LocalCliTask,
+    LocalCliMessage,
+) {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.native_session_id = Some("parent-native-session".into());
+    parent.config_json = json!({"runtime_generation":Uuid::new_v4()}).to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let mut child = task("child", Some("parent"));
+    child.native_session_id = Some("child-native-session".into());
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    parent.state = LocalCliTaskState::Completed;
+    parent.revision = 1;
+    parent.result = Some("PARENT_QUEUED".into());
+    parent.terminal_evidence = Some("父首轮原生完成".into());
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    child.state = LocalCliTaskState::Completed;
+    child.revision = 1;
+    child.result = Some("子任务真实命令结果".into());
+    child.terminal_evidence = Some("子回合原生完成".into());
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    let message = insert_task_result(&mut connection, "child", 1)
+        .unwrap()
+        .unwrap();
+    (connection, parent, child, message)
+}
+
+fn claude_acknowledged_result_chain_fixture() -> (
+    SqliteConnection,
+    LocalCliTask,
+    LocalCliMessage,
+    LocalCliMessage,
+) {
+    let (mut connection, mut parent, mut child, first) = claude_completed_result_claim_fixture();
+    child.generation = 2;
+    child.revision = 0;
+    child.state = LocalCliTaskState::Queued;
+    child.result = None;
+    child.terminal_evidence = None;
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    child.revision = 1;
+    child.state = LocalCliTaskState::Completed;
+    child.result = Some("子任务第二结果".into());
+    child.terminal_evidence = Some("原生完成".into());
+    checkpoint(&mut connection, child.clone(), Some(2)).unwrap();
+    let second = insert_task_result(&mut connection, &child.task_id, 2)
+        .unwrap()
+        .unwrap();
+    claim_result_if_current(&mut connection, first.clone(), Some(&parent))
+        .unwrap()
+        .unwrap();
+    let link = ClaudeResultLink::from_message(&first).unwrap();
+    let mut config: Value = serde_json::from_str(&parent.config_json).unwrap();
+    config["claude_pending_input"] =
+        json!({"message_id":first.message_id,"submission_generation":1,"result":link});
+    parent.config_json = config.to_string();
+    parent.revision += 1;
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    assert_eq!(
+        read_message(&mut connection, &second.message_id).unwrap(),
+        Some(second.clone())
+    );
+    update_message_state(
+        &mut connection,
+        &first.message_id,
+        &parent.task_id,
+        1,
+        LocalCliMessageState::Acknowledged,
+    )
+    .unwrap();
+    parent.generation = 2;
+    parent.revision = 0;
+    parent.state = LocalCliTaskState::Queued;
+    parent.result = None;
+    parent.terminal_evidence = None;
+    config["claude_current_input"] =
+        json!({"turn_id":first.message_id,"submission_generation":1,"result":link});
+    parent.config_json = config.to_string();
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    config
+        .as_object_mut()
+        .unwrap()
+        .remove("claude_pending_input");
+    parent.config_json = config.to_string();
+    parent.revision = 1;
+    parent.state = LocalCliTaskState::Completed;
+    parent.result = Some("父已消费第一子结果".into());
+    parent.terminal_evidence = Some("原生完成".into());
+    checkpoint(&mut connection, parent.clone(), Some(2)).unwrap();
+    assert_eq!(
+        read_message(&mut connection, &second.message_id).unwrap(),
+        Some(second.clone())
+    );
+    (connection, parent, first, second)
+}
+
+#[test]
+fn claude_result_chain_rejects_unacknowledged_modified_or_nonautomatic_generations() {
+    for invalid in [
+        "missing-ack",
+        "wrong-receipt",
+        "driver-body",
+        "driver-origin",
+        "user-turn",
+        "runtime",
+        "session",
+        "failed",
+        "cancelled",
+        "pending-digest",
+    ] {
+        let (mut connection, mut current, first, second) =
+            claude_acknowledged_result_chain_fixture();
+        let mut config: Value = serde_json::from_str(&current.config_json).unwrap();
+        match invalid {
+            "missing-ack" | "wrong-receipt" | "driver-body" => {
+                let mut driver = read_message(&mut connection, &first.message_id)
+                    .unwrap()
+                    .unwrap();
+                match invalid {
+                    "missing-ack" => {
+                        driver.state = LocalCliMessageState::Sent;
+                        driver.receipt_kind = None;
+                    }
+                    "wrong-receipt" => {
+                        driver.receipt_kind = Some(LocalCliReceiptKind::ApplicationHistory)
+                    }
+                    "driver-body" => driver.body.push_str("篡改"),
+                    _ => unreachable!("固定测试变体"),
+                }
+                write_message_state(&mut connection, &driver).unwrap();
+            }
+            "driver-origin" => {
+                let mut child = read_task_generation(
+                    &mut connection,
+                    &first.sender_task_id,
+                    first.sender_generation,
+                )
+                .unwrap()
+                .unwrap();
+                child.parent_generation = Some(2);
+                diesel::update(
+                    local_cli_task_generations::table.find((&child.task_id, child.generation)),
+                )
+                .set(local_cli_task_generations::data.eq(serde_json::to_string(&child).unwrap()))
+                .execute(&mut connection)
+                .unwrap();
+            }
+            "pending-digest" => {
+                let mut previous = read_task_generation(&mut connection, &current.task_id, 1)
+                    .unwrap()
+                    .unwrap();
+                let mut value: Value = serde_json::from_str(&previous.config_json).unwrap();
+                value["claude_pending_input"]["result"]["mailbox_sha256"] = json!("0".repeat(64));
+                previous.config_json = value.to_string();
+                diesel::update(local_cli_task_generations::table.find((&previous.task_id, 1)))
+                    .set(
+                        local_cli_task_generations::data
+                            .eq(serde_json::to_string(&previous).unwrap()),
+                    )
+                    .execute(&mut connection)
+                    .unwrap();
+            }
+            "user-turn" => {
+                config["claude_current_input"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("result");
+            }
+            "runtime" => config["runtime_generation"] = json!(Uuid::new_v4()),
+            "session" => current.native_session_id = Some(Uuid::new_v4().to_string()),
+            "failed" => current.state = LocalCliTaskState::Failed,
+            "cancelled" => current.state = LocalCliTaskState::Cancelled,
+            _ => unreachable!("固定测试变体"),
+        }
+        current.config_json = config.to_string();
+        replace_current_task_record(&mut connection, &current);
+        diesel::update(
+            local_cli_task_generations::table.find((&current.task_id, current.generation)),
+        )
+        .set(local_cli_task_generations::data.eq(serde_json::to_string(&current).unwrap()))
+        .execute(&mut connection)
+        .unwrap();
+        assert!(
+            !claude_result_history_matches(&mut connection, &second, &current).unwrap(),
+            "{invalid}"
+        );
+        assert!(
+            claim_result_if_current(&mut connection, second.clone(), Some(&current)).is_err(),
+            "{invalid}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &second.message_id).unwrap(),
+            Some(second),
+            "{invalid}"
+        );
+    }
+}
+
+#[test]
+fn claude_result_cross_generation_ack_requires_exact_pending_link_and_native_receipt() {
+    for invalid in [
+        "none",
+        "missing-link",
+        "wrong-message",
+        "wrong-digest",
+        "wrong-receipt",
+        "wrong-generation",
+    ] {
+        let (mut connection, mut current, _first, second) =
+            claude_acknowledged_result_chain_fixture();
+        claim_result_if_current(&mut connection, second.clone(), Some(&current))
+            .unwrap()
+            .unwrap();
+        let mut link = ClaudeResultLink::from_message(&second).unwrap();
+        if invalid == "wrong-message" {
+            link.message_id = Uuid::new_v4();
+        }
+        if invalid == "wrong-digest" {
+            link.mailbox_sha256 = "0".repeat(64);
+        }
+        let mut config: Value = serde_json::from_str(&current.config_json).unwrap();
+        if invalid != "missing-link" {
+            config["claude_pending_input"] = json!({"message_id":second.message_id,"submission_generation":current.generation,"result":link});
+        }
+        current.config_json = config.to_string();
+        current.revision += 1;
+        checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+        let receipt = if invalid == "wrong-receipt" {
+            LocalCliReceiptKind::ApplicationHistory
+        } else {
+            LocalCliReceiptKind::NativeProtocol
+        };
+        let generation = if invalid == "wrong-generation" { 2 } else { 1 };
+        let result = update_message_state_with_receipt(
+            &mut connection,
+            &second.message_id,
+            &current.task_id,
+            generation,
+            LocalCliMessageState::Acknowledged,
+            Some(receipt),
+        );
+        if invalid == "none" {
+            result.unwrap();
+            update_message_state_with_receipt(
+                &mut connection,
+                &second.message_id,
+                &current.task_id,
+                1,
+                LocalCliMessageState::Acknowledged,
+                Some(receipt),
+            )
+            .unwrap();
+            let saved = read_message(&mut connection, &second.message_id)
+                .unwrap()
+                .unwrap();
+            assert_eq!(saved.recipient_generation, 1);
+            assert_eq!(saved.state, LocalCliMessageState::Acknowledged);
+        } else {
+            assert!(result.is_err(), "{invalid}");
+            let saved = read_message(&mut connection, &second.message_id)
+                .unwrap()
+                .unwrap();
+            assert_eq!(saved.state, LocalCliMessageState::Sent);
+            assert_eq!(saved.receipt_kind, None);
+        }
+    }
+}
+
+#[test]
+fn claude_result_created_after_explicit_new_generation_is_saved_without_dispatch_authority() {
+    let (mut connection, mut parent, mut child, _first) = claude_completed_result_claim_fixture();
+    parent.generation = 2;
+    parent.revision = 0;
+    parent.state = LocalCliTaskState::Queued;
+    parent.result = None;
+    parent.terminal_evidence = None;
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    child.generation = 2;
+    child.revision = 0;
+    child.state = LocalCliTaskState::Queued;
+    child.result = None;
+    child.terminal_evidence = None;
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    child.revision = 1;
+    child.state = LocalCliTaskState::Completed;
+    child.result = Some("旧子任务晚到的真实结果".into());
+    child.terminal_evidence = Some("原生完成".into());
+    checkpoint(&mut connection, child.clone(), Some(2)).unwrap();
+    let result = insert_task_result(&mut connection, &child.task_id, 2)
+        .unwrap()
+        .unwrap();
+    assert_eq!(result.recipient_generation, 1);
+    assert_eq!(result.state, LocalCliMessageState::Cancelled);
+    assert_eq!(result.body, task_result_message_body(&child));
+    assert_eq!(result.receipt_kind, None);
+    assert_eq!(
+        insert_task_result(&mut connection, &child.task_id, 2).unwrap(),
+        Some(result)
+    );
+}
+
+#[test]
+fn claude_completed_result_claim_requires_current_worker_and_reserves_one_unconfirmed_slot() {
+    let (mut connection, parent, mut child, message) = claude_completed_result_claim_fixture();
+    assert!(
+        claim_result(&mut connection, message.clone()).is_err(),
+        "冷恢复没有当前 worker 快照"
+    );
+    let claimed = claim_result_if_current(&mut connection, message.clone(), Some(&parent))
+        .unwrap()
+        .unwrap();
+    assert_eq!(claimed.state, LocalCliMessageState::Sent);
+    assert_eq!(claimed.receipt_kind, None);
+    assert_eq!(
+        read_task(&mut connection, "parent").unwrap(),
+        Some(parent.clone())
+    );
+    assert_eq!(
+        claim_result_if_current(&mut connection, message, Some(&parent)).unwrap(),
+        None
+    );
+
+    child.generation = 2;
+    child.revision = 0;
+    child.state = LocalCliTaskState::Queued;
+    child.result = None;
+    child.terminal_evidence = None;
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    child.revision = 1;
+    child.state = LocalCliTaskState::Completed;
+    child.result = Some("另一个真实结果".into());
+    child.terminal_evidence = Some("第二个子回合原生完成".into());
+    checkpoint(&mut connection, child, Some(2)).unwrap();
+    let second = insert_task_result(&mut connection, "child", 2)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        claim_result_if_current(&mut connection, second.clone(), Some(&parent)).unwrap(),
+        None
+    );
+    assert_eq!(
+        read_message(&mut connection, &second.message_id).unwrap(),
+        Some(second)
+    );
+    assert_eq!(
+        read_message(&mut connection, &claimed.message_id).unwrap(),
+        Some(claimed)
+    );
+}
+
+#[test]
+fn claude_completed_result_claim_rejects_stale_or_unverified_parent_snapshot() {
+    for invalid in [
+        "snapshot-runtime",
+        "snapshot-session",
+        "snapshot-generation",
+        "pending",
+        "missing-runtime",
+        "missing-session",
+        "failed",
+        "cancelled",
+        "unknown",
+    ] {
+        let (mut connection, mut parent, _child, message) = claude_completed_result_claim_fixture();
+        let mut expected = parent.clone();
+        match invalid {
+            "snapshot-runtime" => {
+                expected.config_json = json!({"runtime_generation":Uuid::new_v4()}).to_string()
+            }
+            "snapshot-session" => {
+                expected.native_session_id = Some("different-native-session".into())
+            }
+            "snapshot-generation" => expected.generation = 2,
+            "pending" => {
+                let mut config: Value = serde_json::from_str(&parent.config_json).unwrap();
+                config["claude_pending_input"] =
+                    json!({"message_id":Uuid::new_v4(),"submission_generation":1});
+                parent.config_json = config.to_string();
+                expected = parent.clone();
+                replace_current_task_record(&mut connection, &parent);
+            }
+            "missing-runtime" => {
+                parent.config_json = "{}".into();
+                expected = parent.clone();
+                replace_current_task_record(&mut connection, &parent);
+            }
+            "missing-session" => {
+                parent.native_session_id = None;
+                expected = parent.clone();
+                replace_current_task_record(&mut connection, &parent);
+            }
+            "failed" | "cancelled" | "unknown" => {
+                parent.state = match invalid {
+                    "failed" => LocalCliTaskState::Failed,
+                    "cancelled" => LocalCliTaskState::Cancelled,
+                    "unknown" => LocalCliTaskState::Unknown,
+                    _ => unreachable!("固定终态变体"),
+                };
+                expected = parent.clone();
+                replace_current_task_record(&mut connection, &parent);
+            }
+            _ => unreachable!("固定测试变体"),
+        }
+        assert!(
+            claim_result_if_current(&mut connection, message.clone(), Some(&expected)).is_err(),
+            "{invalid}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &message.message_id).unwrap(),
+            Some(message),
+            "{invalid}"
+        );
+    }
+}
+
+#[test]
+fn claude_completed_result_claim_verifies_child_origin_and_persisted_body() {
+    for invalid in [
+        "body",
+        "parent-id",
+        "parent-generation",
+        "child-result",
+        "child-not-terminal",
+    ] {
+        let (mut connection, parent, mut child, message) = claude_completed_result_claim_fixture();
+        let mut offered = message.clone();
+        match invalid {
+            "body" => offered.body.push_str("伪造的结果"),
+            "parent-id" => child.parent_task_id = Some("unrelated-parent".into()),
+            "parent-generation" => child.parent_generation = Some(2),
+            "child-result" => child.result = Some("与持久消息不符".into()),
+            "child-not-terminal" => child.state = LocalCliTaskState::Running,
+            _ => unreachable!("固定测试变体"),
+        }
+        diesel::update(local_cli_task_generations::table.find((&child.task_id, 1_i64)))
+            .set(local_cli_task_generations::data.eq(serde_json::to_string(&child).unwrap()))
+            .execute(&mut connection)
+            .unwrap();
+        assert!(
+            claim_result_if_current(&mut connection, offered, Some(&parent)).is_err(),
+            "{invalid}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &message.message_id).unwrap(),
+            Some(message),
+            "{invalid}"
+        );
+    }
 }
 
 #[test]

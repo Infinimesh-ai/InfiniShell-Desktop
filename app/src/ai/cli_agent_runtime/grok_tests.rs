@@ -4731,6 +4731,70 @@ fn interrupt_dispatch_is_not_a_cancelled_terminal_event() {
 }
 
 #[test]
+fn native_permission_cancelled_waits_for_matching_history_and_never_reports_completed() {
+    let native: Value = serde_json::from_str(include_str!(
+        "../../../../specs/cli-agent-parity/fixtures/grok-1.0.41-permission-cancelled-macos.ndjson"
+    ))
+    .unwrap();
+    let params = &native["params"];
+    let session = params["sessionId"].as_str().unwrap();
+    let turn = params["update"]["prompt_id"].as_str().unwrap();
+    assert_eq!(
+        params["_meta"]["cancellationCategory"],
+        "PermissionCancelled"
+    );
+    assert_eq!(params["update"]["stop_reason"], "cancelled");
+    for conflicting_history in [false, true] {
+        let mut protocol = active_byok_prompt();
+        protocol.session_id = Some(session.into());
+        protocol.prompt.as_mut().unwrap().native_id = Some(turn.into());
+        // 只用实录终态字段构造 RPC 封套，原生回放仍保留真实会话、回合与事件身份。
+        let rpc = protocol.pending.as_ref().unwrap().id;
+        let response = json!({"jsonrpc":"2.0", "id":rpc, "result":{
+            "stopReason":params["update"]["stop_reason"],
+            "_meta":{"sessionId":session, "promptId":turn,
+                "cancellationCategory":params["_meta"]["cancellationCategory"]}
+        }});
+        let pending = protocol.receive(response).unwrap();
+        assert!(pending.events.is_empty());
+        assert!(!protocol.prompt.as_ref().unwrap().finished);
+        assert_eq!(pending.writes.len(), 1);
+        assert_eq!(pending.writes[0]["method"], "_x.ai/session/updates");
+        let mut terminal = native.clone();
+        if conflicting_history {
+            terminal["params"]["update"]["stop_reason"] = json!("end_turn");
+        }
+        let result = protocol
+            .receive(
+                json!({"jsonrpc":"2.0", "id":pending.writes[0]["id"], "result":{
+                    "updates":[terminal], "totalCount":1, "hasMore":false,
+                    "lastEventId":params["_meta"]["eventId"]
+                }}),
+            )
+            .unwrap();
+        let expected = match result.events.as_slice() {
+            [
+                RuntimeEventKind::TurnFinished {
+                    turn_id,
+                    outcome,
+                    output,
+                },
+            ] => {
+                assert_eq!(turn_id, turn);
+                assert!(output.is_empty());
+                if conflicting_history {
+                    matches!(outcome, TurnOutcome::Failed { .. })
+                } else {
+                    matches!(outcome, TurnOutcome::Cancelled)
+                }
+            }
+            events => panic!("取消终态不得产生其它结果：{events:?}"),
+        };
+        assert!(expected);
+    }
+}
+
+#[test]
 fn unverified_cancellation_category_does_not_claim_cancellation() {
     let mut protocol = active_byok_prompt();
     let mut response = byok_response(4);

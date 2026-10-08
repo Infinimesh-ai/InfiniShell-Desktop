@@ -19,7 +19,7 @@ use tempfile::{NamedTempFile, TempDir};
 #[cfg(not(target_family = "wasm"))]
 use {command::r#async::Command, warpui::r#async::FutureExt as _};
 
-use super::PluginInstallError;
+use super::{PluginComponentIntegrity, PluginInstallError};
 #[cfg(not(target_family = "wasm"))]
 use crate::util::path::resolve_executable_in_path;
 
@@ -863,6 +863,49 @@ pub(super) fn full_tree_is_applied(home: &Path, kind: PatchKind) -> bool {
             validate_tree(&installation, kind).is_ok()
                 && ready(&installation, kind).unwrap_or(false)
         })
+}
+
+/// 复检完整目录；未知版本没有树合同，已知版本的损坏不能降格为待更新。
+pub(super) fn integrity(home: &Path, kind: PatchKind) -> PluginComponentIntegrity {
+    let installation = match installed(home, kind) {
+        Ok(Some(installation)) => installation,
+        Ok(None) => return PluginComponentIntegrity::Missing,
+        Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+            return PluginComponentIntegrity::Unverified;
+        }
+        Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+    };
+    if !kind
+        .metadata()
+        .compatible_bases
+        .iter()
+        .any(|base| base.version == installation.version)
+    {
+        return PluginComponentIntegrity::Unverified;
+    }
+    match validate_tree(&installation, kind) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+            return PluginComponentIntegrity::Unverified;
+        }
+        Err(_)
+            if kind == PatchKind::Codex
+                && installation.version == kind.version()
+                && super::codex_source::is_previous_notification_cache(&installation.path) =>
+        {
+            // 沿用迁移前检的完整历史树合同；不能按单文件旧摘要拼接出已知版本。
+            return PluginComponentIntegrity::NeedsUpdate;
+        }
+        Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+    }
+    if installation.version != kind.version() {
+        return PluginComponentIntegrity::NeedsUpdate;
+    }
+    match ready(&installation, kind) {
+        Ok(true) => PluginComponentIntegrity::Verified,
+        Ok(false) => PluginComponentIntegrity::NeedsUpdate,
+        Err(_) => PluginComponentIntegrity::IntegrityMismatch,
+    }
 }
 
 type FileStamp = (PathBuf, u64, Option<SystemTime>);

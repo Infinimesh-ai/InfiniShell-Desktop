@@ -1,11 +1,13 @@
-//! Claude 2.1.280 包入口的窄版本探针；各包来源分别验证布局，不继承用户环境。
+//! 已审核 CLI 包入口的窄版本探针；各包来源分别验证布局，不继承用户环境。
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
 use uuid::Uuid;
+
+use crate::terminal::cli_agent_updates::valid_homebrew_prefix;
 
 use super::{AtomicLaunchKind, Manifest};
 
@@ -27,6 +29,13 @@ pub(super) fn is_probe(kind: Option<AtomicLaunchKind>) -> bool {
                 | AtomicLaunchKind::GrokNpmVersionProbeV1
         )
     )
+}
+
+fn valid_homebrew_caskroom(path: Option<&Path>) -> bool {
+    path.is_some_and(|path| {
+        path.file_name() == Some(OsStr::new("Caskroom"))
+            && path.parent().is_some_and(valid_homebrew_prefix)
+    })
 }
 
 fn valid_entry(manifest: &Manifest) -> bool {
@@ -62,7 +71,11 @@ fn valid_entry(manifest: &Manifest) -> bool {
             let name = package
                 .and_then(Path::file_name)
                 .and_then(|name| name.to_str());
-            let candidate = version == Some("2.1.280")
+            let candidate = (version == Some("2.1.280")
+                || cfg!(all(target_os = "macos", target_arch = "aarch64"))
+                    && matches!(version, Some("2.1.285" | "2.1.287"))
+                || cfg!(all(target_os = "linux", target_arch = "x86_64"))
+                    && version == Some("2.1.285"))
                 && name
                     .and_then(|name| name.strip_prefix(".infinishell-brew-"))
                     .and_then(|id| Uuid::parse_str(id).ok())
@@ -78,7 +91,9 @@ fn valid_entry(manifest: &Manifest) -> bool {
                             || matches!(version, Some("2.1.278" | "2.1.280"))
                                 && name == Some("claude-code@latest"))
                 } else {
-                    cfg!(all(target_os = "macos", target_arch = "aarch64")) && candidate
+                    cfg!(all(target_os = "macos", target_arch = "aarch64"))
+                        && candidate
+                        && valid_homebrew_caskroom(package.and_then(Path::parent))
                 }
         }
         Some(AtomicLaunchKind::ClaudeWingetVersionProbeV1) => {
@@ -103,9 +118,9 @@ fn valid_entry(manifest: &Manifest) -> bool {
             let name = package
                 .and_then(Path::file_name)
                 .and_then(|name| name.to_str());
-            let (target, caskroom) = match (std::env::consts::OS, std::env::consts::ARCH) {
-                ("macos", "aarch64") => ("macos-aarch64", "/opt/homebrew/Caskroom"),
-                ("linux", "x86_64") => ("linux-x86_64", "/home/linuxbrew/.linuxbrew/Caskroom"),
+            let target = match (std::env::consts::OS, std::env::consts::ARCH) {
+                ("macos", "aarch64") => "macos-aarch64",
+                ("linux", "x86_64") => "linux-x86_64",
                 _ => return false,
             };
             version.is_some_and(|version| {
@@ -113,13 +128,18 @@ fn valid_entry(manifest: &Manifest) -> bool {
                     .executable
                     .file_name()
                     .is_some_and(|name| name == format!("grok-{version}-{target}").as_str())
-            }) && (version == Some("1.0.41")
+            }) && ((version == Some("1.0.41")
+                || cfg!(all(target_os = "macos", target_arch = "aarch64"))
+                    && version == Some("1.0.46"))
                 && name
                     .and_then(|name| name.strip_prefix(".infinishell-brew-"))
                     .and_then(|id| Uuid::parse_str(id).ok())
                     .is_some_and(|id| !id.is_nil())
-                || matches!(version, Some("1.0.40" | "1.0.41")) && name == Some("grok-build"))
-                && package.and_then(Path::parent) == Some(Path::new(caskroom))
+                || (matches!(version, Some("1.0.40" | "1.0.41"))
+                    || cfg!(all(target_os = "macos", target_arch = "aarch64"))
+                        && version == Some("1.0.46"))
+                    && name == Some("grok-build"))
+                && valid_homebrew_caskroom(package.and_then(Path::parent))
         }
         Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1) => {
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -138,19 +158,14 @@ fn valid_entry(manifest: &Manifest) -> bool {
                     .and_then(|name| name.to_str());
                 cfg!(target_os = "macos")
                     && manifest.executable.ends_with("bin/codex")
-                    && (version == Some("0.156.1")
+                    && (matches!(version, Some("0.156.1" | "0.160.0"))
                         && stage
                             .and_then(|name| name.strip_prefix(".infinishell-brew-"))
                             .and_then(|id| Uuid::parse_str(id).ok())
                             .is_some_and(|id| !id.is_nil())
-                        || matches!(version, Some("0.155.1" | "0.156.1"))
-                            && stage == Some("codex")
-                            && package.and_then(Path::parent).is_some_and(|path| {
-                                matches!(
-                                    path.to_str(),
-                                    Some("/opt/homebrew/Caskroom" | "/usr/local/Caskroom")
-                                )
-                            }))
+                        || matches!(version, Some("0.155.1" | "0.156.1" | "0.160.0"))
+                            && stage == Some("codex"))
+                    && valid_homebrew_caskroom(package.and_then(Path::parent))
             }
         }
         Some(AtomicLaunchKind::CodexNpmVersionProbeV1) => {
@@ -322,22 +337,24 @@ pub(super) fn validate(manifest: &Manifest, state_dir: &Path) -> io::Result<()> 
         return Ok(());
     }
     if manifest.atomic_launch_kind == Some(AtomicLaunchKind::GrokNpmVersionProbeV1) {
-        let expected = if cfg!(target_os = "macos") {
-            (
-                145657952,
-                "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+        if manifest.expected_files.first().is_none_or(|file| {
+            !matches!(
+                (std::env::consts::OS, file.size, file.sha256.as_str()),
+                (
+                    "macos",
+                    145_657_952,
+                    "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
+                ) | (
+                    "macos",
+                    150_374_256,
+                    "e8daa302364c9c3b6a5546d511cfbd1ab5e5d407a9b04282f660665ea405f9f3"
+                ) | (
+                    "linux",
+                    165_967_424,
+                    "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"
+                )
             )
-        } else {
-            (
-                165967424,
-                "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
-            )
-        };
-        if manifest
-            .expected_files
-            .first()
-            .is_none_or(|file| file.size != expected.0 || file.sha256 != expected.1)
-        {
+        }) {
             return Err(io::Error::other("Grok npm 探针不属于固定发行映像"));
         }
     }
@@ -382,6 +399,10 @@ pub(super) fn validate(manifest: &Manifest, state_dir: &Path) -> io::Result<()> 
                 233_709_640,
                 "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b",
             ),
+            Some("2.1.285") => (
+                240_327_864,
+                "33dad1ec615a2e08cc78b494f05c110e49916de2c79d78ec8799ebf46b233d29",
+            ),
             _ => return Err(io::Error::other("Claude Linux cask 探针版本不匹配")),
         };
         if manifest.expected_files.len() != 1
@@ -405,6 +426,10 @@ pub(super) fn validate(manifest: &Manifest, state_dir: &Path) -> io::Result<()> 
             ("macos", Some("1.0.41")) => (
                 145_657_952,
                 "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+            ),
+            ("macos", Some("1.0.46")) => (
+                150_374_256,
+                "e8daa302364c9c3b6a5546d511cfbd1ab5e5d407a9b04282f660665ea405f9f3",
             ),
             ("linux", Some("1.0.40")) => (
                 165_587_968,

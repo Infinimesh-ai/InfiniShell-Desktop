@@ -13,6 +13,130 @@ fn private_home() -> (TempDir, PathBuf) {
     (directory, home)
 }
 
+fn integrity_home(home: &Path) {
+    materialize(home).unwrap();
+    let mut document = DocumentMut::new();
+    document["marketplaces"][MARKETPLACE]["source_type"] = toml_edit::value("local");
+    document["marketplaces"][MARKETPLACE]["source"] =
+        toml_edit::value(source_path(home).to_str().unwrap());
+    for name in ["warp", "orchestration"] {
+        let key = format!("{name}@codex-warp");
+        document["plugins"][&key]["enabled"] = toml_edit::value(true);
+        copy_plugin(home, name, &cache_root(home, name));
+    }
+    save(home, &document);
+}
+
+#[test]
+fn integrity_report_missing_codex_plugins_does_not_create_files() {
+    let (_directory, home) = private_home();
+    let report = integrity_report(&home);
+    assert_eq!(report.notification, PluginComponentIntegrity::Missing);
+    assert_eq!(report.platform, PluginComponentIntegrity::Missing);
+    assert_eq!(fs::read_dir(&home).unwrap().count(), 0);
+}
+
+#[test]
+fn integrity_report_codex_rechecks_source_and_both_caches_without_writing() {
+    let (_directory, home) = private_home();
+    integrity_home(&home);
+    assert!(is_current(&home));
+    let report = integrity_report(&home);
+    assert_eq!(report.notification, PluginComponentIntegrity::Verified);
+    assert_eq!(report.platform, PluginComponentIntegrity::Verified);
+    let original_config = fs::read(home.join("config.toml")).unwrap();
+    let source = tree(&source_path(&home), false).unwrap();
+    let notification = cache_snapshot(&cache_root(&home, "warp")).unwrap();
+    let extra = cache_root(&home, "orchestration").join("0.4.0/user.txt");
+    fs::write(&extra, "用户文件").unwrap();
+    let platform = cache_snapshot(&cache_root(&home, "orchestration")).unwrap();
+
+    let report = integrity_report(&home);
+    assert_eq!(report.notification, PluginComponentIntegrity::Verified);
+    assert_eq!(report.platform, PluginComponentIntegrity::IntegrityMismatch);
+    assert_eq!(fs::read(home.join("config.toml")).unwrap(), original_config);
+    assert_eq!(tree(&source_path(&home), false).unwrap(), source);
+    assert_eq!(
+        cache_snapshot(&cache_root(&home, "warp")).unwrap(),
+        notification
+    );
+    assert_eq!(
+        cache_snapshot(&cache_root(&home, "orchestration")).unwrap(),
+        platform
+    );
+
+    fs::write(source_path(&home).join("user.txt"), "来源修改").unwrap();
+    let report = integrity_report(&home);
+    assert_eq!(
+        report.notification,
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(report.platform, PluginComponentIntegrity::IntegrityMismatch);
+}
+
+#[test]
+fn integrity_report_codex_disabled_precedes_damaged_source() {
+    let (_directory, home) = private_home();
+    integrity_home(&home);
+    fs::write(source_path(&home).join("user.txt"), "来源修改").unwrap();
+    let mut document = config(&home);
+    document["plugins"]["warp@codex-warp"]["enabled"] = toml_edit::value(false);
+    save(&home, &document);
+    let before = fs::read(home.join("config.toml")).unwrap();
+    assert_eq!(
+        integrity_report(&home).notification,
+        PluginComponentIntegrity::Disabled
+    );
+    assert_eq!(fs::read(home.join("config.toml")).unwrap(), before);
+}
+
+#[test]
+fn integrity_report_codex_known_previous_patch_needs_update_without_migration() {
+    let (_directory, home) = private_home();
+    let source = rev5_home(&home);
+    let before_source = tree(&source, false).unwrap();
+    let before_cache = cache_snapshot(&cache_root(&home, "warp")).unwrap();
+    let before_config = fs::read(home.join("config.toml")).unwrap();
+    assert_eq!(
+        integrity_report(&home).notification,
+        PluginComponentIntegrity::NeedsUpdate
+    );
+    assert_eq!(tree(&source, false).unwrap(), before_source);
+    assert_eq!(
+        cache_snapshot(&cache_root(&home, "warp")).unwrap(),
+        before_cache
+    );
+    assert_eq!(fs::read(home.join("config.toml")).unwrap(), before_config);
+
+    let payload = cache_root(&home, "warp").join("0.4.0/scripts/build-payload.sh");
+    fs::write(&payload, "用户修改").unwrap();
+    let modified_cache = cache_snapshot(&cache_root(&home, "warp")).unwrap();
+    assert_eq!(
+        integrity_report(&home).notification,
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(
+        cache_snapshot(&cache_root(&home, "warp")).unwrap(),
+        modified_cache
+    );
+    assert_eq!(tree(&source, false).unwrap(), before_source);
+    assert_eq!(fs::read(home.join("config.toml")).unwrap(), before_config);
+}
+
+#[test]
+fn integrity_report_codex_unknown_platform_version_remains_unverified() {
+    let (_directory, home) = private_home();
+    integrity_home(&home);
+    let cache = cache_root(&home, "orchestration");
+    fs::rename(cache.join("0.4.0"), cache.join("9.0.0")).unwrap();
+    let before = cache_snapshot(&cache).unwrap();
+    assert_eq!(
+        integrity_report(&home).platform,
+        PluginComponentIntegrity::Unverified
+    );
+    assert_eq!(cache_snapshot(&cache).unwrap(), before);
+}
+
 fn restore_rev6_plugin(source: &Path) {
     for (relative, contents) in [
         (".codex-plugin/plugin.json", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev6/.codex-plugin/plugin.json").as_slice()),

@@ -840,6 +840,9 @@ impl HostInfo {
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
     pub session_id: SessionId,
+    /// 仅缓存当前 shell 的候选身份；连接重建后必须重新挑战。
+    pub shell_pid: Option<u32>,
+    pub shell_tty: Option<String>,
     pub shell: Shell,
     pub launch_data: Option<ShellLaunchData>,
     pub histfile: Option<String>,
@@ -930,6 +933,8 @@ impl SessionInfo {
 
         SessionInfo {
             session_id: init_shell_value.session_id,
+            shell_pid: None,
+            shell_tty: None,
             shell: Shell::new(shell_type, None, None, Default::default(), None),
             launch_data,
             user: init_shell_value.user,
@@ -1058,6 +1063,8 @@ impl SessionInfo {
 
         SessionInfo {
             session_id: self.session_id,
+            shell_pid: bootstrapped_value.shell_pid.filter(|pid| *pid != 0),
+            shell_tty: bootstrapped_value.shell_tty,
             shell: Shell::new(
                 shell_type,
                 bootstrapped_value.shell_version,
@@ -2006,6 +2013,8 @@ pub mod testing {
 
             Self {
                 session_id: SessionId::from(0),
+                shell_pid: None,
+                shell_tty: None,
                 shell: Shell::new(shell_type, None, None, Default::default(), None),
                 launch_data: None,
                 // 测试默认不应读取开发机的真实 shell history。

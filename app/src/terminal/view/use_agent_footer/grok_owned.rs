@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 
 use async_channel::Receiver;
 use serde_json::{Value, json};
@@ -104,7 +105,8 @@ impl TerminalView {
         let Some(owned) = self.grok_owned_input.as_mut() else {
             return;
         };
-        if owned.invalidated || owned.sending {
+        if owned.invalidated || owned.sending || owned.recovery_blocks_input.load(Ordering::SeqCst)
+        {
             self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
             return;
         }
@@ -122,6 +124,7 @@ impl TerminalView {
             return;
         }
         let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
             return;
         };
         let GrokPermissionEvidence::Observed(observation) =
@@ -152,6 +155,7 @@ impl TerminalView {
         if !CLIAgentSessionsModel::handle(ctx).update(ctx, |model, _| {
             model.register_owned_grok_input(self.view_id, observation.clone(), lease.clone())
         }) {
+            self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
             return;
         }
         let files = self
@@ -311,6 +315,26 @@ impl TerminalView {
                 match event {
                     Ok(GrokOwnedWorkerEvent::Claimed(_)) => {
                         view.receive_owned_grok_event(input_revision, snapshot, events, ctx)
+                    }
+                    Ok(GrokOwnedWorkerEvent::Acknowledged(_)) => {
+                        view.receive_owned_grok_event(input_revision, snapshot, events, ctx)
+                    }
+                    Ok(GrokOwnedWorkerEvent::ResultSaved(task)) => {
+                        if let Some(owned) = view
+                            .grok_owned_input
+                            .as_mut()
+                            .filter(|owned| owned.accepts_saved_result(&task))
+                        {
+                            owned.task = task;
+                        }
+                        view.receive_owned_grok_event(input_revision, snapshot, events, ctx);
+                    }
+                    Ok(GrokOwnedWorkerEvent::ResultUnverified) => {
+                        view.show_error_toast(
+                            crate::t!("cli-agent-grok-owned-result-unverified"),
+                            ctx,
+                        );
+                        view.receive_owned_grok_event(input_revision, snapshot, events, ctx);
                     }
                     Ok(GrokOwnedWorkerEvent::NativePermissionPending { .. }) => {
                         // 只让原生审批界面可见；输入桥没有允许、拒绝或发送回车的权限。

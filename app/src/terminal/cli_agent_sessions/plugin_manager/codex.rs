@@ -8,8 +8,8 @@ use serde_json::Value;
 use super::codex_source;
 use super::notification_patch::{self, PatchKind, VerifiedRuntime};
 use super::{
-    CliAgentPluginManager, NativeAuthorizationStatus, PluginInstallError, PluginInstructionStep,
-    PluginInstructions, compare_versions,
+    CliAgentPluginManager, NativeAuthorizationStatus, PluginComponentIntegrity, PluginInstallError,
+    PluginInstructionStep, PluginInstructions, PluginIntegrityReport, compare_versions,
 };
 use crate::features::FeatureFlag;
 
@@ -107,6 +107,22 @@ impl CodexPluginManager {
 
 #[async_trait]
 impl CliAgentPluginManager for CodexPluginManager {
+    fn integrity_report(&self) -> PluginIntegrityReport {
+        if !FeatureFlag::CodexPlugin.is_enabled() {
+            return PluginIntegrityReport {
+                notification: PluginComponentIntegrity::Disabled,
+                platform: PluginComponentIntegrity::Disabled,
+            };
+        }
+        match codex_home_dir() {
+            Ok(home) => codex_source::integrity_report(&home),
+            Err(_) => PluginIntegrityReport {
+                notification: PluginComponentIntegrity::Unverified,
+                platform: PluginComponentIntegrity::Unverified,
+            },
+        }
+    }
+
     fn minimum_plugin_version(&self) -> &'static str {
         if FeatureFlag::CodexPlugin.is_enabled() {
             MINIMUM_PLUGIN_VERSION

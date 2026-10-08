@@ -19,7 +19,10 @@ use super::{
 
 const MANIFEST: &[u8] =
     include_bytes!("../../../../script/cli-agent-parity/grok_1041_npm_manifest.json");
+const MACOS_CURRENT_MANIFEST: &[u8] =
+    include_bytes!("../../../../script/cli-agent-parity/grok_1046_macos_npm_manifest.json");
 pub(super) const VERSION: &str = "1.0.41";
+pub(super) const MACOS_CURRENT_VERSION: &str = "1.0.46";
 pub(super) const PACKAGE: &str = "@xai-official/grok";
 
 #[derive(Clone, Debug, Deserialize)]
@@ -28,6 +31,9 @@ pub(super) struct FileSpec {
     pub(super) length: u64,
     pub(super) sha256: String,
     pub(super) executable: bool,
+    /// 旧清单只有执行位；新消费者清单额外绑定 tar 的完整权限位。
+    #[serde(default)]
+    mode: Option<u32>,
 }
 
 impl FileSpec {
@@ -53,6 +59,8 @@ impl NativeImage {
 #[serde(deny_unknown_fields)]
 struct Package {
     integrity: String,
+    #[serde(default)]
+    archive_sha256: Option<String>,
     manifest: Value,
     files: BTreeMap<PathBuf, FileSpec>,
 }
@@ -81,7 +89,16 @@ pub(super) fn target() -> Result<&'static str, Error> {
 
 pub(super) fn supports(version: &str) -> Result<(), Error> {
     target()?;
-    if version != VERSION {
+    if !matches!(version, VERSION | MACOS_CURRENT_VERSION) {
+        return Err(Error::InvalidRelease);
+    }
+    contract(version).map(|_| ())
+}
+
+pub(super) fn supports_transition(old: &str, target: &str) -> Result<(), Error> {
+    supports(target)?;
+    native(old)?;
+    if old == MACOS_CURRENT_VERSION && target != MACOS_CURRENT_VERSION {
         return Err(Error::InvalidRelease);
     }
     Ok(())
@@ -205,14 +222,28 @@ pub(super) async fn latest(client: &http_client::Client) -> Result<String, Error
 }
 
 fn contract(version: &str) -> Result<Contract, Error> {
-    let value: Contract = serde_json::from_slice(MANIFEST).map_err(|_| Error::InvalidRelease)?;
+    let manifest = match version {
+        "1.0.40" | VERSION => MANIFEST,
+        MACOS_CURRENT_VERSION if cfg!(all(target_os = "macos", target_arch = "aarch64")) => {
+            MACOS_CURRENT_MANIFEST
+        }
+        _ => return Err(Error::InvalidRelease),
+    };
+    let value: Contract = serde_json::from_slice(manifest).map_err(|_| Error::InvalidRelease)?;
     if value.schema != 1
-        || !matches!(version, "1.0.40" | VERSION)
         || !value.versions.iter().any(|item| item == version)
         || !value
             .targets
             .iter()
             .any(|item| item == target().unwrap_or_default())
+    {
+        return Err(Error::InvalidRelease);
+    }
+    if version == MACOS_CURRENT_VERSION
+        && value.packages.values().any(|package| {
+            package.archive_sha256.is_none()
+                || package.files.values().any(|file| file.mode.is_none())
+        })
     {
         return Err(Error::InvalidRelease);
     }
@@ -266,6 +297,7 @@ pub(super) fn installed_files(version: &str) -> Result<BTreeMap<PathBuf, FileSpe
                 length: native.length,
                 sha256: native.sha256,
                 executable: true,
+                mode: None,
             },
         );
     }
@@ -287,11 +319,19 @@ pub(super) struct DownloadedPackage {
     pub(super) verified: VerifiedNpmArchive,
 }
 
+#[cfg(windows)]
 pub(super) async fn download_release(root: &Path) -> Result<Vec<DownloadedPackage>, Error> {
-    supports(VERSION)?;
-    let contract = contract(VERSION)?;
+    download_version_release(root, VERSION).await
+}
+
+pub(super) async fn download_version_release(
+    root: &Path,
+    version: &str,
+) -> Result<Vec<DownloadedPackage>, Error> {
+    supports(version)?;
+    let contract = contract(version)?;
     let mut output = Vec::new();
-    for (key, prefix) in packages(VERSION)? {
+    for (key, prefix) in packages(version)? {
         let expected = contract.packages.get(&key).ok_or(Error::InvalidRelease)?;
         let name = expected.manifest["name"]
             .as_str()
@@ -320,18 +360,7 @@ pub(super) async fn download_release(root: &Path) -> Result<Vec<DownloadedPackag
         )
         .await?;
         let verified = artifact.verify_archive(archive.as_file_mut())?;
-        if verified.files.len() != expected.files.len() {
-            return Err(Error::InvalidRelease);
-        }
-        for (path, file) in &verified.files {
-            let expected = expected.files.get(path).ok_or(Error::InvalidRelease)?;
-            if file.length != expected.length
-                || file.sha256 != expected.digest()?
-                || file.executable != expected.executable
-            {
-                return Err(Error::InvalidRelease);
-            }
-        }
+        expected.verify_archive(&verified)?;
         output.push(DownloadedPackage {
             prefix,
             artifact,
@@ -340,6 +369,30 @@ pub(super) async fn download_release(root: &Path) -> Result<Vec<DownloadedPackag
         });
     }
     Ok(output)
+}
+
+impl Package {
+    fn verify_archive(&self, archive: &VerifiedNpmArchive) -> Result<(), Error> {
+        if archive.files.len() != self.files.len()
+            || self
+                .archive_sha256
+                .as_ref()
+                .is_some_and(|expected| digest(expected).ok() != Some(archive.compressed_sha256))
+        {
+            return Err(Error::InvalidRelease);
+        }
+        for (path, file) in &archive.files {
+            let expected = self.files.get(path).ok_or(Error::InvalidRelease)?;
+            if file.length != expected.length
+                || file.sha256 != expected.digest()?
+                || file.executable != expected.executable
+                || expected.mode.is_some_and(|mode| mode != file.mode)
+            {
+                return Err(Error::InvalidRelease);
+            }
+        }
+        Ok(())
+    }
 }
 
 async fn download(url: &str, output: &mut File, limit: u64) -> Result<(), Error> {
@@ -379,8 +432,17 @@ async fn download(url: &str, output: &mut File, limit: u64) -> Result<(), Error>
 }
 
 /// 只对已经验证的固定平台 .br 解压；不启动 Node 或官方 postinstall。
+#[cfg(windows)]
 pub(super) fn decompress(input: &mut dyn std::io::Read, output: &mut File) -> Result<(), Error> {
-    let expected = native(VERSION)?;
+    decompress_version(input, output, VERSION)
+}
+
+pub(super) fn decompress_version(
+    input: &mut dyn std::io::Read,
+    output: &mut File,
+    version: &str,
+) -> Result<(), Error> {
+    let expected = native(version)?;
     let mut reader = brotli::Decompressor::new(input, 64 * 1024);
     let mut digest = Sha256::new();
     let mut length = 0_u64;
@@ -424,3 +486,7 @@ pub(super) fn digest(value: &str) -> Result<[u8; 32], Error> {
     }
     Ok(result)
 }
+
+#[cfg(test)]
+#[path = "sources_npm_grok_contract_tests.rs"]
+mod tests;

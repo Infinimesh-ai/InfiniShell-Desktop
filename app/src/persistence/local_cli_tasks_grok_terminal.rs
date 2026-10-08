@@ -83,6 +83,17 @@ pub struct GrokTerminalInputRecord {
     pub message: LocalCliMessage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grok_terminal_delivery: Option<GrokTerminalDelivery>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grok_terminal_result: Option<GrokTerminalVerifiedResult>,
+}
+
+/// 仅保存经完整原生历史和同回合完成水位核对过的正文。
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GrokTerminalVerifiedResult {
+    pub native_prompt_id: Uuid,
+    pub completion_watermark: String,
+    pub output: String,
 }
 
 #[derive(Debug)]
@@ -99,6 +110,15 @@ pub enum GrokTerminalPersistenceRequest {
     Load {
         message_id: Uuid,
         completion: oneshot::Sender<Result<Option<GrokTerminalInputRecord>, String>>,
+    },
+    SaveVerifiedResult {
+        expected: GrokTerminalDelivery,
+        verified: GrokTerminalVerifiedResult,
+        completion: oneshot::Sender<Result<Option<LocalCliTask>, String>>,
+    },
+    MissingHistoricalResults {
+        current_task: LocalCliTask,
+        completion: oneshot::Sender<Result<Vec<GrokTerminalDelivery>, String>>,
     },
 }
 
@@ -154,6 +174,44 @@ pub(crate) fn load_input(
     Ok(receiver)
 }
 
+/// 仅对已经原生 ACK 的同一回合保存完整历史结果；旧任务代只更新其历史行。
+pub(crate) fn save_verified_result(
+    sender: &SyncSender<ModelEvent>,
+    expected: GrokTerminalDelivery,
+    verified: GrokTerminalVerifiedResult,
+) -> Result<oneshot::Receiver<Result<Option<LocalCliTask>, String>>, String> {
+    let (completion, receiver) = oneshot::channel();
+    enqueue_request(
+        sender,
+        LocalCliPersistenceRequest::GrokTerminal(
+            GrokTerminalPersistenceRequest::SaveVerifiedResult {
+                expected,
+                verified,
+                completion,
+            },
+        ),
+    )?;
+    Ok(receiver)
+}
+
+/// 冷恢复只列举同一原生会话已确认且缺少结果的回合，不改变任务或输入状态。
+pub(crate) fn missing_historical_results(
+    sender: &SyncSender<ModelEvent>,
+    current_task: LocalCliTask,
+) -> Result<oneshot::Receiver<Result<Vec<GrokTerminalDelivery>, String>>, String> {
+    let (completion, receiver) = oneshot::channel();
+    enqueue_request(
+        sender,
+        LocalCliPersistenceRequest::GrokTerminal(
+            GrokTerminalPersistenceRequest::MissingHistoricalResults {
+                current_task,
+                completion,
+            },
+        ),
+    )?;
+    Ok(receiver)
+}
+
 pub(super) fn handle_request(
     request: GrokTerminalPersistenceRequest,
     connection: &mut SqliteConnection,
@@ -177,6 +235,15 @@ pub(super) fn handle_request(
             read_record(connection, message_id).map(|row| row.map(|(_, record)| record)),
             completion,
         ),
+        GrokTerminalPersistenceRequest::SaveVerifiedResult {
+            expected,
+            verified,
+            completion,
+        } => complete(save_verified_exact(connection, expected, verified), completion),
+        GrokTerminalPersistenceRequest::MissingHistoricalResults {
+            current_task,
+            completion,
+        } => complete(missing_historical_exact(connection, current_task), completion),
     }
 }
 
@@ -185,6 +252,14 @@ pub(super) fn reject_request(request: GrokTerminalPersistenceRequest, error: Str
         GrokTerminalPersistenceRequest::Claim { completion, .. }
         | GrokTerminalPersistenceRequest::Acknowledge { completion, .. }
         | GrokTerminalPersistenceRequest::Load { completion, .. } => completion,
+        GrokTerminalPersistenceRequest::SaveVerifiedResult { completion, .. } => {
+            let _ = completion.send(Err(error));
+            return;
+        }
+        GrokTerminalPersistenceRequest::MissingHistoricalResults { completion, .. } => {
+            let _ = completion.send(Err(error));
+            return;
+        }
     };
     let _ = completion.send(Err(error));
 }
@@ -286,6 +361,28 @@ fn read_record(
             {
                 bail!("普通 Grok 已派发输入缺少领取记录");
             }
+        }
+    }
+    if let Some(verified) = &record.grok_terminal_result {
+        let Some(delivery) = &record.grok_terminal_delivery else {
+            bail!("普通 Grok 结果缺少原生领取记录");
+        };
+        if !matches!(
+            delivery.status,
+            GrokTerminalDeliveryStatus::Finished {
+                native_prompt_id,
+                outcome: GrokTerminalOutcome::EndTurn,
+            } if native_prompt_id == verified.native_prompt_id
+        ) || verified.output.trim().is_empty()
+            || verified.output.len() > 8 * 1024 * 1024
+            || !verified
+                .completion_watermark
+                .strip_prefix(&format!("{}-", delivery.session_id))
+                .is_some_and(|suffix| {
+                    suffix.parse::<u64>().is_ok_and(|sequence| sequence.to_string() == suffix)
+                })
+        {
+            bail!("普通 Grok 历史结果与原生回合不一致");
         }
     }
     Ok(Some((raw, record)))
@@ -489,6 +586,184 @@ fn acknowledge_exact(
         record.message.receipt_kind = Some(LocalCliReceiptKind::NativeProtocol);
         write_record(connection, &raw, &record)?;
         Ok(Some(record))
+    })
+}
+
+fn missing_historical_exact(
+    connection: &mut SqliteConnection,
+    current_task: LocalCliTask,
+) -> Result<Vec<GrokTerminalDelivery>> {
+    let persisted = read_task(connection, &current_task.task_id)?
+        .context("普通 Grok 当前运行不存在")?;
+    let requested_owner = owner(&current_task)?;
+    let persisted_owner = owner(&persisted)?;
+    if current_task.generation != persisted.generation
+        || requested_owner.launch_id != persisted_owner.launch_id
+        || requested_owner.binding_id != persisted_owner.binding_id
+        || requested_owner.session_id != persisted_owner.session_id
+        || requested_owner.permission_mode != "default"
+        || persisted_owner.permission_mode != "default"
+    {
+        bail!("普通 Grok 历史补查不属于当前绑定运行");
+    }
+    let mut missing = Vec::new();
+    for message in read_task_messages(connection, &persisted.task_id)? {
+        if message.recipient_task_id != persisted.task_id
+            || message.recipient_generation > persisted.generation
+            || !is_input_subject(&message.subject)
+        {
+            continue;
+        }
+        let id = Uuid::parse_str(&message.message_id)?;
+        let (_, record) = read_record(connection, id)?.context("普通 Grok 旧输入记录不存在")?;
+        let Some(delivery) = record.grok_terminal_delivery else {
+            continue;
+        };
+        if record.grok_terminal_result.is_some()
+            || !matches!(
+                delivery.status,
+                GrokTerminalDeliveryStatus::Finished {
+                    outcome: GrokTerminalOutcome::EndTurn,
+                    ..
+                }
+            )
+        {
+            continue;
+        }
+        let historical = read_task_generation(
+            connection,
+            &persisted.task_id,
+            delivery.task_generation,
+        )?
+        .context("普通 Grok 旧任务代不存在")?;
+        let historical_owner = owner(&historical)?;
+        if historical.generation != delivery.task_generation
+            || (historical.generation < persisted.generation
+                && !(historical.state.is_terminal()
+                    || historical.state == LocalCliTaskState::Disconnected))
+            || historical_owner.launch_id != delivery.launch_id
+            || historical_owner.binding_id != delivery.binding_id
+            || historical_owner.session_id != delivery.session_id
+            || delivery.session_id != persisted_owner.session_id
+        {
+            bail!("普通 Grok 旧回合不属于当前原生会话的历史链");
+        }
+        missing.push(delivery);
+        if missing.len() > 128 {
+            bail!("普通 Grok 待补查历史超过有界数量");
+        }
+    }
+    Ok(missing)
+}
+
+fn save_verified_exact(
+    connection: &mut SqliteConnection,
+    expected: GrokTerminalDelivery,
+    verified: GrokTerminalVerifiedResult,
+) -> Result<Option<LocalCliTask>> {
+    connection.immediate_transaction(|connection| {
+        let (raw, mut record) = read_record(connection, expected.message_id)?
+            .context("普通 Grok 已确认输入不存在")?;
+        let stored = record
+            .grok_terminal_delivery
+            .as_ref()
+            .context("普通 Grok 输入缺少原生回执")?;
+        if stored != &expected
+            || !matches!(
+                stored.status,
+                GrokTerminalDeliveryStatus::Finished {
+                    native_prompt_id,
+                    outcome: GrokTerminalOutcome::EndTurn,
+                } if native_prompt_id == verified.native_prompt_id
+            )
+            || verified.output.trim().is_empty()
+            || verified.output.len() > 8 * 1024 * 1024
+            || !verified
+                .completion_watermark
+                .strip_prefix(&format!("{}-", stored.session_id))
+                .is_some_and(|suffix| {
+                    suffix
+                        .parse::<u64>()
+                        .is_ok_and(|sequence| sequence.to_string() == suffix)
+                })
+        {
+            bail!("普通 Grok 历史结果不属于已经确认的原生回合");
+        }
+        if let Some(previous) = &record.grok_terminal_result {
+            if previous != &verified {
+                bail!("普通 Grok 同一回合出现不同的历史结果");
+            }
+            return Ok(None);
+        }
+        let historical = read_task_generation(connection, &stored.task_id, stored.task_generation)?
+            .context("普通 Grok 原任务代不存在")?;
+        let historical_owner = owner(&historical)?;
+        if historical_owner.launch_id != stored.launch_id
+            || historical_owner.binding_id != stored.binding_id
+            || historical_owner.session_id != stored.session_id
+            || historical.generation != stored.task_generation
+        {
+            bail!("普通 Grok 历史结果对应的运行身份已变化");
+        }
+        record.grok_terminal_result = Some(verified.clone());
+        write_record(connection, &raw, &record)?;
+
+        let messages = read_task_messages(connection, &stored.task_id)?;
+        let mut after_this = false;
+        for message in messages.iter().filter(|message| {
+            message.recipient_task_id == stored.task_id
+                && message.recipient_generation == stored.task_generation
+                && is_input_subject(&message.subject)
+        }) {
+            if message.message_id == record.message.message_id {
+                after_this = true;
+                continue;
+            }
+            if after_this
+                && read_record(connection, Uuid::parse_str(&message.message_id)?)?
+                    .is_some_and(|(_, later)| later.grok_terminal_result.is_some())
+            {
+                return Ok(None);
+            }
+        }
+        if !after_this {
+            bail!("普通 Grok 历史结果的输入顺序不存在");
+        }
+        let current = read_task(connection, &stored.task_id)?
+            .context("普通 Grok 当前任务不存在")?;
+        let mut task = if current.generation == stored.task_generation {
+            current.clone()
+        } else {
+            historical.clone()
+        };
+        // 消息级核验结果已保存；取消、失败或未知任务不可据此升级任务结果。
+        if task.state == LocalCliTaskState::Cancelled
+            || task.state == LocalCliTaskState::Failed
+            || task.state == LocalCliTaskState::Unknown
+        {
+            return Ok(None);
+        }
+        if task.result.as_deref() == Some(verified.output.as_str()) {
+            return Ok(Some(task));
+        }
+        task.revision = task.revision.checked_add(1).context("普通 Grok 任务 revision 溢出")?;
+        task.result = Some(verified.output);
+        if task.generation == current.generation {
+            checkpoint(connection, task.clone(), Some(task.generation))?;
+        } else {
+            let before = serde_json::to_string(&historical)?;
+            let changed = diesel::update(
+                local_cli_task_generations::table
+                    .find((&task.task_id, task.generation))
+                    .filter(local_cli_task_generations::data.eq(&before)),
+            )
+            .set(local_cli_task_generations::data.eq(serde_json::to_string(&task)?))
+            .execute(connection)?;
+            if changed != 1 {
+                bail!("普通 Grok 旧任务代已由其他写入取代");
+            }
+        }
+        Ok(Some(task))
     })
 }
 

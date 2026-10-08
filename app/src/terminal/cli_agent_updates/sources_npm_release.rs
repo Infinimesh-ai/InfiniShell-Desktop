@@ -43,7 +43,7 @@ const CLAUDE_PREPARE: &str = "node -e \"if (!process.env.AUTHORIZED) { console.e
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Layout {
-    Codex01561,
+    CodexNativeV1,
     ClaudeNativeV1,
 }
 
@@ -80,6 +80,8 @@ pub(super) struct NpmArchiveFile {
     pub(super) length: u64,
     pub(super) sha256: [u8; 32],
     pub(super) executable: bool,
+    /// 保留原始 tar 权限位，供固定发行合同校验；落盘策略仍由事务层决定。
+    pub(super) mode: u32,
 }
 
 struct ArchiveRead<'a, R> {
@@ -108,20 +110,61 @@ impl NpmRelease {
         wrapper_metadata: &[u8],
         platform_metadata: &[u8],
     ) -> Result<Self, Error> {
+        #[cfg(windows)]
+        let windows_claude_consumer = agent == CLIAgent::Claude
+            && target == "win32-x64"
+            && matches!(
+                version,
+                super::claude_current_release::V285 | super::claude_current_release::V287
+            )
+            && super::npm_claude_windows_contract::supports(version);
+        #[cfg(not(windows))]
+        let windows_claude_consumer = false;
         // 消费者渠道仍由外层选择；布局合同不会把本次验收外推到未知版本。
-        let layout = if agent == CLIAgent::Codex && version == "0.156.1" {
-            Layout::Codex01561
+        let layout = if agent == CLIAgent::Codex
+            && (version == "0.156.1"
+                || cfg!(all(target_os = "macos", target_arch = "aarch64"))
+                    && version == "0.160.0"
+                    && target == "darwin-arm64")
+        {
+            Layout::CodexNativeV1
         } else if agent == CLIAgent::Claude
             && (version == "2.1.280"
                 || (version == super::claude_downgrade::TO
-                    && matches!(target, "darwin-arm64" | "linux-x64")))
+                    && matches!(target, "darwin-arm64" | "linux-x64"))
+                || super::claude_current_release::supports(version, target).is_ok()
+                || windows_claude_consumer)
         {
             Layout::ClaudeNativeV1
         } else {
             return Err(Error::InvalidRelease);
         };
+        if agent == CLIAgent::Claude
+            && (target == "linux-x64-musl"
+                || matches!(
+                    version,
+                    super::claude_current_release::V285 | super::claude_current_release::V287
+                ))
+        {
+            if windows_claude_consumer {
+                #[cfg(windows)]
+                super::npm_claude_windows_contract::verify_metadata(
+                    version,
+                    wrapper_metadata,
+                    platform_metadata,
+                )
+                .map_err(|_| Error::InvalidRelease)?;
+            } else {
+                super::claude_current_release::verify_metadata(
+                    version,
+                    target,
+                    wrapper_metadata,
+                    platform_metadata,
+                )?;
+            }
+        }
         let (package, command, entry, targets) = match layout {
-            Layout::Codex01561 => (
+            Layout::CodexNativeV1 => (
                 "@openai/codex",
                 "codex",
                 "bin/codex.js",
@@ -141,14 +184,14 @@ impl NpmRelease {
             .iter()
             .map(|target| {
                 let requirement = match layout {
-                    Layout::Codex01561 => format!("npm:{package}@{version}-{target}"),
+                    Layout::CodexNativeV1 => format!("npm:{package}@{version}-{target}"),
                     Layout::ClaudeNativeV1 => version.to_owned(),
                 };
                 (format!("{package}-{target}"), requirement)
             })
             .collect();
         let scripts = match layout {
-            Layout::Codex01561 => json!({}),
+            Layout::CodexNativeV1 => json!({}),
             Layout::ClaudeNativeV1 => {
                 json!({"prepare":CLAUDE_PREPARE,"postinstall":"node install.cjs"})
             }
@@ -160,7 +203,7 @@ impl NpmRelease {
         });
         let platform_package = format!("{package}-{target}");
         let (platform_name, platform_version) = match layout {
-            Layout::Codex01561 => (package.to_owned(), format!("{version}-{target}")),
+            Layout::CodexNativeV1 => (package.to_owned(), format!("{version}-{target}")),
             Layout::ClaudeNativeV1 => (platform_package.clone(), version.to_owned()),
         };
         let mut components = target.split('-');
@@ -183,7 +226,7 @@ impl NpmRelease {
         let wrapper = NpmArtifact::from_metadata(wrapper_metadata, wrapper_contract)?;
         let platform = NpmArtifact::from_metadata(platform_metadata, platform_contract)?;
         let native_entry = match layout {
-            Layout::Codex01561 => {
+            Layout::CodexNativeV1 => {
                 let triple = match target {
                     "darwin-arm64" => "aarch64-apple-darwin",
                     "darwin-x64" => "x86_64-apple-darwin",
@@ -488,6 +531,7 @@ impl NpmArtifact {
                     length,
                     sha256: digest.finalize().into(),
                     executable: mode & 0o111 != 0,
+                    mode,
                 },
             );
         }

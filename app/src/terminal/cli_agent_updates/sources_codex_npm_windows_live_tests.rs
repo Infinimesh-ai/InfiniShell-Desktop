@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{Read as _, Write as _};
+use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -210,8 +211,11 @@ struct Manifest {
     root: PathBuf,
     worker: Binary,
     supervisor: Binary,
+    station_bootstrap: Binary,
     node: Binary,
     npm_cli: Binary,
+    #[serde(default)]
+    clr_reader: Option<Binary>,
     old_public_sha256: String,
     npm_install_sha256: String,
     npm_tree: BTreeMap<String, Member>,
@@ -219,7 +223,205 @@ struct Manifest {
     source_sha256: BTreeMap<String, String>,
 }
 
+// 与运行器的完整来源集合一致；验收文件无需嵌入生产监督程序。
 const SOURCES: &[(&str, &[u8])] = &[
+    (
+        "crates/command/src/windows_clr_reader.rs",
+        include_bytes!("../../../../crates/command/src/windows_clr_reader.rs"),
+    ),
+    (
+        "crates/command/src/windows_clr_reader_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_clr_reader_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_shell_classification.rs",
+        include_bytes!("../../../../crates/command/src/windows_shell_classification.rs"),
+    ),
+    (
+        "crates/command/src/windows_shell_classification_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_shell_classification_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_clr.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_clr.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_clr_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_clr_tests.rs"),
+    ),
+    (
+        "script/ci/g09-clr-reader/reader.cpp",
+        include_bytes!("../../../../script/ci/g09-clr-reader/reader.cpp"),
+    ),
+    (
+        "script/ci/g09-clr-reader/wire.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/wire.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/sos_layout.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/sos_layout.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/README.md",
+        include_bytes!("../../../../script/ci/g09-clr-reader/README.md"),
+    ),
+    (
+        "script/ci/g09-clr-reader/sources.safe.json",
+        include_bytes!("../../../../script/ci/g09-clr-reader/sources.safe.json"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/clrdata.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/clrdata.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/xclrdata.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/xclrdata.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/sospriv.h",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/sospriv.h"),
+    ),
+    (
+        "script/ci/g09-clr-reader/vendor/LICENSE.TXT",
+        include_bytes!("../../../../script/ci/g09-clr-reader/vendor/LICENSE.TXT"),
+    ),
+    (
+        "script/ci/g09-clr-fixture/build-reader.ps1",
+        include_bytes!("../../../../script/ci/g09-clr-fixture/build-reader.ps1"),
+    ),
+    (
+        "script/ci/g09-clr-fixture/preparation-context.ps1",
+        include_bytes!("../../../../script/ci/g09-clr-fixture/preparation-context.ps1"),
+    ),
+    (
+        "crates/command/src/windows_station_debugger.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debugger.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_debug_event.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debug_event.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_debugger_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debugger_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_debug_event_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debug_event_tests.rs"),
+    ),
+    (
+        "crates/command/src/managed.rs",
+        include_bytes!("../../../../crates/command/src/managed.rs"),
+    ),
+    (
+        "crates/command/src/managed_tests.rs",
+        include_bytes!("../../../../crates/command/src/managed_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_device_map.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_device_map.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_device_map_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_device_map_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_probe_control.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_probe_control.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_probe_control_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_probe_control_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_npm_probe_windows_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe_windows_tests.rs"),
+    ),
+    (
+        ".github/workflows/cross-platform-preflight.yml",
+        include_bytes!("../../../../.github/workflows/cross-platform-preflight.yml"),
+    ),
+    ("app/Cargo.toml", include_bytes!("../../../Cargo.toml")),
+    (
+        "crates/command/Cargo.toml",
+        include_bytes!("../../../../crates/command/Cargo.toml"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness_tests.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp_tests.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_witness.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_witness.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_witness_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_witness_tests.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows.rs",
+        include_bytes!("../../../../crates/command/src/windows.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_witness.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_witness.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_bootstrap_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_bootstrap_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_console_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_console_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_output_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_output_tests.rs"),
+    ),
     (
         "app/src/terminal/cli_agent_updates.rs",
         include_bytes!("../cli_agent_updates.rs"),
@@ -271,6 +473,22 @@ const SOURCES: &[(&str, &[u8])] = &[
     (
         "crates/command/src/windows_appcontainer.rs",
         include_bytes!("../../../../crates/command/src/windows_appcontainer.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_desktop.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_desktop.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_output.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_output.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_bootstrap.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_bootstrap.rs"),
+    ),
+    (
+        "crates/command/src/bin/infinishell-station-bootstrap.rs",
+        include_bytes!("../../../../crates/command/src/bin/infinishell-station-bootstrap.rs"),
     ),
     (
         "script/cli-agent-parity/codex_0156_package_manifest.json",
@@ -354,6 +572,89 @@ fn verify_shims(manifest: &Manifest) -> Result<(), String> {
     }
     Ok(())
 }
+// 仅验收入口接纳精确的首 CMD 取证开关；代次仍只能由生产父进程注入。
+fn validate_inherited_environment(
+    case: &str,
+    step: &str,
+    variables: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Result<(), String> {
+    let allowed = env_paths()
+        .into_iter()
+        .map(|(name, _)| name)
+        .chain([
+            "SYSTEMROOT",
+            "WINDIR",
+            "COMSPEC",
+            "PATH",
+            "PATHEXT",
+            "LANG",
+            "LC_ALL",
+            "DISABLE_AUTOUPDATER",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW",
+            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_MANIFEST",
+            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_STEP",
+            "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE",
+        ])
+        .collect::<std::collections::BTreeSet<_>>();
+    for (name, value) in variables {
+        let name = name.to_string_lossy().to_ascii_uppercase();
+        let permitted = if name == "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW" {
+            cfg!(feature = "cli-agent-native-witness")
+                && case == "updated"
+                && step == "execute"
+                && matches!(
+                    value.to_str(),
+                    Some("codex-npm-first-cmd-v1" | "codex-npm-first-powershell-v1")
+                )
+        } else {
+            allowed.contains(name.as_str())
+        };
+        check(permitted, "inherited_environment")?;
+    }
+    Ok(())
+}
+
+fn validate_clr_reader_scope(
+    present: bool,
+    case: &str,
+    step: &str,
+    permit: Option<&str>,
+) -> Result<(), String> {
+    let powershell = permit == Some("codex-npm-first-powershell-v1");
+    check(
+        present == powershell
+            && (!present
+                || cfg!(feature = "cli-agent-native-witness")
+                    && case == "updated"
+                    && step == "execute"),
+        "clr_reader_scope",
+    )
+}
+
+fn validate_clr_reader(reader: &Binary) -> Result<(), String> {
+    let identity = tree::path_identity(&reader.path).map_err(mapped)?;
+    check(
+        reader.path.canonicalize().ok().as_ref() == Some(&reader.path)
+            && !identity.directory
+            && identity.length > 0
+            && identity.length <= 64 * 1024 * 1024
+            && reader.sha256.len() == 64
+            && reader
+                .sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            && identity
+                .digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+                == reader.sha256
+            && tree::path_identity(&reader.path).map_err(mapped)? == identity,
+        "clr_reader_binding",
+    )
+}
+
 fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
     let root = &manifest.root;
     check(
@@ -393,30 +694,17 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
             "private_environment_path",
         )?;
     }
-    let allowed = env_paths()
-        .into_iter()
-        .map(|(name, _)| name)
-        .chain([
-            "SYSTEMROOT",
-            "WINDIR",
-            "COMSPEC",
-            "PATH",
-            "PATHEXT",
-            "LANG",
-            "LC_ALL",
-            "DISABLE_AUTOUPDATER",
-            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
-            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW",
-            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_MANIFEST",
-            "INFINISHELL_CLI_CODEX_WINDOWS_NPM_STEP",
-            "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE",
-        ])
-        .collect::<std::collections::BTreeSet<_>>();
-    for (name, _) in std::env::vars_os() {
-        check(
-            allowed.contains(name.to_string_lossy().to_ascii_uppercase().as_str()),
-            "inherited_environment",
-        )?;
+    validate_inherited_environment(&manifest.case, &step(), std::env::vars_os())?;
+    validate_clr_reader_scope(
+        manifest.clr_reader.is_some(),
+        &manifest.case,
+        &step(),
+        std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW")
+            .ok()
+            .as_deref(),
+    )?;
+    if let Some(reader) = &manifest.clr_reader {
+        validate_clr_reader(reader)?;
     }
     check(
         std::env::var("INFINISHELL_CLI_CODEX_WINDOWS_NPM_ALLOW").as_deref() == Ok(SCOPE)
@@ -432,6 +720,7 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
     for binary in [
         &manifest.worker,
         &manifest.supervisor,
+        &manifest.station_bootstrap,
         &manifest.node,
         &manifest.npm_cli,
     ] {
@@ -448,6 +737,15 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
             .as_ref()
             == Some(&manifest.worker.path),
         "worker_binding",
+    )?;
+    check(
+        manifest
+            .supervisor
+            .path
+            .parent()
+            .map(|directory| directory.join("infinishell-station-bootstrap.exe"))
+            == Some(manifest.station_bootstrap.path.clone()),
+        "station_bootstrap_not_packaged_sibling",
     )?;
     check(
         manifest
@@ -802,6 +1100,15 @@ async fn real_codex_windows_npm_update_without_model() {
             if step() == "recover" {
                 cold_recover(&manifest).await
             } else {
+                #[cfg(feature = "cli-agent-native-witness")]
+                if let Some(reader) = &manifest.clr_reader {
+                    // 完整清单与来源已核；注册不进入候选环境，仅供首个获准 PS 代次。
+                    managed_process::register_native_witness_reader(
+                        reader.path.clone(),
+                        reader.sha256.clone(),
+                    )
+                    .map_err(|_| "clr_reader_registration")?;
+                }
                 exercise(&manifest).await
             }
         })
@@ -820,5 +1127,235 @@ async fn real_codex_windows_npm_update_without_model() {
     assert!(
         result.is_ok(),
         "Windows npm 产品验收失败，原始现场保留：{result:?}"
+    );
+}
+
+#[test]
+fn windows_npm_witness_reader_rejects_changed_bytes_and_hardlinks() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("reader.exe");
+    fs::write(&path, b"fixed reader bytes; never execute").unwrap();
+    let reader = Binary {
+        path: path.canonicalize().unwrap(),
+        sha256: digest(&path).unwrap(),
+    };
+    assert_eq!(validate_clr_reader(&reader), Ok(()));
+    fs::write(&path, b"changed reader bytes; never execute").unwrap();
+    assert_eq!(
+        validate_clr_reader(&reader),
+        Err("clr_reader_binding".into())
+    );
+    let reader = Binary {
+        sha256: digest(&path).unwrap(),
+        ..reader
+    };
+    fs::hard_link(&path, directory.path().join("reader-alias.exe")).unwrap();
+    assert!(validate_clr_reader(&reader).is_err());
+}
+
+#[test]
+fn windows_npm_witness_reader_requires_exact_powershell_execute_scope() {
+    let permit = Some("codex-npm-first-powershell-v1");
+    let result = validate_clr_reader_scope(true, "updated", "execute", permit);
+    assert_eq!(result.is_ok(), cfg!(feature = "cli-agent-native-witness"));
+    assert_eq!(
+        validate_clr_reader_scope(false, "updated", "execute", permit),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "updated", "recover", permit),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "old_moved", "execute", permit),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "updated", "execute", Some("codex-npm-first-cmd-v1")),
+        Err("clr_reader_scope".into())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(true, "updated", "execute", None),
+        Err("clr_reader_scope".into())
+    );
+}
+
+#[test]
+fn windows_npm_witness_reader_keeps_regular_and_cmd_manifests_optional() {
+    assert_eq!(
+        validate_clr_reader_scope(false, "updated", "execute", None),
+        Ok(())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(false, "old_moved", "recover", None),
+        Ok(())
+    );
+    assert_eq!(
+        validate_clr_reader_scope(false, "updated", "execute", Some("codex-npm-first-cmd-v1")),
+        Ok(())
+    );
+}
+
+#[test]
+fn windows_npm_witness_environment_preserves_standard_environment() {
+    for case in [
+        "updated",
+        "old_moved",
+        "published_receipt_missing",
+        "external_change_preserved",
+        "candidate_changed_preserved",
+    ] {
+        for step in ["execute", "recover"] {
+            let variables = env_paths()
+                .into_iter()
+                .map(|(name, relative)| (OsString::from(name), OsString::from(relative)))
+                .chain([
+                    (OsString::from("Path"), OsString::from("private fixture")),
+                    (OsString::from("SystemRoot"), OsString::from("Windows")),
+                ]);
+            assert_eq!(
+                validate_inherited_environment(case, step, variables),
+                Ok(())
+            );
+        }
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_requires_compiled_feature() {
+    for name in [
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW",
+        "infinishell_windows_native_witness_allow",
+        "InfiniShell_Windows_Native_Witness_Allow",
+    ] {
+        let result = validate_inherited_environment(
+            "updated",
+            "execute",
+            [(
+                OsString::from(name),
+                OsString::from("codex-npm-first-cmd-v1"),
+            )],
+        );
+        if cfg!(feature = "cli-agent-native-witness") {
+            assert_eq!(result, Ok(()));
+        } else {
+            assert_eq!(result, Err("inherited_environment".to_string()));
+        }
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_rejects_wrong_values() {
+    for value in [
+        "",
+        "1",
+        "codex-npm-first-cmd-v2",
+        "CODEX-NPM-FIRST-CMD-V1",
+        "codex-npm-first-cmd-v1 ",
+        "codex-npm-first-cmd-v1\0extra",
+    ] {
+        let result = validate_inherited_environment(
+            "updated",
+            "execute",
+            [(
+                OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                OsString::from(value),
+            )],
+        );
+        assert_eq!(result, Err("inherited_environment".to_string()));
+    }
+    let result = validate_inherited_environment(
+        "updated",
+        "execute",
+        [(
+            OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+            OsString::from_wide(&[0xd800]),
+        )],
+    );
+    assert_eq!(result, Err("inherited_environment".to_string()));
+}
+
+#[test]
+fn windows_npm_witness_environment_rejects_other_cases_and_steps() {
+    for (case, step) in [
+        ("old_moved", "execute"),
+        ("published_receipt_missing", "execute"),
+        ("external_change_preserved", "execute"),
+        ("candidate_changed_preserved", "execute"),
+        ("unknown", "execute"),
+        ("updated", "recover"),
+        ("updated", "install"),
+        ("updated", ""),
+    ] {
+        let result = validate_inherited_environment(
+            case,
+            step,
+            [(
+                OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                OsString::from("codex-npm-first-cmd-v1"),
+            )],
+        );
+        assert_eq!(result, Err("inherited_environment".to_string()));
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_rejects_generation_and_unknown_names() {
+    for name in [
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION",
+        "infinishell_windows_native_witness_generation",
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_MODE",
+        "infinishell_windows_native_witness_mode",
+        "INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW_EXTRA",
+        "OPENAI_API_KEY",
+    ] {
+        for include_allow in [false, true] {
+            let mut variables = vec![(OsString::from(name), OsString::from("fixture"))];
+            if include_allow {
+                variables.push((
+                    OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                    OsString::from("codex-npm-first-cmd-v1"),
+                ));
+            }
+            assert_eq!(
+                validate_inherited_environment("updated", "execute", variables),
+                Err("inherited_environment".to_string())
+            );
+        }
+    }
+}
+
+#[test]
+fn windows_npm_witness_environment_powershell_requires_updated_execute_and_feature() {
+    let variable = || {
+        [(
+            OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+            OsString::from("codex-npm-first-powershell-v1"),
+        )]
+    };
+    let result = validate_inherited_environment("updated", "execute", variable());
+    if cfg!(feature = "cli-agent-native-witness") {
+        assert_eq!(result, Ok(()));
+    } else {
+        assert_eq!(result, Err("inherited_environment".to_string()));
+    }
+    assert_eq!(
+        validate_inherited_environment("updated", "recover", variable()),
+        Err("inherited_environment".to_string())
+    );
+    assert_eq!(
+        validate_inherited_environment("old_moved", "execute", variable()),
+        Err("inherited_environment".to_string())
+    );
+    assert_eq!(
+        validate_inherited_environment(
+            "updated",
+            "execute",
+            [(
+                OsString::from("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"),
+                OsString::from("codex-npm-first-powershell-v1 ")
+            )]
+        ),
+        Err("inherited_environment".to_string())
     );
 }

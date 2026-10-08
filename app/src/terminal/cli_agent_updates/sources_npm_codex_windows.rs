@@ -52,14 +52,26 @@ pub(super) fn version_invocation(entry: &Path) -> Result<Option<Invocation>, Err
         .join("WindowsPowerShell/v1.0/powershell.exe")
         .canonicalize()
         .map_err(|_| Error::UnsupportedPlatform)?;
+    // PowerShell 对 verbatim 路径有不同解释；只简化安全的呈现形式，并复核原有绑定。
+    // 尾点、保留名、UNC 或长路径等不能安全简化的路径保持原义，不直接截去前缀。
+    let presented_program = dunce::simplified(&program);
+    let presented_entry = dunce::simplified(&before.canonical);
+    if presented_program
+        .canonicalize()
+        .map_err(|_| Error::SourceChanged)?
+        != program
+        || stamp(presented_entry)? != before
+    {
+        return Err(Error::SourceChanged);
+    }
     Ok(Some(Invocation::new(
-        &program,
+        presented_program,
         [
             OsString::from("-NoLogo"),
             "-NoProfile".into(),
             "-NonInteractive".into(),
             "-File".into(),
-            entry.as_os_str().to_owned(),
+            presented_entry.as_os_str().to_owned(),
             "--version".into(),
         ],
     )))
@@ -271,14 +283,39 @@ fn journal_path(root: &Path) -> PathBuf {
 }
 
 fn save(root: &Path, journal: &Journal) -> Result<(), Error> {
-    let mut file = NamedTempFile::new_in(root).map_err(|_| Error::PersistenceFailed)?;
+    let phase = journal.phase;
+    let mut file = NamedTempFile::new_in(root).map_err(|failure| {
+        let os_error = failure.raw_os_error();
+        log::warn!(
+            "cli_agent_updates.windows_codex_npm_journal_failed operation=create phase={phase:?} os_error={os_error:?}"
+        );
+        Error::PersistenceFailed
+    })?;
     file.write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
-        .map_err(|_| Error::PersistenceFailed)?;
+        .map_err(|failure| {
+            let os_error = failure.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_journal_failed operation=write phase={phase:?} os_error={os_error:?}"
+            );
+            Error::PersistenceFailed
+        })?;
     file.as_file()
         .sync_all()
-        .map_err(|_| Error::PersistenceFailed)?;
+        .map_err(|failure| {
+            let os_error = failure.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_journal_failed operation=sync phase={phase:?} os_error={os_error:?}"
+            );
+            Error::PersistenceFailed
+        })?;
     file.persist(journal_path(root))
-        .map_err(|_| Error::PersistenceFailed)?;
+        .map_err(|failure| {
+            let os_error = failure.error.raw_os_error();
+            log::warn!(
+                "cli_agent_updates.windows_codex_npm_journal_failed operation=persist phase={phase:?} os_error={os_error:?}"
+            );
+            Error::PersistenceFailed
+        })?;
     super::sync_config_directory(root)
 }
 
@@ -734,13 +771,16 @@ pub(super) async fn execute(
         verified_exit(root, &journal, true)?;
         journal.owner.verify()?;
         unchanged(&journal, false)?;
-        let _images = tree::freeze_images(&journal.owner.package, &journal.original)?;
         if tree::snapshot(&journal.stage)?
             != *journal.prepared.as_ref().ok_or(Error::RecoveryRequired)?
         {
             return Err(Error::SourceChanged);
         }
-        tree::rename(&journal.owner.package, &journal.backup, &journal.original)?;
+        let images = tree::rename_inactive_images(
+            &journal.owner.package,
+            &journal.backup,
+            &journal.original,
+        )?;
         journal.phase = Phase::OldMoved;
         save(root, &journal)?;
         #[cfg(test)]
@@ -754,7 +794,7 @@ pub(super) async fn execute(
         live_tests::checkpoint(live_tests::Point::Published).await;
         journal.phase = Phase::Published;
         save(root, &journal)?;
-        drop(_images);
+        drop(images);
         if let Some(progress) = progress {
             progress.enter().await;
         }
@@ -810,6 +850,11 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     {
         return Ok(None);
     }
+    // 未收敛的事务日志仍在时，恢复失败不能解除应用内的启动保护。
+    recover_pending(entry, root).map_err(|_| Error::RecoveryRequired)
+}
+
+fn recover_pending(entry: &Path, root: &Path) -> Result<Option<String>, Error> {
     let mut journal: Journal =
         serde_json::from_slice(&read_limited(&journal_path(root), 12 * MAX_CONFIG)?)
             .map_err(|_| Error::RecoveryRequired)?;
@@ -847,9 +892,10 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         if tree::snapshot(&journal.backup)? != journal.original {
             return Err(Error::RecoveryRequired);
         }
-        let _images = tree::freeze_images(&journal.owner.package, prepared)?;
-        tree::rename(&journal.owner.package, &journal.stage, prepared)?;
+        let images =
+            tree::rename_inactive_images(&journal.owner.package, &journal.stage, prepared)?;
         tree::rename(&journal.backup, &journal.owner.package, &journal.original)?;
+        drop(images);
     }
     if tree::snapshot(&journal.owner.package)? != journal.original {
         return Err(Error::RecoveryRequired);
@@ -883,6 +929,10 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     super::sync_config_directory(root)?;
     Ok(None)
 }
+
+#[cfg(test)]
+#[path = "sources_npm_codex_windows_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "sources_codex_npm_windows_live_tests.rs"]

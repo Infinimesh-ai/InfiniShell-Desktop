@@ -42,16 +42,21 @@ import probe_claude_rich_images
                           capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def failed_probe(self, module, missing_private_tmp=False, timed_out=False):
+    def failed_probe(self, module, missing_private_tmp=False, timed_out=False,
+                     macos_registered=False, multi=False):
         with tempfile.TemporaryDirectory(prefix="claude-image-runner-offline-") as temporary:
             root = Path(temporary)
             binary = root / "未执行的二进制"
             binary.write_bytes(b"offline fixture only")
             output = root / "收据"
             args = SimpleNamespace(output=output, executable=binary, test_binary=binary,
-                                   supervisor=binary, case="jpeg", model="claude-opus-5-5")
+                                   supervisor=binary, case="jpeg", model="claude-opus-5-5",
+                                   private_root=root / "r-offline")
             binding = {"critical_source_sha256": {"offline-fixture": "a" * 64}}
             requested_dirs = []
+            authenticated_environment = []
+            if macos_registered:
+                args.private_root.mkdir(mode=0o700)
 
             def isolated_root(*args, **kwargs):
                 requested_dirs.append(kwargs.get("dir"))
@@ -67,7 +72,28 @@ import probe_claude_rich_images
                 return REAL_OPEN(path, mode, buffering, encoding, errors, newline)
 
             def fixture_process(command, **kwargs):
+                if module is rich and command[1:] == ["auth", "status", "--json"]:
+                    self.assertEqual(kwargs.get("cwd").name, "project")
+                    authenticated_environment.append(kwargs["env"])
+                    self.assertNotIn("CLAUDE_CONFIG_DIR", kwargs["env"])
+                    self.assertTrue(rich.adapter.API_ENVIRONMENT_KEYS.isdisjoint(kwargs["env"]))
+                    return subprocess.CompletedProcess(command, 0, json.dumps({
+                        "loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+                        "subscriptionType": "pro", "email": "private-account@example.invalid",
+                        "token": "PRIVATE_AUTH_CANARY"}), "")
                 self.assertEqual(kwargs.get("cwd"), module.REPOSITORY)
+                if module is rich:
+                    self.assertIs(kwargs["env"], authenticated_environment[0])
+                else:
+                    self.assertEqual(command[1], skill.MULTI_TEST if multi else skill.TEST)
+                if macos_registered:
+                    self.assertEqual(kwargs["env"]["TMPDIR"], str(args.private_root))
+                    self.assertEqual(kwargs["env"]["TMP"], str(args.private_root))
+                    self.assertEqual(kwargs["env"]["TEMP"], str(args.private_root))
+                    self.assertEqual(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_ROOT"], str(args.private_root))
+                for key in ("HOME", "CODEX_HOME"):
+                    if key in kwargs["env"]:
+                        self.assertEqual(kwargs["env"][key], os.environ.get(key))
                 events = Path(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_ARTIFACT"])
                 events.write_bytes((json.dumps({"event": "acceptance_failed", "reason": FAILURE_TEXT},
                                                ensure_ascii=False) + "\n").encode("utf-8"))
@@ -90,6 +116,18 @@ import probe_claude_rich_images
                 stack.enter_context(patch.object(subprocess, "_text_encoding", return_value="cp1252"))
                 stack.enter_context(patch.object(subprocess, "run", side_effect=fixture_process))
                 stack.enter_context(patch.object(subprocess, "check_output", return_value="b" * 40))
+                if module is rich:
+                    stack.enter_context(patch.object(rich.prepare_claude_cli, "current_platform",
+                        return_value="darwin-arm64" if macos_registered else "linux-x64"))
+                    if macos_registered:
+                        verified_root = stack.enter_context(patch.object(rich, "registered_macos_root",
+                            return_value=args.private_root))
+                else:
+                    stack.enter_context(patch.object(skill, "current_platform",
+                        return_value="darwin-arm64" if macos_registered else "linux-x64"))
+                    if macos_registered:
+                        verified_root = stack.enter_context(patch.object(skill, "private_macos_root",
+                            return_value=args.private_root))
                 if missing_private_tmp:
                     stack.enter_context(patch.object(Path, "is_dir", lambda path:
                         False if str(path) == "/private/tmp" else REAL_IS_DIR(path)))
@@ -100,13 +138,23 @@ import probe_claude_rich_images
                     else:
                         stack.enter_context(patch.object(module, "verify_binary", return_value={}))
                         stack.enter_context(patch.object(module, "verify_version"))
-                        stack.enter_context(patch.object(sys, "argv", ["probe", "--executable", str(binary),
-                            "--test-binary", str(binary), "--supervisor", str(binary), "--output", str(output)]))
+                        arguments = ["probe", "--executable", str(binary), "--test-binary", str(binary),
+                                     "--supervisor", str(binary), "--output", str(output)]
+                        if macos_registered:
+                            arguments.extend(["--private-root", str(args.private_root)])
+                        if multi:
+                            arguments.append("--multi")
+                        stack.enter_context(patch.object(sys, "argv", arguments))
                         module.main()
                 self.assertEqual(stopped.exception.code, 1)
             self.assertEqual((output / "test-output.txt").read_bytes(), FAILURE_TEXT.encode("utf-8"))
             receipt = json.loads((output / "receipt.json").read_text(encoding="utf-8"))
             self.assertFalse(receipt["acceptance_passed"] if module is rich else receipt["passed"])
+            self.assertNotIn("PRIVATE_AUTH_CANARY", json.dumps(receipt))
+            self.assertNotIn("private-account@example.invalid", json.dumps(receipt))
+            if macos_registered:
+                verified_root.assert_called_once_with(args.private_root)
+                self.assertEqual(requested_dirs, [])
             if missing_private_tmp:
                 self.assertEqual(requested_dirs, [None])
 
@@ -144,6 +192,102 @@ import probe_claude_rich_images
 
     def test_production_format_probe_uses_platform_temp_without_private_tmp(self):
         self.failed_probe(rich, missing_private_tmp=True)
+
+    def test_production_format_uses_registered_short_macos_tmpdir(self):
+        self.failed_probe(rich, macos_registered=True)
+
+    def test_production_skill_uses_registered_short_macos_tmpdir(self):
+        for multi in (False, True):
+            with self.subTest(multi=multi):
+                self.failed_probe(skill, macos_registered=True, multi=multi)
+
+    def test_production_authentication_ignores_parent_private_configuration(self):
+        with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": "unrelated-parent-config",
+                                    "ANTHROPIC_API_KEY": "UNRELATED_PARENT_AUTH"}):
+            self.failed_probe(rich)
+
+    def test_unavailable_default_account_cannot_launch_production_test(self):
+        with tempfile.TemporaryDirectory(prefix="claude-auth-environment-offline-") as temporary:
+            root = Path(temporary)
+            binary = root / "never-executed"
+            args = SimpleNamespace(output=root / "evidence", executable=binary, test_binary=binary,
+                                   supervisor=binary, case="jpeg", model="claude-opus-5-5")
+
+            def unauthenticated(command, **kwargs):
+                self.assertEqual(command[1:], ["auth", "status", "--json"])
+                self.assertNotIn("CLAUDE_CONFIG_DIR", kwargs["env"])
+                self.assertNotIn("ANTHROPIC_API_KEY", kwargs["env"])
+                return subprocess.CompletedProcess(command, 0, '{"loggedIn":false}', "")
+
+            with ExitStack() as stack:
+                stack.enter_context(patch.dict(os.environ, {
+                    "CLAUDE_CONFIG_DIR": "logged-in-parent-config",
+                    "ANTHROPIC_API_KEY": "UNRELATED_PARENT_AUTH"}))
+                stack.enter_context(patch.object(rich.prepare_claude_cli, "current_platform",
+                                                return_value="linux-x64"))
+                stack.enter_context(patch.object(tempfile, "mkdtemp", return_value=str(root)))
+                process = stack.enter_context(patch.object(subprocess, "run", side_effect=unauthenticated))
+                with self.assertRaisesRegex(ValueError, "默认账户尚未登录"):
+                    rich.run_production(args, {})
+                self.assertEqual(process.call_count, 1)
+                self.assertFalse((args.output / "events.ndjson").exists())
+
+    def test_production_main_does_not_probe_authentication_in_parent_environment(self):
+        arguments = ["probe", "--executable", "fixed-claude", "--test-binary", "libtest",
+                     "--supervisor", "supervisor", "--case", "jpeg", "--output", "evidence"]
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(sys, "argv", arguments))
+            stack.enter_context(patch.object(rich.prepare_claude_cli, "verify_binary", return_value={}))
+            stack.enter_context(patch.object(rich.prepare_claude_cli, "current_platform",
+                                            return_value="linux-x64"))
+            version = stack.enter_context(patch.object(subprocess, "check_output",
+                                                      return_value="2.1.280 (Claude Code)\n"))
+            production = stack.enter_context(patch.object(rich, "run_production"))
+            rich.main()
+            self.assertEqual(version.call_count, 1)
+            self.assertEqual(version.call_args.args[0], ["fixed-claude", "--version"])
+            production.assert_called_once()
+
+    def test_macos_root_rejects_missing_or_external_round_path(self):
+        for path in (None, Path("/Volumes/external/r-offline")):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError):
+                    rich.registered_macos_root(path)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "登记身份检查仅适用于 macOS")
+    def test_macos_root_requires_matching_running_directory_record(self):
+        with tempfile.TemporaryDirectory(prefix="claude-registered-root-offline-") as temporary:
+            base = Path(temporary)
+            root = base / "r-offline"
+            root.mkdir(mode=0o700)
+            records = base / "records"
+            records.mkdir(mode=0o700)
+            record = records / f"{root.name}.json"
+            directory = root.stat()
+            registered = {
+                "run_id": root.name, "status": "running", "temporary_directory": str(root),
+                "temporary_realpath": str(root.resolve()), "directory_device": directory.st_dev,
+                "directory_inode": directory.st_ino, "directory_owner": directory.st_uid,
+                "directory_mode": 0o700, "cleanup_ready": False,
+            }
+            with patch.object(rich, "private_macos_root", return_value=root):
+                with self.assertRaises(FileNotFoundError):
+                    rich.registered_macos_root(root)
+                record.write_text(json.dumps(registered), encoding="utf-8")
+                record.chmod(0o600)
+                self.assertEqual(rich.registered_macos_root(root), root)
+                for key, value in (("directory_inode", directory.st_ino + 1),
+                                   ("temporary_realpath", "/Volumes/external/r-offline"),
+                                   ("status", "cleaned"), ("cleanup_ready", True)):
+                    with self.subTest(key=key):
+                        changed = dict(registered, **{key: value})
+                        record.write_text(json.dumps(changed), encoding="utf-8")
+                        with self.assertRaisesRegex(ValueError, "登记状态或目录身份不匹配"):
+                            rich.registered_macos_root(root)
+                record.unlink()
+                record.symlink_to(root)
+                with self.assertRaisesRegex(ValueError, "登记文件身份或权限"):
+                    rich.registered_macos_root(root)
 
     def test_production_format_failure_preserves_utf8_under_windows_codepage(self):
         self.failed_probe(rich)

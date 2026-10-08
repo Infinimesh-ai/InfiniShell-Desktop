@@ -56,12 +56,14 @@ pub(super) async fn entries(
                 .map_err(|_| Error::PersistenceFailed)?
             )
         );
+        let (digest, acl_base_digest) = acl_probe_digest(journal, &program, digest)?;
         let binding = probe_binding(CLIAgent::Grok, digest.clone())?;
         let generation = Uuid::new_v4();
         journal.entry_probes.push(Probe {
             generation,
             program: program.clone(),
             digest,
+            acl_base_digest,
             version: None,
             arguments: vec!["--version".into()],
             completed: false,

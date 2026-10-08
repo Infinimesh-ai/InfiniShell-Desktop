@@ -1,4 +1,4 @@
-//! Codex 0.156.1 npm 的公共 Node launcher、平台别名包和完整资源闭包。
+//! 已审 Codex npm 的公共 Node launcher、平台别名包和完整资源闭包。
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -13,6 +13,8 @@ use super::{Error, Stamp, managed_process, stamp};
 
 const PACKAGE_MANIFEST: &[u8] =
     include_bytes!("../../../../script/cli-agent-parity/codex_0156_package_manifest.json");
+const MACOS_0160_MANIFEST: &[u8] =
+    include_bytes!("../../../../script/cli-agent-parity/codex_0160_macos_package_manifest.json");
 const WRAPPER_INTEGRITY: &str = "sha512-nI1iVl/n2SO2lSvlwEsJx63zdSI4C4Me2gR7AG0OWMJiGSakz2tY2hx43E39Zq5aEoeB5bZjJXzp5Sqhog6vyA==";
 const WRAPPER_FILES: [(&str, u64, &str, bool); 3] = [
     (
@@ -53,28 +55,71 @@ fn target() -> Result<(&'static str, &'static str, &'static str), Error> {
     }
 }
 
-pub(super) fn supports(version: &str) -> Result<(), Error> {
-    if version != "0.156.1" {
-        return Err(Error::InvalidRelease);
-    }
-    target().map(|_| ())
+struct ReleaseContract {
+    package_manifest: &'static [u8],
+    wrapper_integrity: &'static str,
+    platform_integrity: &'static str,
+    wrapper_manifest_sha256: &'static str,
 }
 
-pub(super) fn verify_metadata(wrapper: &[u8], platform: &[u8]) -> Result<(), Error> {
+fn release_contract(version: &str) -> Result<ReleaseContract, Error> {
     let (platform_name, _, _) = target()?;
+    match version {
+        "0.156.1" => Ok(ReleaseContract {
+            package_manifest: PACKAGE_MANIFEST,
+            wrapper_integrity: WRAPPER_INTEGRITY,
+            platform_integrity: match platform_name {
+                "darwin-arm64" => {
+                    "sha512-Jg6wbdV+wmMZczhwE74GSxOYEZlViKXn6KyCw/yfrz3PAKFD14xljuPopmdhWC1+8IKU2WdN5fdmXNPt2q4HPA=="
+                }
+                "linux-x64" => {
+                    "sha512-2ePo0wgOcnONKsuzp8vBjOmNY+IdsKaouaDDIdiKq9HOWNuV/GI22OeXft2A/1GaoL71ictO0/pLAsCEnQ6wew=="
+                }
+                _ => return Err(Error::UnsupportedPlatform),
+            },
+            wrapper_manifest_sha256: WRAPPER_FILES[1].2,
+        }),
+        "0.160.0" if cfg!(all(target_os = "macos", target_arch = "aarch64")) => {
+            Ok(ReleaseContract {
+                package_manifest: MACOS_0160_MANIFEST,
+                wrapper_integrity: "sha512-kEtVGzjRAYAMOwJxN39bGcna7LT3IDQgq64NNJ/dDTfu4OzZaocJcyNb5/gGJ/IVF/Vj7oK7E2m3nmTan7lpjg==",
+                platform_integrity: "sha512-aefV6cqZA2REZgR//4McyXlp7zLcTti4CI2v3j9IVgNndPBv2kCeNEcz07qeelXcwOdSFPUKb6roA48vZmDgrQ==",
+                wrapper_manifest_sha256: "29c350dfcd8d33749852c16e2f5dcde528409d7e1d3f5d916fe3c576f3914820",
+            })
+        }
+        _ => Err(Error::InvalidRelease),
+    }
+}
+
+pub(super) fn supports(version: &str) -> Result<(), Error> {
+    release_contract(version).map(|_| ())
+}
+
+/// 恢复仍沿用旧收据摘要，但其中的固定 wrapper 必须属于账本的目标版本。
+pub(super) fn verify_probe_target(
+    version: &str,
+    stage: &Path,
+    closure: &ProbeClosure,
+) -> Result<(), Error> {
+    let contract = release_contract(version)?;
+    let path = stage.join("package.json");
+    let manifest = closure
+        .expected_files
+        .iter()
+        .find(|file| file.path() == path)
+        .ok_or(Error::RecoveryRequired)?;
+    if !manifest.matches_release_image(WRAPPER_FILES[1].1, contract.wrapper_manifest_sha256) {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
+pub(super) fn verify_metadata(version: &str, wrapper: &[u8], platform: &[u8]) -> Result<(), Error> {
+    let contract = release_contract(version)?;
     let wrapper: Value = serde_json::from_slice(wrapper).map_err(|_| Error::InvalidRelease)?;
     let platform: Value = serde_json::from_slice(platform).map_err(|_| Error::InvalidRelease)?;
-    let platform_integrity = match platform_name {
-        "darwin-arm64" => {
-            "sha512-Jg6wbdV+wmMZczhwE74GSxOYEZlViKXn6KyCw/yfrz3PAKFD14xljuPopmdhWC1+8IKU2WdN5fdmXNPt2q4HPA=="
-        }
-        "linux-x64" => {
-            "sha512-2ePo0wgOcnONKsuzp8vBjOmNY+IdsKaouaDDIdiKq9HOWNuV/GI22OeXft2A/1GaoL71ictO0/pLAsCEnQ6wew=="
-        }
-        _ => return Err(Error::UnsupportedPlatform),
-    };
-    if wrapper["dist"]["integrity"] != WRAPPER_INTEGRITY
-        || platform["dist"]["integrity"] != platform_integrity
+    if wrapper["dist"]["integrity"] != contract.wrapper_integrity
+        || platform["dist"]["integrity"] != contract.platform_integrity
     {
         return Err(Error::InvalidRelease);
     }
@@ -82,10 +127,12 @@ pub(super) fn verify_metadata(wrapper: &[u8], platform: &[u8]) -> Result<(), Err
 }
 
 pub(super) fn verify_archives(
+    version: &str,
     release: &NpmRelease,
     wrapper: &VerifiedNpmArchive,
     platform: &VerifiedNpmArchive,
 ) -> Result<(), Error> {
+    let contract = release_contract(version)?;
     let (target, package, triple) = target()?;
     if release.public_entry != Path::new("bin/codex.js")
         || release.dependency_directory
@@ -96,7 +143,9 @@ pub(super) fn verify_archives(
     {
         return Err(Error::InvalidRelease);
     }
-    for (path, size, digest, executable) in WRAPPER_FILES {
+    let mut wrapper_files = WRAPPER_FILES;
+    wrapper_files[1].2 = contract.wrapper_manifest_sha256;
+    for (path, size, digest, executable) in wrapper_files {
         let file = wrapper
             .files
             .get(Path::new(path))
@@ -104,16 +153,17 @@ pub(super) fn verify_archives(
         if file.length != size
             || file.sha256 != digest_bytes(digest)?
             || file.executable != executable
+            || version == "0.160.0" && file.mode != if executable { 0o755 } else { 0o644 }
         {
             return Err(Error::InvalidRelease);
         }
     }
     let metadata: Value =
-        serde_json::from_slice(PACKAGE_MANIFEST).map_err(|_| Error::InvalidRelease)?;
+        serde_json::from_slice(contract.package_manifest).map_err(|_| Error::InvalidRelease)?;
     let expected = &metadata["packages"][package];
     let files: BTreeMap<PathBuf, (u64, String, u32)> =
         serde_json::from_value(expected["files"].clone()).map_err(|_| Error::InvalidRelease)?;
-    if metadata["version"] != "0.156.1"
+    if metadata["version"] != version
         || expected["target"] != triple
         || platform.files.len() != files.len() + 2
     {
@@ -125,8 +175,34 @@ pub(super) fn verify_archives(
             .files
             .get(Path::new(name))
             .ok_or(Error::InvalidRelease)?;
-        if entry.executable || entry.length == 0 || entry.length > 64 * 1024 {
+        if entry.executable
+            || version == "0.160.0" && entry.mode != 0o644
+            || entry.length == 0
+            || entry.length > 64 * 1024
+        {
             return Err(Error::InvalidRelease);
+        }
+    }
+    if version == "0.160.0" {
+        for (path, length, digest) in [
+            (
+                "package.json",
+                517,
+                "2497ae33d4df7cb43618e3935fb1dfbff6a7bf536e2258776d1e95afc3c47017",
+            ),
+            (
+                "README.md",
+                3334,
+                "ba4e1f69ff48386e72a9c5e1edaf76aad64a475c2d51af79ccba6d1128261ba7",
+            ),
+        ] {
+            let file = platform
+                .files
+                .get(Path::new(path))
+                .ok_or(Error::InvalidRelease)?;
+            if file.length != length || file.sha256 != digest_bytes(digest)? {
+                return Err(Error::InvalidRelease);
+            }
         }
     }
     for (path, (length, digest, mode)) in files {
@@ -135,6 +211,7 @@ pub(super) fn verify_archives(
         if file.length != length
             || file.sha256 != digest_bytes(&digest)?
             || file.executable != (mode & 0o111 != 0)
+            || version == "0.160.0" && file.mode != mode
         {
             return Err(Error::InvalidRelease);
         }
@@ -186,3 +263,13 @@ pub(super) fn capture_probe(
         expected_files,
     })
 }
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+    )
+))]
+#[path = "sources_npm_codex_tests.rs"]
+mod tests;

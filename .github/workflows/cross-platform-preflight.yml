@@ -26,18 +26,51 @@ on:
         required: true
         default: false
         type: boolean
-      upstream_essence_only:
-        description: 仅运行上游精华修复定向验证；全量模式优先，不可叠加其他专项
-        required: false
-        default: false
-        type: boolean
       native_acceptance_only:
         description: 仅补验原生 CLI 安装升级和 GUI；全量模式优先
         required: true
         default: false
         type: boolean
+      source_gate_only:
+        description: 仅运行完整普通源码门禁及自建辅助回归；不覆盖已知原生失败或关闭缺口
+        required: true
+        default: false
+        type: boolean
       run_gui_clipboard:
         description: 单独复验真实 GUI 系统剪贴板，不重复完整工作区测试
+        required: true
+        default: false
+        type: boolean
+      run_grok_viewport_static:
+        description: 单独采集 Linux/Windows 固定 Grok 英中静态视口，审批仍待在线验收
+        required: true
+        default: false
+        type: boolean
+      run_grok_viewport_approval_synthetic:
+        description: 采集 Linux/Windows 固定 Grok 英中合成审批视口与按钮动作，原生审批另验
+        required: true
+        default: false
+        type: boolean
+      run_grok_native_bridge_host:
+        description: 验证普通 Grok 宿主、生产 ConPTY 辅助程序及输入回归，不重建原生工件
+        required: true
+        default: false
+        type: boolean
+      run_grok_native_bridge_source:
+        description: 从受审公开源码构建 Linux/Windows 普通 Grok 原子桥并保存独立工件
+        required: true
+        default: false
+        type: boolean
+      grok_native_source_capability:
+        description: 原生构建能力；通知扩展使用独立补丁和工件，不替换已验原子桥
+        required: true
+        default: terminal-bridge
+        type: choice
+        options:
+          - terminal-bridge
+          - session-notifications
+      run_claude_image_regression:
+        description: Linux/Windows 定向运行 Claude 图片格式、纯图及图片加技能离线回归
         required: true
         default: false
         type: boolean
@@ -71,6 +104,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_windows_npm_native_witness:
+        description: 仅固定 Codex npm 首个选定模式候选的取消前原生取证；不计完整验收
+        required: true
+        default: false
+        type: boolean
       run_grok_npm_updates:
         description: Linux 私有 npm 安装的 Grok 1.0.41 后端更新事务及中断恢复
         required: true
@@ -82,13 +120,23 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 原生调试范围；stdio 仅跑普通 CMD 标准流正例、固定 Node 根标准流与 NUL 重定向三项
+        description: 专项范围；upstream_essence 仅验上游精华，g09_clr_fixture 验固定 CLR，g09_npm_powershell 选择首 PS 快照
         required: true
         default: all
         type: choice
         options:
           - all
+          - upstream_essence
           - stdio
+          - nul_token
+          - g09_tokens
+          - g09_netcredentials
+          - g09_stdio_lifetime
+          - codex_hooks
+          - g09_image_contract
+          - g09_powershell_contract
+          - g09_clr_fixture
+          - g09_npm_powershell
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -100,7 +148,7 @@ on:
           - claude
           - grok
       linux_atomic_agent:
-        description: 原生补验模式的 Linux 升级对象；默认和全量模式始终验三款
+        description: 原生补验模式的 Linux 升级对象；claude_musl 仅用于独立 Claude npm musl 验收
         required: true
         default: all
         type: choice
@@ -109,6 +157,7 @@ on:
           - codex
           - claude
           - grok
+          - claude_musl
 # 自托管 runner 只需要读取代码。这个 workflow 不接收部署密钥，也不向仓库写入内容。
 permissions:
   contents: read
@@ -122,11 +171,89 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  validate_scope:
+    name: Validate verification scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # 独立前置 job 阻止冲突模式进入含 !cancelled() 条件的后续步骤。
+      - name: Reject conflicting source-only inputs
+        shell: bash
+        env:
+          PREFLIGHT_INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if inputs.get("windows_atomic_debug_scope") == "upstream_essence" and not inputs.get("full_workspace_tests", False):
+              allowed = {"run_linux", "run_windows", "windows_atomic_debug_scope"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in allowed and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts:
+                  sys.exit("上游精华验证不能与其他专项混用：" + ", ".join(sorted(conflicts)))
+              if not (inputs.get("run_linux", False) or inputs.get("run_windows", False)):
+                  sys.exit("上游精华验证至少选择 Linux 或 Windows 一个平台")
+          if inputs.get("linux_atomic_agent") == "claude_musl":
+              required = {"run_linux", "native_acceptance_only", "run_claude_npm_updates"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "all", "windows_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"linux_atomic_agent"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name) is True for name in required):
+                  sys.exit("Claude npm musl 验收只允许独立 Linux 原生补验，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
+          if inputs.get("windows_atomic_debug_scope") == "g09_npm_powershell" and not inputs.get("run_windows_npm_native_witness", False):
+              sys.exit("PowerShell 原生取证范围必须显式开启限定 witness")
+          if inputs.get("windows_atomic_debug_scope") == "g09_stdio_lifetime":
+              required = {"run_windows", "run_atomic_windows_debug"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name, False) for name in required):
+                  sys.exit("标准流生命周期对照只允许单独 Windows 限定范围：" + ", ".join(sorted(conflicts)))
+          if inputs.get("windows_atomic_debug_scope") in {"g09_image_contract", "g09_powershell_contract", "g09_clr_fixture"}:
+              required = {"run_windows"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or inputs.get("run_windows") is not True:
+                  sys.exit("固定 Windows 实现验证只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
+          if inputs.get("windows_atomic_debug_scope") == "codex_hooks":
+              required = {"run_windows", "run_atomic_windows_debug"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name, False) for name in required):
+                  sys.exit("固定 Codex hooks 复验只允许单独 Windows 范围：" + ", ".join(sorted(conflicts)))
+          if inputs.get("run_windows_npm_native_witness", False):
+              required = {"run_windows", "windows_grok_installer_only", "run_windows_codex_npm_updates", "run_windows_npm_native_witness"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "g09_npm_powershell" if inputs.get("windows_atomic_debug_scope") == "g09_npm_powershell" else "all", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or not all(inputs.get(name, False) for name in required):
+                  sys.exit("原生取证只允许单独 Windows 首个选定模式范围：" + ", ".join(sorted(conflicts)))
+          if not inputs.get("source_gate_only", False):
+              sys.exit(0)
+          allowed = {"source_gate_only", "run_linux", "run_windows"}
+          defaults = {
+              "grok_native_source_capability": "terminal-bridge",
+              "windows_atomic_debug_scope": "all",
+              "windows_atomic_agent": "all",
+              "linux_atomic_agent": "all",
+          }
+          conflicts = [
+              name for name, value in inputs.items()
+              if name not in allowed
+              and (value if isinstance(value, bool) else name not in defaults or defaults[name] != value)
+          ]
+          if conflicts:
+              sys.exit("源码门禁不能与专项、原生、GUI 或全量模式混用：" + ", ".join(sorted(conflicts)))
+          if not (inputs.get("run_linux", False) or inputs.get("run_windows", False)):
+              sys.exit("源码门禁至少选择 Linux 或 Windows 一个平台")
+          PY
+
   upstream_essence:
     name: 上游精华 / ${{ matrix.platform }} x64
+    needs: validate_scope
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      inputs.upstream_essence_only && !inputs.full_workspace_tests
+      inputs.windows_atomic_debug_scope == 'upstream_essence' && !inputs.full_workspace_tests
     strategy:
       fail-fast: false
       matrix:
@@ -172,7 +299,7 @@ jobs:
             exit 1
           fi
           if [[ "$OTHER_SPECIALIZED_MODE" == true ]]; then
-            echo '::error::upstream_essence_only 不可与其他专项模式同时开启。'
+            echo '::error::upstream_essence 不可与其他专项模式同时开启。'
             exit 1
           fi
 
@@ -349,10 +476,11 @@ jobs:
 
   linux:
     name: Linux x64
+    needs: validate_scope
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_linux &&
-       (!inputs.upstream_essence_only || inputs.full_workspace_tests))
+       (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, linux, x64, infinishell-ci]
     timeout-minutes: 180
     steps:
@@ -361,6 +489,13 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           clean: true
+
+      - name: Validate Linux native bridge verification scope
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.run_grok_native_bridge_source || inputs.run_grok_native_bridge_host) && inputs.linux_gui_only && !inputs.full_workspace_tests }}
+        shell: bash
+        run: |
+          echo '::error::普通桥门禁不能与仅 GUI 模式同时启用'
+          exit 1
 
       # 固定完整 action 提交和 Python 补丁版本，只更新当前作业的工具链环境。
       - name: Install Python for CLI parity verification
@@ -443,6 +578,7 @@ jobs:
           python3 -B script/cli-agent-parity/claude_coordinator_v2_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_batch_cancel_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_approval_cancel_runner_tests.py -v
+          python3 -B script/cli-agent-parity/claude_v2_write_cancel_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_image_probe_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
@@ -459,6 +595,9 @@ jobs:
           # 仅运行合成证据与准备边界回归，不启动真实 CLI 或模型。
           python3 -B script/cli-agent-parity/grok_native_skill_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_fixed_policy_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_user_skill_runner_tests.py -v
+          python3 -B script/cli-agent-parity/run_grok_fixed_skill_live_tests.py -v
+          python3 -B script/cli-agent-parity/grok_image_skill_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_child_coordinator_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_files_policy_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_selected_skill_runner_tests.py -v
@@ -486,7 +625,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
 
       - name: Prepare fixed native Codex without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success') }}
         id: fixed_codex
         shell: bash
         run: |
@@ -495,7 +634,7 @@ jobs:
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success') }}
         id: fixed_claude
         shell: bash
         timeout-minutes: 10
@@ -505,7 +644,7 @@ jobs:
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests || inputs.run_grok_viewport_static || inputs.run_grok_viewport_approval_synthetic) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success') }}
         id: fixed_grok
         shell: bash
         timeout-minutes: 5
@@ -579,6 +718,43 @@ jobs:
         shell: bash
         run: cargo check -p warp --lib
 
+      - name: Build fixed Grok terminal bridge from public source on Linux
+        id: grok_native_bridge_source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_grok_native_bridge_source && !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 90
+        run: |
+          set -euo pipefail
+          python3 -B script/cli-agent-parity/build_grok_terminal_bridge_tests.py -v
+          python3 -B script/cli-agent-parity/run_private_linux_tmp_tests.py -v
+          python3 -I -B script/cli-agent-parity/run_private_linux_tmp.py --receipt "$RUNNER_TEMP/grok-native-tmp.safe.json" -- python3 -I -B script/cli-agent-parity/build_grok_terminal_bridge.py --capability '${{ inputs.grok_native_source_capability || 'terminal-bridge' }}' --output "$RUNNER_TEMP/grok-terminal-bridge-source" --target-dir "$GITHUB_WORKSPACE/target/grok-terminal-bridge"
+
+      - name: Preserve Linux Grok terminal bridge source build
+        if: ${{ always() && (steps.grok_native_bridge_source.outcome == 'success' || steps.grok_native_bridge_source.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-${{ inputs.grok_native_source_capability || 'terminal-bridge' }}-linux-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/grok-terminal-bridge-source/artifacts
+            ${{ runner.temp }}/grok-native-tmp.safe.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Test Claude image acceptance runner on Linux
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+          python3 -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
+
+      - name: Test Claude image and skill regressions on Linux
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: bash
+        run: >-
+          cargo nextest run --no-fail-fast -p warp --lib
+          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::) | test(ai::cli_agent_runtime::claude::live_tests::managed_image_live_tests::tests::)'
+
       # GUI 专项包含字体行为修正，仍保留用户功能的双语资源门禁。
       - name: Test bilingual resources for Linux GUI verification
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.linux_gui_only && !inputs.full_workspace_tests }}
@@ -598,8 +774,19 @@ jobs:
         id: test_app
         shell: bash
         run: >-
+          python3 -I -B script/cli-agent-parity/run_private_linux_tmp.py
+          --receipt "$RUNNER_TEMP/grok-host-tmp.safe.json" --
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && (inputs.native_acceptance_only || inputs.run_grok_native_bridge_host) && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_sessions::grok_native_bridge) | test(terminal::cli_agent_sessions::grok_owned_launch) | test(terminal::cli_agent_sessions::grok_leader_input) | test(terminal::view::grok_remote_owned::) | test(terminal::cli_agent_sessions::tests::) | (test(terminal::view::tests::) & (test(ctrl_c) | test(escape))) | test(persistence::local_cli_tasks::grok_native_bridge::tests::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+
+      - name: Preserve Linux host test temporary directory evidence
+        if: ${{ always() && (steps.test_app.outcome == 'success' || steps.test_app.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-host-tmp-linux-${{ github.sha }}
+          path: ${{ runner.temp }}/grok-host-tmp.safe.json
+          if-no-files-found: error
+          retention-days: 14
 
       # 客户端图片 RPC 合同属于 remote_server crate，warp 的筛选不会执行这些用例。
       # 只读解析固定 Node 与系统 loader/cache/依赖，不启动候选或绕过 Landlock。
@@ -616,7 +803,7 @@ jobs:
       - name: Test remote CLI image client contracts
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
-        run: cargo nextest run --no-fail-fast -p remote_server --lib -E 'test(client::image_staging::tests::)'
+        run: cargo nextest run --no-fail-fast -p remote_server --lib -E 'test(client::image_staging::tests::) | test(client::terminal_binding::tests::) | test(terminal_candidate) | test(manager::)'
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
@@ -639,9 +826,25 @@ jobs:
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
-        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
+        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed::linux::tests::)'
 
-      # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
+      # 诊断仅在专用 feature 中经专用匿名管道启用；先保存通知 worker，再重建默认 supervisor。
+      - name: Build Linux notification worker with bounded phase evidence
+        id: notify_trace_worker
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 30
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          set -euo pipefail
+          cargo nextest run --locked --no-fail-fast -p warp --lib --features cli-agent-notify-trace -E 'test(cli_agent_notify_trace::tests::)'
+          cargo build -p warp_tui --bin infinishell-tui --features cli-agent-notify-trace
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          # 正式身份门禁要求单链接入口；保留独立副本，不修改 Cargo 缓存产物。
+          install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
+
+      # 默认构建仍用于正式 supervisor；通知诊断 feature 不传入原子更新等后续验收。
       - name: Build CLI process supervisor
         id: supervisor
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
@@ -651,16 +854,26 @@ jobs:
         run: cargo build -p warp_tui --bin infinishell-tui
 
       - name: Test installed Grok hook through the native notification worker
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' && steps.notify_trace_worker.outcome == 'success' }}
         shell: bash
-        timeout-minutes: 3
+        timeout-minutes: 8
         run: |
           set -euo pipefail
-          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
-          # Cargo 可以把顶层二进制硬链接到 deps 产物；正式安装身份门禁要求单链接文件。
-          # 复制同提交构建产物到 runner 私有目录，不放宽生产 worker 的身份校验。
-          install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
+          # 补齐已定义的真实 shell 回归依赖，避免缺少解释器时静默跳过。
+          if ! command -v fish >/dev/null || ! command -v zsh >/dev/null; then
+            apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=30)
+            timeout 120s sudo -n apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update
+            timeout 180s sudo -n env DEBIAN_FRONTEND=noninteractive apt-get "${apt_options[@]}" install --no-install-recommends -y fish zsh
+          fi
+          for dependency in bash zsh fish tmux; do
+            command -v "$dependency"
+          done
+          zsh --version
+          fish --version
+          tmux -V
           export INFINISHELL_TEST_NOTIFY_WORKER="$RUNNER_TEMP/infinishell-test-notify-worker"
+          export INFINISHELL_TEST_NOTIFY_TRACE_REQUIRED=1
+          python3 -B script/cli-agent-parity/run_installed_grok_hook_tests.py -v
           python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
 
       # 只验原生安装/inspect/升级/禁用/修复；没有凭据时不声称 SessionStart 已派发。
@@ -716,6 +929,8 @@ jobs:
         if: ${{ !cancelled() && inputs.run_claude_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 45
+        env:
+          CLAUDE_NPM_MUSL: ${{ inputs.linux_atomic_agent == 'claude_musl' }}
         run: |
           set -euo pipefail
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
@@ -730,12 +945,17 @@ jobs:
           digest() { sha256sum "$1" | cut -d ' ' -f 1; }
           test "$(digest "$target_dir/debug/infinishell-tui")" = "$(digest "$fixture_parent/supervisor")"
           test "$(digest "$test_binary")" = "$(digest "$fixture_parent/warp-libtest")"
+          # 仅显式 musl 范围改变平台参数，其他范围继续使用驱动原默认值。
+          libc_args=()
+          if [ "$CLAUDE_NPM_MUSL" = "true" ]; then
+            libc_args=(--linux-libc musl)
+          fi
           python3 -B script/cli-agent-parity/run_claude_npm_update_live.py \
             --repo "$GITHUB_WORKSPACE" --output "$fixture_parent/evidence" \
             --test-binary "$fixture_parent/warp-libtest" --test-binary-sha256 "$(digest "$fixture_parent/warp-libtest")" \
             --supervisor "$fixture_parent/supervisor" --supervisor-sha256 "$(digest "$fixture_parent/supervisor")" \
             --node "$node_path" --node-sha256 "$(digest "$node_path")" \
-            --npm-cli "$npm_path" --npm-cli-sha256 "$(digest "$npm_path")"
+            --npm-cli "$npm_path" --npm-cli-sha256 "$(digest "$npm_path")" ${libc_args[@]+"${libc_args[@]}"}
 
       - name: Preserve Linux Claude npm update receipts
         if: ${{ !cancelled() && inputs.run_claude_npm_updates && steps.claude_npm_updates.outcome != 'skipped' && env.CLAUDE_NPM_EVIDENCE != '' }}
@@ -744,6 +964,7 @@ jobs:
           name: cli-linux-claude-npm-updates-${{ github.sha }}
           path: |
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.safe.json
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/manifest.private.json
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.metadata.json
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.stdout
             ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.stderr
@@ -876,7 +1097,7 @@ jobs:
           python3 -B script/cli-agent-parity/run_grok_supervised_exit.py --test-binary "$test_binary" --grok "$INFINISHELL_TEST_GROK_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/grok-supervised-exit.json"
 
       - name: Preserve Linux native CLI boundary evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-linux-native-boundaries-${{ github.sha }}
@@ -914,7 +1135,7 @@ jobs:
         shell: bash
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
-          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(i18n::tests)'
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
@@ -1001,6 +1222,52 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Verify Linux fixed Grok bilingual static viewport
+        id: grok_static_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_static }}
+        shell: bash
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-view-evidence/linux
+        run: |
+          set -euo pipefail
+          cargo build -p integration --bin integration
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          bash script/cli-agent-parity/run_linux_grok_static_viewport.sh "$target_dir/debug/integration"
+
+      - name: Preserve Linux fixed Grok static viewport evidence
+        if: ${{ !cancelled() && (steps.grok_static_viewport.outcome == 'success' || steps.grok_static_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-grok-static-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-view-evidence/linux
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Verify Linux fixed Grok bilingual synthetic approval viewport
+        id: grok_approval_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_approval_synthetic }}
+        shell: bash
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-approval-evidence/linux
+        run: |
+          set -euo pipefail
+          cargo build -p integration --bin integration
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          bash script/cli-agent-parity/run_linux_grok_approval_viewport.sh "$target_dir/debug/integration"
+
+      - name: Preserve Linux fixed Grok synthetic approval viewport evidence
+        if: ${{ !cancelled() && (steps.grok_approval_viewport.outcome == 'success' || steps.grok_approval_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-grok-approval-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-approval-evidence/linux
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Run desktop workspace unit tests
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: bash
@@ -1008,9 +1275,25 @@ jobs:
         # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
+      - name: Report Linux source-only gate boundary
+        if: ${{ always() && inputs.source_gate_only }}
+        shell: bash
+        env:
+          CHECK_RESULT: ${{ steps.check_app.outcome }}
+          TEST_RESULT: ${{ steps.test_app.outcome }}
+        run: |
+          {
+            echo '### Linux 普通源码门禁'
+            echo "提交：$GITHUB_SHA；cargo check：$CHECK_RESULT；普通主应用回归：$TEST_RESULT。其余源码步骤须按本 job 终态分别审计。"
+            echo '保留原普通广筛、完整更新器、i18n、command/IPC 和平台辅助回归；自建 worker/合成夹具不计外部 CLI 验收。'
+            echo '未执行固定外部 CLI、真实安装/升级/恢复及 GUI 专项；这些条件仍待验收。'
+            echo '6726e735994568e0f2b0995a068d6c5bb32924f1 / run 37045744557 的 Windows 固定 Codex hooks 退出和真实 npm 首 CMD 候选失败仍然保留；本次源码结果不覆盖或修复它们，不关闭 G09，不构成最终合并许可。'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   macos_intel_ssh_extension_build:
     name: macOS Intel SSH extension fallback cross-build
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel && (!inputs.upstream_essence_only || inputs.full_workspace_tests) }}
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel && (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests) }}
     runs-on: macos-26
     timeout-minutes: 360
     outputs:
@@ -1104,12 +1387,218 @@ jobs:
           [[ "$version" == *"$EXPECTED_TAG"* ]]
           test -d resources
 
+  windows_g09_image_contract:
+    name: Windows fixed system image contract
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope == 'g09_image_contract' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 只保存与 b3 原代次摘要一致的四个固定候选，不执行映像或原生探针。
+      - name: Collect fixed Windows system images without executing them
+        shell: pwsh
+        timeout-minutes: 3
+        run: ./script/ci/collect_g09_windows_images.ps1
+
+      - name: Preserve fixed system image bytes and mismatch evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: g09-windows-image-contract-${{ github.sha }}
+          path: ${{ runner.temp }}/g09-image-contract-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  windows_g09_powershell_contract:
+    name: Windows PowerShell 5.1 implementation contract
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope == 'g09_powershell_contract' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 使用系统 Windows PowerShell 5.1 读取实际加载的实现，不实例化命令处理器或执行升级候选。
+      - name: Read loaded PowerShell and Framework method bodies
+        shell: powershell
+        timeout-minutes: 3
+        run: ./script/ci/collect_g09_powershell_contract.ps1
+
+      - name: Preserve bounded PowerShell implementation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: g09-powershell-contract-${{ github.sha }}
+          path: ${{ runner.temp }}/g09-powershell-contract-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  windows_g09_clr_fixture:
+    name: Windows fixed Framework CLR reader fixture
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.windows_atomic_debug_scope == 'g09_clr_fixture' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: 'C:\infinishell-ci\cargo-target'
+      RUSTC_WRAPPER: 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+      SCCACHE_DIR: 'C:\infinishell-ci\sccache'
+      SCCACHE_CACHE_SIZE: 80G
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 先独立证明固定 CLR 的字段/栈读取和精确回收，不执行真实 PowerShell 候选。
+      - name: Check fixed CLR controller types
+        shell: pwsh
+        run: cargo check --locked -p command --tests
+
+      - name: Test fixed CLR receipt binding
+        shell: pwsh
+        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(windows::clr_fixture_tests::) | test(windows::clr_reader::tests::) | test(windows::shell_classification::tests::) | test(windows::station_bootstrap::debugger::tests::)'
+
+      - name: Build fixed CLR reader with existing MSVC
+        shell: powershell
+        run: ./script/ci/g09-clr-fixture/build-reader.ps1
+
+      - name: Prepare fixed Framework exception fixture
+        shell: powershell
+        run: ./script/ci/g09-clr-fixture/prepare.ps1 -Reader $env:INFINISHELL_CLR_READER
+
+      - name: Verify original CLR exception thread and bounded reader cleanup
+        shell: pwsh
+        timeout-minutes: 3
+        run: cargo nextest run --locked --no-fail-fast --retries 0 --run-ignored only -p command --lib -E 'test(windows::clr_fixture_tests::framework_exception_chain_uses_original_event_thread_and_reaps_reader)'
+
+      - name: Preserve fixed CLR reader and fixture evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-g09-clr-fixture-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/g09-clr-build-${{ github.run_id }}-${{ github.run_attempt }}/
+            ${{ runner.temp }}/g09-clr-fixture-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  windows_codex_hooks:
+    name: Windows fixed Codex 0.156.1 hooks
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'codex_hooks' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Prepare job-local Python for fixed Codex hook verification
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
+
+      - name: Test fixed Codex Windows hook contracts
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/codex_windows_hook_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Codex Windows hook contract tests failed' }
+
+      # 复用正式入口和退出判定；本范围不执行旧版、ConPTY、更新事务或 Cargo。
+      - name: Verify fixed Codex 0.156.1 Windows native hooks without model requests
+        shell: pwsh
+        timeout-minutes: 20
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash with msys-2.0.dll is required for Codex hooks' }
+          $env:INFINISHELL_GIT_BASH_EXE = (Resolve-Path $gitBash).Path
+          $env:INFINISHELL_JQ_EXE = (Get-Command jq.exe -ErrorAction Stop).Source
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_hooks.py" --codex-version 0.156.1 --repo "$env:GITHUB_WORKSPACE" --architecture x86_64 --download-dir "$env:RUNNER_TEMP\codex-01561-hook-inputs" --bash-executable "$env:INFINISHELL_GIT_BASH_EXE" --jq-executable "$env:INFINISHELL_JQ_EXE" --output "$env:RUNNER_TEMP\codex-01561-windows-native-hooks.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
+
+      - name: Preserve fixed Codex 0.156.1 Windows native hook evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-01561-windows-native-hooks-${{ github.sha }}
+          path: ${{ runner.temp }}/codex-01561-windows-native-hooks.json
+          if-no-files-found: error
+          retention-days: 14
+
+  windows_stdio_lifetime:
+    name: Windows Rust stdio logon lifetime
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'g09_stdio_lifetime' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: 'C:\infinishell-ci\cargo-target'
+      RUSTC_WRAPPER: 'C:\infinishell-ci\tools\sccache-v0.17.0\sccache.exe'
+      SCCACHE_DIR: 'C:\infinishell-ci\sccache'
+      SCCACHE_CACHE_SIZE: 80G
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      # 该差分只涉及 command 与固定 C helper；最终 app 源码门禁仍走原双平台 job。
+      - name: Check Windows command tests
+        shell: pwsh
+        run: cargo check --locked -p command --tests
+
+      - name: Test Windows command process ownership
+        shell: pwsh
+        run: cargo nextest run --locked --no-fail-fast --retries 0 -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::appcontainer::output::tests::) | test(windows::station_bootstrap::tests::) | test(windows::station_bootstrap::device_map::tests::) | test(windows::station_bootstrap::debugger::tests::) | test(windows::station_bootstrap::debugger::event::tests::)'
+
+      - name: Observe Rust stdio logon lifetime without and with a write
+        id: windows_netcredentials
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/verify_windows_netcredentials_station.ps1 -CaseSet Stdio
+
+      - name: Preserve Rust stdio logon lifetime evidence
+        if: ${{ always() && (steps.windows_netcredentials.outcome == 'success' || steps.windows_netcredentials.outcome == 'failure') && env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-netcredentials-station-${{ github.sha }}
+          path: ${{ env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR }}/**/*
+          if-no-files-found: error
+          retention-days: 14
+
   windows:
     name: Windows x64
+    needs: validate_scope
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_windows &&
-       (!inputs.upstream_essence_only || inputs.full_workspace_tests))
+       inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime' &&
+       (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: 180
     env:
@@ -1123,6 +1612,11 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           clean: true
+
+      - name: Validate Windows native bridge verification scope
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.run_grok_native_bridge_source || inputs.run_grok_native_bridge_host) && inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
+        shell: pwsh
+        run: throw '普通桥门禁不能与仅安装器模式同时启用'
 
       # 空间充足时复用 Cargo/sccache；不足时才清理可重建产物，避免每轮从零编译。
       - name: Reclaim Windows build storage
@@ -1246,7 +1740,7 @@ jobs:
 
       # 安装器补验跳过无关 CLI 的离线合集，仅保留固定 Grok 获取前置。
       - name: Test fixed Grok preparation for installer-only verification
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
+        if: ${{ !inputs.run_windows_npm_native_witness && github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -1291,6 +1785,7 @@ jobs:
             'claude_coordinator_v2_runner_tests.py',
             'claude_batch_cancel_runner_tests.py',
             'claude_approval_cancel_runner_tests.py',
+            'claude_v2_write_cancel_runner_tests.py',
             'claude_image_probe_runner_tests.py',
             'claude_managed_image_runner_tests.py',
             'claude_rich_image_runner_portability_tests.py',
@@ -1302,6 +1797,9 @@ jobs:
             'grok_policy_preflight_runner_tests.py',
             'grok_native_skill_runner_tests.py',
             'grok_fixed_policy_runner_tests.py',
+            'grok_user_skill_runner_tests.py',
+            'run_grok_fixed_skill_live_tests.py',
+            'grok_image_skill_runner_tests.py',
             'grok_child_coordinator_runner_tests.py',
             'grok_files_policy_runner_tests.py',
             'grok_selected_skill_runner_tests.py',
@@ -1335,7 +1833,7 @@ jobs:
 
       - name: Prepare fixed native Codex without credentials
         id: fixed_codex
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success')) }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -1346,7 +1844,7 @@ jobs:
       # 生产通知安装器的当前插件合同仍精确绑定 0.147.0；不要把最新版运行时冒充该合同。
       - name: Prepare fixed Codex production installer contract
         id: fixed_codex_installer
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success')) }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -1357,7 +1855,7 @@ jobs:
 
       - name: Prepare fixed native Claude without credentials
         id: fixed_claude
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success')) }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -1368,7 +1866,7 @@ jobs:
 
       - name: Prepare fixed native Grok without credentials
         id: fixed_grok
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.run_windows_npm_native_witness && !inputs.source_gate_only && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1462,7 +1960,7 @@ jobs:
 
       # 原生候选只在临时目录加载，必须在模型调用前由真实 hook 阻断，不开启产品安装门禁。
       - name: Verify Codex Windows native hooks without model requests
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 20
         env:
@@ -1481,7 +1979,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
 
       - name: Preserve Codex Windows native hook evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-native-hooks-${{ github.sha }}
@@ -1491,7 +1989,7 @@ jobs:
 
       # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
       - name: Verify Codex Windows ConPTY notification transport
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -1511,7 +2009,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
 
       - name: Preserve Codex Windows ConPTY evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-conpty-${{ github.sha }}
@@ -1524,7 +2022,7 @@ jobs:
 
       # 当前固定版本独立验收；旧版 0.147 专项不能替代新版原生派发和 ConPTY。
       - name: Verify fixed Codex 0.156.1 Windows native hooks without model requests
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 20
         env:
@@ -1543,7 +2041,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
 
       - name: Preserve fixed Codex 0.156.1 Windows native hook evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-01561-windows-native-hooks-${{ github.sha }}
@@ -1553,7 +2051,7 @@ jobs:
 
       # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
       - name: Verify fixed Codex 0.156.1 Windows ConPTY notification transport
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -1571,7 +2069,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
 
       - name: Preserve fixed Codex 0.156.1 Windows ConPTY evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-01561-windows-conpty-${{ github.sha }}
@@ -1602,7 +2100,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: claude-windows-notifications-${{ github.sha }}
-          path: ${{ runner.temp }}/claude-windows-notifications.json
+          path: |
+            ${{ runner.temp }}/claude-windows-notifications.json
+            ${{ runner.temp }}/claude-windows-notifications.case-0.pty.bin
+            ${{ runner.temp }}/claude-windows-notifications.case-1.pty.bin
           if-no-files-found: error
           retention-days: 14
 
@@ -1610,7 +2111,47 @@ jobs:
         id: check_app
         if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
-        run: cargo check -p warp --lib
+        run: |
+          $arguments = @('check', '-p', 'warp', '--lib')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'cli-agent-native-witness') }
+          cargo @arguments
+
+      - name: Build fixed Grok terminal bridge from public source on Windows
+        id: grok_native_bridge_source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_grok_native_bridge_source && !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 90
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -B script/cli-agent-parity/build_grok_terminal_bridge_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok source profile tests failed' }
+          python -I -B script/cli-agent-parity/build_grok_terminal_bridge.py --capability '${{ inputs.grok_native_source_capability || 'terminal-bridge' }}' --output "$env:RUNNER_TEMP/grok-terminal-bridge-source" --target-dir "$env:CARGO_TARGET_DIR-grok-terminal-bridge"
+          if ($LASTEXITCODE -ne 0) { throw 'Grok source build failed' }
+
+      - name: Preserve Windows Grok terminal bridge source build
+        if: ${{ always() && (steps.grok_native_bridge_source.outcome == 'success' || steps.grok_native_bridge_source.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-${{ inputs.grok_native_source_capability || 'terminal-bridge' }}-windows-${{ github.sha }}
+          path: ${{ runner.temp }}/grok-terminal-bridge-source/artifacts
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Test Claude image acceptance runner on Windows
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
+
+      - name: Test Claude image and skill regressions on Windows
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: >-
+          cargo nextest run --no-fail-fast -p warp --lib
+          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::) | test(ai::cli_agent_runtime::claude::live_tests::managed_image_live_tests::tests::)'
 
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；直接覆盖超大帧后的恢复路径。
       - name: Test IPC frame-limit recovery
@@ -1622,9 +2163,22 @@ jobs:
 
       - name: Build InfiniShell SSH worker
         id: ssh_worker
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
+        if: ${{ (inputs.run_grok_native_bridge_source || inputs.run_grok_native_bridge_host) && !cancelled() && steps.check_app.outcome == 'success' || (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
-        run: cargo build -p warp --bin infinishell-ssh --features "release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildArgs = @('build', '-p', 'warp', '--bin', 'infinishell-ssh', '--features', 'release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker')
+          if ('${{ inputs.run_grok_native_bridge_source || inputs.run_grok_native_bridge_host }}' -eq 'true') { $buildArgs += @('--bin', 'infinishell') }
+          cargo @buildArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Console worker build failed' }
+
+      - name: Verify original ConPTY membership through the production console helper
+        if: ${{ (inputs.run_grok_native_bridge_source || inputs.run_grok_native_bridge_host) && !cancelled() && steps.ssh_worker.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          INFINISHELL_TEST_CONSOLE_PROBE_EXECUTABLE: '${{ env.CARGO_TARGET_DIR }}\debug\infinishell-ssh.exe'
+        run: cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 --success-output immediate -p command --lib --run-ignored only -E 'test(=managed_windows_console_probe::tests::real_conpty_probe_binds_original_console)'
 
       - name: Test Windows PowerShell SSH worker arguments
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.ssh_worker.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
@@ -1639,7 +2193,7 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && (inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && (inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && (inputs.native_acceptance_only || inputs.run_grok_native_bridge_host) && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_sessions::grok_native_bridge) | test(terminal::cli_agent_sessions::grok_owned_launch) | test(terminal::cli_agent_sessions::grok_leader_input) | test(terminal::view::grok_remote_owned::) | test(terminal::cli_agent_sessions::tests::) | (test(terminal::view::tests::) & (test(ctrl_c) | test(escape))) | test(persistence::local_cli_tasks::grok_native_bridge::tests::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
@@ -1711,7 +2265,7 @@ jobs:
       - name: Test remote CLI image client contracts
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
-        run: cargo nextest run --no-fail-fast -p remote_server --lib -E 'test(client::image_staging::tests::)'
+        run: cargo nextest run --no-fail-fast -p remote_server --lib -E 'test(client::image_staging::tests::) | test(client::terminal_binding::tests::) | test(terminal_candidate) | test(manager::)'
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
@@ -1734,21 +2288,100 @@ jobs:
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
-        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
+        run: |
+          $arguments = @('nextest', 'run', '--no-fail-fast', '-p', 'command', '--lib', '-E', 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::appcontainer::output::tests::) | test(windows::station_bootstrap::tests::) | test(windows::station_bootstrap::device_map::tests::) | test(windows::station_bootstrap::debugger::tests::) | test(windows::station_bootstrap::debugger::event::tests::)')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'native-probe-witness') }
+          cargo @arguments
+
+      - name: Diagnose unnamed Windows station without changing the production probe
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: cargo nextest run --no-fail-fast --retries 0 --success-output immediate -p command --lib --run-ignored only -E 'test(=windows::appcontainer::console_tests::unnamed_station_create_only_reports_identity_and_cleanup)'
+
+      - name: Verify two-stage Windows logon window station identity and cleanup
+        id: windows_netcredentials
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/verify_windows_netcredentials_station.ps1
+
+      - name: Preserve two-stage Windows logon window station evidence
+        if: ${{ !cancelled() && steps.windows_netcredentials.outcome != 'skipped' && env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-netcredentials-station-${{ github.sha }}
+          path: ${{ env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR }}/**/*
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Diagnose Windows atomic image-debug exit in a strict Job
         id: atomic_windows_debug
         # 原生调试可独立运行；保留首次失败，不继承服务会话测试的自动重试。
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
         env:
-          ATOMIC_WINDOWS_DEBUG_SCOPE: ${{ inputs.windows_atomic_debug_scope }}
+          ATOMIC_WINDOWS_DEBUG_SCOPE: ${{ inputs.windows_atomic_debug_scope == 'upstream_essence' && 'all' || inputs.windows_atomic_debug_scope }}
         run: |
           switch -CaseSensitive ($env:ATOMIC_WINDOWS_DEBUG_SCOPE) {
             'all' { $atomicDebugFilter = 'test(managed_process::atomic_windows::tests::debug_session_runs_system_only_process_to_native_exit) | test(managed_process::atomic_windows::tests::debug_session_rejects_non_system_dynamic_image_before_continue) | test(managed_process::atomic_windows::tests::package_probe_rejects_unbound_child_and_confirms_cleanup) | test(managed_process::atomic_windows::tests::package_probe_cleans_up_before_initial_debug_event) | test(managed_process::atomic_windows::tests::package_probe_continue_failure_preserves_pending_cleanup) | test(managed_process::atomic_windows::tests::console_binding::)' }
             'stdio' { $atomicDebugFilter = 'test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_cmd_full_shim_bound_cmd_with_worker_stdio) | test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_fixed_node_root_with_worker_stdio) | test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_cmd_nul_redirection_runs_between_builtin_controls)' }
+            'nul_token' { $atomicDebugFilter = 'test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_appcontainer_token_createfile_nul_vs_regular)' }
+            'g09_tokens' { $atomicDebugFilter = 'test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_appcontainer_token_createfile_nul_vs_regular) | test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_fixed_node_root_with_existing_station_desktop)' }
             default { throw 'Windows 原生调试范围无效' }
+          }
+          if ($env:ATOMIC_WINDOWS_DEBUG_SCOPE -in @('all', 'nul_token', 'g09_tokens')) {
+            # 小型测试映像仅由本次 checkout 的 C 源编译；缺 MSVC/SDK 时在诊断前停止。
+            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            if (-not (Test-Path -LiteralPath $vswhere)) { throw 'MSVC discovery tool is missing' }
+            $vsInstall = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($vsInstall)) { throw 'MSVC x64 toolset is unavailable' }
+            $vcvars = Join-Path $vsInstall.Trim() 'VC\Auxiliary\Build\vcvars64.bat'
+            if (-not (Test-Path -LiteralPath $vcvars)) { throw 'MSVC x64 environment is missing' }
+            $helperDirectory = Join-Path $env:RUNNER_TEMP ('infinishell-nul-helper-' + [guid]::NewGuid().ToString())
+            New-Item -ItemType Directory -Path $helperDirectory | Out-Null
+            $helperSource = (Resolve-Path -LiteralPath 'app/src/ai/cli_agent_runtime/fixtures/windows_nul_createfile_helper.c').Path
+            $helperObject = Join-Path $helperDirectory 'nul-createfile.obj'
+            $helperExecutable = Join-Path $helperDirectory 'nul-createfile.exe'
+            $buildScript = Join-Path $helperDirectory 'build-helper.cmd'
+            foreach ($boundPath in @($vcvars, $helperDirectory, $helperSource)) {
+              if ($boundPath -match '[%!"&|<>^]') { throw 'Win32 helper build path contains CMD metacharacters' }
+            }
+            @(
+              '@echo off'
+              "call `"$vcvars`" >nul || exit /b 1"
+              "cl.exe /nologo /std:c11 /utf-8 /W4 /WX /GS- /Zl /c /Fo`"$helperObject`" `"$helperSource`" || exit /b 1"
+              "link.exe /nologo /NODEFAULTLIB /ENTRY:ProbeMain /SUBSYSTEM:WINDOWS /MACHINE:X64 /OUT:`"$helperExecutable`" `"$helperObject`" kernel32.lib || exit /b 1"
+            ) | Set-Content -LiteralPath $buildScript -Encoding ascii
+            & cmd.exe /d /v:off /c "`"$buildScript`""
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $helperExecutable)) { throw 'Fixed Win32 CreateFile helper build failed' }
+            $baselineDirectory = Join-Path $helperDirectory 'baseline'
+            New-Item -ItemType Directory -Path $baselineDirectory | Out-Null
+            $baselineOrdinary = Join-Path $baselineDirectory 'ordinary.txt'
+            $baselineReport = Join-Path $baselineDirectory 'receipt.bin'
+            [IO.File]::WriteAllBytes($baselineOrdinary, [byte[]](1))
+            $previousReport = $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT
+            $previousOrdinary = $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY
+            try {
+              $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT = $baselineReport
+              $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY = $baselineOrdinary
+              $baselineProcess = Start-Process -FilePath $helperExecutable -WorkingDirectory $baselineDirectory -Wait -PassThru
+              if ($baselineProcess.ExitCode -ne 0) { throw 'Fixed Win32 CreateFile helper baseline exited abnormally' }
+              $baselineBytes = [IO.File]::ReadAllBytes($baselineReport)
+              if ($baselineBytes.Length -ne 120 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 0) -ne 0x4e554c31 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 24) -ne 1 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 36) -ne 1 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 72) -ne 1 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 84) -ne 1) { throw 'Fixed Win32 CreateFile helper baseline receipt is invalid' }
+            } finally {
+              [Environment]::SetEnvironmentVariable('INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT', $previousReport, 'Process')
+              [Environment]::SetEnvironmentVariable('INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY', $previousOrdinary, 'Process')
+            }
+            $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER = $helperExecutable
+            $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER_SHA256 = (Get-FileHash -LiteralPath $helperExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
+            $helperSourceSha256 = (Get-FileHash -LiteralPath $helperSource -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Output "atomic_windows_createfile_helper_baseline=true source_sha256=$helperSourceSha256 helper_sha256=$env:INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER_SHA256"
           }
           # 只向显式原生对照传入已安装的固定 Node；候选仍复制到私有目录并核摘要。
           $nodeControl = (Get-Command node.exe -CommandType Application).Source
@@ -1766,7 +2399,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Preserve Windows Node stdio control evidence
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.atomic_windows_debug.outcome != 'skipped' && env.INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT != '' }}
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'nul_token' && steps.atomic_windows_debug.outcome != 'skipped' && env.INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-node-stdio-controls-${{ github.sha }}
@@ -1784,22 +2417,53 @@ jobs:
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
-        run: cargo build -p warp_tui --bin infinishell-tui
+        run: |
+          $arguments = @('build', '-p', 'warp_tui', '--bin', 'infinishell-tui', '-p', 'command', '--bin', 'infinishell-station-bootstrap')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'warp/cli-agent-native-witness,command/native-probe-witness') }
+          cargo @arguments
+
+      # 固定夹具与真实 PS 分开调度；此处只构建同提交 reader，不自动执行夹具。
+      - name: Build reader for the authorized PowerShell npm observation
+        id: ps_clr_reader
+        if: ${{ !cancelled() && inputs.windows_atomic_debug_scope == 'g09_npm_powershell' && inputs.run_windows_npm_native_witness && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: powershell
+        run: ./script/ci/g09-clr-fixture/build-reader.ps1
+
+      - name: Preserve PowerShell npm reader build evidence
+        if: ${{ always() && inputs.windows_atomic_debug_scope == 'g09_npm_powershell' && (steps.ps_clr_reader.outcome == 'success' || steps.ps_clr_reader.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-g09-npm-clr-reader-${{ github.sha }}
+          path: ${{ runner.temp }}/g09-clr-build-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 14
 
       # 真实 npm 生成私有安装登记和入口；不改写用户前缀、凭据或执行策略。
       - name: Verify fixed Windows Codex npm update transactions without credentials
         id: codex_npm_updates
-        if: ${{ !cancelled() && inputs.run_windows_codex_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_windows_codex_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' && (inputs.windows_atomic_debug_scope != 'g09_npm_powershell' || steps.ps_clr_reader.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 45
         env:
           PYTHONUTF8: "1"
         run: |
           $ErrorActionPreference = 'Stop'
-          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          $arguments = @('test', '-p', 'warp', '--lib', '--no-run', '--message-format=json-render-diagnostics')
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'cli-agent-native-witness') }
+          $buildMessages = cargo @arguments
           if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
           $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
           if ($executables.Count -ne 1) { throw 'Expected exactly one same-commit warp libtest executable' }
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') {
+            $unitBinary = $executables[0]
+            $listedTests = @(& $unitBinary --list)
+            if ($LASTEXITCODE -ne 0) { throw 'Witness unit test discovery failed' }
+            foreach ($filter in @('atomic_windows::native_snapshot::tests::', 'atomic_windows::native_snapshot::temp_path::tests::', 'atomic_windows::creation_witness::tests::', 'atomic_windows::native_witness::tests::', 'atomic_windows::native_clr::tests::', 'managed_process::tests::native_witness_', 'sources::claude_downgrade::tests::', 'sources::npm_windows::live_tests::windows_npm_witness_')) {
+              if (@($listedTests | Where-Object { $_.Contains($filter) -and $_.EndsWith(': test') }).Count -eq 0) { throw "Missing witness unit group: $filter" }
+              & $unitBinary $filter --test-threads=1
+              if ($LASTEXITCODE -ne 0) { throw "Witness unit group failed: $filter" }
+            }
+          }
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'Same-commit supervisor lookup failed' }
           $parityFixture = Join-Path $env:RUNNER_TEMP ('infinishell-codex-npm-' + [guid]::NewGuid().ToString())
@@ -1808,18 +2472,33 @@ jobs:
           "WINDOWS_CODEX_NPM_EVIDENCE=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $testBinary = Join-Path $parityFixture 'warp-libtest.exe'
           $supervisor = Join-Path $parityFixture 'supervisor.exe'
+          $stationBootstrap = Join-Path $parityFixture 'infinishell-station-bootstrap.exe'
+          "WINDOWS_STATION_BOOTSTRAP_EVIDENCE=$stationBootstrap" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $sourceSupervisor = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          $sourceBootstrap = Join-Path $metadata.target_directory 'debug/infinishell-station-bootstrap.exe'
           Copy-Item -LiteralPath $executables[0] -Destination $testBinary
           Copy-Item -LiteralPath $sourceSupervisor -Destination $supervisor
+          Copy-Item -LiteralPath $sourceBootstrap -Destination $stationBootstrap
           function Get-ParityDigest([string] $path) {
             return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
           }
           if ((Get-ParityDigest $testBinary) -ne (Get-ParityDigest $executables[0])) { throw 'Copied libtest hash mismatch' }
           if ((Get-ParityDigest $supervisor) -ne (Get-ParityDigest $sourceSupervisor)) { throw 'Copied supervisor hash mismatch' }
+          if ((Get-ParityDigest $stationBootstrap) -ne (Get-ParityDigest $sourceBootstrap)) { throw 'Copied station bootstrap hash mismatch' }
           $nodePath = (Get-Command node.exe -CommandType Application).Source
           $npmPath = Join-Path (Split-Path -Parent $nodePath) 'node_modules/npm/bin/npm-cli.js'
           if (-not (Test-Path -LiteralPath $npmPath -PathType Leaf)) { throw 'Fixed Node npm entry is missing' }
-          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath)
+          $witnessArguments = @()
+          if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') {
+            $witnessMode = 'cmd'
+            if ('${{ inputs.windows_atomic_debug_scope }}' -eq 'g09_npm_powershell') { $witnessMode = 'powershell' }
+            $witnessArguments = @('--native-witness', '--native-witness-mode', $witnessMode, '--case', 'updated')
+            if ($witnessMode -eq 'powershell') {
+              if ([string]::IsNullOrWhiteSpace($env:INFINISHELL_CLR_READER)) { throw 'Same-commit CLR reader is missing' }
+              $witnessArguments += @('--clr-reader', $env:INFINISHELL_CLR_READER, '--clr-reader-sha256', (Get-ParityDigest $env:INFINISHELL_CLR_READER))
+            }
+          }
+          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --station-bootstrap $stationBootstrap --station-bootstrap-sha256 (Get-ParityDigest $stationBootstrap) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath) @witnessArguments
           if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm transaction failed; original receipts are preserved' }
 
       - name: Preserve Windows Codex npm update receipts
@@ -1840,6 +2519,8 @@ jobs:
             ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.json
             ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.log
             ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/appcontainer-cleanup-v1
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/claude-npm-version-*/station-*/*.json
+            ${{ env.WINDOWS_STATION_BOOTSTRAP_EVIDENCE }}
           if-no-files-found: error
           retention-days: 14
 
@@ -1934,7 +2615,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok production supervised cleanup failed' }
 
       - name: Preserve Windows native CLI boundary evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-native-boundaries-${{ github.sha }}
@@ -1963,11 +2644,11 @@ jobs:
         run: cargo nextest run --locked --no-fail-fast -p warp_completer --features v2
 
       - name: Test desktop and TUI input regressions
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.run_grok_native_bridge_host || inputs.full_workspace_tests) }}
         shell: pwsh
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
-          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(i18n::tests)'
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.windows_toolchain.outcome == 'success') }}
@@ -2007,6 +2688,58 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Verify Windows fixed Grok bilingual static viewport
+        id: grok_static_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_static }}
+        shell: pwsh
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-view-evidence/windows
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build -p integration --bin integration
+          if ($LASTEXITCODE -ne 0) { throw 'Grok GUI integration binary compilation failed' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Grok GUI integration binary discovery failed' }
+          $binary = Join-Path $metadata.target_directory 'debug\integration.exe'
+          ./script/cli-agent-parity/run_windows_grok_static_viewport.ps1 -Binary $binary
+
+      - name: Preserve Windows fixed Grok static viewport evidence
+        if: ${{ !cancelled() && (steps.grok_static_viewport.outcome == 'success' || steps.grok_static_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-grok-static-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-view-evidence/windows
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Verify Windows fixed Grok bilingual synthetic approval viewport
+        id: grok_approval_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_approval_synthetic }}
+        shell: pwsh
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-approval-evidence/windows
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build -p integration --bin integration
+          if ($LASTEXITCODE -ne 0) { throw 'Grok synthetic approval GUI integration binary compilation failed' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Grok synthetic approval GUI integration binary discovery failed' }
+          $binary = Join-Path $metadata.target_directory 'debug\integration.exe'
+          ./script/cli-agent-parity/run_windows_grok_approval_viewport.ps1 -Binary $binary
+
+      - name: Preserve Windows fixed Grok synthetic approval viewport evidence
+        if: ${{ !cancelled() && (steps.grok_approval_viewport.outcome == 'success' || steps.grok_approval_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-grok-approval-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-approval-evidence/windows
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Run desktop workspace unit tests
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests) }}
         shell: pwsh
@@ -2019,3 +2752,18 @@ jobs:
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (always()) }}
         shell: pwsh
         run: '& $env:RUSTC_WRAPPER --show-stats'
+
+      - name: Report Windows source-only gate boundary
+        if: ${{ always() && inputs.source_gate_only }}
+        shell: pwsh
+        env:
+          CHECK_RESULT: ${{ steps.check_app.outcome }}
+          TEST_RESULT: ${{ steps.test_app.outcome }}
+        run: |
+          @(
+            '### Windows 普通源码门禁'
+            "提交：${env:GITHUB_SHA}；cargo check：${env:CHECK_RESULT}；普通主应用回归：${env:TEST_RESULT}。其余源码步骤须按本 job 终态分别审计。"
+            '保留原普通广筛、完整更新器、i18n、command/IPC 和平台辅助回归；自建 worker/合成夹具不计外部 CLI 验收。'
+            '未执行固定外部 CLI、真实安装/升级/恢复及 GUI 专项；这些条件仍待验收。'
+            '6726e735994568e0f2b0995a068d6c5bb32924f1 / run 37045744557 的 Windows 固定 Codex hooks 退出和真实 npm 首 CMD 候选失败仍然保留；本次源码结果不覆盖或修复它们，不关闭 G09，不构成最终合并许可。'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

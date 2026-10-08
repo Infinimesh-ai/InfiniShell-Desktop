@@ -22,6 +22,8 @@ use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
 use warpui::clipboard::ClipboardContent;
+#[cfg(feature = "integration_tests")]
+use warpui::elements::SavePosition;
 use warpui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
 use warpui::elements::{
     ChildView, ClippedScrollStateHandle, ConstrainedBox, Container, Flex, ParentElement,
@@ -1761,7 +1763,7 @@ impl View for LocalCLITaskManagerView {
         let snapshot = self.selected_snapshot(ctx);
         if let Some(snapshot) = &snapshot {
             for approval in &snapshot.approvals {
-                if approval.details.get("appCommandContext").is_some() {
+                if approval.details.get("reviewedProjectCommand").is_some() {
                     body.add_child(self.text(
                         crate::t!("cli-task-manager-reviewed-command-approval"),
                         appearance,
@@ -1783,12 +1785,29 @@ impl View for LocalCLITaskManagerView {
                     .iter()
                     .find(|buttons| buttons.approval_id == approval.approval_id)
                 {
-                    body.add_child(
-                        Flex::row()
-                            .with_child(ChildView::new(&buttons.allow).finish())
-                            .with_child(ChildView::new(&buttons.deny).finish())
-                            .finish(),
-                    );
+                    #[cfg(feature = "integration_tests")]
+                    let approval_index = snapshot
+                        .approvals
+                        .iter()
+                        .position(|candidate| candidate.approval_id == approval.approval_id)
+                        .expect("审批必须在当前快照中");
+                    #[cfg(feature = "integration_tests")]
+                    let allow = SavePosition::new(
+                        ChildView::new(&buttons.allow).finish(),
+                        &format!("v05-approval-allow-{approval_index}"),
+                    )
+                    .finish();
+                    #[cfg(not(feature = "integration_tests"))]
+                    let allow = ChildView::new(&buttons.allow).finish();
+                    #[cfg(feature = "integration_tests")]
+                    let deny = SavePosition::new(
+                        ChildView::new(&buttons.deny).finish(),
+                        &format!("v05-approval-deny-{approval_index}"),
+                    )
+                    .finish();
+                    #[cfg(not(feature = "integration_tests"))]
+                    let deny = ChildView::new(&buttons.deny).finish();
+                    body.add_child(Flex::row().with_child(allow).with_child(deny).finish());
                 }
             }
         }

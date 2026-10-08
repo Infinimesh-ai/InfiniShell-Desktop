@@ -1,0 +1,415 @@
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::sync::mpsc::TryRecvError;
+
+use super::*;
+use crate::terminal::cli_agent_sessions::grok_leader_input::GrokOwnedInputRejection;
+
+#[test]
+fn configured_tmux_service_cannot_fall_back_after_its_owner_disappears() {
+    let fixture = Fixture::new();
+    fixture.service.set_tmux_owned(Weak::new());
+    assert!(
+        fixture
+            .service
+            .ticket_scope(&fixture.scope, &ticket())
+            .is_err()
+    );
+}
+
+struct Fixture {
+    root: tempfile::TempDir,
+    service: Arc<Service>,
+    connection: Arc<Connection>,
+    scope: Scope,
+    requested: Receiver<(Scope, Ticket)>,
+}
+
+impl Fixture {
+    fn new() -> Self {
+        let root = tempfile::Builder::new()
+            .permissions(fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
+        let (cleanup, requested) = mpsc::channel();
+        let service = Arc::new(Service {
+            host: "grok-cleanup-test-host".into(),
+            tickets: TicketStore::new(&root.path().canonicalize().unwrap()).unwrap(),
+            cleanup,
+            tmux_owned: Mutex::new(None),
+        });
+        let scope = Scope {
+            host: service.host.clone(),
+            terminal_session: 17,
+            terminal_epoch: Uuid::new_v4(),
+            generation: Uuid::new_v4(),
+        };
+        let connection = connected(&scope);
+        Self {
+            root,
+            service,
+            connection,
+            scope,
+            requested,
+        }
+    }
+
+    fn reserve_request(&self, scope: &Scope, ticket: &Ticket) -> Request {
+        Request {
+            version: 1,
+            revision: 1,
+            scope: scope.clone(),
+            action: Action::Reserve {
+                ticket: ticket.clone(),
+                cwd: self
+                    .root
+                    .path()
+                    .canonicalize()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .into(),
+            },
+        }
+    }
+
+    fn reserve(&self, connection: &Arc<Connection>, scope: &Scope, ticket: &Ticket) {
+        let reply = self.service.handle(
+            connection,
+            &encode(&self.reserve_request(scope, ticket)).unwrap(),
+        );
+        assert!(matches!(
+            serde_json::from_slice::<Reply>(&reply).unwrap(),
+            Reply::Reserved { ticket: reserved, .. } if reserved == *ticket
+        ));
+    }
+
+    fn directory(&self, scope: &Scope, ticket: &Ticket) -> PathBuf {
+        self.service
+            .tickets
+            .lock(scope, ticket)
+            .unwrap()
+            .directory
+            .clone()
+    }
+
+    // 显式推进生产回收函数，使用真实私有票据，不等待轮询或启动原生进程。
+    fn finish_queued_cleanup(&self, ticket: &Ticket) {
+        let (scope, queued) = self.requested.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(queued.id, ticket.id);
+        assert_eq!(queued.key, ticket.key);
+        cancel_launch(&self.service.tickets, &scope, &queued).unwrap();
+    }
+}
+
+fn connected(scope: &Scope) -> Arc<Connection> {
+    let connection = Arc::new(Connection::new());
+    connection.initialize();
+    connection.bootstrap(scope.terminal_session, &scope.terminal_epoch.to_string(), 1);
+    connection
+}
+
+fn ticket() -> Ticket {
+    Ticket {
+        id: Uuid::new_v4(),
+        key: Uuid::new_v4(),
+    }
+}
+
+#[test]
+fn disconnect_requests_cleanup_before_any_hook_or_input() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    write_new(&directory.join("entered.json"), &true).unwrap();
+
+    fixture.connection.disconnect();
+    fixture.finish_queued_cleanup(&ticket);
+
+    assert!(directory.join("cleanup-requested.json").exists());
+    assert!(!directory.join("released.json").exists());
+    assert!(!directory.join("cancelled.json").exists());
+    fixture.connection.disconnect();
+    assert!(matches!(
+        fixture.requested.try_recv(),
+        Err(TryRecvError::Empty)
+    ));
+}
+
+#[test]
+fn reserve_finishing_after_disconnect_cannot_escape_cleanup() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    let request = fixture.reserve_request(&fixture.scope, &ticket);
+    // 固定 handle 的 current 检查成功、Reserve 尚未完成时发生 EOF 的顺序。
+    assert!(fixture.connection.current(&request.scope));
+    fixture.connection.disconnect();
+    let reply = fixture
+        .service
+        .execute(&fixture.connection, request)
+        .unwrap();
+    assert!(matches!(reply, Reply::Reserved { .. }));
+
+    fixture.finish_queued_cleanup(&ticket);
+
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    assert!(directory.join("cancelled.json").exists());
+    assert!(!directory.join("entered.json").exists());
+    assert!(matches!(
+        fixture.requested.try_recv(),
+        Err(TryRecvError::Empty)
+    ));
+}
+
+#[test]
+fn old_disconnect_cannot_retire_reconnected_ticket_or_input() {
+    let fixture = Fixture::new();
+    let old_ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &old_ticket);
+    let new_scope = Scope {
+        terminal_epoch: Uuid::new_v4(),
+        generation: Uuid::new_v4(),
+        ..fixture.scope.clone()
+    };
+    let new_connection = connected(&new_scope);
+    let new_ticket = ticket();
+    fixture.reserve(&new_connection, &new_scope, &new_ticket);
+    let new_lease = new_connection.permit(&new_scope, 2).unwrap();
+    let new_directory = fixture.directory(&new_scope, &new_ticket);
+    write_new(&new_directory.join("entered.json"), &true).unwrap();
+
+    fixture.connection.disconnect();
+    fixture.finish_queued_cleanup(&old_ticket);
+
+    assert!(!new_directory.join("cleanup-requested.json").exists());
+    assert!(!new_directory.join("cancelled.json").exists());
+    assert!(!new_directory.join("released.json").exists());
+    assert!(new_connection.current(&new_scope));
+    assert_eq!(new_lease.load(Ordering::SeqCst), 0);
+    assert!(matches!(
+        fixture.requested.try_recv(),
+        Err(TryRecvError::Empty)
+    ));
+}
+
+#[test]
+fn failed_duplicate_reserve_does_not_adopt_another_connections_ticket() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let other = connected(&fixture.scope);
+    let reply = fixture.service.handle(
+        &other,
+        &encode(&fixture.reserve_request(&fixture.scope, &ticket)).unwrap(),
+    );
+    assert!(matches!(
+        serde_json::from_slice::<Reply>(&reply).unwrap(),
+        Reply::Failed { .. }
+    ));
+
+    other.disconnect();
+
+    assert!(matches!(
+        fixture.requested.try_recv(),
+        Err(TryRecvError::Empty)
+    ));
+    assert!(
+        !fixture
+            .directory(&fixture.scope, &ticket)
+            .join("cancelled.json")
+            .exists()
+    );
+    fixture.connection.disconnect();
+    fixture.finish_queued_cleanup(&ticket);
+}
+
+#[test]
+fn input_revoke_does_not_request_launch_cleanup() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let lease = fixture.connection.permit(&fixture.scope, 1).unwrap();
+    let request = Request {
+        version: 1,
+        revision: 2,
+        scope: fixture.scope.clone(),
+        action: Action::Revoke {
+            ticket: ticket.clone(),
+            generation: fixture.scope.generation,
+        },
+    };
+
+    fixture
+        .connection
+        .revoke_request(&encode(&request).unwrap());
+
+    assert_eq!(lease.load(Ordering::SeqCst), 2);
+    assert!(matches!(
+        fixture.requested.try_recv(),
+        Err(TryRecvError::Empty)
+    ));
+    assert!(
+        !fixture
+            .directory(&fixture.scope, &ticket)
+            .join("cancelled.json")
+            .exists()
+    );
+    fixture.connection.disconnect();
+    fixture.finish_queued_cleanup(&ticket);
+}
+
+#[test]
+fn rejected_scope_does_not_register_cleanup_or_create_ticket() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    let wrong_scope = Scope {
+        terminal_epoch: Uuid::new_v4(),
+        ..fixture.scope.clone()
+    };
+    let reply = fixture.service.handle(
+        &fixture.connection,
+        &encode(&fixture.reserve_request(&wrong_scope, &ticket)).unwrap(),
+    );
+    assert!(matches!(
+        serde_json::from_slice::<Reply>(&reply).unwrap(),
+        Reply::Failed { .. }
+    ));
+
+    fixture.connection.disconnect();
+
+    assert!(matches!(
+        fixture.requested.try_recv(),
+        Err(TryRecvError::Empty)
+    ));
+    assert!(
+        fixture
+            .service
+            .tickets
+            .lock(&fixture.scope, &ticket)
+            .is_err()
+    );
+}
+
+#[test]
+fn service_drop_before_connection_still_drains_launch_cleanup() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    write_new(&directory.join("entered.json"), &true).unwrap();
+    let tickets = fixture.service.tickets.clone();
+    let Fixture {
+        root,
+        service,
+        connection,
+        scope,
+        requested,
+    } = fixture;
+    let worker = std::thread::spawn(move || cleanup_worker(tickets, requested));
+
+    drop(service);
+    drop(connection);
+    worker.join().unwrap();
+
+    assert!(directory.join("cleanup-requested.json").exists());
+    assert!(!directory.join("released.json").exists());
+    drop((scope, root));
+}
+
+#[test]
+fn ordinary_ticket_cannot_be_promoted_to_owned_identity_without_tmux_guard() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    let before = fs::read_dir(&directory).unwrap().count();
+    let request = Request {
+        version: 1,
+        revision: 2,
+        scope: fixture.scope.clone(),
+        action: Action::Observe {
+            ticket: ticket.clone(),
+        },
+    };
+    let response = fixture
+        .service
+        .handle(&fixture.connection, &encode(&request).unwrap());
+    assert!(matches!(
+        serde_json::from_slice::<Reply>(&response).unwrap(),
+        Reply::Failed { .. }
+    ));
+    assert_eq!(fs::read_dir(&directory).unwrap().count(), before);
+    assert!(!directory.join("entered.json").exists());
+}
+
+#[test]
+fn owned_submit_protocol_has_no_fabricated_hook_observation() {
+    let fixture = Fixture::new();
+    let request = Request {
+        version: 1,
+        revision: 1,
+        scope: fixture.scope.clone(),
+        action: Action::SubmitOwned {
+            ticket: ticket(),
+            binding_id: Uuid::new_v4(),
+            input: Input {
+                message_id: Uuid::new_v4(),
+                text: "图片".into(),
+                images: Vec::new(),
+            },
+        },
+    };
+    let bytes = encode(&request).unwrap();
+    assert!(matches!(
+        Request::decode(&bytes).unwrap().action,
+        Action::SubmitOwned { .. }
+    ));
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["action"]["action"], "submit_owned");
+    assert!(value["action"].get("observation").is_none());
+    assert!(value["action"].get("event_id").is_none());
+    assert!(value["action"].get("permission_revision").is_none());
+    assert!(
+        InputAuthority::Owned {
+            binding_id: Uuid::nil()
+        }
+        .binding_id()
+        .is_err()
+    );
+}
+
+#[test]
+fn exact_persisted_rejection_is_queryable_without_a_native_prompt_id() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    let message_id = Uuid::new_v4();
+    let record = Finished {
+        claim: Claim {
+            subject: "a".repeat(64),
+            delivery: GrokLeaderDelivery {
+                binding_id: Uuid::new_v4(),
+                session_id: Uuid::new_v4(),
+                message_id,
+                rpc_id: Uuid::new_v4(),
+                status: GrokLeaderDeliveryStatus::RejectedBeforeEnqueue {
+                    reason: GrokOwnedInputRejection::PreconditionChanged,
+                },
+            },
+        },
+        native_ack_sha256: "b".repeat(64),
+    };
+    write_new(
+        &directory.join(format!("{message_id}-finished.json")),
+        &record,
+    )
+    .unwrap();
+    assert!(
+        matches!(delivery_status(&directory, &ticket, message_id).unwrap(),
+        Reply::Input { state, native_prompt_id: None, native_ack_sha256: Some(_), .. }
+            if state == "rejected_before_enqueue")
+    );
+}

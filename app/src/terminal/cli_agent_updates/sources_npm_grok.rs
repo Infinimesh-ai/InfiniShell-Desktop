@@ -205,11 +205,15 @@ fn path(root: &Path) -> PathBuf {
 }
 
 fn save(path: &Path, journal: &Journal) -> Result<(), Error> {
+    let bytes = serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?;
+    if bytes.len() as u64 > 12 * MAX_CONFIG {
+        return Err(Error::PersistenceFailed);
+    }
     plain_ancestors(path)?;
     let parent = path.parent().ok_or(Error::PersistenceFailed)?;
     let mut temporary = NamedTempFile::new_in(parent).map_err(|_| Error::PersistenceFailed)?;
     temporary
-        .write_all(&serde_json::to_vec(journal).map_err(|_| Error::PersistenceFailed)?)
+        .write_all(&bytes)
         .map_err(|_| Error::PersistenceFailed)?;
     temporary
         .as_file()
@@ -252,6 +256,7 @@ pub(super) async fn execute(
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
     supports(plan.agent, &plan.target_version)?;
+    contract::supports_transition(&plan.installed_version, &plan.target_version)?;
     let path = path(root);
     if path.try_exists().map_err(|_| Error::RecoveryRequired)? {
         return Err(Error::RecoveryRequired);
@@ -266,8 +271,13 @@ pub(super) async fn execute(
         return Err(Error::UnsupportedSource);
     }
     let id = Uuid::new_v4();
-    let mirror = Mirror::capture(&owner.home, &plan.installed_version, id)?;
-    let mut packages = contract::download_release(root).await?;
+    let mirror = Mirror::capture(
+        &owner.home,
+        &plan.installed_version,
+        &plan.target_version,
+        id,
+    )?;
+    let mut packages = contract::download_version_release(root, &plan.target_version).await?;
     let mut journal = Journal {
         schema: 1,
         id,
@@ -314,7 +324,11 @@ pub(super) async fn execute(
                     package.archive.as_file_mut(),
                     |path, _, bytes| {
                         if path == contract::compressed_entry() {
-                            contract::decompress(bytes, native.as_file_mut())
+                            contract::decompress_version(
+                                bytes,
+                                native.as_file_mut(),
+                                &journal.target_version,
+                            )
                         } else {
                             std::io::copy(bytes, &mut std::io::sink())
                                 .map(|_| ())
@@ -324,7 +338,7 @@ pub(super) async fn execute(
                 )?;
             }
         }
-        let expected = contract::native(contract::VERSION)?;
+        let expected = contract::native(journal.target_version.as_str())?;
         native
             .as_file_mut()
             .seek(SeekFrom::Start(0))
@@ -336,19 +350,21 @@ pub(super) async fn execute(
             expected.digest()?,
         )?;
         stage.create_grok_link()?;
-        let executables = contract::installed_files(contract::VERSION)?
+        let executables = contract::installed_files(journal.target_version.as_str())?
             .into_iter()
             .map(|(path, file)| (path, file.executable))
             .collect();
         stage.apply_grok_permissions(&journal.original.tree, &executables)?;
         let prepared = stage.grok_snapshot()?;
-        verify_release(&prepared, contract::VERSION)?;
+        verify_release(&prepared, journal.target_version.as_str())?;
         journal.prepared = Some(prepared);
         native
             .as_file_mut()
             .seek(SeekFrom::Start(0))
             .map_err(|_| Error::PersistenceFailed)?;
-        journal.mirror.prepare(native.as_file_mut())?;
+        journal
+            .mirror
+            .prepare(native.as_file_mut(), &journal.target_version)?;
         save(&path, &journal)?;
         #[cfg(test)]
         live_tests::checkpoint(live_tests::Point::Prepared).await;
@@ -398,6 +414,35 @@ fn binding(probe: &Probe) -> Result<managed_process::PreparedLaunchBinding, Erro
         .map_err(|_| Error::RecoveryRequired)
 }
 
+fn probe_digest(journal: &Journal, identity: &Stamp) -> Result<String, Error> {
+    let bytes = serde_json::to_vec(&(identity, "--version", journal.id))
+        .map_err(|_| Error::PersistenceFailed)?;
+    let original = format!("{:x}", Sha256::digest(bytes));
+    if !journal.owner.prefix_identity.has_acl()
+        && !journal.owner.parent_identity.has_acl()
+        && !journal.original.tree.has_acl()
+        && !journal
+            .prepared
+            .as_ref()
+            .is_some_and(|tree| tree.tree.has_acl())
+        && !journal.mirror.has_acl()
+    {
+        return Ok(original);
+    }
+    // 镜像与包树同时发布，原生候选收据必须绑定两侧已保存的权限身份。
+    let bytes = serde_json::to_vec(&(
+        "unix-acl-v1",
+        original,
+        &journal.owner.prefix_identity,
+        &journal.owner.parent_identity,
+        &journal.original,
+        &journal.prepared,
+        &journal.mirror,
+    ))
+    .map_err(|_| Error::PersistenceFailed)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Error> {
     let program = journal
         .owner
@@ -407,17 +452,11 @@ async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Er
         .join(&journal.stage)
         .join("bin/grok-native");
     let identity = stamp(&program)?;
-    let expected = contract::native(contract::VERSION)?;
+    let expected = contract::native(journal.target_version.as_str())?;
     if identity.canonical != program || identity.digest != expected.digest()? {
         return Err(Error::SourceChanged);
     }
-    let digest = format!(
-        "{:x}",
-        Sha256::digest(
-            serde_json::to_vec(&(&identity, "--version", journal.id))
-                .map_err(|_| Error::PersistenceFailed)?
-        )
-    );
+    let digest = probe_digest(journal, &identity)?;
     let generation = Uuid::new_v4();
     journal.probe = Some(Probe {
         generation,
@@ -470,7 +509,7 @@ async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Er
         std::str::from_utf8(&bytes).map_err(|_| Error::ProbeFailed)?,
     )
     .ok_or(Error::ProbeFailed)?;
-    if actual != contract::VERSION {
+    if actual != journal.target_version.as_str() {
         return Err(Error::VersionMismatch);
     }
     journal
@@ -499,7 +538,7 @@ fn confirmed(root: &Path, journal: &Journal) -> Result<(), Error> {
 }
 
 fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
-    contract::supports(&journal.target_version)?;
+    contract::supports_transition(&journal.old_version, &journal.target_version)?;
     if journal.schema != 1
         || journal.id.is_nil()
         || journal.stage != OsString::from(format!(".infinishell-grok-npm-{}", journal.id))
@@ -510,9 +549,12 @@ fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
         return Err(Error::RecoveryRequired);
     }
     journal.owner.validate(entry)?;
-    journal
-        .mirror
-        .validate(&journal.owner.home, &journal.old_version, journal.id)?;
+    journal.mirror.validate(
+        &journal.owner.home,
+        &journal.old_version,
+        &journal.target_version,
+        journal.id,
+    )?;
     verify_release(&journal.original, &journal.old_version)?;
     if let Some(prepared) = &journal.prepared {
         verify_release(prepared, &journal.target_version)?;
@@ -525,22 +567,17 @@ fn validate(entry: &Path, journal: &Journal) -> Result<(), Error> {
             .ok_or(Error::RecoveryRequired)?
             .join(&journal.stage)
             .join("bin/grok-native");
-        let digest = format!(
-            "{:x}",
-            Sha256::digest(
-                serde_json::to_vec(&(&probe.identity, "--version", journal.id))
-                    .map_err(|_| Error::RecoveryRequired)?
-            )
-        );
+        let digest = probe_digest(journal, &probe.identity).map_err(|_| Error::RecoveryRequired)?;
         if probe.generation.is_nil()
             || probe.program != program
             || probe.identity.canonical != program
-            || probe.identity.digest != contract::native(contract::VERSION)?.digest()?
+            || probe.identity.digest
+                != contract::native(journal.target_version.as_str())?.digest()?
             || probe.binding != digest
             || probe
                 .version
                 .as_ref()
-                .is_some_and(|version| version != contract::VERSION)
+                .is_some_and(|version| version != journal.target_version.as_str())
         {
             return Err(Error::RecoveryRequired);
         }
@@ -569,7 +606,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
                 .probe
                 .as_ref()
                 .and_then(|probe| probe.version.as_deref())
-                != Some(contract::VERSION)
+                != Some(journal.target_version.as_str())
         {
             return Err(Error::RecoveryRequired);
         }
@@ -584,16 +621,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         return Ok(Some(journal.target_version));
     }
     let parent = journal.owner.parent()?;
-    let current = parent.child(OsStr::new("grok"))?.grok_snapshot()?;
-    if current != journal.original {
-        if Some(&current) != journal.prepared.as_ref()
-            || parent.child(&journal.stage)?.grok_snapshot()? != journal.original
-        {
-            return Err(Error::RecoveryRequired);
-        }
-        parent.exchange(OsStr::new("grok"), &journal.stage)?;
-    }
-    journal.mirror.finish(false)?;
+    rollback_publication(&journal, &parent)?;
     config_unchanged(&journal, false)?;
     if let Some(prepared) = &journal.prepared {
         if parent.has_child(&journal.stage)? {
@@ -620,12 +648,42 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     Ok(None)
 }
 
+// 入口已核固定发行合同和退出收据；先整体核验包树与镜像，再执行回滚交换。
+fn rollback_publication(journal: &Journal, parent: &Directory) -> Result<(), Error> {
+    let current = parent.child(OsStr::new("grok"))?.grok_snapshot()?;
+    if current != journal.original {
+        if Some(&current) != journal.prepared.as_ref()
+            || parent.child(&journal.stage)?.grok_snapshot()? != journal.original
+        {
+            return Err(Error::RecoveryRequired);
+        }
+    } else if let Some(prepared) = &journal.prepared
+        && parent.has_child(&journal.stage)?
+    {
+        let staged = parent.child(&journal.stage)?.grok_snapshot()?;
+        staged.tree.verify_remaining(&prepared.tree)?;
+        if staged
+            .link
+            .as_ref()
+            .is_some_and(|link| Some(link) != prepared.link.as_ref())
+        {
+            return Err(Error::RecoveryRequired);
+        }
+    }
+    // 镜像可能在包交换后才被外部改动；任何回滚交换之前先核完整镜像布局。
+    journal.mirror.verify_rollback()?;
+    if current != journal.original {
+        parent.exchange(OsStr::new("grok"), &journal.stage)?;
+    }
+    journal.mirror.finish(false)
+}
+
 fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
     if journal
         .probe
         .as_ref()
         .and_then(|probe| probe.version.as_deref())
-        != Some(contract::VERSION)
+        != Some(journal.target_version.as_str())
     {
         return Err(Error::RecoveryRequired);
     }
@@ -652,3 +710,13 @@ fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
 #[cfg(test)]
 #[path = "sources_grok_npm_live_tests.rs"]
 pub(super) mod live_tests;
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+#[path = "sources_npm_grok_tests.rs"]
+mod tests;

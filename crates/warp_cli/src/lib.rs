@@ -416,6 +416,8 @@ pub enum WorkerCommand {
     CliAgentNotify {
         #[arg(long, hide = true)]
         protocol_version: bool,
+        #[arg(long, hide = true, conflicts_with = "protocol_version")]
+        require_protocol: Option<u32>,
     },
 
     /// 管理本地 CLI 的独立生命周期；此入口不用于普通终端命令。

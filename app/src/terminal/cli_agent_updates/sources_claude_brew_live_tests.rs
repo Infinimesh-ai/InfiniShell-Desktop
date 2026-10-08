@@ -548,6 +548,8 @@ fn plan(root: &Path) -> Result<UpdatePlan, String> {
         config: None,
         intent: "claude-brew-backend-private-fixed".into(),
         downgrade: None,
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        claude_npm_platform: None,
     })
 }
 

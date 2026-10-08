@@ -134,3 +134,23 @@ fn json_command_lists_keep_existing_whitespace_and_nul_trimming() {
     );
     assert_eq!(bootstrap.function_names.as_deref(), Some("claude\ncodex\n"));
 }
+
+
+#[test]
+fn terminal_candidate_json_and_kv_are_optional_and_match() {
+    let legacy = serde_json::from_value::<BootstrappedValue>(bootstrap_json()).unwrap();
+    assert_eq!(legacy.shell_pid, None);
+    assert_eq!(legacy.shell_tty, None);
+    let mut json = bootstrap_json();
+    json["shell_pid"] = json!(1234);
+    json["shell_tty"] = json!("/dev/pts/7");
+    let json = serde_json::from_value::<BootstrappedValue>(json).unwrap();
+    let kv = kv_bootstrap(&[("shell_pid", "1234"), ("shell_tty", "/dev/pts/7")]);
+    assert_eq!(json.shell_pid, kv.shell_pid);
+    assert_eq!(json.shell_tty, kv.shell_tty);
+    assert_eq!(json.shell_pid, Some(1234));
+    assert_eq!(json.shell_tty.as_deref(), Some("/dev/pts/7"));
+    let missing = kv_bootstrap(&[("shell_pid", "0"), ("shell_tty", "")]);
+    assert_eq!(missing.shell_pid, None);
+    assert_eq!(missing.shell_tty, None);
+}

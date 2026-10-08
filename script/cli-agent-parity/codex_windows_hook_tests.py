@@ -222,7 +222,10 @@ class FormalResourceTests(unittest.TestCase):
         def case():
             return {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
                     'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
-                                        'output_readers_eof': True} for _ in range(2)]}
+                                        'output_readers_eof': True, 'job_supervision_requested': True,
+                                    'job_assigned_before_resume': True, 'all_descendants_job_verified': True,
+                                    'job_active_after_cleanup': 0, 'job_close_confirmed': True}
+                                   for _ in range(2)]}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'owned-private'
             root.mkdir()
@@ -248,15 +251,43 @@ class FormalResourceTests(unittest.TestCase):
             self.assertEqual(receipt['failure']['filename'], str(root / 'fixture'))
             self.assertFalse(receipt['deleted'])
             self.assertTrue(root.is_dir())
+            for field, value in [('job_supervision_requested', False),
+                                 ('job_assigned_before_resume', False),
+                                 ('all_descendants_job_verified', False),
+                                 ('job_active_after_cleanup', 1),
+                                 ('job_close_confirmed', False)]:
+                for formal in (False, True):
+                    changed = case()
+                    phase = case() if formal else changed
+                    if formal:
+                        changed.update(mode='formal', formal_registration=phase)
+                    phase['process_closes'][1][field] = value
+                    receipt = {}
+                    with self.subTest(field=field, formal=formal), self.assertRaisesRegex(ValueError, '后代 Job'):
+                        native_probe.cleanup_private_cases(root, [changed], receipt)
+                    self.assertFalse(receipt['attempted'])
+                    self.assertFalse(receipt['descendants_job_verified'])
+                    self.assertTrue((root / 'fixture').is_file())
+            changed = case()
+            del changed['process_closes'][0]['all_descendants_job_verified']
+            with self.assertRaisesRegex(ValueError, '后代 Job'):
+                native_probe.cleanup_private_cases(root, [changed], {})
             receipt = {}
-            native_probe.cleanup_private_cases(root, [case()], receipt)
+            confirmed = case()
+            # 根自然退出后允许有界回收自己的后代，但必须另有 Job 为空及关闭证明。
+            confirmed['process_closes'][1]['descendants_forced'] = True
+            native_probe.cleanup_private_cases(root, [confirmed], receipt)
+            self.assertTrue(receipt['descendants_job_verified'])
             self.assertTrue(receipt['deleted'])
             self.assertFalse(root.exists())
 
     def test_cleanup_removes_only_confirmed_private_windows_readonly_file(self):
         case = {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
                 'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
-                                    'output_readers_eof': True} for _ in range(2)]}
+                                    'output_readers_eof': True, 'job_supervision_requested': True,
+                                    'job_assigned_before_resume': True, 'all_descendants_job_verified': True,
+                                    'job_active_after_cleanup': 0, 'job_close_confirmed': True}
+                                   for _ in range(2)]}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'owned-private'
             target = root / '.git/objects/pack/tmp_idx_test'
@@ -291,7 +322,10 @@ class FormalResourceTests(unittest.TestCase):
     def test_cleanup_readonly_retry_rejects_escape_reparse_hardlink_and_other_errors(self):
         case = {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
                 'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
-                                    'output_readers_eof': True} for _ in range(2)]}
+                                    'output_readers_eof': True, 'job_supervision_requested': True,
+                                    'job_assigned_before_resume': True, 'all_descendants_job_verified': True,
+                                    'job_active_after_cleanup': 0, 'job_close_confirmed': True}
+                                   for _ in range(2)]}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'owned-private'
             target = root / 'objects/private-file'
@@ -344,6 +378,12 @@ class FormalResourceTests(unittest.TestCase):
             self.assertTrue(receipt['output_readers_eof'])
             self.assertEqual(receipt['root_exit_code'], 0)
             self.assertFalse(receipt['all_descendants_job_verified'])
+            self.assertFalse(receipt['stdin_closed_before'])
+            self.assertTrue(receipt['stdin_closed_after'])
+            self.assertTrue(receipt['stdin_close_returned'])
+            self.assertIsNone(receipt['stdin_close_error_type'])
+            self.assertIsNone(receipt['stdin_close_errno'])
+            self.assertIsNone(receipt['stdin_close_winerror'])
 
 
 class NativeCompletionTests(unittest.TestCase):
@@ -612,6 +652,63 @@ class NativeRecorderCloseTests(unittest.TestCase):
         self.assertTrue(receipt['termination_requested'])
         self.assertTrue(receipt['all_descendants_job_verified'])
         self.assertTrue(receipt['output_readers_eof'])
+
+    def test_stdin_close_errors_preserve_diagnostics_and_still_reap_without_natural_success(self):
+        for error, closed_after in ((BrokenPipeError(32, 'private-message', 'private-path'), True),
+                                    (OSError(5, 'private-message', 'private-path'), False)):
+            with self.subTest(error=type(error).__name__, closed_after=closed_after):
+                error.winerror = 6
+                clock = {'now': 0.0}
+                stdin = Mock(closed=False)
+                def close_stdin():
+                    clock['now'] += 2
+                    stdin.closed = closed_after
+                    raise error
+                stdin.close.side_effect = close_stdin
+                process = Mock(stdin=stdin, stdout=io.StringIO(), stderr=io.StringIO(), returncode=1)
+                waits = []
+                def wait(timeout):
+                    waits.append(timeout)
+                    if len(waits) == 1:
+                        clock['now'] += 5
+                        raise subprocess.TimeoutExpired('fixture', timeout)
+                    clock['now'] += 0.25
+                process.wait.side_effect = wait
+                with patch.object(native_probe.subprocess, 'Popen', return_value=process):
+                    recorder = native_probe.NativeRecorder(['fixture'], {}, Path('.'), [])
+                for reader in recorder.readers.values():
+                    reader.join(timeout=1)
+                    self.assertFalse(reader.is_alive())
+                recorder.probe_job = Mock()
+                recorder.probe_job.wait_empty.return_value = 0
+                recorder.job_startup = {'assigned_before_resume': True}
+                evidence = {}
+                with patch.object(native_probe.time, 'monotonic', side_effect=lambda: clock['now']), \
+                        self.assertRaisesRegex(ValueError, '未正常退出'):
+                    native_probe.close_case(recorder, evidence)
+                receipt = evidence['failed_close_receipt']
+                self.assertFalse(receipt['stdin_closed_before'])
+                self.assertEqual(receipt['stdin_closed_after'], closed_after)
+                self.assertFalse(receipt['stdin_close_returned'])
+                self.assertEqual(receipt['stdin_close_error_type'], type(error).__name__)
+                self.assertEqual(receipt['stdin_close_errno'], error.errno)
+                self.assertEqual(receipt['stdin_close_winerror'], 6)
+                self.assertEqual(receipt['stdin_close_elapsed_ms'], 2000)
+                self.assertEqual(receipt['root_wait_elapsed_ms'], 5250)
+                self.assertEqual(receipt['close_elapsed_ms'], 7250)
+                self.assertEqual(waits, [5, 3])
+                self.assertFalse(receipt['root_exited_naturally'])
+                self.assertTrue(receipt['termination_requested'])
+                self.assertTrue(receipt['all_descendants_job_verified'])
+                self.assertTrue(receipt['job_close_confirmed'])
+                self.assertTrue(receipt['output_readers_eof'])
+                self.assertNotIn('private-message', json.dumps(receipt))
+                self.assertNotIn('private-path', json.dumps(receipt))
+                stdin.close.assert_called_once_with()
+                process.terminate.assert_called_once_with()
+                process.kill.assert_not_called()
+                recorder.probe_job.wait_empty.assert_called_once_with(5)
+                recorder.probe_job.close.assert_called_once_with()
 
     def test_startup_reuses_suspended_job_before_popen_and_does_not_double_wrap_cache_callers(self):
         import probe_codex_plugin_cache_refresh as shared

@@ -13,8 +13,8 @@ use sha2::{Digest as _, Sha256};
 use tempfile::{NamedTempFile, TempDir};
 use toml_edit::{DocumentMut, Item};
 
-use super::PluginInstallError;
 use super::notification_patch::{self, PatchKind, VerifiedRuntime};
+use super::{PluginComponentIntegrity, PluginInstallError, PluginIntegrityReport};
 
 const MARKETPLACE: &str = "codex-warp";
 const COMMIT: &str = "31ce59d9011cfb1d78f265649a228dac5de58d76";
@@ -430,6 +430,89 @@ pub(super) fn is_current(home: &Path) -> bool {
     }
     cache.insert(home.to_owned(), (Instant::now(), value));
     value
+}
+
+/// 更新核验直接读取来源与完整缓存，不读取或更新渲染缓存。
+pub(super) fn integrity_report(home: &Path) -> PluginIntegrityReport {
+    let inspect = || -> io::Result<PluginIntegrityReport> {
+        let (_, document) = read_config(home)?;
+        if document.as_table().is_empty() {
+            return Ok(PluginIntegrityReport {
+                notification: PluginComponentIntegrity::Missing,
+                platform: PluginComponentIntegrity::Missing,
+            });
+        }
+        let home = home.canonicalize()?;
+        Ok(PluginIntegrityReport {
+            notification: component_integrity(&home, &document, "warp"),
+            platform: component_integrity(&home, &document, "orchestration"),
+        })
+    };
+    inspect().unwrap_or(PluginIntegrityReport {
+        notification: PluginComponentIntegrity::Unverified,
+        platform: PluginComponentIntegrity::Unverified,
+    })
+}
+
+fn component_integrity(
+    home: &Path,
+    document: &DocumentMut,
+    name: &str,
+) -> PluginComponentIntegrity {
+    let key = format!("{name}@codex-warp");
+    match document
+        .get("plugins")
+        .and_then(|plugins| plugins.get(&key))
+        .and_then(|plugin| plugin.get("enabled"))
+        .and_then(Item::as_bool)
+    {
+        Some(false) => return PluginComponentIntegrity::Disabled,
+        None => return PluginComponentIntegrity::Missing,
+        Some(true) => {}
+    }
+    let source = if owned_entry(document, home) {
+        verify_owned(home)
+    } else if owned_revision_entry(document, home, &PREVIOUS_BUNDLE) {
+        verify_revision(home, &PREVIOUS_BUNDLE, PREVIOUS_METADATA)
+    } else if owned_revision_entry(document, home, &REV4_BUNDLE) {
+        verify_revision(home, &REV4_BUNDLE, REV4_METADATA)
+    } else if owned_revision_entry(document, home, &REV5_BUNDLE) {
+        verify_revision(home, &REV5_BUNDLE, REV5_METADATA)
+    } else if marketplace(document).is_some_and(canonical_entry) {
+        Ok(())
+    } else {
+        return PluginComponentIntegrity::Unverified;
+    };
+    if let Err(error) = source {
+        return if error.kind() == io::ErrorKind::PermissionDenied {
+            PluginComponentIntegrity::Unverified
+        } else {
+            PluginComponentIntegrity::IntegrityMismatch
+        };
+    }
+    if name == "warp" {
+        return notification_patch::integrity(home, PatchKind::Codex);
+    }
+    let cache = cache_root(home, name);
+    let entries =
+        match fs::read_dir(&cache).and_then(|entries| entries.collect::<io::Result<Vec<_>>>()) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return PluginComponentIntegrity::Missing;
+            }
+            Err(_) => return PluginComponentIntegrity::Unverified,
+        };
+    // 编排缓存的固定合同只有 0.4.0；不按目录排序猜测活跃版本。
+    if entries.len() != 1 || entries[0].file_name() != "0.4.0" {
+        return PluginComponentIntegrity::Unverified;
+    }
+    match verify_installed_cache(&cache, name) {
+        Ok(()) => PluginComponentIntegrity::Verified,
+        Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+            PluginComponentIntegrity::Unverified
+        }
+        Err(_) => PluginComponentIntegrity::IntegrityMismatch,
+    }
 }
 
 fn validate_existing(home: &Path, document: &DocumentMut) -> io::Result<()> {

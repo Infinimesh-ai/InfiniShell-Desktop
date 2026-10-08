@@ -233,6 +233,24 @@ fn elf_reads_bounded_needed_and_soname_from_virtual_string_mapping() {
     assert_eq!(image.soname.as_deref(), Some("libfixture.so.1"));
 }
 
+#[test]
+fn glibc_parser_does_not_accept_the_musl_interpreter() {
+    let file = elf(0, "libc.so.6");
+    file.as_file()
+        .write_all_at(&3_u16.to_le_bytes(), 56)
+        .unwrap();
+    let mut header = [0_u8; 56];
+    header[..4].copy_from_slice(&3_u32.to_le_bytes());
+    header[8..16].copy_from_slice(&448_u64.to_le_bytes());
+    header[32..40].copy_from_slice(&25_u64.to_le_bytes());
+    file.as_file().write_all_at(&header, 176).unwrap();
+    file.as_file()
+        .write_all_at(b"/lib/ld-musl-x86_64.so.1\0", 448)
+        .unwrap();
+
+    assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+}
+
 fn elf_with_large_string_table() -> tempfile::NamedTempFile {
     let file = elf(0, "libc.so.6");
     // 官方 Node 20.9.0 Linux x64 的 DT_STRSZ 是 5,291,274；只需要读取依赖名。

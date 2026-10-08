@@ -1,8 +1,12 @@
-//! Claude 2.1.280 Windows x64 官方 npm 归档与 cmd-shim 8 完整字节合同。
+//! Claude Windows x64 官方 npm 归档与 cmd-shim 8 完整字节合同。
 //! 安装脚本只作为受摘要保护的文件保留；宿主明确复制平台 native，不执行生命周期脚本。
 
 use std::collections::BTreeMap;
+use std::io;
 use std::path::PathBuf;
+
+use serde::Deserialize;
+use serde_json::Value;
 
 pub(crate) const VERSION: &str = "2.1.280";
 pub(crate) const WRAPPER_INTEGRITY: &str = "sha512-EZlX8jqNf+e7q9v+UoPbLYAbEGth7aDbcTytHzPYYohbP/fCfrjboCbcv85ZYGEq1Rq7Amm8hXLhuCKxLsabwA==";
@@ -10,6 +14,125 @@ pub(crate) const PLATFORM_INTEGRITY: &str = "sha512-/Cbb0f28a9iKVoZwgrGhNT7/5c8d
 pub(crate) const DEPENDENCY: &str = "node_modules/@anthropic-ai/claude-code-win32-x64";
 pub(crate) const NATIVE: &str = "node_modules/@anthropic-ai/claude-code-win32-x64/claude.exe";
 pub(crate) const PUBLIC: &str = "bin/claude.exe";
+
+#[derive(Deserialize)]
+struct Release {
+    wrapper: Artifact,
+    platform: Artifact,
+}
+
+#[derive(Deserialize)]
+struct Artifact {
+    integrity: String,
+    sha256: String,
+    files: BTreeMap<PathBuf, File>,
+}
+
+#[derive(Deserialize)]
+struct File {
+    length: u64,
+    sha256: String,
+    mode: u32,
+}
+
+pub(crate) fn supports(version: &str) -> bool {
+    matches!(version, "2.1.285" | "2.1.287")
+}
+
+fn release(version: &str) -> Option<Release> {
+    if !supports(version) {
+        return None;
+    }
+    let mut values: BTreeMap<String, Release> =
+        serde_json::from_slice(include_bytes!("sources_npm_claude_windows_contract.json")).ok()?;
+    values.remove(version)
+}
+
+pub(crate) fn integrities_for(version: &str) -> Option<(String, String)> {
+    if version == VERSION {
+        return Some((WRAPPER_INTEGRITY.into(), PLATFORM_INTEGRITY.into()));
+    }
+    let release = release(version)?;
+    Some((release.wrapper.integrity, release.platform.integrity))
+}
+
+pub(crate) fn archive_sha256_for(version: &str) -> Option<(String, String)> {
+    let release = release(version)?;
+    Some((release.wrapper.sha256, release.platform.sha256))
+}
+
+pub(crate) fn archive_modes_for(version: &str) -> Option<BTreeMap<PathBuf, u32>> {
+    let release = release(version)?;
+    Some(
+        release
+            .wrapper
+            .files
+            .into_iter()
+            .map(|(path, file)| (path, file.mode))
+            .chain(
+                release
+                    .platform
+                    .files
+                    .into_iter()
+                    .map(|(path, file)| (PathBuf::from(DEPENDENCY).join(path), file.mode)),
+            )
+            .collect(),
+    )
+}
+
+pub(crate) fn verify_metadata(version: &str, wrapper: &[u8], platform: &[u8]) -> io::Result<()> {
+    let invalid = || io::Error::other("Claude Windows npm 官方发行元数据不匹配");
+    let release = release(version).ok_or_else(invalid)?;
+    for (bytes, name, expected) in [
+        (wrapper, "claude-code", release.wrapper),
+        (platform, "claude-code-win32-x64", release.platform),
+    ] {
+        if bytes.len() > 1024 * 1024 {
+            return Err(invalid());
+        }
+        let value: Value = serde_json::from_slice(bytes).map_err(|_| invalid())?;
+        if value["name"] != format!("@anthropic-ai/{name}")
+            || value["version"] != version
+            || value["dist"]["integrity"] != expected.integrity
+            || value["dist"]["tarball"]
+                != format!("https://registry.npmjs.org/@anthropic-ai/{name}/-/{name}-{version}.tgz")
+            || value["dist"]["fileCount"].as_u64() != Some(expected.files.len() as u64)
+            || value["dist"]["unpackedSize"].as_u64()
+                != Some(expected.files.values().map(|file| file.length).sum())
+        {
+            return Err(invalid());
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn archive_files_for(version: &str) -> Option<BTreeMap<PathBuf, (u64, String, bool)>> {
+    if version == VERSION {
+        return Some(archive_files());
+    }
+    let release = release(version)?;
+    Some(
+        release
+            .wrapper
+            .files
+            .into_iter()
+            .chain(
+                release
+                    .platform
+                    .files
+                    .into_iter()
+                    .map(|(path, file)| (PathBuf::from(DEPENDENCY).join(path), file)),
+            )
+            .map(|(path, file)| (path, (file.length, file.sha256, file.mode & 0o111 != 0)))
+            .collect(),
+    )
+}
+
+pub(crate) fn files_for(version: &str) -> Option<BTreeMap<PathBuf, (u64, String, bool)>> {
+    let mut files = archive_files_for(version)?;
+    files.insert(PUBLIC.into(), files.get(&PathBuf::from(NATIVE))?.clone());
+    Some(files)
+}
 
 pub(crate) fn archive_files() -> BTreeMap<PathBuf, (u64, String, bool)> {
     [
@@ -113,3 +236,7 @@ pub(crate) fn shims() -> [(&'static str, &'static str); 3] {
         ("claude", shell_shim()),
     ]
 }
+
+#[cfg(test)]
+#[path = "sources_npm_claude_windows_contract_tests.rs"]
+mod tests;

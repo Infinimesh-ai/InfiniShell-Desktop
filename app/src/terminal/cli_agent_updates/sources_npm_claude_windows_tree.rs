@@ -443,3 +443,7 @@ pub(super) fn freeze_images(root: &Path, expected: &Snapshot) -> Result<Vec<File
     }
     Ok(held)
 }
+
+#[cfg(test)]
+#[path = "sources_npm_claude_windows_tree_tests.rs"]
+mod tests;

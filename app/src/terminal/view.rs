@@ -33,6 +33,13 @@ use crate::ssh_manager::password_prompt::{
 };
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 pub(crate) mod docker_sandbox;
+mod terminal_binding;
+#[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+mod tmux_remote_owned;
 #[cfg(all(
     feature = "local_fs",
     feature = "local_tty",
@@ -2657,6 +2664,13 @@ pub struct TerminalView {
         )
     ))]
     grok_remote_owned: Option<grok_remote_owned::RemoteOwned>,
+    remote_terminal_binding: Option<terminal_binding::TerminalBinding>,
+    #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+    tmux_remote_owned: Option<tmux_remote_owned::TmuxOwned>,
     #[cfg(all(
         feature = "local_fs",
         feature = "local_tty",
@@ -4430,6 +4444,13 @@ impl TerminalView {
                 )
             ))]
             grok_remote_owned: None,
+            remote_terminal_binding: None,
+            #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+            tmux_remote_owned: None,
             #[cfg(all(
                 feature = "local_fs",
                 feature = "local_tty",
@@ -4598,6 +4619,13 @@ impl TerminalView {
         if FeatureFlag::SshRemoteServer.is_enabled() {
             let mgr_handle = RemoteServerManager::handle(ctx);
             ctx.subscribe_to_model(&mgr_handle, |me, _, event, ctx| {
+                me.invalidate_remote_terminal_binding(ctx);
+                #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+                me.invalidate_remote_tmux_owned(ctx);
                 // `RemoteServerManager` is a singleton, so every `TerminalView` receives every event.
                 // Filter for session-scoped events that are specifically tracked by this view.
                 // Host-scoped variants return `None` and pass through unfiltered.
@@ -9840,25 +9868,9 @@ impl TerminalView {
         });
     }
 
-    /// Writes a shared session viewer's bytes to the pty.
-    ///
-    /// A lone Ctrl-C byte that is actually forwarded to the PTY is
-    /// additionally observed by `CLIAgentSessionsModel` so that an interrupt
-    /// which silently kills a third-party harness turn (no plugin hook fires
-    /// on user interrupt) can still resolve the session, and its task, to
-    /// Cancelled. See `CLIAgentSessionsModel::observe_ctrl_c_write`.
-    /// Observation never delays or drops the write itself, and never arms a
-    /// window for a byte that `write_user_bytes_to_pty` rejected (e.g. the
-    /// active block is under agent control).
+    /// 共享会话输入与本地键盘共用转发边界；被拒绝的输入不会启动中断确认等待。
     pub fn write_viewer_bytes_to_pty(&mut self, bytes: Vec<u8>, ctx: &mut ViewContext<Self>) {
-        let is_ctrl_c = bytes == [0x03];
-        let forwarded = self.write_user_bytes_to_pty(bytes, ctx);
-        if forwarded && is_ctrl_c && FeatureFlag::CtrlCCancelsThirdPartyHarness.is_enabled() {
-            let terminal_view_id = self.view_id;
-            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
-                sessions.observe_ctrl_c_write(terminal_view_id, ctx);
-            });
-        }
+        self.write_user_bytes_to_pty(bytes, ctx);
     }
 
     /// Ends the current line before writing the given bytes to the PTY.
@@ -9908,6 +9920,20 @@ impl TerminalView {
         self.clear_selected_blocks(ctx);
         self.update_scroll_position_locking(ScrollPositionUpdate::AfterWriteUserBytesToPty, ctx);
         self.write_to_pty(bytes, ctx);
+        // 只观察已通过用户输入守卫并提交给 PTY 的独立按键，不把按键当成原生取消回执。
+        // Escape 也可能只是关闭菜单；此处只为 Codex 观察 Escape，其他 CLI 保持原有接线。
+        if FeatureFlag::CtrlCCancelsThirdPartyHarness.is_enabled() {
+            let terminal_view_id = self.view_id;
+            if bytes_vec == [0x03] {
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                    sessions.observe_ctrl_c_write(terminal_view_id, ctx);
+                });
+            } else if bytes_vec == [0x1b] {
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                    sessions.observe_codex_escape_write(terminal_view_id, ctx);
+                });
+            }
+        }
         self.emit_non_editor_typed_event(bytes_vec, ctx);
         true
     }
@@ -12019,6 +12045,13 @@ impl TerminalView {
     }
 
     fn handle_terminal_event(&mut self, event: &ModelEvent, ctx: &mut ViewContext<Self>) {
+        self.invalidate_remote_terminal_binding(ctx);
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+        self.invalidate_remote_tmux_owned(ctx);
         #[cfg(all(
             feature = "local_fs",
             feature = "local_tty",
@@ -13145,6 +13178,9 @@ impl TerminalView {
                     block_id: Some(block_id.clone()),
                 });
             }
+            ModelEvent::TerminalBindingChallenge(challenge) => {
+                self.handle_terminal_binding_challenge(challenge, ctx);
+            }
             ModelEvent::PluggableNotification { title, body } => {
                 // Intercept structured CLI agent notifications (e.g. from Claude Code plugin).
                 // The listener's own subscription handles subsequent events; we just
@@ -13558,6 +13594,12 @@ impl TerminalView {
         if !is_agent_supported(&notification.agent) {
             return;
         }
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+        if !self.accept_tmux_cli_notification(&notification, body, ctx) { return; }
 
         if notification.agent == CLIAgent::Codex && !FeatureFlag::CodexPlugin.is_enabled() {
             return;
@@ -13570,6 +13612,16 @@ impl TerminalView {
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
             sessions_model.update_from_event(self.view_id, &notification, ctx);
         });
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.remember_tmux_hook_identity(&notification, ctx);
 
         if notification.source == CLIAgentEventSource::RichPlugin
             && matches!(
@@ -16927,6 +16979,40 @@ impl TerminalView {
             if let Some(generation) =
                 CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
             {
+                if FeatureFlag::CLIAgentRichInput.is_enabled()
+                    && !self.has_active_cli_agent_input_session(ctx)
+                    && CLIAgentSessionsModel::as_ref(ctx)
+                        .session(self.view_id)
+                        .is_some_and(|session| session.agent == CLIAgent::Grok)
+                {
+                    if copied.is_empty() {
+                        return;
+                    }
+                    if !self.cli_agent_input_target_matches(generation, ctx) {
+                        self.show_error_toast(crate::t!("cli-agent-input-target-changed"), ctx);
+                        return;
+                    }
+                    // 只追加本地草稿，再由开框事件恢复；不写原生 PTY、不提交或回答审批。
+                    let view_id = self.view_id;
+                    CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                        let mut draft = sessions
+                            .session(view_id)
+                            .and_then(|session| session.draft_text.clone())
+                            .unwrap_or_default();
+                        draft.push_str(&copied);
+                        sessions.set_draft(view_id, draft);
+                    });
+                    self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+                    let window_id = ctx.window_id();
+                    ToastStack::handle(ctx).update(ctx, |stack, ctx| {
+                        stack.add_ephemeral_toast(
+                            DismissibleToast::default(crate::t!("cli-agent-grok-pasted-to-draft")),
+                            window_id,
+                            ctx,
+                        );
+                    });
+                    return;
+                }
                 self.insert_text_into_cli_agent_pty(&copied, generation, ctx);
             }
             return;
@@ -26733,6 +26819,48 @@ impl TerminalView {
 
         let image_filepaths = get_image_filepaths_from_paths(paths);
 
+        // 本地 Grok 拖放整批留在附件流程，不能把非图片或失配目标退回 PTY 输入。
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if (self.grok_owned_input.is_some()
+            && CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.view_id))
+            || (is_in_long_running_command
+                && (!image_filepaths.is_empty()
+                    || CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.view_id))
+                && CLIAgentSessionsModel::as_ref(ctx)
+                    .session(self.view_id)
+                    .is_some_and(|session| {
+                        session.agent == CLIAgent::Grok && session.remote_host.is_none()
+                    }))
+        {
+            if !is_in_long_running_command
+                || !(self.owned_grok_context_target_matches(ctx)
+                    || self.native_grok_image_target_matches(ctx))
+            {
+                self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
+                return;
+            }
+            if image_filepaths.len() != paths.len() {
+                self.show_error_toast(crate::t!("cli-agent-input-non-image-drop-unavailable"), ctx);
+                return;
+            }
+            self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+            if !self.has_active_cli_agent_input_session(ctx) {
+                return;
+            }
+            self.input.update(ctx, |input, ctx| {
+                input.handle_pasted_or_dragdropped_image_filepaths(image_filepaths, ctx)
+            });
+            return;
+        }
+
         // CLI-agent paste path: when a CLI agent (e.g. Claude Code) is the
         // foreground long-running process and the user is interacting with its
         // TUI directly (rich input closed), hand image drops to the agent the
@@ -29041,6 +29169,28 @@ impl View for TerminalView {
                 .finish()
         } else {
             element
+        };
+
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        let final_element = if CLIAgentSessionsModel::as_ref(app).is_input_open(self.view_id)
+            && (self.grok_owned_input.is_some()
+                || CLIAgentSessionsModel::as_ref(app)
+                    .session(self.view_id)
+                    .is_some_and(|session| {
+                        session.agent == CLIAgent::Grok && session.remote_host.is_none()
+                    }))
+        {
+            TerminalSizeElement::new_owned_grok_file_drop_guard(final_element).finish()
+        } else {
+            final_element
         };
 
         final_element

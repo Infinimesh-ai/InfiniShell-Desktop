@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use warp_core::cli_agent_protocol::CodexProcessEvidence;
 
 pub(crate) const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
 pub(crate) const REMOTE_CODEX_COMMAND: &str = "--infinishell-remote-owned-codex";
@@ -31,6 +32,16 @@ pub(crate) struct Owner {
     pub tui_pid: i32,
     pub server_pid: i32,
     pub tty_device: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned_native_session_id: Option<Uuid>,
+}
+
+/// 专属原生实例的只读会话证明；它不是已执行 SessionStart 的证据。
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReadOnlySession {
+    pub native_session_id: Uuid,
+    pub process: CodexProcessEvidence,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -38,6 +49,10 @@ pub(crate) struct Owner {
 pub(crate) enum Action {
     Reserve { ticket: Ticket, cwd: String },
     Status { ticket: Ticket },
+    Observe {
+        ticket: Ticket,
+        expected_session: Option<Uuid>,
+    },
     Cancel { ticket: Ticket },
     Revoke { ticket: Ticket, generation: Uuid },
 }
@@ -62,6 +77,11 @@ pub(crate) enum Reply {
         ticket: Ticket,
         phase: String,
         owner: Option<Owner>,
+    },
+    Observed {
+        ticket: Ticket,
+        owner: Owner,
+        session: ReadOnlySession,
     },
     Revoked {
         ticket: Ticket,

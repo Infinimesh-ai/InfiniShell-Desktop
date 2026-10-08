@@ -11,8 +11,9 @@ use tempfile::NamedTempFile;
 
 use super::notification_patch::{self, PatchKind, VerifiedRuntime};
 use super::{
-    CliAgentPluginManager, PluginInstallError, PluginInstructionStep, PluginInstructions,
-    compare_versions, run_cli_command_logged,
+    CliAgentPluginManager, PluginComponentIntegrity, PluginInstallError, PluginInstructionStep,
+    PluginInstructions, PluginIntegrityReport, compare_versions, integrity_version,
+    run_cli_command_logged,
 };
 use crate::terminal::model::session::LocalCommandExecutor;
 use crate::terminal::shell::ShellType;
@@ -102,6 +103,16 @@ impl ClaudeCodePluginManager {
 
 #[async_trait]
 impl CliAgentPluginManager for ClaudeCodePluginManager {
+    fn integrity_report(&self) -> PluginIntegrityReport {
+        match claude_home_dir() {
+            Ok(home) => integrity_report_at(&home),
+            Err(_) => PluginIntegrityReport {
+                notification: PluginComponentIntegrity::Unverified,
+                platform: PluginComponentIntegrity::Unverified,
+            },
+        }
+    }
+
     fn minimum_plugin_version(&self) -> &'static str {
         MINIMUM_PLUGIN_VERSION
     }
@@ -729,6 +740,84 @@ static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plug
         crate::t_static!("cli-agent-plugin-patch-manual-note"),
     ],
 });
+
+fn integrity_report_at(home: &Path) -> PluginIntegrityReport {
+    let inspect = || -> io::Result<PluginIntegrityReport> {
+        let (_, settings) = read_claude_document(home, "settings.json")?;
+        let registry = read_claude_document(home, "plugins/installed_plugins.json")
+            .ok()
+            .map(|(_, registry)| registry);
+        Ok(PluginIntegrityReport {
+            notification: component_integrity(home, &settings, registry.as_ref(), PLUGIN_KEY),
+            platform: component_integrity(home, &settings, registry.as_ref(), PLATFORM_PLUGIN_KEY),
+        })
+    };
+    inspect().unwrap_or(PluginIntegrityReport {
+        notification: PluginComponentIntegrity::Unverified,
+        platform: PluginComponentIntegrity::Unverified,
+    })
+}
+
+fn component_integrity(
+    home: &Path,
+    settings: &Value,
+    registry: Option<&Value>,
+    key: &str,
+) -> PluginComponentIntegrity {
+    if let Some(plugins) = settings.get("enabledPlugins") {
+        let Some(plugins) = plugins.as_object() else {
+            return PluginComponentIntegrity::Unverified;
+        };
+        if let Some(enabled) = plugins.get(key) {
+            match enabled.as_bool() {
+                Some(false) => return PluginComponentIntegrity::Disabled,
+                Some(true) => {}
+                None => return PluginComponentIntegrity::Unverified,
+            }
+        }
+    }
+    let Some(registry) = registry else {
+        return PluginComponentIntegrity::Unverified;
+    };
+    let Some(plugins) = registry.get("plugins") else {
+        return if registry.as_object().is_some_and(|value| value.is_empty()) {
+            PluginComponentIntegrity::Missing
+        } else {
+            PluginComponentIntegrity::Unverified
+        };
+    };
+    let Some(plugins) = plugins.as_object() else {
+        return PluginComponentIntegrity::Unverified;
+    };
+    let Some(entry) = plugins.get(key) else {
+        return PluginComponentIntegrity::Missing;
+    };
+    let Some(entries) = entry.as_array() else {
+        return PluginComponentIntegrity::Unverified;
+    };
+    if entries.is_empty() {
+        return PluginComponentIntegrity::Missing;
+    }
+    if entries.len() != 1
+        || registry["version"] != 2
+        || entries[0]["scope"].as_str() != Some("user")
+    {
+        return PluginComponentIntegrity::Unverified;
+    }
+    if key == PLUGIN_KEY {
+        return notification_patch::integrity(home, PatchKind::Claude);
+    }
+    // 编排插件只有登记与最低版本约定，没有受审完整树，不能据版本号报告通过。
+    match entries[0]["version"].as_str().and_then(integrity_version) {
+        Some(version)
+            if integrity_version(MINIMUM_PLATFORM_PLUGIN_VERSION)
+                .is_some_and(|minimum| version < minimum) =>
+        {
+            PluginComponentIntegrity::NeedsUpdate
+        }
+        Some(_) | None => PluginComponentIntegrity::Unverified,
+    }
+}
 
 fn check_installed(claude_dir: &Path) -> bool {
     check_plugin_installed(claude_dir, PLUGIN_KEY)

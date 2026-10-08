@@ -22,7 +22,7 @@ pub(super) fn approval_allowed(root: &Path, call: &Value) -> bool {
                     .and_then(|path| resolve_search_path(root, Some(path)))
                     .is_some_and(|path| path.is_dir())
         }
-        (Some("grep"), Some("GrepSearch")) => {
+        (Some("grep"), Some("Grep")) => {
             if call["kind"] != "search"
                 || !input["pattern"].as_str().is_some_and(bounded_pattern)
                 || !input["path"]

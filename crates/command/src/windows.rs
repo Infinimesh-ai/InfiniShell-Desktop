@@ -10,6 +10,12 @@ use warp_errors::report_error;
 #[path = "windows_appcontainer.rs"]
 mod appcontainer;
 pub use appcontainer::AppContainerProbe;
+#[cfg(feature = "native-probe-witness")]
+pub use appcontainer::NativeWitnessProcess;
+
+#[path = "windows_station_bootstrap.rs"]
+mod station_bootstrap;
+pub use station_bootstrap::{StationBootstrapImage, StationDebugger, run_station_bootstrap};
 
 /// 主线程仍处于 `CREATE_SUSPENDED` 状态的子进程。
 ///
@@ -97,7 +103,10 @@ impl SuspendedChild {
 
 impl std::os::windows::io::AsRawHandle for SuspendedChild {
     fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
-        self.child.as_ref().expect("冻结进程必须存在").as_raw_handle()
+        self.child
+            .as_ref()
+            .expect("冻结进程必须存在")
+            .as_raw_handle()
     }
 }
 
@@ -305,3 +314,26 @@ impl CommandExt for crate::r#async::Command {
 #[cfg(test)]
 #[path = "windows_tests.rs"]
 mod tests;
+
+#[cfg(any(test, feature = "native-probe-witness"))]
+#[path = "windows_clr_reader.rs"]
+mod clr_reader;
+#[cfg(any(test, feature = "native-probe-witness"))]
+pub use clr_reader::{
+    ClrExceptionStop, ClrManagedContinuationStop, ClrManagedMethodPairSpec, ClrManagedMethodSpec,
+    ClrNativeReturnStop, ClrReader, ClrReaderImage, ClrRuntimeBinding, ManagedContinuationPair,
+    ManagedContinuationTarget,
+};
+
+#[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
+#[path = "windows_shell_classification.rs"]
+mod shell_classification;
+#[cfg(all(target_arch = "x86_64", any(test, feature = "native-probe-witness")))]
+pub use shell_classification::{
+    ManagedInitialReceipt, Observation as ShellClassificationObservation, PreStartExceptionReceipt,
+    ShellClassificationWitness,
+};
+
+#[cfg(all(test, target_arch = "x86_64"))]
+#[path = "windows_clr_fixture_tests.rs"]
+mod clr_fixture_tests;

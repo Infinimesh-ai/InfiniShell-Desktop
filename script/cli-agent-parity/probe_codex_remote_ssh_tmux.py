@@ -336,6 +336,12 @@ def authorize(ssh, remote_root, command, report):
     require(recorder.process.returncode == 0, "远端原生授权进程没有正常退出")
 
 
+def trust_prompt_visible(compact):
+    old = "Doyoutrustthecontentsofthisdirectory?" in compact and "Yes,continue" in compact
+    current = "Trustthisfolder?" in compact and "Trustandcontinue" in compact
+    return old or current
+
+
 def capture_case(command, token, timeout=40):
     master, slave = os.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 140, 0, 0))
@@ -385,8 +391,7 @@ def capture_case(command, token, timeout=40):
             plain = re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", raw).decode(
                 "utf-8", errors="replace")
             compact = re.sub(r"\s+", "", plain)
-            if not trusted and "Doyoutrustthecontentsofthisdirectory?" in compact \
-                    and "Yes,continue" in compact:
+            if not trusted and trust_prompt_visible(compact):
                 os.write(master, b"1\r"); trusted = True
             if not kept_existing_model and "isnolongeravailable" in compact \
                     and "Useexistingmodel" in compact:
@@ -413,7 +418,8 @@ def capture_case(command, token, timeout=40):
             "ssh_stdout_bytes": len(stream), "ssh_stderr": "<merged-into-control-pty>"}
 
 
-def validate_case(mode, case, native, token):
+def validate_case(mode, case, native, token, codex_version="0.155.1"):
+    require(codex_version in {"0.155.1", "0.156.1"}, "不支持的 Codex 固定版本")
     require(case["capture_error"] is None, "远端原生捕获失败：" + str(case["capture_error"]))
     require(set(native) == {"native-start", "native-exit", "SessionStart", "UserPromptSubmit"},
             "缺少远端真实原生执行或退出记录")
@@ -436,7 +442,7 @@ def validate_case(mode, case, native, token):
         require(not record["hook_control_tty"]["opened"]
                 and record["codex_parent"]["tty_nr"] != 0
                 and not record["diagnostic_parent_tty_adapter"],
-                "Codex 0.155.1 hook 的无控制终端特征或正式路径状态不符")
+                f"Codex {codex_version} hook 的无控制终端特征或正式路径状态不符")
         require(bool(record["environment"]["TMUX"]) == (mode != "direct"), "tmux 环境不符")
     raw = base64.b64decode(case["ssh_stdout_base64"])
     plain = re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", raw).decode("utf-8", errors="replace")
@@ -491,6 +497,7 @@ def main():
     parser.add_argument("--library-relative", default="pkg/usr/lib/x86_64-linux-gnu")
     parser.add_argument("--expected-codex-sha256", required=True)
     parser.add_argument("--expected-codex-package-sha256", required=True)
+    parser.add_argument("--codex-version", choices=("0.155.1", "0.156.1"), default="0.155.1")
     parser.add_argument("--expected-tmux-sha256", required=True)
     parser.add_argument("--private-output", required=True, type=Path)
     parser.add_argument("--safe-output", required=True, type=Path)
@@ -524,7 +531,7 @@ def main():
                     and verify["codex_package_sha256"] == args.expected_codex_package_sha256
                     and verify["tmux_sha256"] == args.expected_tmux_sha256,
                     "远端固定输入摘要不符")
-            require(verify["codex_version"] == "codex-cli 0.155.1", "远端 Codex 版本不符")
+            require(verify["codex_version"] == f"codex-cli {args.codex_version}", "远端 Codex 版本不符")
             require(verify["tmux_version"].startswith("tmux 3.6"), "远端 tmux 版本不符")
             report["remote_inputs"] = verify
             report["reference_tree_sha256"] = expected_tree
@@ -539,7 +546,7 @@ def main():
                     "run", mode, force_tty=True), tokens[mode]))
                 native = remote_json(ssh, "python3", args.remote_root + "/remote_driver.py",
                                      args.remote_root, "reports", mode)
-                validate_case(mode, case, native, tokens[mode])
+                validate_case(mode, case, native, tokens[mode], args.codex_version)
         report["native_cli_hook_triggered"] = all(case["native_cli_hook_triggered"] for case in report["cases"])
         report["direct_transport_passed"] = next(case for case in report["cases"]
                                                    if case["mode"] == "direct")["transport_received"]

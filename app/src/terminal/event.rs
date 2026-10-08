@@ -137,6 +137,8 @@ pub enum Event {
         image_protocol: ImageProtocol,
     },
     BootstrapPrecmdDone,
+    /// 终端线路挑战，正文和 nonce 不参与日志或用户通知。
+    TerminalBindingChallenge(super::model::ansi::TerminalBindingChallenge),
     /// A pluggable notification triggered via OSC 9 or OSC 777 escape sequences.
     /// External programs can use this to trigger notifications in Zap.
     ///
@@ -490,6 +492,7 @@ impl Debug for Event {
             }
             Event::BootstrapPrecmdDone => write!(f, "BootstrapPrecmdDone"),
             Event::PluggableNotification { .. } => write!(f, "PluggableNotification"),
+            Event::TerminalBindingChallenge(_) => write!(f, "TerminalBindingChallenge"),
             Event::ExitShell { session_id } => {
                 write!(f, "ExitShell(session: {session_id:?})")
             }

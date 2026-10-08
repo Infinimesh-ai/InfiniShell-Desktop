@@ -33,10 +33,10 @@ use crate::ai::local_cli_mailbox::{
 };
 use crate::persistence::ModelEvent;
 use crate::persistence::local_cli_tasks::{
-    LocalCliEnqueueOutcome, acknowledge_message, checkpoint_task, checkpoint_task_with_message,
-    enqueue_message, enqueue_task_result, grok_mailbox_digest, grok_mailbox_origin_matches,
-    grok_result_history_matches, load_messages, load_task_generations, load_task_messages,
-    load_tasks,
+    ClaudeResultLink, LocalCliEnqueueOutcome, acknowledge_message, checkpoint_task,
+    checkpoint_task_with_message, enqueue_message, enqueue_task_result, grok_mailbox_digest,
+    grok_mailbox_origin_matches, grok_result_history_matches, load_messages, load_task_generations,
+    load_task_messages, load_tasks,
 };
 use crate::persistence::model::{
     LocalCliMessage, LocalCliMessageState, LocalCliReceiptKind, LocalCliTask, LocalCliTaskState,
@@ -135,6 +135,8 @@ pub(crate) struct ManagedTaskSnapshot {
 struct ClaudePendingInput {
     message_id: Uuid,
     submission_generation: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    result: Option<ClaudeResultLink>,
 }
 
 fn claude_pending_input(task: &LocalCliTask) -> Result<Option<ClaudePendingInput>, String> {
@@ -399,6 +401,55 @@ struct ManagedRequest {
     reply: oneshot::Sender<Result<(), String>>,
 }
 
+#[cfg(feature = "integration_tests")]
+pub(crate) struct V05ApprovalFixtureInbox {
+    receiver: mpsc::Receiver<ManagedRequest>,
+    observed: Vec<ManagedRequest>,
+}
+
+#[cfg(feature = "integration_tests")]
+impl V05ApprovalFixtureInbox {
+    pub(crate) fn observe(
+        &mut self,
+        approval_id: &str,
+        decision: super::ApprovalDecision,
+    ) -> Result<bool, String> {
+        let request = match self.receiver.try_recv() {
+            Ok(request) => request,
+            Err(mpsc::error::TryRecvError::Empty) => return Ok(false),
+            Err(mpsc::error::TryRecvError::Disconnected) => {
+                return Err("V05 夹具命令队列意外断开".into());
+            }
+        };
+        if request.expected_generation != 1
+            || request.from_mailbox
+            || request.message_id.is_nil()
+            || !matches!(
+                &request.action,
+                RuntimeAction::RespondApproval {
+                    approval_id: actual_id,
+                    decision: actual_decision,
+                } if actual_id == approval_id && *actual_decision == decision
+            )
+        {
+            return Err(format!(
+                "V05 审批动作不匹配：预期 {approval_id}/{decision:?}/第 1 代，实际 {:?}/第 {} 代，mailbox={}",
+                request.action, request.expected_generation, request.from_mailbox
+            ));
+        }
+        self.observed.push(request);
+        Ok(true)
+    }
+
+    pub(crate) fn observed_count(&self) -> usize {
+        self.observed.len()
+    }
+
+    pub(crate) fn has_unexpected_request(&mut self) -> bool {
+        self.receiver.try_recv().is_ok()
+    }
+}
+
 struct RecoveredHost {
     snapshot: ManagedTaskSnapshot,
     options: SessionOptions,
@@ -495,6 +546,33 @@ impl LocalCLITaskCoordinator {
         coordinator
     }
 
+    #[cfg(feature = "integration_tests")]
+    pub(crate) fn install_v05_approval_fixture(
+        &mut self,
+        snapshot: ManagedTaskSnapshot,
+        ctx: &mut ModelContext<Self>,
+    ) -> V05ApprovalFixtureInbox {
+        assert_eq!(snapshot.task.harness, "grok");
+        assert_eq!(snapshot.approvals.len(), 2);
+        assert!(snapshot.ready && snapshot.connected);
+        let (commands, receiver) = mpsc::channel(4);
+        self.entries.insert(
+            snapshot.task.task_id.clone(),
+            ManagedTaskEntry {
+                token: Uuid::new_v4(),
+                snapshot,
+                commands,
+                pending_tool_calls: HashSet::new(),
+            },
+        );
+        ctx.emit(LocalCLITaskCoordinatorEvent::Changed);
+        ctx.notify();
+        V05ApprovalFixtureInbox {
+            receiver,
+            observed: Vec::new(),
+        }
+    }
+
     pub(crate) fn endpoint(&self, task_id: &str) -> Option<ManagedTaskEndpoint> {
         let entry = self.entries.get(task_id)?;
         let snapshot = &entry.snapshot;
@@ -514,6 +592,18 @@ impl LocalCLITaskCoordinator {
     fn result_endpoint(&self, task_id: &str) -> Option<ManagedTaskEndpoint> {
         let entry = self.entries.get(task_id)?;
         let snapshot = &entry.snapshot;
+        if claude_completed_result_connection(snapshot, entry.token)
+            && !claude_input_pending(&snapshot.task)
+        {
+            return Some(ManagedTaskEndpoint {
+                task_id: task_id.to_owned(),
+                generation: snapshot.task.generation,
+                harness: Harness::Claude,
+                runtime_generation: entry.token,
+                active_turn_id: None,
+                commands: entry.commands.clone(),
+            });
+        }
         if snapshot.task.harness != "grok" {
             return self.endpoint(task_id);
         }
@@ -1021,14 +1111,14 @@ impl LocalCLITaskCoordinator {
 
     /// 只向当前活跃连接首次投递已提交的子任务结果；恢复记录不会自动启动父任务。
     fn deliver_result(&mut self, message: LocalCliMessage, ctx: &mut ModelContext<Self>) {
-        if self.sender.is_none() {
+        if self.sender.is_none() || message.state != LocalCliMessageState::Queued {
             return;
         }
         let Some(endpoint) = self.result_endpoint(&message.recipient_task_id) else {
             return;
         };
         if (endpoint.generation != message.recipient_generation
-            && endpoint.harness != Harness::Grok)
+            && !matches!(endpoint.harness, Harness::Grok | Harness::Claude))
             || self
                 .entries
                 .get(&endpoint.task_id)
@@ -1087,7 +1177,7 @@ impl LocalCLITaskCoordinator {
         ctx.spawn(
             async move {
                 let current = current.ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
-                let messages = if current.harness == "grok" {
+                let messages = if matches!(current.harness.as_str(), "grok" | "claude") {
                     load_task_messages(&sender, task_id.clone())?
                 } else {
                     load_messages(&sender, task_id.clone(), generation)?
@@ -1136,7 +1226,11 @@ impl LocalCLITaskCoordinator {
                         }) {
                             continue;
                         }
-                    } else if message.recipient_generation != generation {
+                    } else if message.recipient_generation != generation
+                        && !(current.harness == "claude"
+                            && current.state == LocalCliTaskState::Completed
+                            && message.recipient_generation < generation)
+                    {
                         continue;
                     }
                     if candidate.is_none() {
@@ -1219,7 +1313,7 @@ impl LocalCLITaskCoordinator {
                     | RuntimeEventKind::TurnStarted { .. }
                     | RuntimeEventKind::InputJoined { .. }
                     | RuntimeEventKind::RequestFailed { .. }
-            ) || (task.harness == "grok"
+            ) || (matches!(task.harness.as_str(), "grok" | "claude")
                 && matches!(
                     event.kind,
                     RuntimeEventKind::TurnFinished {
@@ -2961,10 +3055,11 @@ async fn run_managed_task(
                     let result = if request.expected_generation != snapshot.task.generation {
                         Err(crate::t!("cli-agent-task-invalid-launch"))
                     } else if request.from_mailbox {
-                        let completed_result = snapshot.task.harness == "grok"
-                            && snapshot.task.state == LocalCliTaskState::Completed
-                            && snapshot.active_turn_id.is_none()
-                            && request.prepared_result.is_some();
+                        let completed_result = request.prepared_result.is_some()
+                            && ((snapshot.task.harness == "grok"
+                                && snapshot.task.state == LocalCliTaskState::Completed
+                                && snapshot.active_turn_id.is_none())
+                                || claude_completed_result_connection(&snapshot, token));
                         if !snapshot.connected
                             || !snapshot.ready
                             || (!snapshot.task.state.is_active() && !completed_result)
@@ -3331,8 +3426,19 @@ async fn send_user_request(
         let pending = ClaudePendingInput {
             message_id,
             submission_generation: updated.generation,
+            result: None,
         };
         set_claude_pending_input(&mut updated, Some(pending))?;
+        let mut config: serde_json::Value = serde_json::from_str(&updated.config_json)
+            .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+        if let Some(input) = config
+            .get_mut("claude_current_input")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            // 显式用户输入终止自动结果延续，不让后来的子结果混入新意图。
+            input.remove("result");
+        }
+        updated.config_json = config.to_string();
         if updated.generation == previous.generation {
             updated.revision = previous
                 .revision
@@ -3420,6 +3526,32 @@ fn grok_result_slot_available(snapshot: &ManagedTaskSnapshot) -> Result<bool, St
         && grok_input_links(&snapshot.task)?.pending.is_empty())
 }
 
+fn claude_completed_result_connection(snapshot: &ManagedTaskSnapshot, token: Uuid) -> bool {
+    // 仅复用原生仍在线的已完成回合；恢复记录或普通消息不能借此启动父任务。
+    snapshot.task.harness == "claude"
+        && snapshot.task.state == LocalCliTaskState::Completed
+        && snapshot.connected
+        && snapshot.ready
+        && snapshot.active_turn_id.is_none()
+        && snapshot.approvals.is_empty()
+        && !token.is_nil()
+        && snapshot
+            .task
+            .native_session_id
+            .as_deref()
+            .is_some_and(|sid| {
+                !sid.trim().is_empty() && sid.len() <= 4096 && !sid.chars().any(char::is_control)
+            })
+        && serde_json::from_str::<serde_json::Value>(&snapshot.task.config_json).is_ok_and(
+            |config| {
+                config["runtime_generation"]
+                    .as_str()
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                    == Some(token)
+            },
+        )
+}
+
 async fn send_mailbox_request(
     sender: &SyncSender<ModelEvent>,
     snapshot: &mut ManagedTaskSnapshot,
@@ -3434,7 +3566,7 @@ async fn send_mailbox_request(
             || message.state != LocalCliMessageState::Queued
             || message.recipient_task_id != snapshot.task.task_id
             || (message.recipient_generation != snapshot.task.generation
-                && snapshot.task.harness != "grok")
+                && !matches!(snapshot.task.harness.as_str(), "grok" | "claude"))
             || message.recipient_generation > snapshot.task.generation
             || message.message_id != message_id.to_string()
         {
@@ -3454,6 +3586,17 @@ async fn send_mailbox_request(
         stored.state = LocalCliMessageState::Queued;
         stored.receipt_kind = None;
         if stored != *message {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
+        if snapshot.task.harness == "claude"
+            && action
+                != (RuntimeAction::Submit {
+                    input: vec![InputContent::Text(format!(
+                        "Subject: {}\n\n{}",
+                        message.subject, message.body
+                    ))],
+                })
+        {
             return Err(crate::t!("cli-agent-task-invalid-launch"));
         }
         // 同一结果的重复派发不占新槽，也不能把真实待启动输入误报成失败。
@@ -3478,6 +3621,20 @@ async fn send_mailbox_request(
         {
             return Err(crate::t!("cli-agent-message-recipient-unavailable"));
         }
+    }
+    if prepared_result.is_some()
+        && snapshot.task.harness == "claude"
+        && !snapshot.task.state.is_active()
+        && !claude_completed_result_connection(snapshot, token)
+    {
+        return Err(crate::t!("cli-agent-message-recipient-unavailable"));
+    }
+    if prepared_result.as_ref().is_some_and(|message| {
+        snapshot.task.harness == "claude"
+            && message.recipient_generation != snapshot.task.generation
+            && snapshot.task.state != LocalCliTaskState::Completed
+    }) {
+        return Ok(());
     }
     // 队列占用与结果领取在同一 worker 中处理；明确未写入的结果仍保留 Queued。
     if snapshot.task.harness == "claude"
@@ -3505,7 +3662,10 @@ async fn send_mailbox_request(
         return dispatch_prepared_result_if_current(
             sender,
             message,
-            (snapshot.task.harness == "grok").then(|| snapshot.task.clone()),
+            (snapshot.task.harness == "grok"
+                || (snapshot.task.harness == "claude"
+                    && snapshot.task.state == LocalCliTaskState::Completed))
+                .then(|| snapshot.task.clone()),
             || send_mailbox_action(sender, snapshot, controller, token, message_id, action),
         )
         .await;
@@ -3628,9 +3788,39 @@ async fn send_mailbox_action(
     }
     if snapshot.task.harness == "claude" && matches!(action, RuntimeAction::Submit { .. }) {
         let previous = snapshot.task.clone();
+        let message = load_task_messages(sender, previous.task_id.clone())?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
+            .into_iter()
+            .find(|message| {
+                message.message_id == message_id.to_string()
+                    && message.recipient_task_id == previous.task_id
+            })
+            .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+        let result = if message.subject == "local_task_result" {
+            if message.state != LocalCliMessageState::Sent
+                || message.receipt_kind.is_some()
+                || action
+                    != (RuntimeAction::Submit {
+                        input: vec![InputContent::Text(format!(
+                            "Subject: {}\n\n{}",
+                            message.subject, message.body
+                        ))],
+                    })
+            {
+                return Err(crate::t!("cli-agent-task-invalid-launch"));
+            }
+            Some(
+                ClaudeResultLink::from_message(&message)
+                    .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?,
+            )
+        } else {
+            None
+        };
         let pending = ClaudePendingInput {
             message_id,
             submission_generation: previous.generation,
+            result,
         };
         let mut updated = previous.clone();
         set_claude_pending_input(&mut updated, Some(pending))?;
@@ -3701,6 +3891,50 @@ fn next_task_generation(previous: &LocalCliTask) -> Result<LocalCliTask, String>
     task.result = None;
     task.terminal_evidence = None;
     Ok(task)
+}
+
+fn set_claude_current_input(
+    task: &mut LocalCliTask,
+    turn_id: &str,
+    pending: Option<&ClaudePendingInput>,
+) -> Result<(), String> {
+    let mut config: serde_json::Value = serde_json::from_str(&task.config_json)
+        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    config["claude_current_input"] = json!({
+        "turn_id": turn_id,
+        "submission_generation": pending.map(|input| input.submission_generation),
+    });
+    if let Some(link) = pending.and_then(|input| input.result.as_ref()) {
+        config["claude_current_input"]["result"] = json!(link);
+    }
+    task.config_json = config.to_string();
+    Ok(())
+}
+
+fn claude_receipt_generation(task: &LocalCliTask, message_id: Uuid) -> Result<i64, String> {
+    if let Some(pending) = claude_pending_input(task)?
+        && pending.message_id == message_id
+    {
+        return Ok(pending
+            .result
+            .map_or(pending.submission_generation, |link| {
+                link.recipient_generation
+            }));
+    }
+    let config: serde_json::Value = serde_json::from_str(&task.config_json)
+        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    let input = &config["claude_current_input"];
+    if input["turn_id"].as_str() == Some(message_id.to_string().as_str())
+        && let Some(link) = input.get("result").filter(|value| !value.is_null())
+    {
+        let link: ClaudeResultLink = serde_json::from_value(link.clone())
+            .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+        if link.message_id != message_id {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
+        return Ok(link.recipient_generation);
+    }
+    Ok(task.generation)
 }
 
 fn runtime_event_is_stale(
@@ -3970,6 +4204,26 @@ async fn commit_runtime_event(
                 // 自动开新代与真实回合关联一起落盘，崩溃后也保留原提交身份。
                 set_grok_input_links(&mut next, &grok_links)?;
             }
+            if previous.harness == "claude" {
+                if let Some(link) = pending.as_ref().and_then(|input| input.result.as_ref()) {
+                    let messages =
+                        load_messages(sender, previous.task_id.clone(), link.recipient_generation)?
+                            .await
+                            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+                    if !messages.iter().any(|message| {
+                        message.message_id == link.message_id.to_string()
+                            && message.recipient_task_id == previous.task_id
+                            && message.state == LocalCliMessageState::Acknowledged
+                            && message.receipt_kind == Some(LocalCliReceiptKind::NativeProtocol)
+                            && ClaudeResultLink::from_message(message)
+                                .is_ok_and(|actual| actual == *link)
+                    }) {
+                        return Err(crate::t!("cli-agent-claude-queue-uncertain"));
+                    }
+                }
+                // 先持久真实 ACK 驱动关联，再提交新代，避免误取消同父剩余结果。
+                set_claude_current_input(&mut next, turn_id, pending.as_ref())?;
+            }
             commit_transition(sender, &mut next, &previous).await?;
             snapshot.task = next;
         }
@@ -4027,6 +4281,17 @@ async fn commit_runtime_event(
         }
         accepted_turns.remove(&message_id.to_string());
     }
+    let claude_original_receipt_generation = if snapshot.task.harness == "claude" {
+        match &event.kind {
+            RuntimeEventKind::MessageAccepted { message_id, .. }
+            | RuntimeEventKind::RequestFailed { message_id, .. } => {
+                Some(claude_receipt_generation(&snapshot.task, *message_id)?)
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
     let previous = snapshot.task.clone();
     let mut updated = snapshot.clone();
     let mut claude_skills_added = false;
@@ -4044,7 +4309,7 @@ async fn commit_runtime_event(
             let messages = load_messages(
                 sender,
                 snapshot.task.task_id.clone(),
-                snapshot.task.generation,
+                claude_receipt_generation(&snapshot.task, *message_id)?,
             )?
             .await
             .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
@@ -4076,19 +4341,8 @@ async fn commit_runtime_event(
         }
         if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
             set_claude_pending_input(&mut updated.task, None)?;
-            let mut config: serde_json::Value = serde_json::from_str(&updated.task.config_json)
-                .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
-            // 保留执行回合与原始提交的对应关系；不会篡改旧代的消息回执。
-            config["claude_current_input"] = json!({
-                "turn_id": turn_id,
-                "submission_generation": pending.as_ref().map(|input| input.submission_generation),
-            });
-            updated.task.config_json = config.to_string();
+            set_claude_current_input(&mut updated.task, turn_id, pending.as_ref())?;
         } else if matches!(&event.kind, RuntimeEventKind::InputJoined { .. }) {
-            set_claude_pending_input(&mut updated.task, None)?;
-        } else if matches!(&event.kind, RuntimeEventKind::RequestFailed { message_id, .. }
-            if pending.as_ref().is_some_and(|input| input.message_id == *message_id))
-        {
             set_claude_pending_input(&mut updated.task, None)?;
         }
     }
@@ -4131,13 +4385,23 @@ async fn commit_runtime_event(
         acknowledge_runtime_message(
             sender,
             &snapshot.task.task_id,
-            grok_receipt_generation.unwrap_or(snapshot.task.generation),
+            grok_receipt_generation
+                .or(claude_original_receipt_generation)
+                .unwrap_or(snapshot.task.generation),
             &event.kind,
         )
         .await?
     };
     if grok_receipt_generation.is_some() && receipt.is_none() {
         return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    if snapshot.task.harness == "claude"
+        && matches!(&event.kind, RuntimeEventKind::RequestFailed { message_id, .. }
+            if pending.as_ref().is_some_and(|input| input.message_id == *message_id))
+    {
+        let previous = snapshot.task.clone();
+        set_claude_pending_input(&mut snapshot.task, None)?;
+        commit_transition(sender, &mut snapshot.task, &previous).await?;
     }
     if let Some(input) = grok_skill_input {
         // 顺序不能倒置：原生回合关联先落盘，ACK 再落盘，最后登记技能；宿主水位尚未推进。
@@ -4649,6 +4913,18 @@ mod cli_update_launch_tests;
 mod claude_live_tests;
 
 #[cfg(all(test, target_os = "macos"))]
+#[path = "g10_fixed_policy_live_tests.rs"]
+mod g10_fixed_policy_live_tests;
+
+#[cfg(all(test, target_os = "macos"))]
+#[path = "g10_cold_recovery_live_tests.rs"]
+mod g10_cold_recovery_live_tests;
+
+#[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+#[path = "g10_reviewed_commands_live_tests.rs"]
+mod g10_reviewed_commands_live_tests;
+
+#[cfg(all(test, target_os = "macos"))]
 #[path = "codex_coordinator_live_tests.rs"]
 mod codex_live_tests;
 
@@ -4659,3 +4935,7 @@ mod grok_live_tests;
 #[cfg(test)]
 #[path = "grok_child_coordinator_live_tests.rs"]
 mod grok_child_live_tests;
+
+#[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+#[path = "g10_grok_commands_skills_live_tests.rs"]
+mod g10_grok_commands_skills_live_tests;

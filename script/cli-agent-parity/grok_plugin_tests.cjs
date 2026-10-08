@@ -154,17 +154,19 @@ test("Node 只把纯 JSON 交给绝对路径 worker", () => {
   const calls = [];
   const execute = (file, args, options) => {
     calls.push({ file, args, options });
-    return calls.length === 1 ? '{"protocol":1,"maxFrameBytes":4096}\n' : "";
+    return '{"protocol":1,"maxFrameBytes":4096}\n';
   };
   assert.equal(plugin.sendNotification(notification, {
     ...environment("notification"), WARP_CLI_AGENT_NOTIFY_EXECUTABLE: executable,
   }, 5000, execute, () => 1000), true);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
   assert.equal(calls[0].file, executable);
-  assert.deepEqual(calls[0].args, ["cli-agent-notify", "--protocol-version"]);
-  assert.deepEqual(calls[1].args, ["cli-agent-notify"]);
-  assert.deepEqual(JSON.parse(calls[1].options.input), JSON.parse(JSON.stringify(notification)));
-  assert.equal(calls[1].options.shell, undefined);
+  assert.deepEqual(calls[0].args, ["cli-agent-notify", "--require-protocol", "1"]);
+  assert.deepEqual(JSON.parse(calls[0].options.input), JSON.parse(JSON.stringify(notification)));
+  assert.equal(calls[0].options.shell, undefined);
+  assert.equal(calls[0].options.timeout, 2600);
+  assert.equal(calls[0].options.maxBuffer, 256);
+  assert.equal(calls[0].options.killSignal, "SIGKILL");
   assert.deepEqual(notification, original);
 });
 
@@ -182,12 +184,12 @@ test("4096 字节预算按 tmux 最坏帧计算且只移除可选文本", () => 
   assert.equal(plugin.fitNotification({ ...notification, session_id: "s".repeat(5000) }), null);
 });
 
-test("worker 协议必须精确匹配且空 stdout 才表示完整写入", () => {
+test("发送成功后必须取得精确协议回复，任何无效回复均不重投", () => {
   const notification = plugin.makeNotification(normalized("session_start"));
   const executable = path.resolve("infinishell-notify-worker");
   const env = { ...environment("session_start"), WARP_CLI_AGENT_NOTIFY_EXECUTABLE: executable };
   for (const reply of [
-    "not-json", "{}", '{"protocol":2,"maxFrameBytes":4096}',
+    "", "null", "[]", "not-json", "{}", '{"protocol":2,"maxFrameBytes":4096}',
     '{"protocol":1,"maxFrameBytes":4095}',
     '{"protocol":1,"maxFrameBytes":4096,"extra":true}',
   ]) {
@@ -198,12 +200,24 @@ test("worker 协议必须精确匹配且空 stdout 才表示完整写入", () =>
     }, () => 1000), false);
     assert.equal(calls, 1);
   }
+});
+
+test("一次启动可使用原发送预算，剩余期限不足或耗尽不扩限", () => {
+  const notification = plugin.makeNotification(normalized("session_start"));
+  const env = { ...environment("session_start"),
+    WARP_CLI_AGENT_NOTIFY_EXECUTABLE: path.resolve("infinishell-notify-worker") };
+  let clock = 1000;
   let calls = 0;
-  assert.equal(plugin.sendNotification(notification, env, 5000, () => {
+  assert.equal(plugin.sendNotification(notification, env, 2000, (file, args, options) => {
     calls += 1;
-    return calls === 1 ? '{"protocol":1,"maxFrameBytes":4096}' : "unexpected";
-  }, () => 1000), false);
-  assert.equal(calls, 2);
+    assert.equal(options.timeout, 1000);
+    // 模拟超过旧 500ms 查询窗口、但在原剩余发送预算内完成的启动和写入。
+    clock += 600;
+    return '{"protocol":1,"maxFrameBytes":4096}\n';
+  }, () => clock), true);
+  assert.equal(calls, 1);
+  assert.equal(plugin.sendNotification(notification, env, 1600,
+    () => assert.fail("期限已耗尽不能启动"), () => clock), false);
 });
 
 test("一次 worker 失败不在 Node 留状态，显式重投仍调用相同事件", () => {
@@ -214,17 +228,16 @@ test("一次 worker 失败不在 Node 留状态，显式重投仍调用相同事
   let failSend = true;
   const execute = (file, args, options) => {
     calls.push({ file, args, options });
-    if (args.includes("--protocol-version")) return '{"protocol":1,"maxFrameBytes":4096}\n';
     if (failSend) {
       failSend = false;
       throw new Error("terminal unavailable");
     }
-    return "";
+    return '{"protocol":1,"maxFrameBytes":4096}\n';
   };
   assert.equal(plugin.sendNotification(notification, env, 5000, execute, () => 1000), false);
   assert.equal(plugin.sendNotification(notification, env, 5000, execute, () => 1000), true);
-  assert.equal(calls.length, 4);
-  assert.equal(calls[1].options.input, calls[3].options.input);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].options.input, calls[1].options.input);
   assert.equal(plugin.sendNotification(notification, {
     ...env, WARP_CLI_AGENT_NOTIFY_EXECUTABLE: "relative-worker",
   }, 5000, () => assert.fail("相对路径不能启动"), () => 1000), false);

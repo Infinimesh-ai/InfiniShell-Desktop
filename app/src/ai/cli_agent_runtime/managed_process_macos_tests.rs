@@ -62,6 +62,7 @@ impl Fixture {
             arguments: Vec::new(),
             cwd: state.to_owned(),
             expected_files: Vec::new(),
+            grok_stdio_eof: None,
             atomic_launch_kind: None,
             atomic_cwd: None,
         };

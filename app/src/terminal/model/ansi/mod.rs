@@ -12,6 +12,7 @@
 mod ansi_c_decoder;
 mod dcs_hooks;
 mod handler;
+mod terminal_binding;
 
 use std::fmt::Write;
 use std::time::Duration;
@@ -21,6 +22,7 @@ use ansi_c_decoder::*;
 use byte_unit::{Byte, Unit as ByteUnit};
 pub use dcs_hooks::*;
 pub use handler::*;
+pub use terminal_binding::TerminalBindingChallenge;
 use hex;
 use instant::Instant;
 use itertools::Itertools;
@@ -824,6 +826,16 @@ where
         }
         // 其他 OSC（含命令生命周期消息）必须正常处理，不能被缺失的 End 截断。
         self.state.conpty_reset_controls_remaining = 0;
+
+        // 在任何正文格式化或日志分支前消费挑战，畸形挑战也不能落回原始日志。
+        if params.first() == Some(&WARP_OSC_MARKER) && params.get(1) == Some(&b"t".as_slice()) {
+            if let Some(challenge) = terminal_binding::parse_terminal_binding_challenge(params)
+                && self.handler.is_registered_session(challenge.session_id)
+            {
+                self.handler.terminal_binding_challenge(challenge);
+            }
+            return;
+        }
 
         let writer = &mut self.writer;
         let terminator = if bell_terminated { "\x07" } else { "\x1b\\" };

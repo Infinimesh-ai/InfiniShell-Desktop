@@ -136,6 +136,8 @@ harness = false
 required-features = ["test-util"]
 
 [features]
+# 只传递 Linux 通知阶段取证开关，不启用 test-util。
+cli-agent-notify-trace = ["warp/cli-agent-notify-trace"]
 # Enables native microphone capture and transcription support. Keep this
 # opt-in so portable Linux builds do not require the host ALSA runtime.
 voice_input = ["warp/voice_input"]

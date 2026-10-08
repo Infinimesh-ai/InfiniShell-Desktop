@@ -109,8 +109,8 @@ impl Alias {
         old_native: &Path,
         new_native: &Path,
     ) -> Result<(), Error> {
-        if prefix != super::brew_grok::prefix()?
-            || id.is_nil()
+        super::brew::validate_prefix(prefix)?;
+        if id.is_nil()
             || self.path != prefix.join("bin/agent")
             || self.stage
                 != prefix

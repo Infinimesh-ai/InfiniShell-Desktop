@@ -4579,6 +4579,30 @@ impl Workspace {
         ctx.notify();
     }
 
+    #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+    fn start_remote_owned_in_tmux(&mut self, agent: CLIAgent, ctx: &mut ViewContext<Self>) {
+        if let Some(terminal) = self.active_session_view(ctx) {
+            terminal.update(ctx, |view, ctx| view.start_remote_tmux_owned(agent, ctx));
+        }
+        ctx.notify();
+    }
+
+    #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+    fn restore_remote_owned_in_tmux(&mut self, ctx: &mut ViewContext<Self>) {
+        if let Some(terminal) = self.active_session_view(ctx) {
+            terminal.update(ctx, |view, ctx| view.restore_remote_tmux_owned(ctx));
+        }
+        ctx.notify();
+    }
+
     fn toggle_ai_assistant_panel(&mut self, ctx: &mut ViewContext<Self>) {
         // Now that the user has interacted with the panel, we can close
         // the dialogue and mark it as dismissed.
@@ -7541,6 +7565,32 @@ impl Workspace {
                         .with_icon(CLIAgent::Codex.icon().unwrap_or(icons::Icon::LayoutAlt01))
                         .into_item(),
                 );
+            }
+            #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+            if let Some(terminal) = self.active_session_view(ctx) {
+                for (agent, label) in [
+                    (CLIAgent::Claude, crate::t!("workspace-start-tmux-claude")),
+                    (CLIAgent::Codex, crate::t!("workspace-start-tmux-codex")),
+                    (CLIAgent::Grok, crate::t!("workspace-start-tmux-grok")),
+                ] {
+                    if AISettings::as_ref(ctx).is_cli_agent_tab_menu_enabled(agent)
+                        && terminal.as_ref(ctx).is_remote_tmux_owned_launch_available(agent, ctx)
+                    {
+                        menu_items.push(MenuItemFields::new(label)
+                            .with_on_select_action(WorkspaceAction::StartRemoteOwnedInTmux(agent))
+                            .with_tooltip(crate::t!("workspace-start-tmux-agent-help"))
+                            .with_icon(agent.icon().unwrap_or(icons::Icon::LayoutAlt01)).into_item());
+                    }
+                }
+                if terminal.as_ref(ctx).can_restore_remote_tmux_owned(ctx) {
+                    menu_items.push(MenuItemFields::new(crate::t!("workspace-restore-tmux-agent"))
+                        .with_on_select_action(WorkspaceAction::RestoreRemoteOwnedInTmux)
+                        .with_tooltip(crate::t!("workspace-restore-tmux-agent-help")).into_item());
+                }
             }
             menu_items.len() - start_len
         };
@@ -23362,6 +23412,18 @@ impl TypedActionView for Workspace {
                 )
             ))]
             StartRemoteOwnedCodexInCurrentTerminal => self.start_remote_owned_codex(ctx),
+            #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+            StartRemoteOwnedInTmux(agent) => self.start_remote_owned_in_tmux(*agent, ctx),
+            #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+            RestoreRemoteOwnedInTmux => self.restore_remote_owned_in_tmux(ctx),
             AddDockerSandboxTab => self.add_docker_sandbox_tab(ctx),
             StartAgentOnboardingTutorial(tutorial) => {
                 self.start_agent_onboarding_tutorial(tutorial.clone(), ctx)

@@ -13,7 +13,7 @@ use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
 
 use super::super::npm_grok_contract as contract;
-use super::{Directory, Error, Identity, Node, name, reject_extra_permissions};
+use super::{Directory, Error, Identity, Node, acl, name};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -44,9 +44,8 @@ pub(in super::super) struct Mirror {
 
 fn file_node(directory: &Directory, leaf: &OsStr) -> Result<Node, Error> {
     let mut file = directory.read_file(leaf)?;
-    reject_extra_permissions(&file)?;
     let before = file.metadata().map_err(|_| Error::SourceChanged)?;
-    let identity = Identity::read(&before)?;
+    let identity = Identity::read_file(&file)?;
     if !before.is_file() || before.nlink() != 1 || before.len() > 1024 * 1024 * 1024 {
         return Err(Error::UnsupportedSource);
     }
@@ -66,7 +65,7 @@ fn file_node(directory: &Directory, leaf: &OsStr) -> Result<Node, Error> {
     }
     let after = file.metadata().map_err(|_| Error::SourceChanged)?;
     if total != before.len()
-        || Identity::read(&after)? != identity
+        || Identity::read_file(&file)? != identity
         || before.mtime() != after.mtime()
         || before.mtime_nsec() != after.mtime_nsec()
         || before.ctime() != after.ctime()
@@ -112,6 +111,8 @@ fn link(directory: &Directory, leaf: &OsStr) -> Result<Link, Error> {
         ))
     };
     let before = read()?;
+    #[cfg(target_os = "macos")]
+    directory.reject_link_acl(&leaf, before.0, before.1)?;
     let mut target = [0; 128];
     let length = unsafe {
         libc::readlinkat(
@@ -125,9 +126,11 @@ fn link(directory: &Directory, leaf: &OsStr) -> Result<Link, Error> {
         return Err(Error::SourceChanged);
     }
     let target = OsStr::from_bytes(&target[..length as usize]).to_owned();
-    if !matches!(target.to_str(), Some("grok-1.0.40" | "grok-1.0.41")) {
-        return Err(Error::UnsupportedSource);
-    }
+    let version = target
+        .to_str()
+        .and_then(|target| target.strip_prefix("grok-"))
+        .ok_or(Error::UnsupportedSource)?;
+    contract::native(version).map_err(|_| Error::UnsupportedSource)?;
     Ok(Link {
         device: before.0,
         inode: before.1,
@@ -150,12 +153,30 @@ fn matches_native(node: &Node, version: &str) -> Result<(), Error> {
 }
 
 impl Mirror {
-    pub(in super::super) fn capture(home: &Path, old: &str, id: Uuid) -> Result<Self, Error> {
-        contract::native(old)?;
+    pub(in super::super) fn has_acl(&self) -> bool {
+        self.directory.has_acl()
+            || self.old_file.identity.has_acl()
+            || self
+                .existing_new
+                .as_ref()
+                .is_some_and(|node| node.identity.has_acl())
+            || self
+                .new_file
+                .as_ref()
+                .is_some_and(|node| node.identity.has_acl())
+    }
+
+    pub(in super::super) fn capture(
+        home: &Path,
+        old: &str,
+        target: &str,
+        id: Uuid,
+    ) -> Result<Self, Error> {
+        contract::supports_transition(old, target)?;
         let bin = home.join("bin");
         let directory = Directory::open(&bin)?;
         let old_name: OsString = format!("grok-{old}").into();
-        let new_name: OsString = format!("grok-{}", contract::VERSION).into();
+        let new_name: OsString = format!("grok-{target}").into();
         let old_link = link(&directory, OsStr::new("grok"))?;
         if old_link.target != old_name {
             return Err(Error::UnsupportedSource);
@@ -164,7 +185,7 @@ impl Mirror {
         matches_native(&old_file, old)?;
         let existing_new = if directory.has_child(&new_name)? {
             let file = file_node(&directory, &new_name)?;
-            matches_native(&file, contract::VERSION)?;
+            matches_native(&file, target)?;
             Some(file)
         } else {
             None
@@ -184,10 +205,17 @@ impl Mirror {
         })
     }
 
-    pub(in super::super) fn validate(&self, home: &Path, old: &str, id: Uuid) -> Result<(), Error> {
+    pub(in super::super) fn validate(
+        &self,
+        home: &Path,
+        old: &str,
+        target: &str,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        contract::supports_transition(old, target)?;
         if self.bin != home.join("bin")
             || self.old_name != OsString::from(format!("grok-{old}"))
-            || self.new_name != OsString::from(format!("grok-{}", contract::VERSION))
+            || self.new_name != OsString::from(format!("grok-{target}"))
             || self.file_stage != OsString::from(format!(".infinishell-grok-npm-image-{id}"))
             || self.link_stage != OsString::from(format!(".infinishell-grok-npm-link-{id}"))
             || self.old_link.target != self.old_name
@@ -200,7 +228,7 @@ impl Mirror {
         }
         matches_native(&self.old_file, old)?;
         for node in self.existing_new.iter().chain(self.new_file.iter()) {
-            matches_native(node, contract::VERSION)?;
+            matches_native(node, target)?;
         }
         Ok(())
     }
@@ -215,18 +243,30 @@ impl Mirror {
         Ok(directory)
     }
 
-    pub(in super::super) fn prepare(&mut self, native: &mut File) -> Result<(), Error> {
+    pub(in super::super) fn prepare(
+        &mut self,
+        native: &mut File,
+        target: &str,
+    ) -> Result<(), Error> {
+        contract::supports(target)?;
+        if self.new_name != OsString::from(format!("grok-{target}")) {
+            return Err(Error::RecoveryRequired);
+        }
         let directory = self.directory()?;
         if link(&directory, OsStr::new("grok"))? != self.old_link {
             return Err(Error::SourceChanged);
         }
         if let Some(expected) = &self.existing_new {
-            if file_node(&directory, &self.new_name)? != *expected {
+            if file_node(&directory, &self.new_name)? != *expected
+                || expected.identity.acl != self.old_file.identity.acl
+                || expected.identity.mode & 0o777 != self.old_file.identity.mode & 0o777
+                || expected.identity.gid != self.old_file.identity.gid
+            {
                 return Err(Error::SourceChanged);
             }
             self.new_file = Some(expected.clone());
         } else {
-            let expected = contract::native(contract::VERSION)?;
+            let expected = contract::native(target)?;
             directory.write_new(
                 Path::new(&self.file_stage),
                 native,
@@ -234,15 +274,17 @@ impl Mirror {
                 expected.digest()?,
             )?;
             let file = directory.read_file(&self.file_stage)?;
-            // 新版本沿用原镜像的 POSIX 权限，不能因升级扩大组或其他用户的访问范围。
+            // 新版本沿用原镜像的权限与 ACL；包内 native 的权限不是用户镜像的策略。
             let old = &self.old_file.identity;
-            if unsafe { libc::fchown(file.as_raw_fd(), old.uid, old.gid) } != 0
-                || unsafe { libc::fchmod(file.as_raw_fd(), (old.mode & 0o777) as libc::mode_t) }
-                    != 0
-            {
-                return Err(Error::PersistenceFailed);
-            }
-            file.sync_all().map_err(|_| Error::PersistenceFailed)?;
+            let created = Identity::read_file(&file)?;
+            Directory::apply_new_permissions(
+                &file,
+                &created,
+                old.uid,
+                old.gid,
+                old.mode & 0o777,
+                &old.acl.clone().unwrap_or_else(acl::Acl::absent),
+            )?;
             self.new_file = Some(file_node(&directory, &self.file_stage)?);
         }
         let target = name(&self.new_name)?;
@@ -316,7 +358,45 @@ impl Mirror {
         Ok(())
     }
 
+    pub(in super::super) fn verify_rollback(&self) -> Result<(), Error> {
+        let directory = self.directory()?;
+        let actual = link(&directory, OsStr::new("grok"))?;
+        if actual == self.old_link {
+            if let Some(expected) = &self.new_link
+                && directory.has_child(&self.link_stage)?
+                && link(&directory, &self.link_stage)? != *expected
+            {
+                return Err(Error::RecoveryRequired);
+            }
+        } else if Some(&actual) == self.new_link.as_ref() {
+            if link(&directory, &self.link_stage)? != self.old_link
+                || self.new_file.as_ref() != Some(&file_node(&directory, &self.new_name)?)
+            {
+                return Err(Error::RecoveryRequired);
+            }
+        } else {
+            return Err(Error::RecoveryRequired);
+        }
+        if let Some(expected) = &self.existing_new
+            && file_node(&directory, &self.new_name)? != *expected
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        if let Some(expected) = &self.new_file {
+            for leaf in [&self.file_stage, &self.new_name] {
+                // 回滚清理已经移除的本轮对象允许缺失；仍存在的对象必须完整匹配。
+                if directory.has_child(leaf)? && file_node(&directory, leaf)? != *expected {
+                    return Err(Error::RecoveryRequired);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(in super::super) fn finish(&self, committed: bool) -> Result<(), Error> {
+        if !committed {
+            self.verify_rollback()?;
+        }
         let directory = self.directory()?;
         let actual = link(&directory, OsStr::new("grok"))?;
         if committed {
@@ -363,3 +443,13 @@ fn unlink(directory: &Directory, leaf: &OsStr) -> Result<(), Error> {
     }
     directory.sync()
 }
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+#[path = "sources_npm_grok_mirror_tests.rs"]
+pub(in super::super) mod tests;

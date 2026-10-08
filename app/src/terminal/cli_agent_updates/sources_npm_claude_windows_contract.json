@@ -1,0 +1,140 @@
+{
+  "2.1.285": {
+    "wrapper": {
+      "integrity": "sha512-frr0DLmVHSDNjw+hC6ZmXMVQ8yH4nNmVcI4lVFzWt0bdPNZP7clOKsuLcqSdwQabIpe6A3NEc3TJfiBVD8B2Bg==",
+      "sha256": "6560abb7c2d71de8cdd164676a2386930e96f12c8c9c7e33b7548d2fbd734a92",
+      "files": {
+        "cli-wrapper.cjs": {
+          "length": 4997,
+          "sha256": "61ad63033d9c8155d5e60a29f45dc4665afa07631c0b108e62cc83bf45ba490e",
+          "mode": 420
+        },
+        "install.cjs": {
+          "length": 7196,
+          "sha256": "5cbab1670597f492cd4eeb946f3c344ebcb1fbd43c623ba192c9b33744461b85",
+          "mode": 420
+        },
+        "bin/claude.exe": {
+          "length": 500,
+          "sha256": "6d7abae055d3b598281300a6c835086dec81bf3048f8a2294c5d3e50c8830d7b",
+          "mode": 420
+        },
+        "package.json": {
+          "length": 1476,
+          "sha256": "1f65f3c9dd891c967b38e049663ae8f49d70f8e0b60363a3179d56a9b163a655",
+          "mode": 420
+        },
+        "LICENSE.md": {
+          "length": 147,
+          "sha256": "8ce94b9478bb9868f9641f818e06cd722fbe55d4c22e2d2ed11971b20146173a",
+          "mode": 420
+        },
+        "README.md": {
+          "length": 2037,
+          "sha256": "da7cf15ce4e35bad6a107acd6a36b4fe052083068bb9e564b1aa3f2078b5d0ce",
+          "mode": 420
+        },
+        "sdk-tools.d.ts": {
+          "length": 169648,
+          "sha256": "91ab2df2cb687cd3692f74a149867a847e3a4c88478c55a255e6a33df7fc5fca",
+          "mode": 420
+        }
+      }
+    },
+    "platform": {
+      "integrity": "sha512-7TR0I2gOkYBADZlazRQERyP9WHCOKTZPPUSYzoxHP5EdHNvd9ZRYfIHJwydRfECpm6EYjGZ9goB/ACPJOMVdww==",
+      "sha256": "96890f4585c781fc0c383af9fdba08e9fe2b7da186ebe3bc10d01e1a5131b27c",
+      "files": {
+        "claude.exe": {
+          "length": 243751072,
+          "sha256": "121fc8151ed40bd9c144d68aa1cea23427803628ffab65e23da1cceda155697e",
+          "mode": 493
+        },
+        "package.json": {
+          "length": 272,
+          "sha256": "ced22ae299e73b7fd99cc3e9807d2ee4bc8e7cf47e3b225f47ab25ffac2803ec",
+          "mode": 420
+        },
+        "LICENSE.md": {
+          "length": 148,
+          "sha256": "fe8260e23b045e5d1ce9c31d2dfe06a39ec9227a12b1bde4c8c6bcb50e9310c8",
+          "mode": 420
+        },
+        "README.md": {
+          "length": 150,
+          "sha256": "88b447ebed5c162732eb18e9bd51aed947841a82272225a636b84bfbef06eb55",
+          "mode": 420
+        }
+      }
+    }
+  },
+  "2.1.287": {
+    "wrapper": {
+      "integrity": "sha512-V5WRpA+p41siSlf/Ujxjm//RtYvySxH/p9/rh6zRxNoHeBzqTgSDw3nP8PgtACM/KcVx/g5TFUNdVkq51dfg0g==",
+      "sha256": "b829179017c73acbc4084b764ca3a8cd9d0f3554ec2107519a272c8ded975efb",
+      "files": {
+        "cli-wrapper.cjs": {
+          "length": 4997,
+          "sha256": "61ad63033d9c8155d5e60a29f45dc4665afa07631c0b108e62cc83bf45ba490e",
+          "mode": 420
+        },
+        "install.cjs": {
+          "length": 7196,
+          "sha256": "5cbab1670597f492cd4eeb946f3c344ebcb1fbd43c623ba192c9b33744461b85",
+          "mode": 420
+        },
+        "bin/claude.exe": {
+          "length": 500,
+          "sha256": "6d7abae055d3b598281300a6c835086dec81bf3048f8a2294c5d3e50c8830d7b",
+          "mode": 420
+        },
+        "package.json": {
+          "length": 1476,
+          "sha256": "da5ad00826c9d3b8c42cf3c12f8a84ac1628bfd3db5363cc0af0d40c41a03208",
+          "mode": 420
+        },
+        "LICENSE.md": {
+          "length": 147,
+          "sha256": "8ce94b9478bb9868f9641f818e06cd722fbe55d4c22e2d2ed11971b20146173a",
+          "mode": 420
+        },
+        "README.md": {
+          "length": 2037,
+          "sha256": "da7cf15ce4e35bad6a107acd6a36b4fe052083068bb9e564b1aa3f2078b5d0ce",
+          "mode": 420
+        },
+        "sdk-tools.d.ts": {
+          "length": 169648,
+          "sha256": "91ab2df2cb687cd3692f74a149867a847e3a4c88478c55a255e6a33df7fc5fca",
+          "mode": 420
+        }
+      }
+    },
+    "platform": {
+      "integrity": "sha512-PWFxa2+cd8sIco+W3qDR85GhumGzNNdwgqHkz2u5jNhvoH8i4loBvOMEyrtZo3bYVwNeEt905GImhchv2duQGg==",
+      "sha256": "909db6e67dd772ff4e7c7570fb9f630827bb495df5cc9005ea51c1054b171970",
+      "files": {
+        "claude.exe": {
+          "length": 247736480,
+          "sha256": "6d5be51f0edfe3429cd1a9885950db31c1e59eb9a2c9a30a47e64179d2ff98b4",
+          "mode": 493
+        },
+        "package.json": {
+          "length": 272,
+          "sha256": "5b20426d3c839d528b31e038b06210e66b7d814243e65caf4cb68c92f0ddef99",
+          "mode": 420
+        },
+        "LICENSE.md": {
+          "length": 148,
+          "sha256": "fe8260e23b045e5d1ce9c31d2dfe06a39ec9227a12b1bde4c8c6bcb50e9310c8",
+          "mode": 420
+        },
+        "README.md": {
+          "length": 150,
+          "sha256": "88b447ebed5c162732eb18e9bd51aed947841a82272225a636b84bfbef06eb55",
+          "mode": 420
+        }
+      }
+    }
+  }
+}

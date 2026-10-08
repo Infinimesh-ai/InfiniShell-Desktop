@@ -25,6 +25,7 @@ struct MockHandler {
     identity_reported: bool,
     d_proto_hooks: Vec<DProtoHook>,
     pluggable_notifications: Vec<(Option<String>, String)>,
+    terminal_binding_challenges: Vec<TerminalBindingChallenge>,
     hyperlink_events: Vec<Option<Hyperlink>>,
     cwd_updates: Vec<String>,
     reset_grid_count: usize,
@@ -245,6 +246,10 @@ impl Handler for MockHandler {
             .push(DProtoHook::SourcedRcFileForWarp { value: data })
     }
 
+    fn terminal_binding_challenge(&mut self, challenge: TerminalBindingChallenge) {
+        self.terminal_binding_challenges.push(challenge);
+    }
+
     fn pluggable_notification(&mut self, title: Option<String>, body: String) {
         self.pluggable_notifications.push((title, body));
     }
@@ -284,6 +289,7 @@ impl Default for MockHandler {
             identity_reported: false,
             d_proto_hooks: Vec::new(),
             pluggable_notifications: Vec::new(),
+            terminal_binding_challenges: Vec::new(),
             hyperlink_events: Vec::new(),
             cwd_updates: Vec::new(),
             reset_grid_count: 0,
@@ -962,6 +968,8 @@ fn parse_dcs_bootstrapped() {
             **value,
             BootstrappedValue {
                 session_id: Some(167303092612201),
+                shell_pid: None,
+                shell_tty: None,
                 histfile: Some("/Users/andy/.zsh_history".to_string()),
                 shell: "bash".to_string(),
                 home_dir: Some("/Users/andy".to_string()),
@@ -1556,4 +1564,58 @@ fn parse_osc7_non_drive_slash_letter_untouched() {
     let payload = format!("\x1b]7;file://{local}/E:extra\x07");
     let (_, handler) = parse_bytes(payload.as_bytes());
     assert_eq!(handler.cwd_updates, vec!["/E:extra".to_string()]);
+}
+
+
+#[test]
+fn terminal_binding_osc_routes_without_cli_notification_or_dcs_hook() {
+    let body = b"\x1b]9278;t;1;17;10000000-0000-4000-8000-000000000001;20000000-0000-4000-8000-000000000001\x07";
+    let (_, handler) = parse_bytes_with_registered_sessions(body, [SessionId::from(17)]);
+    assert_eq!(handler.terminal_binding_challenges.len(), 1);
+    assert!(handler.d_proto_hooks.is_empty());
+    assert!(handler.pluggable_notifications.is_empty());
+}
+
+#[test]
+fn terminal_binding_osc_rejects_unregistered_session_even_without_dcs_validation() {
+    let body = b"\x1b]9278;t;1;17;10000000-0000-4000-8000-000000000001;20000000-0000-4000-8000-000000000001\x1b\\";
+    let (_, handler) = parse_bytes_with_registered_sessions_and_validation(body, [], false);
+    assert!(handler.terminal_binding_challenges.is_empty());
+    assert!(handler.d_proto_hooks.is_empty());
+    assert!(handler.pluggable_notifications.is_empty());
+}
+
+#[test]
+fn conpty_reset_span_ends_before_a_terminal_binding_challenge() {
+    let body = b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b]9278;t;1;17;10000000-0000-4000-8000-000000000001;20000000-0000-4000-8000-000000000001\x07\x1b]1337;InfiniShellResetGrid=End\x07";
+    let (_, handler) = parse_bytes_with_registered_sessions(body, [SessionId::from(17)]);
+
+    assert_eq!(handler.reset_grid_count, 0);
+    assert_eq!(handler.terminal_binding_challenges.len(), 1);
+    assert!(handler.d_proto_hooks.is_empty());
+    assert!(handler.pluggable_notifications.is_empty());
+}
+
+#[test]
+fn conpty_reset_span_ends_before_a_malformed_terminal_binding_challenge() {
+    let body = b"\x1b]1337;InfiniShellResetGrid=Begin\x07\x1b]9278;t;2;17;not-a-uuid;secret\x07\x1b]1337;InfiniShellResetGrid=End\x07";
+    let (_, handler) = parse_bytes_with_registered_sessions(body, [SessionId::from(17)]);
+
+    assert_eq!(handler.reset_grid_count, 0);
+    assert!(handler.terminal_binding_challenges.is_empty());
+    assert!(handler.d_proto_hooks.is_empty());
+    assert!(handler.pluggable_notifications.is_empty());
+}
+
+#[test]
+fn malformed_terminal_binding_osc_does_not_become_a_shell_or_cli_hook() {
+    for body in [
+        b"\x1b]9278;t;2;17;not-a-uuid;secret\x07".as_slice(),
+        b"\x1b]9278;t;1;17;10000000-0000-4000-8000-000000000001;20000000-0000-4000-8000-000000000001;extra\x07",
+    ] {
+        let (_, handler) = parse_bytes_with_registered_sessions(body, [SessionId::from(17)]);
+        assert!(handler.terminal_binding_challenges.is_empty());
+        assert!(handler.d_proto_hooks.is_empty());
+        assert!(handler.pluggable_notifications.is_empty());
+    }
 }

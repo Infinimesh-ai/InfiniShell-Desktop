@@ -2657,6 +2657,12 @@ impl Input {
                 }
                 AgentInputFooterEvent::PluginInstalled(agent) => {
                     ctx.emit(Event::RegisterPluginListener(*agent));
+                    #[cfg(not(target_family = "wasm"))]
+                    if ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+                        CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+                            updates.check_now(*agent, ctx);
+                        });
+                    }
                 }
                 // InfiniShell Wave 7-3:`AgentInputFooterEvent::OpenEnvironmentManagementPane` handler
                 // 随 ambient-agent UI 子系统物理删。
@@ -2672,6 +2678,7 @@ impl Input {
         ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), |me, _, event, ctx| {
             let CLIAgentSessionsModelEvent::InputSessionChanged {
                 terminal_view_id,
+                previous_input_state,
                 new_input_state,
                 ..
             } = event
@@ -2682,6 +2689,7 @@ impl Input {
                 return;
             }
 
+            let before = me.editor.as_ref(ctx).buffer_revision(ctx);
             match new_input_state {
                 CLIAgentInputState::Open { .. } => {
                     // Input just opened — switch to agent mode.
@@ -2704,6 +2712,18 @@ impl Input {
                     me.clear_buffer_and_reset_undo_stack(ctx);
                 }
             }
+
+            // 自动收起/恢复只迁移未编辑的原草稿清理凭证，不恢复发送租约。
+            let after = me.editor.as_ref(ctx).buffer_revision(ctx);
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                sessions.transition_remote_image_consumption(
+                    me.terminal_view_id,
+                    matches!(previous_input_state, CLIAgentInputState::Open { .. }),
+                    matches!(new_input_state, CLIAgentInputState::Open { .. }),
+                    &before,
+                    after,
+                );
+            });
 
             // Set the CLI agent flag after the mode switch so that
             // refresh_categories_state sees the correct is_ai_or_autodetect_mode.
@@ -11486,6 +11506,12 @@ impl Input {
 
         if !self.can_attach_on_filepaths_paste_or_dragdrop(ctx) {
             return 0;
+        }
+
+        // 首次拖放会先打开 CLI 富输入，但打开通知尚未刷新编辑器的图片选项。
+        // 运行中的启动命令仍占据缓冲，不能依赖下方空缓冲分支完成初始化。
+        if CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id) {
+            self.update_image_context_options(ctx);
         }
 
         self.maybe_enter_agent_view_for_image_add(ctx);

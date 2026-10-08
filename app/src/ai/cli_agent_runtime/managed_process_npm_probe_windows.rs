@@ -7,8 +7,7 @@ use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStringExt as _;
 use std::os::windows::fs::OpenOptionsExt as _;
 use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +17,7 @@ use windows::Win32::Storage::FileSystem::{FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHA
 use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
 
 use super::atomic_windows::{WindowsDirectoryLease, capture_directory_id, prepare_directory};
+use super::probe_control::CancellationListener;
 use super::{ExpectedFileIdentity, Manifest};
 
 #[path = "../../terminal/cli_agent_updates/sources_npm_codex_windows_contract.rs"]
@@ -82,6 +82,19 @@ fn invalid() -> io::Error {
     io::Error::other("Codex Windows npm 探针闭包不匹配")
 }
 
+fn station_bootstrap_executable() -> io::Result<PathBuf> {
+    // 只使用本版监督程序同目录的已打包引导器，不从用户 PATH 查找。
+    let supervisor = super::supervisor_executable()?.canonicalize()?;
+    let path = supervisor
+        .parent()
+        .ok_or_else(invalid)?
+        .join("infinishell-station-bootstrap.exe");
+    if path.canonicalize()? != path || !safe_path(&path) {
+        return Err(invalid());
+    }
+    Ok(path)
+}
+
 fn system_program(mode: &str) -> io::Result<PathBuf> {
     let mut buffer = [0u16; 32768];
     let count = unsafe { GetSystemDirectoryW(Some(&mut buffer)) } as usize;
@@ -96,6 +109,67 @@ fn system_program(mode: &str) -> io::Result<PathBuf> {
     PathBuf::from(OsString::from_wide(&buffer[..count]))
         .join(relative)
         .canonicalize()
+}
+
+fn candidate_environment(mode: &str, root: &Path) -> io::Result<Vec<(OsString, OsString)>> {
+    let mut environment = super::version_probe::resolved_environment(root)?;
+    if mode == "cmd" {
+        // 仅本次受管 CMD 候选使用标准堆，调试事件与隔离约束保持原样。
+        environment.push(("_NO_DEBUG_HEAP".into(), "1".into()));
+    }
+    if mode == "powershell" {
+        // 空 PATHEXT 会被 Windows PowerShell 补成仅 .CPL，令 Node 走 ShellExecute。
+        // 封闭入口只需固定的 node.exe；显式保留可执行分类，不继承宿主扩展列表。
+        environment.push(("PATHEXT".into(), ".EXE".into()));
+    }
+    Ok(environment)
+}
+
+fn mapped_command(
+    mode: &str,
+    root: &Path,
+    node_alongside_shim: bool,
+) -> io::Result<(OsString, Vec<(OsString, OsString)>)> {
+    let value = root.to_str().ok_or_else(invalid)?.as_bytes();
+    if value.len() != 3 || !(b'D'..=b'Z').contains(&value[0]) || &value[1..] != b":\\" {
+        return Err(invalid());
+    }
+    let install = root.join("install");
+    let entry = dos_path(&install.join(match mode {
+        "cmd" => "codex.cmd",
+        "powershell" => "codex.ps1",
+        _ => return Err(invalid()),
+    }))?;
+    let arguments = match mode {
+        "cmd" => format!("/d /v:off /s /c \"\"{entry}\" --version\""),
+        "powershell" => {
+            // PowerShell 从 FileSystem 当前位置设置原生子进程的工作目录。
+            // 先切到已绑定映射根，让原 shim 不再依赖启动时的物理路径位置。
+            let cwd = root.display();
+            // 空输入和流式输出让原 shim 请求独立管道，不保证禁止系统启动回退。
+            // 非零初值避免未取得原生退出码时沿用成功状态。
+            format!(
+                r#"-NoLogo -NoProfile -NonInteractive -Command "$global:LASTEXITCODE=1; Set-Location -LiteralPath '{cwd}' -ErrorAction Stop; @() | & '{entry}' --version | & {{ process {{ $_ }} }}; exit $global:LASTEXITCODE""#
+            )
+        }
+        _ => return Err(invalid()),
+    };
+    let mut environment = candidate_environment(mode, root)?;
+    if !node_alongside_shim {
+        let system_path = environment
+            .iter_mut()
+            .find(|(name, _)| name == "PATH")
+            .ok_or_else(invalid)?;
+        // 只在固定 shim 原本使用 PATH 时加入同一私有树的固定 Node，保留官方选路。
+        system_path.1 = std::env::join_paths(
+            std::iter::once(root.join("runtime")).chain(std::env::split_paths(&system_path.1)),
+        )
+        .map_err(|_| invalid())?;
+    }
+    environment.push(("CODEX_HOME".into(), root.join("config").into_os_string()));
+    environment.push(("NODE_DISABLE_COMPILE_CACHE".into(), "1".into()));
+    environment.push(("COMSPEC".into(), system_program("cmd")?.into_os_string()));
+    Ok((arguments.into(), environment))
 }
 
 fn safe_path(path: &Path) -> bool {
@@ -153,7 +227,11 @@ pub(super) fn validate(input: &ProbeInputs) -> io::Result<()> {
         .into_iter()
         .map(|(name, text)| (input.prefix().join(name), text))
         .collect();
-    let mut external = BTreeSet::from([input.program.clone(), input.node().to_owned()]);
+    let mut external = BTreeSet::from([
+        input.program.clone(),
+        input.node().to_owned(),
+        station_bootstrap_executable()?,
+    ]);
     if input.files.len() > 64
         || input
             .files
@@ -225,6 +303,7 @@ pub(crate) fn capture(
     let mut files = vec![
         ExpectedFileIdentity::capture(&program)?,
         ExpectedFileIdentity::capture(node)?,
+        ExpectedFileIdentity::capture(&station_bootstrap_executable()?)?,
     ];
     for name in contract::SHIM_NAMES {
         files.push(ExpectedFileIdentity::capture(&prefix.join(name))?);
@@ -337,7 +416,7 @@ fn dos_directory_path(lease: &WindowsDirectoryLease) -> io::Result<PathBuf> {
 pub(super) fn execute(
     manifest: &Manifest,
     record_directory: &Path,
-    cancellation: Arc<AtomicBool>,
+    control: &CancellationListener,
 ) -> io::Result<()> {
     let input = ProbeInputs {
         program: manifest.executable.clone(),
@@ -346,6 +425,31 @@ pub(super) fn execute(
     };
     validate(&input)?;
     super::verify_expected_files(&input.files)?;
+    let bootstrap_path = station_bootstrap_executable()?;
+    let bootstrap_identity = input
+        .files
+        .iter()
+        .find(|file| file.path == bootstrap_path)
+        .ok_or_else(invalid)?;
+    // 同一文件身份进入事务摘要，并在引导器接管前锁住原文件，封住路径替换窗口。
+    let mut bootstrap_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(&bootstrap_path)?;
+    if ExpectedFileIdentity::capture_opened(
+        &bootstrap_path,
+        bootstrap_path.clone(),
+        &mut bootstrap_handle,
+    )? != *bootstrap_identity
+    {
+        return Err(invalid());
+    }
+    let bootstrap = command::windows::StationBootstrapImage::capture(
+        &bootstrap_path,
+        bootstrap_identity.size,
+        &bootstrap_identity.sha256,
+    )?;
     let install = manifest.cwd.join("install");
     fs::create_dir(&install)?;
     // 保留官方 shim 原先的 Node 选路；PATH 布局不能在镜像中变成本地 Node 分支。
@@ -360,7 +464,7 @@ pub(super) fn execute(
     let mut readonly = Vec::new();
     let mut images = Vec::new();
     for expected in &input.files {
-        if expected.path == input.program {
+        if expected.path == input.program || expected.path == bootstrap_path {
             continue;
         }
         let destination = if expected.path == input.node() {
@@ -398,35 +502,6 @@ pub(super) fn execute(
         readonly.push(destination);
     }
     readonly.extend(directories.into_iter().filter(|path| path != &manifest.cwd));
-    let entry = dos_path(&install.join(if input.mode() == "cmd" {
-        "codex.cmd"
-    } else {
-        "codex.ps1"
-    }))?;
-    let arguments = match input.mode() {
-        "cmd" => format!("/d /v:off /s /c \"\"{entry}\" --version\""),
-        "powershell" => format!("-NoLogo -NoProfile -NonInteractive -File \"{entry}\" --version"),
-        _ => return Err(invalid()),
-    };
-    let mut environment = super::version_probe::resolved_environment(&manifest.cwd)?;
-    if node_directory != install {
-        let system_path = environment
-            .iter_mut()
-            .find(|(name, _)| name == "PATH")
-            .ok_or_else(invalid)?;
-        // 只把本次固定 Node 的私有目录放在系统目录之前，不继承用户 PATH。
-        system_path.1 = std::env::join_paths(
-            std::iter::once(PathBuf::from(dos_path(&node_directory)?))
-                .chain(std::env::split_paths(&system_path.1)),
-        )
-        .map_err(|_| invalid())?;
-    }
-    environment.push((
-        "CODEX_HOME".into(),
-        manifest.cwd.join("config").into_os_string(),
-    ));
-    environment.push(("NODE_DISABLE_COMPILE_CACHE".into(), "1".into()));
-    environment.push(("COMSPEC".into(), system_program("cmd")?.into_os_string()));
     let mut executable = super::atomic_windows::prepare(&input.files[0])?;
     executable.set_package_images(images)?;
     executable.enable_npm_console_host()?;
@@ -435,37 +510,87 @@ pub(super) fn execute(
     executable.verify_for_spawn()?;
     cwd.verify_for_spawn()?;
     let mut debugger = executable.prepare_image_debug_session()?;
-    debugger.bind_cancellation(cancellation);
-    let mut process =
-        command::windows::AppContainerProbe::spawn_package_suspended_with_execution_cwd(
-            executable.execution_path(),
-            arguments.as_ref(),
-            cwd.execution_path(),
-            &execution_cwd,
-            &environment,
-            &format!("InfiniShell.Version.{}", manifest.generation),
-            &readonly,
-        )?;
+    debugger.bind_cancellation(control.token());
+    debugger.bind_package_diagnostics(manifest.generation);
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    let reader = super::read_native_witness_reader(record_directory, manifest)?;
+    let spawn_started = Instant::now();
+    let spawned = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
+        executable.execution_path(),
+        cwd.execution_path(),
+        &execution_cwd,
+        &format!("InfiniShell.Version.{}", manifest.generation),
+        &readonly,
+        &bootstrap,
+        record_directory,
+        |operation, process| control.authorize_process(operation, process),
+        |root| {
+            let (arguments, environment) =
+                mapped_command(input.mode(), root, node_directory == install)?;
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            debugger.bind_native_witness(
+                manifest.generation,
+                input.mode(),
+                &environment,
+                &cwd,
+                root,
+                record_directory,
+                reader.as_ref(),
+            )?;
+            Ok((arguments, environment))
+        },
+    );
+    debugger.record_package_spawn_result(spawned.as_ref().map(|_| ()), spawn_started.elapsed());
+    if let Err(failure) = &spawned {
+        debugger.record_package_probe_result(Err(failure));
+    }
+    let mut process = spawned?;
     let started = Instant::now();
-    let result = run_package_probe(&mut process, &mut debugger, started);
+    let result = debugger
+        .bind_station_debugger(process.station_debugger())
+        .and_then(|()| run_package_probe(&mut process, &mut debugger, started));
+    // 终止与清理会继续消费原调试事件；先封存本次真实 generation 的正常阶段边界。
+    debugger.record_package_probe_result(result.as_ref().map(|code| *code));
     if let Err(failure) = &result {
         record_phase("probe_failed", started, Some(failure));
     }
     record_phase("cleanup_before", started, None);
     // 派生后任何失败都保留原事件状态；先请求终止精确 Job，才允许继续未验证事件。
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    if result.is_err() {
+        debugger.note_native_witness_cancel();
+    }
     let termination = match &result {
         Ok(_) => Ok(()),
         Err(_) => terminate_package_probe(&process, &mut debugger),
     };
     drop(cwd);
     let cleanup = termination.and_then(|()| {
-        process.write_cleanup_receipt(&record_directory.join("appcontainer-cleanup-v1"))
+        process.write_cleanup_receipt_with_output(
+            &record_directory.join("appcontainer-cleanup-v1"),
+            &mut io::stdout(),
+            &mut io::stderr(),
+            || {
+                if control.token().load(Ordering::Acquire) {
+                    Err(io::Error::new(
+                        io::ErrorKind::Interrupted,
+                        "managed_process.atomic_windows_probe_cancelled",
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+        )
     });
     match &cleanup {
         Ok(()) => record_phase("cleanup_complete", started, None),
         Err(failure) => record_phase("cleanup_failed", started, Some(failure)),
     }
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    debugger.record_native_witness_result();
     drop(handles);
+    drop(bootstrap);
+    drop(bootstrap_handle);
     let code = match result {
         Ok(code) => {
             cleanup?;

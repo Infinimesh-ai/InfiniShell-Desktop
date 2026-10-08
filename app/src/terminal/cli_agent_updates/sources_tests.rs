@@ -472,6 +472,77 @@ fn startup_recognizes_pending_journal_before_any_network_or_cli_call() {
 }
 
 #[test]
+fn startup_blocks_unresolved_package_manager_journals_only_for_their_agent() {
+    let (_directory, root) = private_root();
+    for (agent, name) in [
+        (CLIAgent::Claude, "claude-homebrew-migration.json"),
+        (CLIAgent::Claude, "claude-homebrew.json"),
+        (CLIAgent::Codex, "codex-homebrew.json"),
+        (CLIAgent::Grok, "grok-homebrew.json"),
+        (CLIAgent::Claude, "claude-npm-windows.json"),
+        (CLIAgent::Codex, "codex-npm-windows.json"),
+        (CLIAgent::Grok, "grok-npm-windows.json"),
+        (CLIAgent::Claude, "claude-winget-candidate.json"),
+        (CLIAgent::Claude, "claude-winget-portable.json"),
+        (CLIAgent::Codex, "codex-winget-v1.json"),
+        (CLIAgent::Grok, "grok-winget-v1.json"),
+    ] {
+        let path = root.join(name);
+        // 启动保护不应等待账本反序列化、网络或 CLI 版本调用成功。
+        fs::write(&path, b"{incomplete journal").unwrap();
+        for checked in [CLIAgent::Claude, CLIAgent::Codex, CLIAgent::Grok] {
+            assert_eq!(
+                recovery_pending_in(&root, checked),
+                checked == agent,
+                "{name}"
+            );
+        }
+        fs::remove_file(path).unwrap();
+        assert!(!recovery_pending_in(&root, agent));
+    }
+}
+
+#[test]
+fn startup_keeps_nonregular_migration_journal_pending() {
+    let (_directory, root) = private_root();
+    fs::create_dir(root.join("claude-homebrew-migration.json")).unwrap();
+    assert!(recovery_pending_in(&root, CLIAgent::Claude));
+    assert!(!recovery_pending_in(&root, CLIAgent::Codex));
+}
+
+#[cfg(unix)]
+#[test]
+fn startup_does_not_follow_dangling_package_journal_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let (_directory, root) = private_root();
+    symlink(
+        root.join("missing"),
+        root.join("claude-homebrew-migration.json"),
+    )
+    .unwrap();
+    assert!(recovery_pending_in(&root, CLIAgent::Claude));
+    assert!(!recovery_pending_in(&root, CLIAgent::Grok));
+}
+
+#[test]
+fn startup_does_not_block_on_retained_or_failed_update_records() {
+    let (_directory, root) = private_root();
+    let id = Uuid::new_v4();
+    for name in [
+        format!("claude-homebrew-migration-{id}.retained.json"),
+        format!("codex-npm-windows-retained-{id}.json"),
+        format!("grok-winget-retained-{id}.json"),
+    ] {
+        fs::write(root.join(name), b"retained evidence").unwrap();
+    }
+    for agent in [CLIAgent::Claude, CLIAgent::Codex, CLIAgent::Grok] {
+        fs::write(failure_path(&root, agent), b"failed intent").unwrap();
+        assert!(!recovery_pending_in(&root, agent));
+    }
+}
+
+#[test]
 fn restart_finishes_only_recorded_success_and_preserves_unknown_prepared_transaction() {
     let (_directory, root) = private_root();
     let path = root.join("grok.json");

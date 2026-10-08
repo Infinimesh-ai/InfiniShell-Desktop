@@ -21,6 +21,9 @@ mod macos;
 const PACKAGE_MANIFEST: &[u8] =
     include_bytes!("../../../../script/cli-agent-parity/codex_0156_package_manifest.json");
 
+const MACOS_0160_MANIFEST: &[u8] =
+    include_bytes!("../../../../script/cli-agent-parity/codex_0160_macos_package_manifest.json");
+
 fn invalid() -> io::Error {
     io::Error::other("Codex npm 的 Node、launcher 或平台闭包不匹配")
 }
@@ -96,8 +99,24 @@ pub(super) fn validate_contract(
         return Err(invalid());
     }
     let (target, package, triple) = platform()?;
+    // 只由已绑定的官方 wrapper 清单摘要选发行闭包；不依赖可伪造的版本文本。
+    let wrapper_manifest = files
+        .iter()
+        .find(|file| file.path == root.join("package.json"))
+        .ok_or_else(invalid)?;
+    let package_manifest = match (wrapper_manifest.size, wrapper_manifest.sha256.as_str()) {
+        (1082, "c3f16464dca0fe1269b17d02fe0997d1ca3a241c3a61da3d89ec13def0a66c6e") => {
+            PACKAGE_MANIFEST
+        }
+        (1082, "29c350dfcd8d33749852c16e2f5dcde528409d7e1d3f5d916fe3c576f3914820")
+            if cfg!(all(target_os = "macos", target_arch = "aarch64")) =>
+        {
+            MACOS_0160_MANIFEST
+        }
+        _ => return Err(invalid()),
+    };
     let metadata: serde_json::Value =
-        serde_json::from_slice(PACKAGE_MANIFEST).map_err(io::Error::other)?;
+        serde_json::from_slice(package_manifest).map_err(io::Error::other)?;
     let native_files: BTreeMap<PathBuf, (u64, String, u32)> =
         serde_json::from_value(metadata["packages"][package]["files"].clone())
             .map_err(io::Error::other)?;
@@ -113,10 +132,7 @@ pub(super) fn validate_contract(
         ),
         (
             PathBuf::from("package.json"),
-            (
-                1082,
-                "c3f16464dca0fe1269b17d02fe0997d1ca3a241c3a61da3d89ec13def0a66c6e".to_owned(),
-            ),
+            (1082, wrapper_manifest.sha256.clone()),
         ),
         (
             PathBuf::from("README.md"),
@@ -135,6 +151,25 @@ pub(super) fn validate_contract(
         dependency.join("package.json"),
         dependency.join("README.md"),
     ]);
+    if wrapper_manifest.sha256 == "29c350dfcd8d33749852c16e2f5dcde528409d7e1d3f5d916fe3c576f3914820"
+    {
+        // 新版本平台清单也逐字节绑定，不能拼入另一版本的 alias 元数据。
+        required.insert(
+            dependency.join("package.json"),
+            (
+                517,
+                "2497ae33d4df7cb43618e3935fb1dfbff6a7bf536e2258776d1e95afc3c47017".to_owned(),
+            ),
+        );
+        required.insert(
+            dependency.join("README.md"),
+            (
+                3334,
+                "ba4e1f69ff48386e72a9c5e1edaf76aad64a475c2d51af79ccba6d1128261ba7".to_owned(),
+            ),
+        );
+        platform_metadata.clear();
+    }
     for file in files.iter().skip(1) {
         if file.path != file.canonical_path || file.file_id.is_none() || !plain_absolute(&file.path)
         {
@@ -440,3 +475,13 @@ pub(super) fn execute(manifest: &Manifest) -> io::Result<()> {
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     Err(invalid())
 }
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+    )
+))]
+#[path = "managed_process_npm_probe_tests.rs"]
+mod tests;

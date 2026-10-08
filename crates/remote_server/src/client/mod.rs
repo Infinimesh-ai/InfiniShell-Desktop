@@ -44,6 +44,7 @@ use crate::protocol::{self, ProtocolError, RequestId};
 mod codex_owned;
 mod grok_owned;
 mod image_staging;
+mod terminal_binding;
 mod tunnel;
 pub use tunnel::TunnelStream;
 
@@ -646,6 +647,24 @@ impl RemoteServerClient {
         shell_type: &str,
         shell_path: Option<&str>,
     ) {
+        self.notify_session_bootstrapped_with_terminal_candidate(
+            session_id,
+            shell_type,
+            shell_path,
+            None,
+            None,
+        );
+    }
+
+    /// 候选随新的 epoch 发送；它本身不是终端或原生 CLI 权限。
+    pub fn notify_session_bootstrapped_with_terminal_candidate(
+        &self,
+        session_id: SessionId,
+        shell_type: &str,
+        shell_path: Option<&str>,
+        shell_pid: Option<u32>,
+        shell_tty: Option<&str>,
+    ) {
         let (image_staging_epoch, image_staging_epoch_revision) =
             self.advance_image_staging_session(session_id);
         let msg = ClientMessage::notification(notification::Message::SessionBootstrapped(
@@ -655,6 +674,8 @@ impl RemoteServerClient {
                 shell_path: shell_path.map(ToOwned::to_owned),
                 image_staging_epoch,
                 image_staging_epoch_revision,
+                shell_pid,
+                shell_tty: shell_tty.map(ToOwned::to_owned),
             },
         ));
         self.send_notification(msg);

@@ -4,6 +4,45 @@ use std::os::windows::io::AsHandle as _;
 
 use super::*;
 
+#[path = "windows_appcontainer_netcredentials_tests.rs"]
+mod netcredentials;
+
+#[test]
+#[ignore = "仅在固定无网络 helper 的非管理员服务身份新登录会话候选验证中执行"]
+fn netcredentials_two_stage_station_records_identity_and_cleanup() {
+    netcredentials::run(false, false);
+}
+
+#[test]
+#[ignore = "仅与原两段基线同轮执行一次私有盘映射对照，不代表 G09 通过"]
+fn netcredentials_two_stage_private_device_map_records_identity_and_cleanup() {
+    netcredentials::run(true, false);
+}
+
+#[test]
+#[ignore = "仅与原两段基线同轮执行一次保留已空 Job 对照，不代表 G09 通过"]
+fn netcredentials_two_stage_retained_empty_job_records_identity_and_cleanup() {
+    netcredentials::run(false, true);
+}
+
+#[test]
+#[ignore = "仅与原两段基线同轮执行一次私有盘映射加保留已空 Job 对照，不代表 G09 通过"]
+fn netcredentials_two_stage_private_device_map_retained_empty_job_records_identity_and_cleanup() {
+    netcredentials::run(true, true);
+}
+
+#[test]
+#[ignore = "仅固定 Rust stdio 管道不写入的生命周期对照，不代表 G09 通过"]
+fn netcredentials_stdio_without_write_records_original_and_released_lifetime() {
+    netcredentials::run_stdio(false);
+}
+
+#[test]
+#[ignore = "仅固定 Rust stdio 管道写入 nonce 的生命周期对照，不代表 G09 通过"]
+fn netcredentials_stdio_with_write_records_original_and_released_lifetime() {
+    netcredentials::run_stdio(true);
+}
+
 #[test]
 fn no_window_mode_preserves_redirected_standard_handles_without_show_flags() {
     // 仅比较启动结构中的哨兵值，不把它们交给任何句柄 API。
@@ -153,12 +192,33 @@ fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
             grants: Vec::new(),
             job,
             process: None,
+            confirmed_exit_code: None,
+            startup_failure: None,
             thread: None,
             process_id: 0,
             cleaned: false,
+            private_station: None,
             private_desktop: None,
+            profile_directories: None,
+            captured_output: None,
         },
     )
+}
+
+#[test]
+fn rejected_parent_binding_cannot_be_cleared_by_retrying_resume() {
+    let (_directory, mut probe) = empty_probe();
+    probe.startup_failure = Some(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "测试拒绝原 Job 绑定",
+    ));
+
+    for _attempt in 0..2 {
+        let failure = probe.resume().unwrap_err();
+        assert_eq!(failure.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(failure.to_string(), "测试拒绝原 Job 绑定");
+    }
+    probe.cleanup().unwrap();
 }
 
 fn current_process_handle() -> OwnedHandle {
@@ -237,6 +297,42 @@ fn private_desktop_rejects_readonly_objects_outside_the_candidate_before_creatin
     );
 }
 
+#[test]
+fn existing_station_desktop_rejects_a_different_execution_directory_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let result = AppContainerProbe::spawn_package_suspended_with_existing_station_desktop(
+        Path::new("unused.exe"),
+        &cwd,
+        other.path(),
+        &[],
+        "unused-profile",
+        &[],
+    );
+    assert_eq!(result.err().unwrap().to_string(), "版本探针执行目录不匹配");
+}
+
+#[test]
+fn existing_station_desktop_rejects_readonly_objects_outside_the_candidate_before_creating_profile()
+{
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let result = AppContainerProbe::spawn_package_suspended_with_existing_station_desktop(
+        Path::new("unused.exe"),
+        &cwd,
+        &cwd,
+        &[],
+        "unused-profile",
+        &[other.path().canonicalize().unwrap()],
+    );
+    assert_eq!(
+        result.err().unwrap().to_string(),
+        "包探针的只读对象范围无效"
+    );
+}
+
 // 私有对象断言由既有 console_tests 入口运行，保持远程定向过滤有效。
 
 #[test]
@@ -282,4 +378,10 @@ fn private_desktop_never_publishes_a_route_for_missing_objects() {
 #[test]
 fn private_desktop_admin_observation_distinguishes_non_member_from_query_failure() {
     super::desktop::test_cases::private_desktop_admin_observation_distinguishes_non_member_from_query_failure();
+}
+
+#[test]
+#[ignore = "无名站创建只在 Windows 服务身份原生对照中显式执行"]
+fn unnamed_station_create_only_reports_identity_and_cleanup() {
+    super::desktop::test_cases::unnamed_station_create_only_reports_identity_and_cleanup();
 }

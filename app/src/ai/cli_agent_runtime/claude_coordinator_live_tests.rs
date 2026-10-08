@@ -1076,3 +1076,6 @@ fn real_claude_fixed_profile_parent_child() {
         }
     });
 }
+
+#[path = "claude_v2_write_cancel_live_tests.rs"]
+mod v2_write_cancel_live_tests;

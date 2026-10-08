@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use command::blocking::Command as BlockingCommand;
 use command::managed::{Containment, ManagedTree};
 use command::windows::SuspendedChild;
+use windows::Win32::Foundation::NTSTATUS;
 use windows::Win32::Storage::FileSystem::{
     FILE_TYPE_CHAR, FILE_TYPE_DISK, FILE_TYPE_PIPE, GetFileType,
 };
@@ -1374,9 +1375,12 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         held_package_processes: Vec::new(),
         initial_breakpoints: HashSet::new(),
         pending_event: None,
+        station_debugger: None,
         root_exit_observed: false,
         cancellation: None,
         npm_diagnostics: None,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        native_witness: None,
         loader_trace: None,
     };
     assert!(session.verify_root_image(&file).is_ok());
@@ -1421,6 +1425,192 @@ fn package_image_rejection_diagnostics_hide_unknown_paths() {
 }
 
 #[test]
+fn debug_backend_cannot_change_while_an_event_is_pending() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    session.pending_event = Some((41, 43, CREATE_PROCESS_DEBUG_EVENT));
+
+    assert!(session.bind_station_debugger(None).is_err());
+    assert_eq!(
+        session.pending_event,
+        Some((41, 43, CREATE_PROCESS_DEBUG_EVENT))
+    );
+    assert!(session.station_debugger.is_none());
+}
+
+#[test]
+fn debug_backend_cannot_change_after_the_root_was_bound() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    session.root_process_id = 41;
+
+    assert!(session.bind_station_debugger(None).is_err());
+    assert_eq!(session.root_process_id, 41);
+    assert!(session.station_debugger.is_none());
+}
+
+#[test]
+fn initial_clr_failure_survives_later_debug_events() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        dwProcessId: 41,
+        dwThreadId: 43,
+        ..Default::default()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(0xe0434352_u32 as i32);
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    event.u.Exception.ExceptionRecord.ExceptionInformation =
+        [0x80131534, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    event.u.Exception.dwFirstChance = 1;
+    trace.received(&event, 10, 43, false);
+    trace.validated(NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43), "root");
+    trace.continued(
+        NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43),
+        DBG_EXCEPTION_NOT_HANDLED.0,
+    );
+    event.dwDebugEventCode = EXIT_THREAD_DEBUG_EVENT;
+    for _ in 0..MAX_NPM_DEBUG_EVENTS {
+        trace.received(&event, 20, 43, true);
+        trace.validated(
+            NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43),
+            "console",
+        );
+        trace.continued(
+            NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43),
+            DBG_CONTINUE.0,
+        );
+    }
+
+    assert_eq!(trace.dropped_events, 1);
+    assert_eq!(trace.initial_clr_exceptions.len(), 1);
+    let failure = &trace.initial_clr_exceptions[0];
+    assert_eq!(failure.sequence, 1);
+    assert_eq!(failure.clr_hresult, Some(0x80131534));
+    assert_eq!(failure.first_chance, Some(1));
+    assert_eq!(failure.role, "root");
+    assert_eq!(failure.mode, "normal");
+    assert!(failure.validation.as_ref().unwrap().ok);
+    assert!(failure.continuation.as_ref().unwrap().ok);
+    assert_eq!(failure.continue_status, Some(DBG_EXCEPTION_NOT_HANDLED.0));
+}
+
+#[test]
+fn clr_failure_history_is_bounded_without_replacing_the_first_exception() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        ..Default::default()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(0xe0434352_u32 as i32);
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    event.u.Exception.ExceptionRecord.ExceptionInformation =
+        [0x80070005, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for _ in 0..MAX_NPM_DEBUG_EVENTS {
+        trace.received(&event, 10, 43, false);
+    }
+    event.u.Exception.ExceptionRecord.ExceptionInformation =
+        [0x80131534, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    trace.received(&event, 20, 43, true);
+    trace.validated(NpmDebugResult::from_io(Ok(()), Duration::ZERO, 43), "root");
+
+    assert_eq!(trace.initial_clr_exceptions.len(), MAX_NPM_DEBUG_EVENTS);
+    assert_eq!(trace.dropped_clr_exceptions, 1);
+    assert_eq!(trace.initial_clr_exceptions[0].sequence, 1);
+    assert_eq!(
+        trace.initial_clr_exceptions[0].clr_hresult,
+        Some(0x80070005)
+    );
+    assert!(
+        trace
+            .initial_clr_exceptions
+            .last()
+            .unwrap()
+            .validation
+            .is_none()
+    );
+    assert_eq!(trace.recent.back().unwrap().clr_hresult, Some(0x80131534));
+}
+
+#[test]
+fn clr_hresult_requires_a_declared_parameter_and_does_not_record_addresses() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let mut event = DEBUG_EVENT {
+        dwDebugEventCode: EXCEPTION_DEBUG_EVENT,
+        ..Default::default()
+    };
+    event.u.Exception.ExceptionRecord.ExceptionCode = NTSTATUS(0xe0434352_u32 as i32);
+    event.u.Exception.ExceptionRecord.ExceptionInformation = [
+        0x80131534, 0x12345678, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    trace.received(&event, 10, 43, false);
+    event.u.Exception.ExceptionRecord.NumberParameters = 16;
+    trace.received(&event, 20, 43, false);
+    event.u.Exception.ExceptionRecord.ExceptionCode = EXCEPTION_BREAKPOINT;
+    event.u.Exception.ExceptionRecord.NumberParameters = 1;
+    trace.received(&event, 30, 43, false);
+
+    assert_eq!(trace.initial_clr_exceptions.len(), 2);
+    assert_eq!(trace.initial_clr_exceptions[0].clr_hresult, None);
+    assert_eq!(trace.initial_clr_exceptions[1].clr_hresult, None);
+    assert_eq!(trace.recent.back().unwrap().clr_hresult, None);
+    let recorded = serde_json::to_string(&trace.initial_clr_exceptions).unwrap();
+    assert!(!recorded.contains("305419896"));
+    assert!(!recorded.contains("12345678"));
+}
+
+#[test]
+fn debug_wait_cancellation_precedes_the_deadline_without_consuming_an_event() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let failure = wait_for_cancellable_debug_event(
+        Instant::now(),
+        "已到原截止时间",
+        &AtomicBool::new(true),
+        Some(&mut trace),
+        None,
+    )
+    .err()
+    .expect("取消后不应返回原生事件");
+
+    assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    assert_eq!(trace.last_boundary, "wait_cancelled");
+    assert_eq!(trace.wait_calls, 0);
+    assert_eq!(trace.received, 0);
+}
+
+#[test]
+fn debug_wait_deadline_does_not_start_another_wait() {
+    let mut trace = NpmDebugTrace::new(Uuid::nil(), 43);
+    let failure = wait_for_cancellable_debug_event(
+        Instant::now(),
+        "已到原截止时间",
+        &AtomicBool::new(false),
+        Some(&mut trace),
+        None,
+    )
+    .err()
+    .expect("截止后不应返回原生事件");
+
+    assert_eq!(failure.kind(), io::ErrorKind::TimedOut);
+    assert_eq!(trace.last_boundary, "wait_deadline");
+    assert_eq!(trace.wait_calls, 0);
+    assert_eq!(trace.received, 0);
+}
+
+#[test]
+fn debug_wait_preserves_native_errors_without_treating_transport_failure_as_timeout() {
+    let timeout = io::Error::other(WindowsError::from_hresult(HRESULT::from_win32(121)));
+    let denied = io::Error::from_raw_os_error(5);
+    let transport = io::Error::new(io::ErrorKind::TimedOut, "有界协议未确认");
+
+    assert_eq!(debug_error_code(&timeout), Some(HRESULT::from_win32(121)));
+    assert_eq!(debug_error_code(&denied), Some(HRESULT::from_win32(5)));
+    assert_eq!(debug_error_code(&transport), None);
+}
+
+#[test]
 fn failed_exit_continue_keeps_process_and_pending_event() {
     let fixture = Fixture::new();
     let lease = prepare(&fixture.expected()).unwrap();
@@ -1441,8 +1631,28 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
     diagnostics.roles.insert(process_id, NpmProcessRole::Root);
     diagnostics.received(process_id, EXIT_PROCESS_DEBUG_EVENT, Some(17));
     session.npm_diagnostics = Some(diagnostics);
+    session.bind_package_diagnostics(Uuid::new_v4());
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .as_mut()
+        .unwrap()
+        .received(
+            &DEBUG_EVENT {
+                dwDebugEventCode: EXIT_PROCESS_DEBUG_EVENT,
+                dwProcessId: process_id,
+                ..Default::default()
+            },
+            0,
+            unsafe { GetCurrentThreadId() },
+            false,
+        );
 
-    assert!(session.continue_pending(DBG_CONTINUE).is_err());
+    let failure = session
+        .continue_pending(DBG_CONTINUE, Instant::now() + DEBUG_DRAIN_TIMEOUT)
+        .unwrap_err();
 
     assert_eq!(
         session.pending_event,
@@ -1456,6 +1666,15 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
         Some(&NpmProcessRole::Root)
     );
     assert_eq!(diagnostics.pending_exit_code, Some(17));
+    let fields = session.package_debug_summary(Err(&failure)).unwrap();
+    assert_eq!(fields["last_boundary"], "continue_failed");
+    assert_eq!(fields["continued"], 0);
+    assert_eq!(fields["recent"][0]["continuation"]["ok"], false);
+    assert!(fields["recent"][0]["continuation"]["hresult"].is_i64());
+    assert_eq!(
+        fields["pending_event"],
+        serde_json::json!([process_id, 0, EXIT_PROCESS_DEBUG_EVENT.0])
+    );
 }
 
 struct PackageProbeFixture {
@@ -1558,7 +1777,12 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
     let (failure, rejected_identity) = loop {
         let event = fixture
             .debugger
-            .next_event(deadline, "测试未收到子映像事件")
+            .next_event(
+                deadline,
+                "测试未收到子映像事件",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                None,
+            )
             .unwrap();
         let image = (event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT).then(|| {
             // 复制 hFile，仅供断言；实际事件所有权仍由 validate_event 接管。
@@ -1567,11 +1791,13 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
             let identity = inspect_handle(&file).unwrap().id;
             identity
         });
-        match fixture
-            .debugger
-            .validate_event_in_container(&event, Some(&fixture.process))
-        {
-            Ok(status) => fixture.debugger.continue_pending(status).unwrap(),
+        match fixture.debugger.validate_event_in_container(
+            &event,
+            Some(&fixture.process),
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            deadline,
+        ) {
+            Ok(status) => fixture.debugger.continue_pending(status, deadline).unwrap(),
             Err(failure) => break (failure, image),
         }
     };
@@ -1615,16 +1841,24 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
         .debugger
         .verify_package_initial_image_in_container(&fixture.process)
         .unwrap();
+    let deadline = Instant::now() + DEBUG_DRIVER_TIMEOUT;
     let event = fixture
         .debugger
         .next_event(
-            Instant::now() + DEBUG_DRIVER_TIMEOUT,
+            deadline,
             "测试未收到 loader 事件",
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            None,
         )
         .unwrap();
     fixture
         .debugger
-        .validate_event_in_container(&event, Some(&fixture.process))
+        .validate_event_in_container(
+            &event,
+            Some(&fixture.process),
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            deadline,
+        )
         .unwrap();
     let pending = fixture.debugger.pending_event.unwrap();
     fixture.debugger.pending_event = Some((pending.0, 0, pending.2));

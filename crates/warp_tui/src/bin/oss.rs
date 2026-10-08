@@ -11,6 +11,8 @@ use warp_core::AppId;
 use warp_core::channel::{Channel, ChannelConfig, ChannelState};
 
 fn main() -> Result<()> {
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    warp::cli_agent_notify_trace::initialize();
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
@@ -25,5 +27,12 @@ fn main() -> Result<()> {
     }
     ChannelState::set(state);
 
-    warp_tui::run()
+    let result = warp_tui::run();
+    #[cfg(all(target_os = "linux", feature = "cli-agent-notify-trace"))]
+    warp::cli_agent_notify_trace::emit(if result.is_ok() {
+        warp::cli_agent_notify_trace::Stage::MainOk
+    } else {
+        warp::cli_agent_notify_trace::Stage::MainError
+    });
+    result
 }

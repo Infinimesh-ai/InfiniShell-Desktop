@@ -77,6 +77,7 @@ message SessionScopedRequest {
     // 专属 Grok 的启动和图片只属于此连接，断连不重投。
     CliGrokOwnedRequest cli_grok_owned = 8;
     CliCodexOwnedRequest cli_codex_owned = 9;
+    TerminalBindingRequest terminal_binding = 10;
   }
 }
 
@@ -92,6 +93,7 @@ message Notification {
     CliImageStagingRequest revoke_cli_image_staging = 11;
     CliGrokOwnedRequest revoke_cli_grok_owned = 12;
     CliCodexOwnedRequest revoke_cli_codex_owned = 13;
+    TerminalBindingRequest cancel_terminal_binding = 14;
     BufferEdit buffer_edit = 5;
     CloseBuffer close_buffer = 6;
     UnsubscribeDiffState unsubscribe_diff_state = 7;
@@ -151,6 +153,7 @@ message ServerMessage {
     CliImageStagingResponse cli_image_staging = 44;
     CliGrokOwnedResponse cli_grok_owned = 45;
     CliCodexOwnedResponse cli_codex_owned = 46;
+    TerminalBindingResponse terminal_binding = 47;
   }
 }
 
@@ -221,6 +224,8 @@ enum RemoteServerCapability {
   // Claude 原生后续输入触发 Read；只有历史中匹配的图片内容才确认消费。
   CLI_IMAGE_CLAUDE_READ_V1 = 8;
   CLI_CODEX_OWNED_V1 = 9;
+  TERMINAL_BINDING_V1 = 10;
+  TMUX_OWNED_V1 = 11;
 }
 
 // ── SSH 字节流隧道 ───────────────────────────────────────────────
@@ -369,6 +374,9 @@ message SessionBootstrapped {
   // 当前连接内严格递增，旧 bootstrap 不得恢复旧图片租约。
   string image_staging_epoch = 4;
   uint64 image_staging_epoch_revision = 5;
+  // 仅为候选值；daemon 必须核对内核生存期并通过此终端的挑战确认。
+  optional uint32 shell_pid = 6;
+  optional string shell_tty = 7;
 }
 
 // Sent by the client to execute a shell command on the remote host.
@@ -1079,6 +1087,7 @@ message CliImageClaudeBinding {
   string tty_path = 3;
   string working_directory = 4;
   string transcript_path = 5;
+  TerminalBindingOwnedReference tmux_owned = 6;
 }
 message CliImageClaudeQueue {
   CliImageClaudeBinding binding = 1;
@@ -1194,5 +1203,75 @@ message CliImageStagingResponse {
     CliImageStagingRecovered recovered = 11;
     CliImageCodexQueueResult codex_queue = 12;
     CliImageCodexQueueResult claude_queue = 13;
+  }
+}
+
+// 与 CLI hook 和图片租约独立；只复用连接内当前终端 epoch。
+message TerminalBindingScope {
+  string host_id = 1;
+  uint64 terminal_session_id = 2;
+  string terminal_epoch = 3;
+}
+message TerminalBindingBegin {}
+message TerminalBindingAck { string nonce = 1; }
+message TerminalBindingCancel {}
+enum TerminalBindingOwnedAgent {
+  TERMINAL_BINDING_OWNED_AGENT_UNSPECIFIED = 0;
+  TERMINAL_BINDING_OWNED_AGENT_CLAUDE = 1;
+  TERMINAL_BINDING_OWNED_AGENT_CODEX = 2;
+  TERMINAL_BINDING_OWNED_AGENT_GROK = 3;
+}
+message TerminalBindingStartOwned {
+  string opaque_binding_id = 1;
+  string launch_id = 2;
+  string launch_key = 3;
+  TerminalBindingOwnedAgent agent = 4;
+}
+message TerminalBindingStatusOwned {
+  string opaque_binding_id = 1;
+  string launch_id = 2;
+  string launch_key = 3;
+  TerminalBindingOwnedAgent agent = 4;
+}
+message TerminalBindingOwnedReference {
+  string opaque_binding_id = 1;
+  string launch_id = 2;
+  string launch_key = 3;
+}
+message TerminalBindingRequest {
+  TerminalBindingScope scope = 1;
+  string attempt_id = 2;
+  oneof action {
+    TerminalBindingBegin begin = 3;
+    TerminalBindingAck ack = 4;
+    TerminalBindingCancel cancel = 5;
+    TerminalBindingStartOwned start_owned = 6;
+    TerminalBindingStatusOwned status_owned = 7;
+  }
+}
+// nonce 只能写入受核验的 TTY，禁止放入响应或错误。
+message TerminalBindingChallengeWritten {}
+message TerminalBindingBound {
+  string opaque_binding_id = 1;
+  string pane_cwd = 2;
+}
+message TerminalBindingOwned {
+  string launch_id = 1;
+  TerminalBindingOwnedAgent agent = 2;
+  string phase = 3;
+  bytes owned_reply_json = 4;
+  optional string native_session_id = 5;
+}
+message TerminalBindingFailed { string code = 1; }
+message TerminalBindingCancelled {}
+message TerminalBindingResponse {
+  TerminalBindingScope scope = 1;
+  string attempt_id = 2;
+  oneof result {
+    TerminalBindingChallengeWritten challenge_written = 3;
+    TerminalBindingBound bound = 4;
+    TerminalBindingFailed failed = 5;
+    TerminalBindingCancelled cancelled = 6;
+    TerminalBindingOwned owned = 7;
   }
 }

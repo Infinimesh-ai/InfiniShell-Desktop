@@ -5,7 +5,7 @@
 //! 以前保持对象身份。目录必须申请真实读取访问参与共享删除检查；固定官方更新器
 //! 由来源层绑定固定安装布局；未知 helper 或 DLL 在放行调试事件前拒绝。
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read as _, Seek as _};
@@ -19,7 +19,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use command::blocking::Command;
-use command::windows::AppContainerProbe;
+use command::windows::{AppContainerProbe, StationDebugger};
+use serde::Serialize;
+use uuid::Uuid;
 use windows::Win32::Foundation::{
     DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_SAME_ACCESS, DuplicateHandle,
     ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, FILETIME, GENERIC_READ, HANDLE, HLOCAL, LocalFree,
@@ -46,13 +48,26 @@ use windows::Win32::System::SystemInformation::{
     GetSystemDirectoryW, GetSystemTimePreciseAsFileTime,
 };
 use windows::Win32::System::Threading::{
-    GetCurrentProcess, GetProcessTimes, TerminateProcess, WaitForSingleObject,
+    GetCurrentProcess, GetCurrentThreadId, GetProcessTimes, TerminateProcess, WaitForSingleObject,
 };
-use windows::core::HRESULT;
+use windows::core::{Error as WindowsError, HRESULT};
 
 use super::{
     AtomicDirectoryIdentity, ExpectedFileId, ExpectedFileIdentity, WindowsChildImage, sha256_file,
 };
+
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_creation_witness.rs"]
+mod creation_witness;
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_clr.rs"]
+mod native_clr;
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_snapshot.rs"]
+mod native_snapshot;
+#[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+#[path = "managed_process_atomic_windows_witness.rs"]
+mod native_witness;
 
 const MAX_NATIVE_EXECUTABLE_BYTES: u64 = 1024 * 1024 * 1024;
 const DOS_HEADER_PE_OFFSET: u64 = 0x3c;
@@ -72,6 +87,7 @@ const DEBUG_INITIAL_TIMEOUT: Duration = Duration::from_secs(20);
 const DEBUG_SESSION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const DEBUG_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_WINDOWS_PATH_U16: usize = 32_768;
+const MAX_NPM_DEBUG_EVENTS: usize = 16;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct LeasedIdentity {
@@ -175,9 +191,12 @@ pub(super) struct WindowsImageDebugSession {
     held_package_processes: Vec<OwnedHandle>,
     initial_breakpoints: HashSet<u32>,
     pending_event: Option<(u32, u32, DEBUG_EVENT_CODE)>,
+    station_debugger: Option<StationDebugger>,
     root_exit_observed: bool,
     cancellation: Option<Arc<AtomicBool>>,
     npm_diagnostics: Option<NpmProcessDiagnostics>,
+    #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+    native_witness: Option<native_witness::NativeWitness>,
     #[cfg(test)]
     loader_trace: Option<loader_tests::LoaderTrace>,
 }
@@ -221,6 +240,196 @@ struct NpmProcessDiagnostics {
     cleanup: bool,
     cancel_observed: bool,
     termination_requested_at: Option<u64>,
+    trace: Option<NpmDebugTrace>,
+}
+
+/// 只保存原 API 调用的固定字段；不读取调试字符串、异常地址、路径或控制材料。
+#[derive(Debug, Serialize)]
+struct NpmDebugTrace {
+    generation: Uuid,
+    spawn_thread_id: u32,
+    spawn_return_thread_id: Option<u32>,
+    spawn_result: Option<NpmDebugResult>,
+    last_boundary: &'static str,
+    last_call_thread_id: u32,
+    wait_calls: u64,
+    wait_timeouts: u64,
+    wait_elapsed_ms: u128,
+    longest_wait_ms: u128,
+    last_wait_hresult: Option<i32>,
+    received: u64,
+    validated: u64,
+    continued: u64,
+    dropped_events: u64,
+    recent: VecDeque<NpmDebugEvent>,
+    initial_clr_exceptions: Vec<NpmDebugEvent>,
+    dropped_clr_exceptions: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct NpmDebugEvent {
+    sequence: u64,
+    process_id: u32,
+    thread_id: u32,
+    code: u32,
+    received_ms: u128,
+    received_on_thread_id: u32,
+    mode: &'static str,
+    role: &'static str,
+    exception_code: Option<i32>,
+    first_chance: Option<u32>,
+    clr_hresult: Option<u32>,
+    validation: Option<NpmDebugResult>,
+    continuation: Option<NpmDebugResult>,
+    continue_status: Option<i32>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct NpmDebugResult {
+    ok: bool,
+    elapsed_ms: u128,
+    call_thread_id: u32,
+    hresult: Option<i32>,
+    win32_error: Option<i32>,
+}
+
+impl NpmDebugResult {
+    fn from_io(result: Result<(), &io::Error>, elapsed: Duration, thread_id: u32) -> Self {
+        let failure = result.err();
+        Self {
+            ok: failure.is_none(),
+            elapsed_ms: elapsed.as_millis(),
+            call_thread_id: thread_id,
+            hresult: failure
+                .and_then(io::Error::get_ref)
+                .and_then(|source| source.downcast_ref::<WindowsError>())
+                .map(|source| source.code().0),
+            win32_error: failure.and_then(io::Error::raw_os_error),
+        }
+    }
+}
+
+impl NpmDebugTrace {
+    fn new(generation: Uuid, thread_id: u32) -> Self {
+        Self {
+            generation,
+            spawn_thread_id: thread_id,
+            spawn_return_thread_id: None,
+            spawn_result: None,
+            last_boundary: "spawn_before",
+            last_call_thread_id: thread_id,
+            wait_calls: 0,
+            wait_timeouts: 0,
+            wait_elapsed_ms: 0,
+            longest_wait_ms: 0,
+            last_wait_hresult: None,
+            received: 0,
+            validated: 0,
+            continued: 0,
+            dropped_events: 0,
+            recent: VecDeque::with_capacity(MAX_NPM_DEBUG_EVENTS),
+            initial_clr_exceptions: Vec::with_capacity(MAX_NPM_DEBUG_EVENTS),
+            dropped_clr_exceptions: 0,
+        }
+    }
+
+    fn wait_finished(&mut self, elapsed: Duration, thread_id: u32, hresult: Option<HRESULT>) {
+        self.last_call_thread_id = thread_id;
+        self.wait_calls = self.wait_calls.saturating_add(1);
+        self.wait_elapsed_ms = self.wait_elapsed_ms.saturating_add(elapsed.as_millis());
+        self.longest_wait_ms = self.longest_wait_ms.max(elapsed.as_millis());
+        self.last_wait_hresult = hresult.map(|code| code.0);
+        let timeout = hresult == Some(HRESULT::from_win32(ERROR_SEM_TIMEOUT.0));
+        self.wait_timeouts = self.wait_timeouts.saturating_add(u64::from(timeout));
+        self.last_boundary = if timeout {
+            "wait_timeout"
+        } else if hresult.is_some() {
+            "wait_failed"
+        } else {
+            "wait_returned"
+        };
+    }
+
+    fn received(&mut self, event: &DEBUG_EVENT, elapsed_ms: u128, thread_id: u32, cleanup: bool) {
+        self.received = self.received.saturating_add(1);
+        self.last_boundary = "received";
+        self.last_call_thread_id = thread_id;
+        if self.recent.len() == MAX_NPM_DEBUG_EVENTS {
+            self.recent.pop_front();
+            self.dropped_events = self.dropped_events.saturating_add(1);
+        }
+        let exception =
+            (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT).then(|| unsafe { event.u.Exception });
+        let clr =
+            exception.filter(|value| value.ExceptionRecord.ExceptionCode.0 as u32 == 0xe0434352);
+        let recorded = NpmDebugEvent {
+            sequence: self.received,
+            process_id: event.dwProcessId,
+            thread_id: event.dwThreadId,
+            code: event.dwDebugEventCode.0,
+            received_ms: elapsed_ms,
+            received_on_thread_id: thread_id,
+            mode: if cleanup { "cleanup" } else { "normal" },
+            role: "unknown",
+            exception_code: exception.map(|value| value.ExceptionRecord.ExceptionCode.0),
+            first_chance: exception.map(|value| value.dwFirstChance),
+            // CLR 异常的首参数为 HRESULT；不采集其余地址、托管堆或用户字符串。
+            clr_hresult: clr.and_then(|value| {
+                let record = value.ExceptionRecord;
+                (record.NumberParameters > 0
+                    && record.NumberParameters as usize <= record.ExceptionInformation.len())
+                .then_some(record.ExceptionInformation[0] as u32)
+            }),
+            validation: None,
+            continuation: None,
+            continue_status: None,
+        };
+        if clr.is_some() {
+            // 保留最初的 CLR 异常事件，避免它被后续 DLL、线程和退出事件挤出最近环。
+            if self.initial_clr_exceptions.len() < MAX_NPM_DEBUG_EVENTS {
+                self.initial_clr_exceptions.push(recorded.clone());
+            } else {
+                self.dropped_clr_exceptions = self.dropped_clr_exceptions.saturating_add(1);
+            }
+        }
+        self.recent.push_back(recorded);
+    }
+
+    fn validated(&mut self, result: NpmDebugResult, role: &'static str) {
+        self.last_call_thread_id = result.call_thread_id;
+        self.last_boundary = if result.ok {
+            "validated"
+        } else {
+            "validation_failed"
+        };
+        self.validated = self.validated.saturating_add(u64::from(result.ok));
+        for event in self.recent.back_mut().into_iter().chain(
+            self.initial_clr_exceptions
+                .last_mut()
+                .filter(|event| event.sequence == self.received),
+        ) {
+            event.role = role;
+            event.validation = Some(result.clone());
+        }
+    }
+
+    fn continued(&mut self, result: NpmDebugResult, status: i32) {
+        self.last_call_thread_id = result.call_thread_id;
+        self.last_boundary = if result.ok {
+            "continued"
+        } else {
+            "continue_failed"
+        };
+        self.continued = self.continued.saturating_add(u64::from(result.ok));
+        for event in self.recent.back_mut().into_iter().chain(
+            self.initial_clr_exceptions
+                .last_mut()
+                .filter(|event| event.sequence == self.received),
+        ) {
+            event.continue_status = Some(status);
+            event.continuation = Some(result.clone());
+        }
+    }
 }
 
 struct NpmProcessEvent {
@@ -242,6 +451,7 @@ impl NpmProcessDiagnostics {
             cleanup: false,
             cancel_observed: false,
             termination_requested_at: None,
+            trace: None,
         }
     }
 
@@ -478,12 +688,15 @@ impl WindowsReplacementLease {
             held_package_processes: Vec::new(),
             initial_breakpoints: HashSet::new(),
             pending_event: None,
+            station_debugger: None,
             root_exit_observed: false,
             cancellation: None,
             npm_diagnostics: self
                 .npm_console_host
                 .is_some()
                 .then(NpmProcessDiagnostics::new),
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            native_witness: None,
             #[cfg(test)]
             loader_trace: None,
         })
@@ -491,8 +704,126 @@ impl WindowsReplacementLease {
 }
 
 impl WindowsImageDebugSession {
+    pub(super) fn bind_station_debugger(
+        &mut self,
+        debugger: Option<StationDebugger>,
+    ) -> io::Result<()> {
+        if self.station_debugger.is_some()
+            || self.root_process_id != 0
+            || self.pending_event.is_some()
+            || !self.processes.is_empty()
+        {
+            return Err(error(
+                "managed_process.atomic_windows_debug_backend_already_bound",
+            ));
+        }
+        self.station_debugger = debugger;
+        Ok(())
+    }
+
     pub(super) fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
         self.cancellation = Some(cancellation);
+    }
+
+    pub(super) fn bind_package_diagnostics(&mut self, generation: Uuid) {
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            diagnostics.trace.get_or_insert_with(|| {
+                NpmDebugTrace::new(generation, unsafe { GetCurrentThreadId() })
+            });
+        }
+    }
+
+    pub(super) fn record_package_spawn_result(
+        &mut self,
+        result: Result<(), &io::Error>,
+        elapsed: Duration,
+    ) {
+        if let Some(trace) = self
+            .npm_diagnostics
+            .as_mut()
+            .and_then(|value| value.trace.as_mut())
+        {
+            let thread_id = unsafe { GetCurrentThreadId() };
+            trace.spawn_return_thread_id = Some(thread_id);
+            trace.last_call_thread_id = thread_id;
+            trace.last_boundary = if result.is_ok() {
+                "spawn_returned"
+            } else {
+                "spawn_failed"
+            };
+            trace.spawn_result = Some(NpmDebugResult::from_io(result, elapsed, thread_id));
+        }
+    }
+
+    fn package_debug_summary(&self, result: Result<u32, &io::Error>) -> Option<serde_json::Value> {
+        let trace = self.npm_diagnostics.as_ref()?.trace.as_ref()?;
+        let failure = result.err();
+        let native_exit_code = result.ok();
+        let failed = failure.is_some() || native_exit_code.is_some_and(|code| code != 0);
+        let mut summary = serde_json::json!({
+            "generation": trace.generation,
+            "debug_backend": if self.station_debugger.is_some() { "station-helper" } else { "local" },
+            "root_pid": self.root_process_id,
+            "spawn_thread_id": trace.spawn_thread_id,
+            "spawn_return_thread_id": trace.spawn_return_thread_id,
+            "spawn_result": trace.spawn_result,
+            "last_call_thread_id": trace.last_call_thread_id,
+            "last_boundary": trace.last_boundary,
+            "wait_calls": trace.wait_calls,
+            "wait_timeouts": trace.wait_timeouts,
+            "wait_elapsed_ms": trace.wait_elapsed_ms,
+            "longest_wait_ms": trace.longest_wait_ms,
+            "last_wait_hresult": trace.last_wait_hresult,
+            "received": trace.received,
+            "validated": trace.validated,
+            "continued": trace.continued,
+            "dropped_events": trace.dropped_events,
+            "pending_event": self.pending_event.map(|(pid, tid, code)| (pid, tid, code.0)),
+            "native_exit_code": native_exit_code,
+            "failed": failed,
+        });
+        if let Some(failure) = failure {
+            summary["failure_kind"] = serde_json::json!(format!("{:?}", failure.kind()));
+            summary["failure_codes"] = serde_json::json!(NpmDebugResult::from_io(
+                Err(failure),
+                Duration::ZERO,
+                unsafe { GetCurrentThreadId() },
+            ));
+        }
+        if failed {
+            summary["recent"] = serde_json::json!(trace.recent);
+            summary["initial_clr_exceptions"] = serde_json::json!(trace.initial_clr_exceptions);
+            summary["dropped_clr_exceptions"] = serde_json::json!(trace.dropped_clr_exceptions);
+        }
+        Some(summary)
+    }
+
+    pub(super) fn record_package_probe_result(&self, result: Result<u32, &io::Error>) {
+        if let Some(summary) = self.package_debug_summary(result) {
+            // 隐藏 worker 未初始化 GUI 日志；失败记录最近 16 个事件及最初 16 个 CLR 异常。
+            // 不逐次输出 100 ms 等待，也不改变原生 API 返回值或待继续事件的所有权。
+            warp_core::safe_eprintln!(
+                safe: ("managed_process.windows_npm_debug_summary={summary}"),
+                full: ("managed_process.windows_npm_debug_summary={summary}")
+            );
+        }
+    }
+
+    fn record_event_validation(&mut self, result: Result<(), &io::Error>, elapsed: Duration) {
+        if let Some(diagnostics) = &mut self.npm_diagnostics
+            && let Some(trace) = &mut diagnostics.trace
+        {
+            let role = self
+                .pending_event
+                .and_then(|(pid, _, _)| diagnostics.roles.get(&pid))
+                .copied()
+                .unwrap_or(NpmProcessRole::Unknown)
+                .as_str();
+            trace.validated(
+                NpmDebugResult::from_io(result, elapsed, unsafe { GetCurrentThreadId() }),
+                role,
+            );
+        }
     }
 
     pub(super) fn record_package_termination_request(&mut self) {
@@ -556,24 +887,74 @@ impl WindowsImageDebugSession {
         &mut self,
         deadline: Instant,
         timeout_message: &'static str,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))] container: Option<
+            &AppContainerProbe,
+        >,
     ) -> io::Result<DEBUG_EVENT> {
         if self.pending_event.is_some() {
             return Err(error(
                 "managed_process.atomic_windows_debug_event_still_pending",
             ));
         }
-        let event = match self.cancellation.as_deref() {
-            Some(cancellation) => {
-                wait_for_cancellable_debug_event(deadline, timeout_message, cancellation)?
+        let event = {
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            let observed = if self.native_witness.is_some()
+                && container.is_some()
+                && self
+                    .npm_diagnostics
+                    .as_ref()
+                    .is_some_and(|value| !value.cleanup)
+            {
+                Some(self.wait_for_native_witness_event(
+                    deadline,
+                    timeout_message,
+                    container.unwrap(),
+                )?)
+            } else {
+                None
+            };
+            #[cfg(not(all(feature = "cli-agent-native-witness", target_arch = "x86_64")))]
+            let observed: Option<DEBUG_EVENT> = None;
+            if let Some(event) = observed {
+                event
+            } else {
+                let diagnostics = self
+                    .npm_diagnostics
+                    .as_mut()
+                    .and_then(|value| value.trace.as_mut());
+                match self.cancellation.as_deref() {
+                    Some(cancellation) => wait_for_cancellable_debug_event(
+                        deadline,
+                        timeout_message,
+                        cancellation,
+                        diagnostics,
+                        self.station_debugger.as_ref(),
+                    )?,
+                    None => wait_for_debug_event_until(
+                        deadline,
+                        timeout_message,
+                        diagnostics,
+                        self.station_debugger.as_ref(),
+                    )?,
+                }
             }
-            None => wait_for_debug_event_until(deadline, timeout_message)?,
         };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             let exit_code = (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
                 .then(|| unsafe { event.u.ExitProcess.dwExitCode });
             diagnostics.received(event.dwProcessId, event.dwDebugEventCode, exit_code);
+            if let Some(trace) = &mut diagnostics.trace {
+                trace.received(
+                    &event,
+                    diagnostics.started.elapsed().as_millis(),
+                    unsafe { GetCurrentThreadId() },
+                    diagnostics.cleanup,
+                );
+            }
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_received(&event)?;
         #[cfg(test)]
         if let Some(mut trace) = self.loader_trace.take() {
             // 仅固定版本对照显式启用；观察失败不改变事件所有权、授权或继续状态。
@@ -583,11 +964,43 @@ impl WindowsImageDebugSession {
         Ok(event)
     }
 
-    fn continue_pending(&mut self, status: windows::Win32::Foundation::NTSTATUS) -> io::Result<()> {
+    fn continue_pending(
+        &mut self,
+        status: windows::Win32::Foundation::NTSTATUS,
+        deadline: Instant,
+    ) -> io::Result<()> {
         let (process_id, thread_id, code) = self
             .pending_event
             .ok_or_else(|| error("managed_process.atomic_windows_debug_event_missing"))?;
-        unsafe { ContinueDebugEvent(process_id, thread_id, status) }.map_err(io::Error::other)?;
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_clr_can_continue()?;
+        let started = Instant::now();
+        let call_thread_id = unsafe { GetCurrentThreadId() };
+        // helper 后端在原创建线程继续其精确待事件；失败时双方均保留事件所有权。
+        let result = match &self.station_debugger {
+            Some(debugger) => debugger.continue_event(process_id, thread_id, status, deadline),
+            None => unsafe { ContinueDebugEvent(process_id, thread_id, status) }
+                .map(|()| status)
+                .map_err(io::Error::other),
+        };
+        if let Some(trace) = self
+            .npm_diagnostics
+            .as_mut()
+            .and_then(|value| value.trace.as_mut())
+        {
+            trace.continued(
+                NpmDebugResult::from_io(
+                    result.as_ref().map(|_| ()),
+                    started.elapsed(),
+                    call_thread_id,
+                ),
+                result.as_ref().map_or(status.0, |actual| actual.0),
+            );
+        }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        let actual_status = result?;
+        #[cfg(not(all(feature = "cli-agent-native-witness", target_arch = "x86_64")))]
+        result.map(|_| ())?;
         self.pending_event = None;
         // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
         if code == EXIT_PROCESS_DEBUG_EVENT {
@@ -595,6 +1008,8 @@ impl WindowsImageDebugSession {
             self.initial_breakpoints.remove(&process_id);
             self.child_images.remove(&process_id);
             self.component_images.remove(&process_id);
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            self.native_witness_process_exit(process_id);
             if process_id == self.root_process_id {
                 self.root_exit_observed = true;
             }
@@ -642,6 +1057,8 @@ impl WindowsImageDebugSession {
                 }
             }
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_continued(process_id, thread_id, code, actual_status)?;
         Ok(())
     }
 
@@ -652,9 +1069,12 @@ impl WindowsImageDebugSession {
         container: Option<&AppContainerProbe>,
     ) -> io::Result<()> {
         self.root_process_id = root_process_id;
+        let deadline = Instant::now() + DEBUG_INITIAL_TIMEOUT;
         let event = self.next_event(
-            Instant::now() + DEBUG_INITIAL_TIMEOUT,
+            deadline,
             "managed_process.atomic_windows_initial_debug_event_timed_out",
+            #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+            container,
         )?;
         if event.dwDebugEventCode != CREATE_PROCESS_DEBUG_EVENT
             || event.dwProcessId != root_process_id
@@ -665,13 +1085,16 @@ impl WindowsImageDebugSession {
                 "managed_process.atomic_windows_initial_debug_event_invalid",
             ));
         }
-        if let Err(failure) = self.handle_create_process(&event, true, container) {
+        let started = Instant::now();
+        let validation = self.handle_create_process(&event, true, container);
+        self.record_event_validation(validation.as_ref().map(|_| ()), started.elapsed());
+        if let Err(failure) = validation {
             if reject_on_error {
                 self.reject_event_and_drain(&event);
             }
             return Err(failure);
         }
-        self.continue_pending(DBG_CONTINUE)
+        self.continue_pending(DBG_CONTINUE, deadline)
     }
 
     pub(super) fn verify_package_initial_image(&mut self, root_process_id: u32) -> io::Result<()> {
@@ -748,8 +1171,15 @@ impl WindowsImageDebugSession {
             let event = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_session_timed_out",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                container,
             )?;
-            let continue_status = match self.validate_event_in_container(&event, container) {
+            let continue_status = match self.validate_event_in_container(
+                &event,
+                container,
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                deadline,
+            ) {
                 Ok(status) => status,
                 Err(failure) => {
                     if reject_on_error {
@@ -762,7 +1192,7 @@ impl WindowsImageDebugSession {
                 self.held_package_processes
                     .push(self.processes[&event.dwProcessId].try_clone()?);
             }
-            self.continue_pending(continue_status)?;
+            self.continue_pending(continue_status, deadline)?;
             if self.root_exit_observed && self.processes.is_empty() {
                 // EXIT Continue 仅释放调试事件；仍须逐个确认已授权映像的真实进程句柄 signaled。
                 return self.wait_for_package_processes_exit(deadline);
@@ -774,8 +1204,10 @@ impl WindowsImageDebugSession {
         &mut self,
         event: &DEBUG_EVENT,
         container: Option<&AppContainerProbe>,
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))] deadline: Instant,
     ) -> io::Result<windows::Win32::Foundation::NTSTATUS> {
-        match event.dwDebugEventCode {
+        let started = Instant::now();
+        let result = (|| match event.dwDebugEventCode {
             CREATE_PROCESS_DEBUG_EVENT => {
                 self.handle_create_process(
                     event,
@@ -785,8 +1217,16 @@ impl WindowsImageDebugSession {
                 Ok(DBG_CONTINUE)
             }
             // 原始线程句柄由 ContinueDebugEvent 在 EXIT_* 时关闭，不能提前释放。
-            CREATE_THREAD_DEBUG_EVENT => Ok(DBG_CONTINUE),
+            CREATE_THREAD_DEBUG_EVENT => {
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                self.native_clr_create_thread(event)?;
+                Ok(DBG_CONTINUE)
+            }
             EXCEPTION_DEBUG_EVENT => {
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                if let Some(status) = self.native_witness_exception(event, deadline)? {
+                    return Ok(status);
+                }
                 let information = unsafe { event.u.Exception };
                 if information.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT
                     && self.initial_breakpoints.insert(event.dwProcessId)
@@ -796,7 +1236,10 @@ impl WindowsImageDebugSession {
                     Ok(DBG_EXCEPTION_NOT_HANDLED)
                 }
             }
-            EXIT_THREAD_DEBUG_EVENT | OUTPUT_DEBUG_STRING_EVENT | UNLOAD_DLL_DEBUG_EVENT => {
+            EXIT_THREAD_DEBUG_EVENT | OUTPUT_DEBUG_STRING_EVENT => Ok(DBG_CONTINUE),
+            UNLOAD_DLL_DEBUG_EVENT => {
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                self.native_witness_unload(event)?;
                 Ok(DBG_CONTINUE)
             }
             EXIT_PROCESS_DEBUG_EVENT => Ok(DBG_CONTINUE),
@@ -835,13 +1278,17 @@ impl WindowsImageDebugSession {
                         dependencies.push(lease);
                     }
                 }
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                self.native_witness_load(event, &file)?;
                 Ok(DBG_CONTINUE)
             }
             RIP_EVENT => Err(error("managed_process.atomic_windows_loader_rip_event")),
             code => Err(io::Error::other(format!(
                 "managed_process.atomic_windows_unknown_debug_event:{code:?}"
             ))),
-        }
+        })();
+        self.record_event_validation(result.as_ref().map(|_| ()), started.elapsed());
+        result
     }
 
     fn handle_create_process(
@@ -937,6 +1384,8 @@ impl WindowsImageDebugSession {
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             diagnostics.roles.insert(event.dwProcessId, role);
         }
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_create(event, &file, role)?;
         #[cfg(test)]
         if self.loader_trace.is_some() && self.npm_console_host.is_some() && container.is_some() {
             // 仅固定对照在映像、精确 Job 和令牌核验后只读观察；失败不影响事件继续。
@@ -1009,14 +1458,16 @@ impl WindowsImageDebugSession {
                 return;
             }
         }
-        if self.continue_pending(DBG_CONTINUE).is_err() {
+        let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
+        if self.continue_pending(DBG_CONTINUE, deadline).is_err() {
             return;
         }
-        let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
         while !self.processes.is_empty() {
             let Ok(next) = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_drain_timed_out",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                None,
             ) else {
                 break;
             };
@@ -1037,7 +1488,7 @@ impl WindowsImageDebugSession {
                     let _ = file_from_debug_handle(information.hFile);
                 }
             }
-            if self.continue_pending(DBG_CONTINUE).is_err() {
+            if self.continue_pending(DBG_CONTINUE, deadline).is_err() {
                 return;
             }
         }
@@ -1081,6 +1532,8 @@ impl WindowsImageDebugSession {
             );
         }
         self.cancellation = None;
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_clr_abort_after_target_termination(deadline)?;
         if let Some(container) = container {
             for process in self.processes.values() {
                 request_debugged_process_termination(container, process)?;
@@ -1094,12 +1547,14 @@ impl WindowsImageDebugSession {
                 ));
             }
             // 验证阶段已接管并释放 hFile；这里只继续原事件，不能再次构造 File。
-            self.continue_pending(DBG_CONTINUE)?;
+            self.continue_pending(DBG_CONTINUE, deadline)?;
         }
         while !self.root_exit_observed || !self.processes.is_empty() {
             let event = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_drain_timed_out",
+                #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+                container,
             )?;
             match event.dwDebugEventCode {
                 CREATE_PROCESS_DEBUG_EVENT => {
@@ -1132,7 +1587,7 @@ impl WindowsImageDebugSession {
                     ));
                 }
             }
-            self.continue_pending(DBG_CONTINUE)?;
+            self.continue_pending(DBG_CONTINUE, deadline)?;
         }
         self.wait_for_package_processes_exit(deadline)
     }
@@ -1141,6 +1596,8 @@ impl WindowsImageDebugSession {
         // 等待失败时保留所有真实句柄；后续 abort 不能用已移除的 EXIT 记录生成空集合成功。
         wait_for_debugged_processes_exit(&self.held_package_processes, deadline)?;
         self.held_package_processes.clear();
+        #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
+        self.native_witness_confirm_exit()?;
         Ok(())
     }
 
@@ -1913,19 +2370,59 @@ fn duplicate_process_handle(handle: HANDLE) -> io::Result<OwnedHandle> {
     Ok(unsafe { OwnedHandle::from_raw_handle(duplicate.0) })
 }
 
-fn wait_for_debug_event(timeout_ms: u32) -> io::Result<DEBUG_EVENT> {
-    let mut event = DEBUG_EVENT::default();
-    unsafe { WaitForDebugEvent(&mut event, timeout_ms) }.map_err(io::Error::other)?;
-    Ok(event)
+fn wait_for_debug_event(
+    timeout_ms: u32,
+    deadline: Instant,
+    diagnostics: Option<&mut NpmDebugTrace>,
+    station_debugger: Option<&StationDebugger>,
+) -> io::Result<Option<DEBUG_EVENT>> {
+    let started = Instant::now();
+    let thread_id = unsafe { GetCurrentThreadId() };
+    let (result, native_error) = match station_debugger {
+        Some(debugger) => {
+            let result = debugger.wait_event(timeout_ms, deadline);
+            // 无事件也可能是已发出的有界 Wait 尚未收完；不能虚构原生超时错误码。
+            let native_error = result.as_ref().err().and_then(debug_error_code);
+            (result, native_error)
+        }
+        None => {
+            let mut event = DEBUG_EVENT::default();
+            let result = unsafe { WaitForDebugEvent(&mut event, timeout_ms) };
+            let native_error = result.as_ref().err().map(WindowsError::code);
+            let result = result.map(|()| Some(event)).map_err(io::Error::other);
+            (result, native_error)
+        }
+    };
+    if let Some(trace) = diagnostics {
+        trace.wait_finished(started.elapsed(), thread_id, native_error);
+    }
+    result
+}
+
+fn debug_error_code(failure: &io::Error) -> Option<HRESULT> {
+    failure
+        .get_ref()
+        .and_then(|value| value.downcast_ref::<WindowsError>())
+        .map(WindowsError::code)
+        .or_else(|| {
+            failure
+                .raw_os_error()
+                .map(|code| HRESULT::from_win32(code as u32))
+        })
 }
 
 fn wait_for_cancellable_debug_event(
     deadline: Instant,
     timeout_message: &'static str,
     cancellation: &AtomicBool,
+    mut diagnostics: Option<&mut NpmDebugTrace>,
+    station_debugger: Option<&StationDebugger>,
 ) -> io::Result<DEBUG_EVENT> {
     loop {
         if cancellation.load(Ordering::Acquire) {
+            if let Some(trace) = diagnostics {
+                trace.last_boundary = "wait_cancelled";
+            }
             return Err(io::Error::new(
                 io::ErrorKind::Interrupted,
                 "managed_process.atomic_windows_probe_cancelled",
@@ -1933,15 +2430,26 @@ fn wait_for_cancellable_debug_event(
         }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
+            if let Some(trace) = diagnostics {
+                trace.last_boundary = "wait_deadline";
+            }
             return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
         }
-        // Windows 调试接口必须留在创建进程的线程；控制监听只设置停止标记。
+        // 本地或 helper 调试接口都留在各自原创建线程；控制监听只设置停止标记。
         let interval = remaining.min(Duration::from_millis(100));
-        let mut event = DEBUG_EVENT::default();
-        match unsafe { WaitForDebugEvent(&mut event, interval.as_millis().max(1) as u32) } {
-            Ok(()) => return Ok(event),
-            Err(failure) if failure.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0) => {}
-            Err(failure) => return Err(io::Error::other(failure)),
+        let result = wait_for_debug_event(
+            interval.as_millis().max(1) as u32,
+            deadline,
+            diagnostics.as_deref_mut(),
+            station_debugger,
+        );
+        match result {
+            Ok(Some(event)) => return Ok(event),
+            Ok(None) => {}
+            Err(failure)
+                if debug_error_code(&failure) == Some(HRESULT::from_win32(ERROR_SEM_TIMEOUT.0)) => {
+            }
+            Err(failure) => return Err(failure),
         }
     }
 }
@@ -1949,21 +2457,38 @@ fn wait_for_cancellable_debug_event(
 fn wait_for_debug_event_until(
     deadline: Instant,
     timeout_message: &'static str,
+    diagnostics: Option<&mut NpmDebugTrace>,
+    station_debugger: Option<&StationDebugger>,
 ) -> io::Result<DEBUG_EVENT> {
+    if station_debugger.is_some() {
+        // 清理忽略协作取消，但沿用原绝对期限；helper 每次最多等待 100 ms。
+        return wait_for_cancellable_debug_event(
+            deadline,
+            timeout_message,
+            &AtomicBool::new(false),
+            diagnostics,
+            station_debugger,
+        );
+    }
     let remaining = deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
+        if let Some(trace) = diagnostics {
+            trace.last_boundary = "wait_deadline";
+        }
         return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
     }
     let timeout_ms = u32::try_from(remaining.as_millis())
         .unwrap_or(u32::MAX)
         .max(1);
-    wait_for_debug_event(timeout_ms).map_err(|failure| {
-        if Instant::now() >= deadline {
-            io::Error::new(io::ErrorKind::TimedOut, timeout_message)
-        } else {
-            failure
-        }
-    })
+    wait_for_debug_event(timeout_ms, deadline, diagnostics, None)
+        .map_err(|failure| {
+            if Instant::now() >= deadline {
+                io::Error::new(io::ErrorKind::TimedOut, timeout_message)
+            } else {
+                failure
+            }
+        })?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, timeout_message))
 }
 
 fn is_plain_kind(attributes: u32, directory: bool) -> bool {

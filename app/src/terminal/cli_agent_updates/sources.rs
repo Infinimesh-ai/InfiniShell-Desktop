@@ -28,6 +28,8 @@ use crate::terminal::cli_agent::{CLIAgent, parse_cli_agent_version};
 #[cfg(test)]
 use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
 
+#[path = "sources_claude_current_release.rs"]
+mod claude_current_release;
 #[path = "sources_claude_downgrade.rs"]
 mod claude_downgrade;
 
@@ -36,7 +38,7 @@ mod npm;
 #[cfg(all(feature = "local_fs", windows))]
 #[path = "sources_npm_claude_windows.rs"]
 mod npm_claude_windows;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 #[path = "sources_npm_claude_windows_contract.rs"]
 mod npm_claude_windows_contract;
 #[cfg(all(feature = "local_fs", windows))]
@@ -93,6 +95,9 @@ mod package_tree;
 #[cfg(windows)]
 #[path = "sources_winget.rs"]
 mod winget;
+#[cfg(any(windows, test))]
+#[path = "sources_winget_claude_contract.rs"]
+mod winget_claude_contract;
 #[cfg(all(feature = "local_fs", windows))]
 #[path = "sources_winget_codex.rs"]
 mod winget_codex;
@@ -145,15 +150,20 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 70] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 99] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
+    include_bytes!("sources_claude_current_release.rs"),
+    include_bytes!("sources_claude_current_release.json"),
+    include_bytes!("sources_claude_musl_release.json"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_musl.rs"),
     include_bytes!("sources_npm.rs"),
     include_bytes!("sources_npm_grok.rs"),
     include_bytes!("sources_npm_grok_contract.rs"),
     include_bytes!("sources_npm_grok_mirror.rs"),
     include_bytes!("../../../../script/cli-agent-parity/grok_1041_npm_manifest.json"),
+    include_bytes!("../../../../script/cli-agent-parity/grok_1046_macos_npm_manifest.json"),
     include_bytes!("sources_npm_release.rs"),
     include_bytes!("sources_npm_codex.rs"),
     include_bytes!("sources_npm_codex_windows.rs"),
@@ -166,16 +176,19 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 70] = [
     include_bytes!("sources_npm_claude_windows.rs"),
     include_bytes!("sources_npm_claude_windows_tree.rs"),
     include_bytes!("sources_npm_claude_windows_contract.rs"),
+    include_bytes!("sources_npm_claude_windows_contract.json"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_claude_npm_probe_windows.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe_windows.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe_macos.rs"),
     include_bytes!("sources_npm_transaction.rs"),
     include_bytes!("sources_npm_tree_unix.rs"),
+    include_bytes!("sources_npm_acl_unix.rs"),
     include_bytes!("sources_brew.rs"),
     include_bytes!("sources_brew_claude_linux.rs"),
     include_bytes!("sources_brew_claude_linux_probes.rs"),
     include_bytes!("sources_brew_transaction.rs"),
+    include_bytes!("sources_brew_claude_migration.rs"),
     include_bytes!("sources_brew_codex.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_codex_cask_probe_linux.rs"),
     include_bytes!("../../../../script/cli-agent-parity/codex_0155_package_manifest.json"),
@@ -184,6 +197,7 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 70] = [
     include_bytes!("sources_brew_grok_probes.rs"),
     include_bytes!("sources_brew_completions.rs"),
     include_bytes!("../../../../script/cli-agent-parity/codex_0156_package_manifest.json"),
+    include_bytes!("../../../../script/cli-agent-parity/codex_0160_macos_package_manifest.json"),
     include_bytes!("sources_winget_grok.rs"),
     include_bytes!("sources_winget_grok_contract.rs"),
     include_bytes!("sources_winget_grok_dependencies.rs"),
@@ -198,14 +212,34 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 70] = [
     include_bytes!("../../ai/cli_agent_runtime/managed_process_winget_codex_probe_windows.rs"),
     include_bytes!("sources_winget.rs"),
     include_bytes!("sources_winget_transaction.rs"),
+    include_bytes!("sources_winget_claude_contract.rs"),
+    include_bytes!("sources_winget_claude_contract.json"),
+    include_bytes!("../../../../crates/command/src/windows.rs"),
+    include_bytes!("../../../../crates/command/src/managed.rs"),
     include_bytes!("../../../../crates/command/src/windows_appcontainer.rs"),
+    include_bytes!("../../../../crates/command/src/windows_appcontainer_witness.rs"),
+    include_bytes!("../../../../crates/command/src/windows_appcontainer_desktop.rs"),
+    include_bytes!("../../../../crates/command/src/windows_appcontainer_output.rs"),
+    include_bytes!("../../../../crates/command/src/windows_clr_reader.rs"),
+    include_bytes!("../../../../crates/command/src/windows_shell_classification.rs"),
+    include_bytes!("../../../../crates/command/src/windows_station_bootstrap.rs"),
+    include_bytes!("../../../../crates/command/src/windows_station_device_map.rs"),
+    include_bytes!("../../../../crates/command/src/windows_station_debugger.rs"),
+    include_bytes!("../../../../crates/command/src/windows_station_debug_event.rs"),
+    include_bytes!("../../../../crates/command/src/bin/infinishell-station-bootstrap.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_probe_control.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_version_probe.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_macos.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_creation_witness.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_witness.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_clr.rs"),
     include_bytes!("../../ai/cli_agent_runtime/codex.rs"),
     include_bytes!("../../ai/cli_agent_runtime/claude.rs"),
     include_bytes!("../../ai/cli_agent_runtime/grok.rs"),
@@ -576,9 +610,15 @@ pub(super) struct UpdatePlan {
     config: Option<ConfigBackup>,
     intent: String,
     downgrade: Option<claude_downgrade::Intent>,
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    claude_npm_platform: Option<npm_transaction::ClaudePlatformBinding>,
 }
 
 impl UpdatePlan {
+    pub(super) fn installation_entry(&self) -> &Path {
+        &self.installation.entry
+    }
+
     pub(super) fn requires_native_update(&self) -> bool {
         self.installed_version != self.target_version
     }
@@ -592,7 +632,20 @@ impl UpdatePlan {
         &self,
         tasks: impl Iterator<Item = &'a crate::persistence::model::LocalCliTask>,
     ) -> bool {
-        self.downgrade.is_none() || claude_downgrade::compatible_history(tasks)
+        match self.downgrade {
+            Some(intent) => {
+                #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+                if let Some(binding) = &self.claude_npm_platform {
+                    return claude_downgrade::compatible_history_for_platform(
+                        intent,
+                        Some(&binding.platform),
+                        tasks,
+                    );
+                }
+                claude_downgrade::compatible_history(intent, tasks)
+            }
+            None => true,
+        }
     }
 }
 
@@ -714,9 +767,28 @@ pub(super) async fn inspect(
     let target_version = latest(agent, installation.channel, client).await?;
     // 这里只开放宿主负责的已登记 npm 布局；ManualOnly 的 npm/Node 启动合同保持禁止执行。
     #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    let claude_npm_platform = if installation.source == Source::Npm && agent == CLIAgent::Claude {
+        npm_transaction::capture_claude_platform(&installation, &installed_version).map(Some)
+    } else {
+        Ok(None)
+    };
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
     if installation.source == Source::Npm {
         installation.error = if agent == CLIAgent::Grok {
             npm_grok::supports(agent, &target_version).err()
+        } else if agent == CLIAgent::Claude {
+            claude_npm_platform
+                .as_ref()
+                .map_err(Clone::clone)
+                .and_then(|binding| {
+                    let binding = binding.as_ref().ok_or(Error::UnsupportedSource)?;
+                    npm_transaction::supports_for_platform(
+                        agent,
+                        &target_version,
+                        &binding.platform,
+                    )
+                })
+                .err()
         } else {
             npm_transaction::supports(agent, &target_version).err()
         };
@@ -727,6 +799,11 @@ pub(super) async fn inspect(
     #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
     if installation.source == Source::Homebrew {
         installation.error = brew::supports(agent, &target_version).err();
+        #[cfg(target_os = "linux")]
+        if agent == CLIAgent::Claude && installation.error.is_none() {
+            installation.error =
+                brew_claude_linux::supports_transition(&installed_version, &target_version).err();
+        }
         if channel != Channel::FollowInstallation && channel != installation.channel {
             installation.error = Some(Error::ChannelMismatch);
         }
@@ -734,6 +811,10 @@ pub(super) async fn inspect(
     #[cfg(all(feature = "local_fs", windows))]
     if installation.source == Source::WinGet {
         installation.error = winget::supports(agent, &target_version).err();
+        if installation.error.is_none() {
+            installation.error =
+                winget::supports_transition(agent, &installed_version, &target_version).err();
+        }
         if channel != Channel::FollowInstallation && channel != installation.channel {
             installation.error = Some(Error::ChannelMismatch);
         }
@@ -750,19 +831,45 @@ pub(super) async fn inspect(
     }
     let version_matches = installed_version == target_version;
     let mut error = installation.error;
-    let downgrade = match claude_downgrade::select(
-        agent,
-        installation.source,
-        &installed_version,
-        &target_version,
-        channel,
-    ) {
+    let selected_downgrade = || {
+        claude_downgrade::select(
+            agent,
+            installation.source,
+            &installed_version,
+            &target_version,
+            channel,
+        )
+    };
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    let selected_downgrade = if let Ok(Some(binding)) = &claude_npm_platform {
+        claude_downgrade::select_unix_npm(
+            &installed_version,
+            &target_version,
+            channel,
+            &binding.platform,
+        )
+    } else {
+        selected_downgrade()
+    };
+    #[cfg(not(all(feature = "local_fs", any(target_os = "macos", target_os = "linux"))))]
+    let selected_downgrade = selected_downgrade();
+    let downgrade = match selected_downgrade {
         Ok(intent) => intent,
         Err(reason) => {
             error.get_or_insert(reason);
             None
         }
     };
+    if downgrade == Some(claude_downgrade::Intent::ClaudeHomebrewStable21287To21285)
+        && installation
+            .invocation
+            .as_ref()
+            .and_then(|invocation| invocation.artifacts.get(&ArtifactRole::DependencyRoot))
+            .and_then(|path| path.file_name())
+            != Some(OsStr::new("claude-code@latest"))
+    {
+        error = Some(Error::UnsupportedSource);
+    }
     if installation
         .source_target
         .as_ref()
@@ -778,7 +885,15 @@ pub(super) async fn inspect(
     }
     let config = snapshot_config(&installation, &installed_version, &target_version, channel)?;
     if agent == CLIAgent::Claude
-        && (source_is_native_claude(&installation) || installation.source == Source::Npm)
+        && (source_is_native_claude(&installation)
+            || installation.source == Source::Npm
+            || matches!(
+                downgrade,
+                Some(
+                    claude_downgrade::Intent::ClaudeHomebrewStable21287To21285
+                        | claude_downgrade::Intent::ClaudeWingetStable21286To21285
+                )
+            ))
         && !version_matches
     {
         let compatibility = config
@@ -829,6 +944,8 @@ pub(super) async fn inspect(
             config,
             intent,
             downgrade,
+            #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+            claude_npm_platform: claude_npm_platform.ok().flatten(),
         });
     Ok(CheckReport {
         failed_target,
@@ -1678,15 +1795,17 @@ async fn discover_npm(
     Ok(Some(found))
 }
 
-/// 只认领已校准的系统平台和 Homebrew 前缀，其他自定义布局保留来源拒绝。
-fn brew_prefixes() -> &'static [&'static str] {
-    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        &["/opt/homebrew", "/usr/local"]
-    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        &["/home/linuxbrew/.linuxbrew"]
-    } else {
-        &[]
-    }
+/// 版本探针和更新事务共用真实前缀的权限边界。
+pub(crate) fn valid_homebrew_prefix(prefix: &Path) -> bool {
+    brew::validate_prefix(prefix).is_ok()
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+pub(crate) fn valid_homebrew_caskroom(prefix: &Path) -> bool {
+    brew::validate_prefix(prefix).is_ok()
+        && package_tree::Directory::open(prefix)
+            .and_then(|directory| directory.homebrew_caskroom())
+            .is_ok()
 }
 
 async fn discover_brew(
@@ -1701,71 +1820,94 @@ async fn discover_brew(
         CLIAgent::Claude => &["claude-code", "claude-code@latest"],
         _ => return Ok(None),
     };
-    for &base in brew_prefixes() {
-        let brew = Path::new(base).join("bin/brew");
-        if !brew.is_file() {
+    let Ok(base) = brew::prefix_from_entry(agent, &installation.entry) else {
+        return Ok(None);
+    };
+    let brew = base.join("bin/brew");
+    if !brew.is_file() {
+        return Ok(None);
+    }
+    for cask in casks {
+        let cask_root = base.join("Caskroom").join(cask).join(installed);
+        if !same_tree(&installation.stamp.canonical, &cask_root) {
             continue;
         }
-        for cask in casks {
-            let cask_root = Path::new(base).join("Caskroom").join(cask).join(installed);
-            if !same_tree(&installation.stamp.canonical, &cask_root) {
-                continue;
-            }
-            let registered =
-                brew::registration(agent, installation, Path::new(base), cask, installed)?;
-            let metadata = brew::metadata(cask).await?;
-            let mut found = installation.clone();
-            found.source = Source::Homebrew;
-            let manager = stamp(&brew)?;
-            let brew = manager.canonical.clone();
-            found.manager = Some(manager);
-            found.registration = Some((registered.receipt.clone(), registered.receipt_stamp));
-            found.source_target = metadata
-                .get("version")
-                .and_then(Value::as_str)
-                .map(ToOwned::to_owned);
-            if found.source_target.is_none() {
-                return Err(Error::InvalidRelease);
-            }
-            found.channel = if matches!(*cask, "claude-code" | "grok-build") {
-                Channel::Stable
-            } else {
-                Channel::Latest
-            };
-            if requested != Channel::FollowInstallation && requested != found.channel {
-                found.error = Some(Error::ChannelMismatch);
-                return Ok(Some(found));
-            }
-            let mut invocation = BoundInvocation::manual_only(
-                [
-                    (ArtifactRole::Program, brew.clone()),
-                    (ArtifactRole::Entry, installation.entry.clone()),
-                    (ArtifactRole::Manager, brew),
-                    (ArtifactRole::InstallRoot, PathBuf::from(base)),
-                    (ArtifactRole::DependencyRoot, registered.root),
-                    (ArtifactRole::Registration, registered.receipt),
-                ],
-                ArtifactRole::Program,
-                ["upgrade", "--cask", "--greedy", cask]
-                    .into_iter()
-                    .map(|argument| ArgumentRef::Literal(argument.into()))
-                    .collect(),
-                "不派生 Homebrew Ruby 闭包；已审核单二进制布局由宿主 cask 事务执行",
-            );
-            invocation.environment.extend([
-                (
-                    "HOMEBREW_NO_AUTO_UPDATE".into(),
-                    ArgumentRef::Literal("1".into()),
-                ),
-                (
-                    "HOMEBREW_NO_INSTALL_CLEANUP".into(),
-                    ArgumentRef::Literal("1".into()),
-                ),
-            ]);
-            found.invocation = Some(invocation);
-            found.error = Some(Error::UnsupportedSource);
+        let registered = brew::registration(agent, installation, &base, cask, installed)?;
+        let metadata = brew::metadata(cask).await?;
+        let mut found = installation.clone();
+        found.source = Source::Homebrew;
+        let manager = brew::manager_stamp(&base)?;
+        let brew = manager.canonical.clone();
+        found.manager = Some(manager);
+        found.registration = Some((registered.receipt.clone(), registered.receipt_stamp));
+        found.source_target = metadata
+            .get("version")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
+        if found.source_target.is_none() {
+            return Err(Error::InvalidRelease);
+        }
+        found.channel = if matches!(*cask, "claude-code" | "grok-build") {
+            Channel::Stable
+        } else {
+            Channel::Latest
+        };
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        if agent == CLIAgent::Claude
+            && *cask == "claude-code@latest"
+            && installed == claude_current_release::V287
+            && requested == Channel::Stable
+        {
+            brew_transaction::claude_migration_metadata(&metadata).await?;
+            found.channel = Channel::Stable;
+            found.source_target = Some(claude_current_release::V285.to_owned());
+            let home = user_home().ok_or(Error::UnsupportedSource)?;
+            found.config = Some((
+                absolute_env("CLAUDE_CONFIG_DIR")
+                    .unwrap_or_else(|| home.join(".claude"))
+                    .join("settings.json"),
+                ConfigKind::Claude,
+            ));
+        }
+        if requested != Channel::FollowInstallation && requested != found.channel {
+            found.error = Some(Error::ChannelMismatch);
             return Ok(Some(found));
         }
+        let mut invocation = BoundInvocation::manual_only(
+            [
+                (ArtifactRole::Program, brew.clone()),
+                (ArtifactRole::Entry, installation.entry.clone()),
+                (ArtifactRole::Manager, brew),
+                (ArtifactRole::InstallRoot, base.clone()),
+                (ArtifactRole::DependencyRoot, registered.root),
+                (ArtifactRole::Registration, registered.receipt),
+            ],
+            ArtifactRole::Program,
+            ["upgrade", "--cask", "--greedy", cask]
+                .into_iter()
+                .map(|argument| ArgumentRef::Literal(argument.into()))
+                .collect(),
+            "不派生 Homebrew Ruby 闭包；已审核单二进制布局由宿主 cask 事务执行",
+        );
+        invocation.environment.extend([
+            (
+                "HOMEBREW_NO_AUTO_UPDATE".into(),
+                ArgumentRef::Literal("1".into()),
+            ),
+            (
+                "HOMEBREW_NO_INSTALL_CLEANUP".into(),
+                ArgumentRef::Literal("1".into()),
+            ),
+        ]);
+        found.invocation = Some(invocation);
+        found.error = Some(Error::UnsupportedSource);
+        return Ok(Some(found));
     }
     Ok(None)
 }
@@ -3083,6 +3225,19 @@ pub(super) async fn execute(
     let installation = &plan.installation;
     verify_installation_identity(installation)?;
     if plan.agent == CLIAgent::Claude && installation.source == Source::Npm {
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        claude_downgrade::validate_unix_npm(
+            plan.downgrade,
+            &plan.installed_version,
+            &plan.target_version,
+            &plan.config,
+            &plan
+                .claude_npm_platform
+                .as_ref()
+                .ok_or(Error::SourceChanged)?
+                .platform,
+        )?;
+        #[cfg(not(all(feature = "local_fs", any(target_os = "macos", target_os = "linux"))))]
         claude_downgrade::validate(
             plan.downgrade,
             &plan.installed_version,
@@ -3118,6 +3273,15 @@ pub(super) async fn execute(
 
     #[cfg(all(feature = "local_fs", windows))]
     if installation.source == Source::WinGet {
+        if plan.agent == CLIAgent::Claude {
+            claude_downgrade::validate_winget(
+                plan.downgrade,
+                &plan.installed_version,
+                &plan.target_version,
+                &plan.config,
+            )?;
+            claude_downgrade::revalidate(plan.downgrade).await?;
+        }
         return if plan.agent == CLIAgent::Codex {
             winget_codex::execute(&plan, &root, verification_progress).await
         } else if plan.agent == CLIAgent::Grok {
@@ -4002,18 +4166,32 @@ fn recovery_pending_in(root: &Path, agent: CLIAgent) -> bool {
     if plain_ancestors(root).is_err() {
         return true;
     }
-    let npm_path = root.join(format!("{}-npm.json", agent.command_prefix()));
-    match fs::symlink_metadata(npm_path) {
-        Ok(_) => return true,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(_) => return true,
+    let prefix = agent.command_prefix();
+    let mut names = vec![format!("{prefix}-npm.json"), format!("{prefix}.json")];
+    if matches!(agent, CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Grok) {
+        names.extend([
+            format!("{prefix}-homebrew.json"),
+            format!("{prefix}-npm-windows.json"),
+        ]);
     }
-    let path = root.join(format!("{}.json", agent.command_prefix()));
-    match fs::symlink_metadata(path) {
-        Ok(_) => true,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(_) => true,
+    if agent == CLIAgent::Claude {
+        names.extend([
+            "claude-homebrew-migration.json".to_owned(),
+            "claude-winget-candidate.json".to_owned(),
+            "claude-winget-portable.json".to_owned(),
+        ]);
     }
+    if matches!(agent, CLIAgent::Codex | CLIAgent::Grok) {
+        names.push(format!("{prefix}-winget-v1.json"));
+    }
+    // 首次检查前禁止启动所有未收敛的来源；退下的 retained/failed 记录不占启动保护。
+    names
+        .iter()
+        .any(|name| match fs::symlink_metadata(root.join(name)) {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(_) => true,
+        })
 }
 
 #[cfg(test)]
@@ -4042,6 +4220,8 @@ pub(super) fn plan_for_test() -> UpdatePlan {
         config: None,
         intent: "synthetic-intent".to_owned(),
         downgrade: None,
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        claude_npm_platform: None,
     }
 }
 

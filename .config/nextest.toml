@@ -2,6 +2,9 @@
 # Mark a test as slow if it takes longer than 30s to execute, and terminate it
 # if it takes 2x as long as the slow timeout (i.e.: 60s total).
 slow-timeout = { period = "30s", terminate-after = 2 }
+# 保持 nextest 0.9.143 的原检测时限，泄漏或重试后通过都不能放行最终门禁。
+leak-timeout = { period = "200ms", result = "fail" }
+flaky-result = "fail"
 
 [test-groups.windows-warp-tests]
 # Windows 服务会话下并发 App 测试会竞争终端进程清理；仅限制这组测试。
@@ -10,6 +13,13 @@ max-threads = 1
 [[profile.default.overrides]]
 # 大型测试二进制的调试拒绝诊断须先由用例内的严格 Job 完成有界清理。
 filter = 'package(warp) and test(debug_session_rejects_non_system_dynamic_image_before_continue)'
+platform = { host = 'cfg(target_os = "windows")' }
+slow-timeout = { period = "150s", terminate-after = 1 }
+retries = 0
+
+[[profile.default.overrides]]
+# 原生受限令牌诊断会复制大型测试二进制；由用例内的严格 Job 先完成有界清理。
+filter = 'package(warp) and test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_appcontainer_token_createfile_nul_vs_regular)'
 platform = { host = 'cfg(target_os = "windows")' }
 slow-timeout = { period = "150s", terminate-after = 1 }
 retries = 0

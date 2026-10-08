@@ -380,15 +380,19 @@ fn validate_response(
         Some(Action::ClaudeQueue(queue)) => {
             matches!(&response.result, Some(Result::ClaudeQueue(result))
                 if request.scope.as_ref().is_some_and(|scope| scope.submission_id == result.submission_id)
+                    && queue.subject_sha256.len() == 32
                     && queue.subject_sha256 == result.subject_sha256
-                    && matches!(result.status.as_str(), "confirmed" | "rejected" | "unknown")
+                    && matches!(result.status.as_str(), "confirmed" | "rejected" | "unknown" | "retired")
+                    && (result.status != "retired" || result.native_queue_id.is_empty())
                     && (result.status != "confirmed" || !result.native_queue_id.is_empty()))
         }
         Some(Action::ClaudeQueueStatus(status)) => {
+            // 原消费者退休只允许回收引用；空原生编号不能被当作图片消费回执。
             matches!(&response.result, Some(Result::ClaudeQueue(result))
                 if status.submission_id == result.submission_id
-                    && matches!(result.status.as_str(), "confirmed" | "rejected" | "unknown" | "absent")
+                    && matches!(result.status.as_str(), "confirmed" | "rejected" | "unknown" | "absent" | "retired")
                     && (result.status == "absent" || result.subject_sha256.len() == 32)
+                    && (result.status != "retired" || result.native_queue_id.is_empty())
                     && (result.status != "confirmed" || !result.native_queue_id.is_empty()))
         }
         None => false,

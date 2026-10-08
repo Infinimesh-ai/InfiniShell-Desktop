@@ -24,7 +24,22 @@ pub(super) struct SealedExecutable {
     file: File,
     sha256: String,
     size: u64,
-    system_closure: Option<glibc::SystemClosure>,
+    system_closure: Option<SystemClosure>,
+}
+
+#[derive(Debug)]
+enum SystemClosure {
+    Glibc(glibc::SystemClosure),
+    Musl(musl::SystemClosure),
+}
+
+impl SystemClosure {
+    fn verify(&self) -> io::Result<()> {
+        match self {
+            Self::Glibc(closure) => closure.verify(),
+            Self::Musl(closure) => closure.verify(),
+        }
+    }
 }
 
 impl SealedExecutable {
@@ -515,7 +530,7 @@ pub(super) fn execute_layout(
     execute_file(&executable.file, argv0, arguments, environment)
 }
 
-fn verify_elf(file: &File, size: u64) -> io::Result<Option<glibc::SystemClosure>> {
+fn verify_elf(file: &File, size: u64) -> io::Result<Option<SystemClosure>> {
     if size < 64 {
         return Err(io::Error::other("managed_process.linux_atomic_not_elf"));
     }
@@ -569,11 +584,43 @@ fn verify_elf(file: &File, size: u64) -> io::Result<Option<glibc::SystemClosure>
 
     let mut table = vec![0_u8; table_size as usize];
     file.read_exact_at(&mut table, program_offset)?;
-    if table
-        .chunks_exact(entry_size as usize)
-        .any(|entry| read_u32(&entry[..4], endian).is_ok_and(|segment| segment == 3))
-    {
-        return glibc::prepare(file, size).map(Some);
+    let mut interpreter = None;
+    for entry in table.chunks_exact(entry_size as usize) {
+        if read_u32(&entry[..4], endian)? != 3 {
+            continue;
+        }
+        let (offset, length) = if class == 1 {
+            (
+                u64::from(read_u32(&entry[4..8], endian)?),
+                u64::from(read_u32(&entry[16..20], endian)?),
+            )
+        } else {
+            (
+                read_u64(&entry[8..16], endian)?,
+                read_u64(&entry[32..40], endian)?,
+            )
+        };
+        if interpreter.is_some()
+            || length == 0
+            || length > 4096
+            || offset.checked_add(length).is_none_or(|end| end > size)
+        {
+            return Err(io::Error::other(
+                "managed_process.linux_atomic_interpreter_invalid",
+            ));
+        }
+        let mut value = vec![0; length as usize];
+        file.read_exact_at(&mut value, offset)?;
+        interpreter = Some(value);
+    }
+    if let Some(interpreter) = interpreter {
+        // 只按完整 PT_INTERP 分派；闭包解析继续核对唯一解释器及全部动态依赖。
+        if interpreter == musl::INTERPRETER.to_bytes_with_nul() {
+            return musl::prepare(file, size).map(SystemClosure::Musl).map(Some);
+        }
+        return glibc::prepare(file, size)
+            .map(SystemClosure::Glibc)
+            .map(Some);
     }
     for entry in table.chunks_exact(entry_size as usize) {
         let segment_type = read_u32(&entry[..4], endian)?;
@@ -786,3 +833,6 @@ mod tests;
 
 #[path = "managed_process_atomic_linux_glibc.rs"]
 mod glibc;
+
+#[path = "managed_process_atomic_linux_musl.rs"]
+mod musl;

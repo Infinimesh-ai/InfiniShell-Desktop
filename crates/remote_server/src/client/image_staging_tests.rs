@@ -1,6 +1,7 @@
 use super::*;
 use crate::client::InitializeParams;
 use crate::proto::{
+    CliImageClaudeQueue, CliImageCodexQueue, CliImageCodexQueueResult, CliImageCodexQueueStatus,
     CliImageStagingActivate, CliImageStagingActivated, CliImageStagingScope, InitializeResponse,
     ServerMessage, client_message,
 };
@@ -41,6 +42,14 @@ fn setup(
     capability: bool,
     wrong_scope: bool,
 ) -> (RemoteServerClient, executor::Background, Arc<AtomicUsize>) {
+    setup_with_retirement(capability, wrong_scope, false)
+}
+
+fn setup_with_retirement(
+    capability: bool,
+    wrong_scope: bool,
+    claude_retirement: bool,
+) -> (RemoteServerClient, executor::Background, Arc<AtomicUsize>) {
     let (client_stream, server_stream) = tokio::io::duplex(8192);
     let (client_read, client_write) = tokio::io::split(client_stream);
     let (server_read, server_write) = tokio::io::split(server_stream);
@@ -74,7 +83,12 @@ fn setup(
                     server_message::Message::InitializeResponse(InitializeResponse {
                         server_version: "test".into(),
                         host_id: "daemon-a".into(),
-                        capabilities: if capability {
+                        capabilities: if claude_retirement {
+                            vec![
+                                RemoteServerCapability::CliImageUnpublishedStagingV1.into(),
+                                RemoteServerCapability::CliImageClaudeReadV1.into(),
+                            ]
+                        } else if capability {
                             vec![RemoteServerCapability::CliImageUnpublishedStagingV1.into()]
                         } else {
                             Vec::new()
@@ -87,12 +101,39 @@ fn setup(
                     if wrong_scope {
                         scope.as_mut().unwrap().terminal_session_id = 8;
                     }
+                    let (revision, result) = if claude_retirement {
+                        let submission_id = match request.action {
+                            Some(cli_image_staging_request::Action::ClaudeQueue(_)) => {
+                                scope.as_ref().unwrap().submission_id.clone()
+                            }
+                            Some(cli_image_staging_request::Action::ClaudeQueueStatus(status)) => {
+                                status.submission_id
+                            }
+                            _ => panic!("退休夹具只接受 Claude 提交或状态查询"),
+                        };
+                        (
+                            request.revision,
+                            cli_image_staging_response::Result::ClaudeQueue(
+                                CliImageCodexQueueResult {
+                                    submission_id,
+                                    subject_sha256: vec![7; 32],
+                                    status: "retired".into(),
+                                    native_queue_id: String::new(),
+                                },
+                            ),
+                        )
+                    } else {
+                        (
+                            request.revision + 1,
+                            cli_image_staging_response::Result::Activated(
+                                CliImageStagingActivated {},
+                            ),
+                        )
+                    };
                     server_message::Message::CliImageStaging(CliImageStagingResponse {
                         scope,
-                        revision: request.revision + 1,
-                        result: Some(cli_image_staging_response::Result::Activated(
-                            CliImageStagingActivated {},
-                        )),
+                        revision,
+                        result: Some(result),
                     })
                 }
                 _ => panic!("意外的协议请求"),
@@ -169,4 +210,141 @@ async fn wrong_host_is_rejected_before_sending() {
         Err(ClientError::FileOperationFailed(_))
     ));
     assert_eq!(count.load(Ordering::SeqCst), 0);
+}
+
+fn claude_request(status_only: bool) -> CliImageStagingRequest {
+    let mut request = request();
+    request.revision = 4;
+    request.action = Some(if status_only {
+        cli_image_staging_request::Action::ClaudeQueueStatus(CliImageCodexQueueStatus {
+            submission_id: request.scope.as_ref().unwrap().submission_id.clone(),
+            recovery_key: "40000000-0000-4000-8000-000000000001".into(),
+        })
+    } else {
+        cli_image_staging_request::Action::ClaudeQueue(CliImageClaudeQueue {
+            subject_sha256: vec![7; 32],
+            recovery_key: "40000000-0000-4000-8000-000000000001".into(),
+            ..Default::default()
+        })
+    });
+    request
+}
+
+fn retirement_response(request: &CliImageStagingRequest) -> CliImageStagingResponse {
+    CliImageStagingResponse {
+        scope: request.scope.clone(),
+        revision: request.revision,
+        result: Some(cli_image_staging_response::Result::ClaudeQueue(
+            CliImageCodexQueueResult {
+                submission_id: request.scope.as_ref().unwrap().submission_id.clone(),
+                subject_sha256: vec![7; 32],
+                status: "retired".into(),
+                native_queue_id: String::new(),
+            },
+        )),
+    }
+}
+
+#[tokio::test]
+async fn claude_retirement_round_trip_preserves_unconfirmed_terminal_state() {
+    let (client, _executor, count) = setup_with_retirement(true, false, true);
+    client.initialize(None, params()).await.unwrap();
+    for status_only in [false, true] {
+        let request = claude_request(status_only);
+        let response = client
+            .stage_unpublished_cli_image(request.clone())
+            .await
+            .unwrap();
+        assert_eq!(response.scope, request.scope);
+        assert_eq!(response.revision, 4);
+        let Some(cli_image_staging_response::Result::ClaudeQueue(result)) = response.result else {
+            panic!("应保留原生 Claude 退休回包");
+        };
+        assert_eq!(result.status, "retired");
+        assert_eq!(result.native_queue_id, "");
+        assert_eq!(result.subject_sha256, vec![7; 32]);
+        assert_eq!(result.submission_id, "20000000-0000-4000-8000-000000000001");
+    }
+    assert_eq!(count.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn claude_retirement_response_requires_exact_scope_revision_and_submission() {
+    for status_only in [false, true] {
+        let request = claude_request(status_only);
+        let mut response = retirement_response(&request);
+        assert!(validate_response(&request, &response).is_ok());
+        response.scope.as_mut().unwrap().terminal_epoch = Uuid::new_v4().to_string();
+        assert!(validate_response(&request, &response).is_err());
+        response.scope = request.scope.clone();
+        response.revision = 5;
+        assert!(validate_response(&request, &response).is_err());
+        response.revision = request.revision;
+        let Some(cli_image_staging_response::Result::ClaudeQueue(result)) = &mut response.result
+        else {
+            panic!("退休夹具类型改变");
+        };
+        result.submission_id = Uuid::new_v4().to_string();
+        assert!(validate_response(&request, &response).is_err());
+    }
+}
+
+#[test]
+fn claude_retirement_requires_full_subject_and_cannot_claim_native_consumption() {
+    for status_only in [false, true] {
+        let request = claude_request(status_only);
+        let original = retirement_response(&request);
+        for (subject, status, native_queue_id) in [
+            (vec![7; 31], "retired", ""),
+            (vec![7; 33], "retired", ""),
+            (vec![7; 32], "retired", "native-ack"),
+            (vec![7; 32], "confirmed", ""),
+        ] {
+            let mut response = original.clone();
+            let Some(cli_image_staging_response::Result::ClaudeQueue(result)) =
+                &mut response.result
+            else {
+                panic!("退休夹具类型改变");
+            };
+            result.subject_sha256 = subject;
+            result.status = status.into();
+            result.native_queue_id = native_queue_id.into();
+            assert!(validate_response(&request, &response).is_err());
+        }
+    }
+    let mut request = claude_request(false);
+    let mut response = retirement_response(&request);
+    let Some(cli_image_staging_request::Action::ClaudeQueue(queue)) = &mut request.action else {
+        panic!("提交夹具类型改变");
+    };
+    queue.subject_sha256 = vec![7; 31];
+    let Some(cli_image_staging_response::Result::ClaudeQueue(result)) = &mut response.result else {
+        panic!("退休夹具类型改变");
+    };
+    result.subject_sha256 = vec![7; 31];
+    assert!(validate_response(&request, &response).is_err());
+}
+
+#[test]
+fn codex_queue_does_not_accept_claude_retirement() {
+    for status_only in [false, true] {
+        let mut request = claude_request(status_only);
+        let mut response = retirement_response(&request);
+        request.action = Some(if status_only {
+            cli_image_staging_request::Action::CodexQueueStatus(CliImageCodexQueueStatus {
+                submission_id: request.scope.as_ref().unwrap().submission_id.clone(),
+                recovery_key: "40000000-0000-4000-8000-000000000001".into(),
+            })
+        } else {
+            cli_image_staging_request::Action::CodexQueue(CliImageCodexQueue {
+                subject_sha256: vec![7; 32],
+                ..Default::default()
+            })
+        });
+        let Some(cli_image_staging_response::Result::ClaudeQueue(result)) = response.result else {
+            panic!("退休夹具类型改变");
+        };
+        response.result = Some(cli_image_staging_response::Result::CodexQueue(result));
+        assert!(validate_response(&request, &response).is_err());
+    }
 }

@@ -926,3 +926,61 @@ fn current_fixed_scope_preserves_exact_binary_configuration_and_child_subset() {
     }
     assert!(fixed_configuration(false).contains("grok-4.6-build"));
 }
+
+#[test]
+fn fixed_search_policy_accepts_native_grep_and_preserves_its_scope() {
+    // 固定官方 1.0.41 的真实搜索输入；输入 Grep 与输出 GrepSearch 不是别名。
+    let native: Value = serde_json::from_str(include_str!(
+        "../../../../specs/cli-agent-parity/fixtures/grok-1.0.41-grep-typed-macos.ndjson"
+    ))
+    .unwrap();
+    let call = &native["params"]["update"];
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("search-target.txt"), "固定搜索夹具").unwrap();
+    let profile = GrokCreationPolicyV1::compile(
+        directory.path(),
+        FIXED_SCOPE_VERSION,
+        "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d".into(),
+        format!("{:x}", Sha256::digest(fixed_configuration(true).as_bytes())),
+        None,
+        PermissionPolicy::GrokRestrictedFilesV2,
+    )
+    .unwrap();
+    assert!(profile.permits_native_request(call));
+    for variant in ["GrepSearch", "FutureGrep"] {
+        let mut changed = call.clone();
+        changed["rawInput"]["variant"] = json!(variant);
+        assert!(!profile.permits_native_request(&changed));
+    }
+    for path in [
+        ".",
+        "missing.txt",
+        "../search-target.txt",
+        ".grok/settings.json",
+    ] {
+        let mut changed = call.clone();
+        changed["rawInput"]["path"] = json!(path);
+        assert!(!profile.permits_native_request(&changed));
+    }
+    for (field, value) in [
+        ("command", json!("echo forbidden")),
+        ("head_limit", json!(100_001)),
+        ("glob", json!("../*")),
+        ("pattern", json!("")),
+    ] {
+        let mut changed = call.clone();
+        changed["rawInput"][field] = value;
+        assert!(!profile.permits_native_request(&changed));
+    }
+    let mut changed = call.clone();
+    changed["kind"] = json!("execute");
+    assert!(!profile.permits_native_request(&changed));
+    let mut changed = call.clone();
+    changed["_meta"]["x.ai/tool"]["name"] = json!("unknown");
+    assert!(!profile.permits_native_request(&changed));
+    for tool_set in [GrokToolSet::Read, GrokToolSet::Files] {
+        let mut restricted = profile.clone();
+        restricted.tool_set = tool_set;
+        assert!(!restricted.permits_native_request(call));
+    }
+}

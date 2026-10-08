@@ -1,12 +1,499 @@
 # CLI 能力缺项与验收缺口
 
-更新日期：2026-09-28。历史核对基线为 `3c5910678`，原产品冻结于 `ee839b4fc`、相关原生验证提交为 `50e1515bc`；输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`已继续实现图片与文件卡片，npm 来源绑定另见 `b6f93f662`。新的在线收据为工作区源码摘要绑定，不是最终 SHA 验收。本表固定讨论 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不将历史版本或未登录探针外推为所有版本、账号与模型的能力。
+## 当前接续状态：S4双平台拒收，明确Node就绪前置条件
 
-当前交付具有阶段性合并基础，但完整体验对齐仍有下列缺项。**安全拒绝、明确降级、原生安装成功或入口可见均不等于对应功能完成。** 原先“P0–P5 全部完成、剩余项为空”的汇总结论不能作为完整 Goal 的验收结论；具体通过记录仍按其实际范围有效。
+冻结 `5b4ad5538825918d0492916781278c8a37a8cd1d` 的正常Windows [37692547122](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37692547122)已独审通过：witness=false、五场景、三次独立冷恢复、8次worker/8代候选/8自动站，严格输出、四角色自然退出0及清理通过。签收SHA `0a0aed5b6a9731f3d6760d4b4b909f62bc191b291ddebad2858447c8b1e3888d`；该结果只归属S4。
+
+同S4 [双平台37700566049](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37700566049)整体failure并拒收：Windows原件独审5211条nextest PASS（APP3443/桌面674），Linux除hook外5568条PASS（APP3861/桌面674）；两平台无LEAK/flaky/retry被算通过，过滤及跳过另列。Linux hook诊断34项通过；25项安装/终端套件24通过、1 ERROR。该25项含Installed6、Detached12和模拟终端读取7，不是25次真实Node调用。
+
+失败仍为 `test_failed_tmux_query_never_falls_back_to_outer_terminal` 原8秒超时。PID1290760/starttime438823138的同身份快照前后，根与唯一线程均为D态、wchan=`wait_on_page_bit_common`、major fault163；父子匿名诊断FD身份一致且size0，preload/native记录missing。采样1.751775ms、poll到kill请求1.822439ms；两个PTY零fallback及data不存在断言未执行。只证明观察时刻的页等待，具体文件/设备、持续时长及旧失败首因未知；不能据此直接认定runner故障重试。日志ZIP SHA `31e84f85be6133f8df147a98d9027256b72b9343a09b02c818aae2b4edcff087`，独审签收SHA `c2d1fc954423da31e28dea5a5893405d8d613b8ecfb3fb547e881481cf156328`；失败原件保留。
+
+原G09正式条件涉及真实升级/恢复；本hook门禁历史已明确“仅验已就绪路径，不称冷hook启动”。当前增量在既有worker预检后增加**独立Node就绪准备**：同路径摘要检查、一次 `-p process.versions.node` 实际JS执行、15秒、正常退出0、Node18+精确版本输出/空stderr及执行后摘要核验，任何失败直接失败，无重试。版本命令执行耗时单列，不含散列和整个准备过程。此准备新增一次Node启动，散列与执行都会预热Node；原25项正文/8秒/全部终端保护断言不变，但不能声称整个suite派生次数不变、全冷Node+hook组合覆盖或旧故障已修复。正式范围独审SHA `7abf2cb19ef8589da4d7c618049e88a84619f1a8061706b1815efd220f12eae3`，历史依据为 `84a174f9ecf142c286fc97d3f17664d232dce1c9` 的独立worker预检及既有已就绪边界。
+
+本机最终增量门禁：离线28项中27通过、1项既有Unix权限测试跳过，包含新增5项Node准备合同；`cargo check --locked -p warp`通过，7207份来源前后未变，收据SHA `ed6e34bcc60146424eb4629fe42cb68de57ec3531f7e6fe4e964cdf092916633`。首轮a1也通过，仅日志耗时标签随后澄清，两个结果分别保留。本机没有执行真实Linux Node/worker或重跑i18n，不冒称现场验收。**无需本地化变更**：只改测试准备及证据日志，没有产品界面语义/文案/布局变化。
+
+**新增关闭0项；G01–G08、G10、V03共10项关闭，G09开放，PR22保持草稿。** 下一冻结源码仍须自身通过正常Windows五场景/三次独立冷恢复与最终Linux/Windows门禁，不拼接旧SHA。V01/V02/V05后续平台实机验收不计通过；已确认的特殊权限安装决定、普通安装及只读ACL自动升级要求保持。cleanup_ready=false。
+
+## 历史记录：S3因Linux真实hook超时拒收，补充同进程超时后状态
+
+冻结 `0a9529ec74750bc15225860e679935d88f623197` 的正常Windows [37672049090](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37672049090) 已独审通过：正常witness=false五场景、三次独立冷恢复、8次worker、8代候选与8个自动站，CMD/PowerShell输出及严格退出清理通过；签收SHA `5748ad6e1948229df53116224ec9a8a87e55c2b15120177d764858129896f61c`。它仅归属S3。
+
+同S3双平台 [37682281738](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37682281738) 整体failure，最终门禁拒收（签收SHA `05b6b7e57b1a56737982616ee35d44719453c0a012d4f253affd3337ac17f6d2`）。Windows原件独审：11个nextest步骤共5211条单次PASS，APP3443、桌面674；原LEAK菜单用例本次仅一次PASS 0.374s，无泄漏/重试。Linux APP3861、桌面674、固定Node glibc单项通过；hook诊断23项通过，真实25项中24通过/1 ERROR。
+
+唯一失败是 `test_failed_tmux_query_never_falls_back_to_outer_terminal` 的原Node超过8秒。PID1112290、starttime437861130已绑定，kill前poll仍存活；preload和native trace都missing，异常输出字段为null，后续两个PTY零fallback断言未执行。原成功PID1112495的阶段不能补证失败者。旧run37267752920同名零诊断超时保留；现有源码和原件不支持preexec回调死锁、tmux故障或诊断背压的原因性修复，首因unknown。
+
+本次仅扩展原超时失败分支：在同一存活Node的原kill前，读取最多8个TID的stat/schedstat/wchan/syscall数值和匿名诊断FD身份；前后复核PID/TID出生身份，失配废弃观察值，缺权限保持unknown。不读环境、原始命令行、内存、业务管道或后代，不增加Node/worker调用、预热、重试或期限。累计读取最多64KiB、每次最多2049B、50ms软预算；proc读取不具有硬墙钟保证，采样起止及kill请求时刻均记录，承认额外清理延迟。采样异常或中断仍保持原TimeoutExpired与kill→wait，不能把超时改判通过。这补充的是此前缺失的内核等待类别，不是首因结论或产品修复。
+
+本地Windows可适用离线23项中22通过、1项既有Unix权限测试跳过；新增11项覆盖身份复用、读取总预算、线程上限、采样异常/中断及原失败清理。首次直接跑完整Unix诊断套件在既有os.pread调用失败的日志保留，不改成通过，不以模拟字段冒称Linux现场。`cargo check --locked -p warp`退出0；7207份来源在两项门禁前后保持一致。普通fixture固定单调时钟，实际50ms分支单独测试。没有产品文案、语义或布局变化，无需本地化变更。原先通过的Rust/i18n不冒称本轮重跑。
+
+仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR草稿、merge_allowed=false、cleanup_ready=false。提交这3份测试诊断源码与4份状态文档形成下一冻结S，再在同一S执行完整正常Windows矩阵和Linux/Windows最终门禁。原25项真实hook、全套筛选和所有期限保持，新增11项诊断测试只能验证取证合同。后续若未复现，按未复现记录，不回填旧首因；G09只能由全部正式条件和同源门禁共同签收，不能以探针或文档关闭。失败原件继续保留，冻结后关闭签收写仓外与PR正文，不预填未来SHA或结果。
+
+## 历史记录：S2泄漏与S3冻结前快照
+
+冻结 `97acad05bc36f1bca1139c8a24d56699d676216f` 的正常Windows [37648615429](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37648615429)已独审通过：witness=false五场景、三次独立冷恢复、8次worker与8代候选，实际8代自动站，严格退出与清理通过。该成功仅归属S2，不能转记为未来冻结源码的验收。
+
+随后同S2双平台 [37657666912](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37657666912)虽被Actions标为success，最终门禁仍拒收：Windows桌面组实际673项干净PASS、1项LEAK，原摘要为674 passed (1 leaky)。异常是 `terminal::input::tests::test_ai_context_menu_closes_when_space_immediately_after_at_symbol`，原日志9916行；未取得可归属该测试的PID或输出持有者，首因仍unknown。Windows APP3443通过；Linux APP3861、桌面674、hook48/48、适用ACL13及固定Node glibc1均通过，2项macOS ACL不适用不算通过。两平台APP和桌面组的i18n分别11项通过，其他平台限定SKIP仍保留。API绿色不能抵消真实LEAK。
+
+本轮仅修正模拟测试依赖和失败判定：`TerminalView::new_for_test_with_cloud_mode` 在cfg(test)内通过既有接口注入NoOpCommandExecutor，避免模拟bootstrap隐式启动真实shell查询；原输入、菜单、补全和显式executor断言未删改。NoOp返回Err，不伪造真实查询成功。nextest保持固定版本既有200ms检测时限，将泄漏和重试后通过设为失败，未增加超时或放宽重试。静态缺陷和夹具隔离不等于已证明旧LEAK持有者。
+
+本地扩大桌面/TUI与输入回归817项通过，原菜单用例PASS一次；cargo check退出0，独立i18n11项通过。扩大轮误写的装饰筛选未命中对应模块，随后准确 `terminal::input::decorations::tests::` 补跑1项通过，不回填旧轮覆盖。原i18n编译在取得终态前执行句柄失效且进程已不存在，部分日志保留；只续跑未完成门禁。各轮源码前后逐7207文件一致。本地nextest0.9.146与原CI0.9.143不同，仍须原runner复验。本地总审收据SHA `11554d8096067c35afee57561d77392aa197d7db95823a8937e564410fbb9025`。无需本地化变更：仅测试夹具、nextest判定和证据文档，无用户文案或布局变化。
+
+仓外v4审计器增加严格短状态、重试次数和异常摘要拒绝；128项纯解析检查保留真实S1 FAIL/S2 LEAK拒绝，检查数不是产品测试数。正式G09条件、原45项在55/151项中的保留覆盖和原PowerShell/CLR同停点证据已逐项复核；Mac证据沿用已接受历史范围，不冒称本轮重跑。详细原件路径与SHA见CURRENT_STATUS.g09_final_gate_input_leak_followup_20261008。旧失败、K3、原26异常及b1/h2保留；LSA首因unknown不改写为已修，不新增永久诊断前置。
+
+仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR保持草稿，merge_allowed=false、cleanup_ready=false。本次提交将形成新冻结S；必须在同一S重跑正常Windows完整矩阵及最终Linux/Windows门禁并独审。最终关闭仍由仓外签收与PR正文记录，冻结后不改S；不预填未来SHA或通过结果。
+
+## 历史记录：S1迁移失败与S2冻结前快照
+
+冻结9271da36e6ced849ab71e536d83e76aeebb648f5的正常Windows run37633797777成功并经独审：witness=false五场景、三次独立冷恢复、8次worker与8代候选，实际8代自动站。audit.safe.json为78246B、SHA 8ee830c58da31308478e5a1a08faee9809b71de47e7d70ace4189a0668bc45db。随后同S dual37639377834失败：Linux APP3861运行/3860通过/1失败；Windows APP3443运行/3442通过/1失败。同一迁移测试将最新版本20261007000000误当目标20260916000001；Windows实际三次尝试，摘要重复不是第四次。本机旧S广筛3443/3442/1复现且来源不变。旧S正常成功不能抵消双平台失败。
+
+自动source-gate-audit-v2.safe.json保留automated_checks_passed=false与11个失败断言（SHA cb2de103fa6deadce51eeb55208fe1efdc975371aca0fc892f5ed59134795aef）；这些不是11项独立产品测试失败。两平台APP各自i18n实际逐名11通过，自动i18n两个false以独立原日志复核分层说明。Linux旧ACL15清单误含2个macOS限定项，实际适用13项全通过；旧错误清单保留，macOS2标不适用，不伪记PASS。Linux fixed Node glibc因APP失败未执行，需新门禁补齐；hook第一组23通过，第二组23通过/2因fish、zsh缺依赖SKIP，旧SKIP不计通过。
+
+当前只改两处非产品范围：local_cli_tasks_tests.rs精确选择20260916000001进行revert/run/revert，保留数据不重写和索引约束断言；cross-platform-preflight.yml在既有hook步骤用有界非交互apt补fish/zsh，显式检查bash/zsh/fish/tmux，步骤期限3→8分钟，原48项测试不变。local-migration-fix-a1实际111运行/111通过/8184跳过、cargo check退出0、i18n11通过/8284筛选，三门禁来源前后不变；之后逐7207来源核对仅workflow改变。ci-hook-dependency-check-a1仅Bash -n通过，真实Linux安装与原48项执行仍待新冻结门禁。没有产品或受管配置变化，无需本地化变更。
+
+明确原件：Windows独审SHA 72292dd7aa6b0de99a56ec33863d12b3a5ce3319eba6c66356df4e28e2edbce1；Linux独审SHA 215e9f74ff67cb468189b51da33aaaf50614debab10c49ccef9af68ab75ad725；本地三门禁汇总SHA f5faf1c9f715ae719991425a8269e6aa2e92328ef46ca64e40e6b0eff8ebc6e5；CI语法/来源边界收据SHA 246d94ba92d9a0a80a5d8466e742ad4a0768dc71936d08ea370ef9e9615d5143。路径与逐项摘要见CURRENT_STATUS.g09_final_gate_migration_followup_20261007。原K3、真实CLR/分类、后续原机修复、K1时间对照、旧b1/h2失败原件不改；LSA首因unknown不改写为已修，也不恢复永久诊断前置。
+
+仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR草稿、merge_allowed=false、cleanup_ready=false，新增关闭0。提交当前修正与四文档形成新冻结源码后，必须在同一源码重新执行正常Windows完整矩阵及Linux/Windows最终门禁并独审；此处不预填未来SHA或通过结果。最终签收仍仓外及PR正文记录，冻结后不改S。
+
+## 历史记录：K3完整本地矩阵与9271冻结前快照
+
+K3于UTC 13:39:35.2614050–13:47:54.2204332唯一执行当前产品正常witness=false完整矩阵，wrapper/driver均0。五场景为updated、old_moved、published_receipt_missing、external_change_preserved、candidate_changed_preserved；中间三场景各由新的worker调用完成冷恢复，共8次worker调用、8代CMD/PowerShell候选，最后一场景在候选启动前拒绝。updated发布0.156.1；前两种冷恢复回到0.155.1；外部变更场景保留0.156.1并返回RecoveryRequired；候选变更场景保留0.155.1并返回RecoveryRequired。
+
+8代实际Ready均station_created_explicitly=true，release-state均station_absent/logon_absent=true且无查询错误，原helper退出、Job空、桌面/DeviceMap关闭及profile标记均通过原件核验。四组CMD/PowerShell继续事件数分别为207/379、207/379、207/381、207/379；候选stdout保留CMD 18B LF、PowerShell 19B CRLF的codex-cli 0.156.1。三次冷恢复的独立性由冻结driver及8组调用/started/result/stdout支持，未归档worker PID/birth，不补造该证据；安全摘要/ACL结论限原收据及成功运行时断言。
+
+K2构建来源d1b4208468459f40c5b0b6023ab8f93fcb1475b7与K3运行来源3ec5d80ea5569b20f5c5e390dfd8096d599cd1d4仅4份状态文档不同，7203份非文档来源逐字相同，三产品和67份运行来源已绑定。K2原Cargo成功、默认产物包装artifact_hardlink失败与补包装通过分别保留；不把wrapper1改为0，不重复Cargo。K1仍只代表历史b1字节的时间对照；原PowerShell真实分类/同停点CLR证据、后续原机修复验证、旧b1/h2失败全部保留，LSA首因仍unknown。本次正常矩阵通过不证明某项诊断或新代码修复了该首因，也不另设永久持有者定位门槛。
+
+权威原件位于仓外local-current-matrix-k3：result.safe.json（1936B，SHA d344cfde978a226889b42d136c5a1483b38b8e35c3a8384a3f6d61ec2e07a42f）、k3-root-execution.safe.json（328B，SHA f6e4ffea1cd1707470e18f363afc9e00fce72fe57c2c6cf00e6814b4836de4c8）、audit.safe.json（57812B，SHA e67e1b13ae468610b8702e9126a367b56e0b29df3730b3c1f863d6bd85945f30）；实际C:/Coding/g09-current3/summary.safe.json为486975B、SHA f0bf6a619288390edc55ef869efdb5d169f597f55aca29c5c180e97a9d05528f。独审10175份原件前后稳定，57840仅为证据一致性断言，不计测试数或缺口关闭。
+
+这是最终冻结前快照：仍10项关闭、G09开放、V01/V02/V05移交不计通过，PR保持草稿、merge_allowed=false、cleanup_ready=false，新增关闭0。提交本轮文档后形成最终源码S；同一S的正常Windows矩阵及Linux/Windows最终门禁全部完成并独审后，关闭结果用仓外签收和PR正文记录，冻结后不改S；此处不预填未来S或通过结果。无需本地化变更；仅同步证据文档，不重跑或冒称重跑普通门禁。
+
+## 历史记录：K1历史产品updated与K2构建
+
+K1于UTC 13:08:39.2350182–13:10:30.8182575唯一执行正常witness=false的updated，wrapper/driver均0，原worker测试1项通过、82.13秒。CMD与PowerShell两代实际均为显式私有站：原helper身份分别28788→10196/LUID2904591524、29068→20760/LUID2904631389；两代received/validated/continued分别205/379，root/node/codex/console均退出0。原stdout分别为18字节LF与19字节CRLF的codex-cli 0.156.1；helper自然0、Job空、desktop/DeviceMap关闭、station/logon absent且无查询错误、profile删除标记齐备。
+
+事务0.155.1→0.156.1发布完成；50文件、63成员与准备快照身份一致，21共同成员ACL摘要、3个shim和44字节配置保持，最终公共CMD/PowerShell版本复验通过。2474输入另加prepared、2736原件（含237病例文件）前后稳定；独审SHA aec9c15fbf27d6b098021e305e56411a6ce406a2352909cfe2e27be3064e996d。实际pending journal路径由补收据SHA a3ccc9b524dfa34588f6533ae0f16a5607d4aff2a1c1559ede8d27652f319428核实；Published回调原件仍为OldMoved，因为该回调在Published save之前，不以文件名冒充已持久化phase。证据断言不是产品测试或关闭数。
+
+本次仍使用历史b1构建（aa3b314基底+原diff、7198来源），真实detached的8e84源码视图仅绑定67项相关来源；执行时当前工作区d1b420846是另一来源边界。worker使用归档367a映像路径，supervisor/helper保持原路径，新根为C:\Coding\g09-b1t1。两个祖先目录的代理/根视图不一致原件保留；根原生身份前置与运行租约未放宽。旧b1失败仍有效，不能将本次通过称为代码修复或认定首因；helper PID/birth/LUID齐备不补造候选未归档身份，原CODEX_HOME告警亦保留。
+
+当前d1源码的K2 worker --no-run和默认products Cargo均成功，7207来源前后不变。原包装因Cargo正常2硬链接被拒绝，原wrapper1保留；补充逐一核target/debug与deps原别名、同柄复制为单链接独立产物后通过，未重跑Cargo。补包装收据SHA 20242c1596136df3458e183843175055c0d6385c4015e92ac8376f14080677cb。随后完成当前源码正常五场景、三次独立冷恢复与最终同一冻结源码Linux/Windows门禁。G09开放、10项关闭、新增关闭0，PR22草稿，V01/V02/V05移交不计通过；i15未执行。详见CURRENT_STATUS的g09_first_user32_load_baseline_20261007.k1_actual_product_temporal_control。无需本地化变更：仅证据文档，既有7203非文档来源门禁不冒称本轮重跑，cleanup_ready=false。
+
+## 历史记录：原h2同映像与查询能力
+
+i19唯一执行原h2的A，沿用原controller/helper绝对路径、FileID与字节；与旧两臂caller已记录的AuthenticationId、session、token类型、提升状态、完整性级别和SID一致，未记录的权限组/default DACL不外推相同。first25944、second9192实际同LUID2896382581/0；显式NULL+CWF_CREATE_ONLY私有站、nonce桌面、严格SD、原对象恢复和owned关闭、两代自然0/原PI关闭/Job空均核实。原首查0xc000005f/NULL、elapsed15ms；owner原柄关闭后的唯一post也absent。pair SHA `255d17b2a56cc52b04ba419c6fc9a27944fe2bf2079eeb823a6a325a107ea0df`；独审SHA `d7f04e55d95a77d91ccc0cc2343e287a206ac76a7c97623afa43aaa57841058d`，133输入另加prepared、162原件前后稳定、21病例文件；212为证据断言，不计测试或关闭。
+
+旧h2两臂各50次present/3047ms证据仍有效，历史post未观察、不回填。旧映像本次也清理，因此不能把i18清理归因其共同源码改动，更不能认定loader、first metric或产品b1首因；时间、系统状态与外部模块没有共同冻结。j1仅核class64通道：自身29576/birth134358504915653782，两次有界尝试中首次0xc0000004扩容、第二次0成功，自身唯一匹配Object=0/type8，原柄已关闭，RtlGetVersion为26300；无token查询、提权或其它条目详情落盘。这不是持有者为零的证据。capability SHA `c520fbb482e7b9c456958216fdfc1c7d2a93ad26eb849b9b5325fdf3e85892e4`，根回执SHA `6d47bc624d61281f5c65923054fefef23ed6da158427e746a1fd2906d5149831`。
+
+## 历史记录：加载组差异与私有站A清理
+
+i16只执行A：同一新first/原leaf、manual恢复、ACK/token/外部second观察off；first加载固定系统USER32、核路径并解析导出，持引用至second原PI关闭后FreeLibrary成功，但没有调用GetSystemMetrics，原172B收据明确attempted/returned=0、公开value=null。两代自然0、Resume1、原PI关闭与Job空；first PID6712/LUID2886566018/0，second PID15540的LUID仍未观察。
+
+原LSA首个样本即0xc000005f/NULL，无Size、返回LUID或free调用；粗tick elapsed0不表示绝对零时长，也不是等待满三秒。owner原句柄关闭后的唯一post于11:54:25.313766Z同样absent。A测量完整且清理成功，因A必须原/post均present的前置不成立，B未启动。wrapper1表示两臂实验未完成，不是A清理失败。pair SHA `26a6d1effb8f2a8c284008c32859dd7684f710985d4ea1558752f8854e7366a6`；独审SHA `bb30e9ea013291e509bdbe4b5cd73aaad3eb0727a16efffdba97b5d5f08df063`，108原件稳定，91输入另加prepared一份；98项断言是证据一致性检查，不计产品测试。
+
+本轮没有metric-on结果，不能归因metric、某单API或持有者。相对旧最小基线还增加了共同加载/路径/导出解析/持有释放及补充收据；USER32预加载、映射对象身份和完全卸载未知，second外部映像/精确Job仍未观察。通用post字段original_logon_after_exit在本轮实际承载logon_absent，不能把true误解为会话存在。
+
+i17在同一新first中只切整组加载/路径/导出解析/持有释放，两臂均不调用metric。A first23204/LUID2889137854/0，原50样本均status0、Size272、正确first LUID/free0，窗口3016ms，post仍present；B first29984/LUID2889142370/0，原首查0xc000005f/NULL、粗tick0，post也absent，无返回缓冲区或free调用。两代自然0、Resume1、原PI关闭与Job空；Apost12:05:55.958273Z先于Bstart55.967500Z。pair SHA `41293fa8e785326e512089b96261ce234f81d04750ebf179d614b25cb8585d38`；独审SHA `61b08a06350645e66eb3590a889324ba1a505411b94fb4903b91645061d8332b`。93输入另加prepared，wrapper0只表示两臂测量完整；该结果最多关联本GUI小程序的整组差异，不能称单API首因或产品修复。
+
+旧原件复核发现d2 first实际metric两臂均2560，h2 first未调用、零槽不是API返回0；h2已覆盖env=NULL继承，尚未覆盖first调用与其显式私有站组合。产品b1 helper静态导入USER32且为console子系统3，i16为动态加载的GUI子系统2；产品second已有metric，first仅查询站。因此仍需产品相关对照，不能直接改产品或宣称修复。
+
+i18保留h2显式私有站和second固定A顺序，仅first metric设为A/off；first12120、second10724实际同LUID2892079684/0。first未调用metric、公开value=null；second原A的metric2560、NULL+CWF_CREATE_ONLY新私有站与nonce桌面、严格SD、原对象恢复、owned句柄关闭、两代自然0/原PI关闭和Job空均核实。原首查0xc000005f/NULL、粗tick0；owner退出并关闭原柄后12:18:58.749715Z单post同样absent，无返回buffer或free调用。A测量完整但双present前置未成立，B未启动；wrapper1不是A清理失败。pair SHA `2dff3c0f1f70a2dc2e72789465a7c126cfd8dc34e9c4adad20791443be31cee6`；独审SHA `6d74a30fbbb3fa75ecacd1f4480766488a9889272a951018de04d067162316bd`，155原件稳定、129输入另加prepared、22病例文件；190项为证据断言，不计测试或缺口关闭。没有B结果，不能认first metric有效、推翻旧h2残留或称产品已修；共同收据I/O、环境键和重链等差异仍在，首查absence不能归因后续singlepost。
+
+i15仍仅准备未执行。i18原WAIT_LIMIT/收据10000ms、first自然wait5000ms和LSA3000ms保持；单post未回填旧h2。i19与K1实际结果及其边界见本文件顶部。
+
+G09开放、10项关闭、新增关闭0，PR22保持草稿；V01/V02/V05移交不计通过。详见CURRENT_STATUS的 `g09_first_user32_load_baseline_20261007`。全部证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11及定向20项来源。
+
+## 历史记录：未恢复诊断终止及无原poll仍有后验残留
+
+i13两臂second均挂起创建：A恢复后自然0；B本入口未Resume，仅通过原PI一次诊断Terminate，BOOL1/error0、实际退出码53523和原柄关闭均确认。B的first自然0、second非自然退出及全体natural=false明确分开，post资格独立核验。两臂各50条原LSA均status0、Size272、正确first LUID/free0，elapsed3031/3016ms，退出后单次post仍present/free0。pair SHA `0f0487987ed3b31bdab1968e395ae28bfbcc47dcd75ce9aa63a0b67478fbc241`；独审SHA `5a2741549b4925b07c8d75c8eb9dcbe0b4ffdc3fcb7551ee552059eac5cb58e3`，103份原件稳定。该诊断终止不计自然清理或产品验收，也不能证明没有创建期系统行为、注入或外部恢复。
+
+i14复用i12 first/leaf并固定manual，仅切原LSA poll与同预算静默。A原50条匹配first LUID/free0，窗口3032ms；B在原句柄关闭点起静默3016ms，3080B v2收据count0、全零样本槽、无80–82事件，原状态明确not_observed/null。两臂自然0、原PI关闭、Job空；退出后的唯一post仍present/free0。窗口后事件开销15/16ms单记；post不能回填B原窗口状态。pair SHA `6bb6cf842edbc73b7a3db7982b7dc8ae7719bc28c7bf1b78a97c29778e645809`；独审SHA `bedec23c81256d582d85e3c810de2521cf6ae6e0b1524fbc55b5db30419fcd43`，100份原件稳定，72输入另加prepared一份。
+
+两组A均先完成原/post双present才B，ACK/token/外部second观察off，second LUID及外部实际映像/精确Job仍未观察。结果分别表明本入口恢复后的运行及自然退出、原重复poll不是各自本轮残留的必要条件；未确定单API或持有者，不是产品修复。原5秒/3秒及单post未放宽，wrapper0仅测量完整。
+
+先只读评估API调用方替代与现有权限下的精确持有者证据，暂无新病例执行授权；显式nonce命名站需管理员的方案不准备。保留d2清理反例、b1实际产品失败和原runner8e84正常矩阵成功的不同边界。最终同一冻结源码Linux/Windows门禁未完成，G09开放、10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。
+
+详见CURRENT_STATUS的 `g09_lifecycle_and_postpoll_controls_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：省去second挂起及恢复仍有残留
+
+i12同一新first及原无清单leaf，两臂ACK/token/外部second观察off；仅切second的CREATE_SUSPENDED/ResumeThread整组。A first14016/leaf26768、LUID2870368909/0，Resume返回1/error0；原/post双present且完整自然测量后才B。B first15828/leaf15812、first LUID2870377014/0，second直接运行，Resume明确not_performed、result/error为null。second LUID均未观察，不由first身份补写。
+
+128B handoff v3与332B completion v4独立绑定恢复mode；两臂保留原PI PID/birth/TID、自然wait/exit0与原柄关闭。各50条原LSA均status0、Size272、对应first LUID且free0，elapsed3016/3015ms；owner自然退出并关闭原柄后的唯一查询仍present/free0。first的CPWLW挂起、身份/Job前置及Resume1、原5秒/3秒未变，B快速退出也只使用原PI继续核验。
+
+pair SHA `2875cf2398daab474f1911d4beb382a7740fe8389a46f776d69503bc82fddab2`；独审SHA `002e63487259f11de71d097598b9eee104396acea7fe20695c2519740246208c`，103份原件稳定。wrapper0仅表示测量完整，清理仍失败。second挂起/恢复整组不是本轮残留必要条件；未定位CreateProcessW内部或外部持有者，不支持移除产品安全前置。
+
+继续依据最小两段差异与d2曾清理反例选择有界对照，不修改系统服务或清理期限。原runner8e84正常五场景/三次冷恢复通过但均自动站，本机b1实际失败保持；产品未修复，最终同一冻结源码Linux/Windows门禁未完成。G09开放、共10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。
+
+详见CURRENT_STATUS的 `g09_second_suspend_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：两代分别嵌入清单仍有残留
+
+i10只改变leaf的Windows清单（asInvoker/uiAccess=false及Windows10 supportedOS），固定另一代与原控制器，native两臂均B且ACK/token/外部second观察off。A原与post均present后封存收据、保全实际A文件，再在同一路径CREATE_NEW B。两臂自然0、Resume1、原PI关闭；各50条原LSA均status0、Size272、匹配first LUID且free0，elapsed3032/3016ms，owner自然退出并关闭原柄后的唯一查询也present/free0。pair SHA `fa3ce4b7ab603491e036241ca8b39282c64560ffd177cbd1eaf4b1a869247f9b`；独审SHA `3f692db05a5dc03fa3596cefb3aa9c8b9e6789f82ad170d5b4986488ade05e51`，113份原件稳定。
+
+i11只改变first的Windows清单（asInvoker/uiAccess=false及Windows10 supportedOS），固定另一代与原控制器，native两臂均B且ACK/token/外部second观察off。A原与post均present后封存收据、保全实际A文件，再在同一路径CREATE_NEW B。两臂自然0、Resume1、原PI关闭；各50条原LSA均status0、Size272、匹配first LUID且free0，elapsed3031/3032ms，owner自然退出并关闭原柄后的唯一查询也present/free0。pair SHA `a6f91e57b648071edf5da39faf813dcafd4e3c3f13f92d73e16cb39c01748195`；独审SHA `8208fed5e6d7c32e069f57ca6f554cd5dc2e1f4b26db101ad17b07c536fb870b`，117份原件稳定。
+
+两组均未重编原生程序；SDK mt只改新B副本，完整PE头/资源字节差异已保存，原节、imports与入口保持。i11每臂first磁盘SHA正确贯穿started、原件解析及post输入；FileID来自磁盘槽租约，不能当进程映像对象或内存哈希。second LUID、实际映像及外部精确Job仍未观察，不用first身份或父Job补写。A同FileID/SHA改名保全已核实，但未排除同用户路径竞态，改名成功不证明全部内核引用释放。
+
+结果只说明这两项清单干预没有消除本轮残留，未定位PCA或其他持有者，不是产品修复。下一组仅仓外准备second挂起创建/恢复整组开关，尚未执行；B的Resume将记not_performed，原PI身份、自然等待、5秒/3秒及单post保持。即使出现差分，也不能直接删除产品暂停期间的身份、Job及授权检查。保留d2清理反例与b1实际产品失败，不改系统服务或清理期限。原runner8e84正常五场景/三次冷恢复通过但均自动站；最终同一冻结源码Linux/Windows门禁仍未完成。
+
+G09开放、共10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。详见CURRENT_STATUS的 `g09_manifest_controls_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过的本地check、i18n11和定向20项来源。
+
+## 历史记录：省去second令牌观察后仍有残留
+
+i9 v2两臂同一新first及原leaf，均ACKoff、controller不观察second；只切换first经原second PI的OpenProcessToken/TokenStatistics/Close整组。A first20440/leaf26188、LUID2861719682/0，open/query56B/close均原BOOL1/error0且同LUID。A完整自然测量与原/post present后才B。B first18056、已绑定first LUID2861735663/0；leaf16744的AuthenticationId与same_luid明确null，三API not_performed，未把原0槽或first身份当成second观察。
+
+两臂124B handoff v2与324B completion v3保留原PI PID/birth/TID、Resume1、自然0、原thread/process关闭。各50条原LSA样本均status0、Size272、匹配对应first LUID及free0，elapsed3031/3016ms；owner自然退出并关闭原柄后的唯一查询仍present/free0。外部second实际映像、精确Job及外柄终态均not_observed。省去令牌查询整组仍有本次残留，没有识别单API或系统持有者。
+
+pair SHA `6a4f2a23a9f02b97bbb8f3f3d5a8bdffc17518c97a16d06718cbe8217060e705`；独审SHA `bc5389b2213c85a68dbe6e60fcd4e683e06436dbaad995247975644269f33923`，146份原件稳定。未执行的v1共43文件已归档，v2只修复解析器在查询失败时仍将auth槽标成meaningful的问题，native字节未改；该失败分支本次未动态覆盖。wrapper0是测量完整，不是清理成功。
+
+下一项仅仓外准备leaf嵌入Windows清单的有界对照，计划保持i9原控制器/first字节、native arm B和token off，并在同一路径一次切换、保全A实际文件；尚未执行，不预判PCA首因或修改服务。原runner8e84正常五场景/三次冷恢复通过但均自动站，本机b1实际失败及d2清理反例保持。最终同源Linux/Windows门禁未完成，G09开放、共10项关闭、新增关闭0，PR22草稿；V01/V02/V05移交不计通过。
+
+详见CURRENT_STATUS的 `g09_second_token_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码匹配本地check、i18n11和定向20项已通过来源。
+
+## 历史记录：取消ACK写读等待后仍有残留
+
+i8共用本轮新first和原leaf，两臂均为两段、controller均不打开second。A保留ACK写入、读取、等待和逐字比对；其原及owner退出后查询均present、完整自然测量后才启动B。B省去ACK整组，268B completion v2明确记录mode/read_attempted/matched均0，实际无ACK文件或event31；结合完整原PI生命周期才记not_performed。
+
+A first21864/leaf8744、LUID2858694979/0；B first15512/leaf7768、LUID2858706723/0。两臂原PI均Resume1、leaf自然0、thread/process关闭，controller自然0、Job空且原柄关闭。各50条原LSA样本均status0、Size272、正确LUID及free0，elapsed3016/3015ms；owner退出并关闭原柄后的唯一查询仍present/free0。两臂外部second的独立身份、实际映像、精确Job及外柄终态均not_observed，不能用父Job空补证。
+
+pair SHA `ae705dca971e7de7869676661e791ea6e1ae562a6ddcbb71fc2f834f71f16594`；独审SHA `cc451ad7569e052fafc5df956c894bff44a0bc0df1f598733453d60170aaf101`，102份原件前后稳定。wrapper0仅表示测量完整；取消ACK文件写/读、等待和恢复时序整组没有消除本次残留，尚未识别单API或系统持有者。原i6/i7时间窗内已有应用兼容性日志无事件；这不能排除兼容性服务，未改日志或服务配置。
+
+下一项仅在仓外准备second原PI令牌查询整组开关，尚未执行；B身份缺测将明确记录，不补查或回填。原runner8e84正常五场景/三次冷恢复通过但均自动站，本机b1实际产品失败与d2曾清理的反例保持。最终同一冻结源码Linux/Windows门禁仍待完成。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_ack_wait_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：省去外层二代观察仍有残留
+
+i7共用冻结i6 first/leaf，first始终两段并保留原PI身份、相同ACK及自然退出/关闭；只有controller对second的额外观察开关不同。A观察开启，在原及owner退出后查询均present、测量完整后才启动B；B省去外部second OpenProcess、完整token/image/精确Job查询及其句柄后续操作。两臂原各50条LSA样本均status0、非空、Size272、返回本臂LUID、free调用及返回0，原elapsed3031/3015ms；owner自然退出并关闭原柄后的唯一查询仍present、free0。
+
+A first11956/leaf30016、LUID2853456782/0；B first29432/leaf16672、LUID2853461019/0。B的second身份、Resume1、自然0及原PI关闭来自first原件；外部独立身份、实际映像、精确second Job成员及外柄终态均明确not_observed，父Job为空不能补足。B确无second-created和对应外部事件。
+
+pair SHA `cd3f504f47a3e28e46db157b6539ef05f71adc8e28db62cffe67443fcdb46e23`；独审SHA `9c4da4aec92ff5622b4f4dfaa21a78dfb0a20b507f3307c3c447fedf817d566a`，92份原件前后稳定。wrapper0只表示测量完整，两臂清理均未通过；该外部观察整组在本次不是残留必要条件，尚未定位单API、ACK或系统持有者首因。d2曾两段清理的反例和b1实际产品失败保持，不用诊断代替产品修复。
+
+下一步只读设计取消ACK等待/读取的有界对照，尚未准备或执行。原runner8e84正常五场景/三次冷恢复已通过但均自动站，最终同一冻结源码Linux/Windows门禁仍待完成。G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。
+
+详见CURRENT_STATUS的 `g09_second_observer_control_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍匹配已通过本地check、i18n11和定向20项来源。
+
+## 历史记录：最小两段及身份握手出现残留差分
+
+i5自身TokenStatistics对照两臂自然退出，原首次LSA及owner退出后唯一查询均不存在；独审SHA `d34beb3855c3b06f3f820ee7ebaefb570038414009dbad30d61dff78a2939119`。B的冻结流程与退出0支持open/query/精确长度/关闭成功，但没有child统计字段或返回LUID原件，不以外层身份补写。
+
+i6 v2两臂仅各一次：A单段first15804、新LUID2849550670/0原首查0xc000005f/null、elapsed0，postowner也不存在；其清理门槛满足后才B。B first3472/birth2269458504-31282748与leaf2512/birth2269694691-31282748，同LUID2849551984/0；120B交接与ACK一致，260B原终态确认Resume1、leaf自然0及原thread/process关闭。controller确认两代自然0、Job空、原second/first/thread/Job关闭后，原50条LSA样本均status0、Size272、返回同LUID，逐条free调用及返回0，elapsed3031ms仍存在；owner自然退出并关闭原柄后的唯一后验也存在且free0。
+
+pair SHA `a1016c60e9a1d1e3dcac2e882889a72ee0779737f6f35b6fd4fc658504996d0a`；独审SHA `43d8e91bae340838a821779d58d2088638f1c8f833e45d76d314958847260d64`，168份原件前后稳定，含未执行v1的42份归档。wrapper0仅表示测量完整，B清理未通过。首末query tick差3016ms，3031包含原日志和粗时钟，不是额外查询；v2快速退出最终读取分支本轮没有动态覆盖。
+
+本轮将复现范围缩到最小两段及必要身份交接，没有显式USER32或窗口对象操作；未排除系统依赖/外部注入。增量仍包含controller对second的独立打开、完整身份/镜像/Job观察及ACK，不能直接归因某个API或持有者，也不能替代b1产品同源复现。d2曾两段清理的反例保留。下一步只准备i7外层second观察整组on/off，复用相同first/leaf及ACK，尚未执行；off缺少的外层second独立观察明确记not_observed。
+
+原runner8e84正常五场景/三次冷恢复已通过但均自动站，本机b1产品失败保持，最终同一冻结源码Linux/Windows门禁仍待完成。已有Unix有界只读ACL支持和Mac验收保持；最终Linux逐名核现有ACL回归，Windows核owner/DACL保持，readonly命令不冒充Windows专项只读ACL验收。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_minimal_two_stage_difference_20261007`；证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码仍与已通过本地check、i18n11和定向20项来源一致。
+
+## 历史记录：三组单段对照可清理，产品缺口仍开放
+
+i2的A不加载、B加载系统USER32并核路径后释放自有引用；i3两臂共同加载并解析GetSystemMetrics，只有B调用一次SM_CXSCREEN；i4的A不写，B唯一新建文件并写入一个字节、flush及关闭。每组共用其冻结child二进制、各臂仅一次，A原LSA和owner退出后查询均确认不存在后才启动B。六代均自然退出0、Job为空、原thread/process/Job关闭，原第一次LSA即0xc000005f/null，owner退出并关闭原柄后的唯一后验也不存在。三份wrapper独立收据均0，没有重试或强杀。
+
+i2 pair SHA `ae9666f68bfbfa52487e9c0b7806e53f19b011b2d04d31ef98f43a1c4fad611b`，独审SHA `ec689ebc0b13fb8716f6e88b62d75514ed5803636835d811e96d47f9503d4b97`；i3 pair SHA `0f0e18b15a6a069397942297f97dec0920beea38f8dce285046c38b34b5ba0ab`，独审SHA `6f16a9e7163bd486f41a835a0b8a99bce0c691b5c1ea58a04ab747c266f7b029`；i4 pair SHA `e524c565011b3183778bf425c60f4f5369c038cf65bed955fb953bf79519c880`，独审SHA `2b543281e84340ece6fcf773bdf05dfb6e6d446cbe3f342a80f0afe8ea9d0e95`。i4单字节0x49及文件身份只在原LSA和postowner之后核验，原文件保留。
+
+三组结果只缩小本次单段路径范围，不是b1产品修复或一般性因果排除。i2的退出0与冻结流程支持加载/路径/释放成功，但不证明模块彻底卸载或运行时映像哈希；i3没有捕获metric具体数值；i4后态FileID不冒称子进程原句柄身份，也不将整体I/O拆成单API首因。静态导入不排除系统或外部加载；null返回没有实测LSA成功buffer路径。
+
+下一步只准备i5子进程自身TokenStatistics查询对照，尚未执行，继续要求A双absence和完整测量后才B。原runner8e84正常witness=false五场景/三次冷恢复已通过但均自动站；本机b1显式站失败及h2等残留证据保留，最终同一冻结源码Linux/Windows门禁待完成。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_single_child_controls_20261007`。证据保留，cleanup_ready=false。无需本地化变更：仅证据文档，7203份非文档源码继续匹配已通过的本地check、i18n11和定向20项来源。
+
+## 历史记录：最小单段基线可清理，产品缺口仍开放
+
+i1仓外最小基线只执行一次：child静态仅导入KERNEL32!ExitProcess，无CRT、USER32、TLS、CLR、子进程文件收据、TokenQuery或第二段。实际child9676/birth425602446-31282741、新LUID2837222244/0自然退出0，Job为空、原thread/process/Job句柄关闭后，原首次LSA查询即0xc000005f/null、elapsed0；owner23956/birth424940179-31282741自然退出并关闭原柄后的唯一查询同样不存在。wrapper独立收据为0，无强杀、超时或重试。
+
+pair SHA `27fad4f9999ed4ce6bb5e6963752a46d3258fceb8ea6f037528d9683bf1d184b`，独审SHA `4072ae73206aa49f0ce3ec992e20c668d0b25c9af69fbd5ec24513a972c24c1a`，82份所读原件前后稳定。该结果仅说明本次最小新登录会话可清理，不是稳定成功基线或b1首因结论；controller仍有文件I/O和TokenQuery，不能与child同名操作混淆。null返回没有实测返回Size/LUID/free成功路径，coarse tick0不等于绝对零耗时；静态导入也不排除系统加载或外部注入。
+
+下一步仅准备同一child两臂的系统USER32加载对照，尚未执行：A不加载，B仅加载已绑定DLL、核路径并释放本次引用，不调用USER32函数。A原LSA及owner退出后结果都必须已知不存在且测量完整，才启动B。原runner8e84正常五场景/三次冷恢复已通过，但均自动站；b1本机显式站失败、h1失败和h2残留均保持，最终同一冻结源码Linux/Windows门禁仍待完成。
+
+G01–G08、G10、V03仍共10项关闭，G09开放，新增关闭0；V01/V02/V05移交不计通过，PR22保持草稿。详见CURRENT_STATUS的 `g09_minimal_single_logon_baseline_20261007`；证据保留，cleanup_ready=false。无需本地化变更：本轮只有证据文档，7203份非文档源码继续匹配本地check、i18n11与定向20项的冻结来源。
+
+## 历史记录：USER32顺序对照未解决本机LSA残留
+
+原runner22在8e84的正常witness=false五场景、三次独立冷恢复和八代候选清理已通过，全部走自动站；本机b1显式建站后的LSA失败仍是阻塞，最终同一冻结源码Linux/Windows门禁尚未完成。原验收和失败证据均保持，不用后续诊断覆盖产品结果。
+
+h1只执行A：新站创建成功，step11错误5；原收据不能唯一分辨UOI_FLAGS与GetUserObjectSecurity。句柄遗漏读取OWNER/DACL所需READ_CONTROL是诊断入口缺口，但不补造错误子API。second退出3、控制器实际强制回收，原wrapper因object_sd_bound记unknown；B未启动，50次LSA查询/3031ms仍存在。独审SHA `c121fa1819b72b5b8248f5b15567d127f9cf14f70edeb37bd46c58d4fda68a79`，原失败不回填成完整测量。
+
+h2修正该诊断入口后，两臂各执行一次、无重试，共用同一helper，仅改变second的GetSystemMetrics位于共同创建/选择块之前或之后。实际站和桌面ACE分别0x000f037f/0x000f01ff；两代自然退出0、Job为空、原句柄关闭及原站/桌面恢复均确认。两臂各50次LSA返回0/非空，原观测均3047ms，LSA终态未观察到差异；metric自身为2560/3840。pair SHA `83f45ced4659a9894fcae423cd86878504aa25a98416107c461eac033ce88c24`，独审SHA `bc21a715a22d3ae2c7e5502aff5274ce542f3d72e624c9116859057c4402d7ea`。这只完成有界测量，未通过清理，也未定位或排除一般性首因。
+
+下一步仅仓外准备单段、child仅静态导入kernel32 ExitProcess的最小新登录会话基线，尚未执行。h2 first仍读取WinSta0，DLL/TLS及外部系统引用未知；不从静态导入、单对结果或原机自动站成功推定本机修复。产品超时、严格清理、普通安装及已支持只读ACL自动升级要求不变。
+
+G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿，新增关闭0。详见CURRENT_STATUS的 `g09_user32_order_controls_20261007`。仓外证据保留，cleanup_ready=false。无需本地化变更：本轮只有证据文档，7203份非文档源码与已通过本地check、i18n11及定向20项的冻结来源一致。
+
+## 历史记录：原机正常矩阵通过，本机显式站LSA仍开放
+
+原runner22的[37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367)在冻结提交 `8e84b737eabeefe1ab082dc3be6b6c0fd5067c96` 正式成功，独审确认正常witness=false五场景、三次独立冷恢复和八代CMD/PowerShell候选的输出、退出及清理。updated为0.156.1；old_moved与published_receipt_missing恢复0.155.1；external_change_preserved保留0.156.1并返回RecoveryRequired；candidate_changed_preserved保留0.155.1并在spawn前拒绝。普通warp1159项、command102项通过，i18n11包含在普通回归内。
+
+候选原ZIP为1099138993B、364成员，官方SHA `e0c38d0a8724506b14d5bd2900ef3771d4e63193f610fdf0fa6901886d50c787`；正式审计SHA `4408a9a9997167f4da3ea598c6511278af332a9ec9833981b78bde6af94e3030`，边界复核SHA `228e60e33646b93214f2cf780f76ba9a781bf35d98432a3fff43adba84350c6e`。67份来源绑定实际Git字节，三组独立execute/recover由冻结subprocess调用链及8次调用原件支持；未归档worker PID/birth，不声称逐PID核验。原ZIP/SRI/所用成员可离线复核；未上传的全部二进制、manager树、完整ACL和配置后态依靠成功的运行时断言与摘要，不冒称原件齐全。readonly-*为公共只读命令，不是独立只读ACL场景。
+
+八份ready均 `station_created_explicitly=false`，自动站路径的成功不能覆盖b1普通交互用户显式建站的LSA残留。原b1失败继续保留为本机阻塞，未用原机通过认定本机首因；当前合并HEAD `60c099990f9672af8175fa459ab07252aaa15856` 的最终同源Linux/Windows门禁仍待完成。
+
+g1仓外原句柄观测已执行一次、无重试：三次NTSTATUS0/56B，HandleCount均1，PointerCount原值32762/32768/32754；在原53/54/55关闭前取样、原90之后写盘。原句柄、Job与私有桌面关闭、两代自然退出0后，50次LSA查询仍存在，原预算观测3046ms。独审SHA `b9471968776fef5afb500a367b0c1aafbdf4666eb6cf490bcd8994772422ec31`，72份所读原件前后稳定。此结果只排除三个采样对象当时的额外打开句柄，不解释PointerCount为泄漏量，未定位其他token、内核引用或b1首因；测量完成不是清理通过。
+
+10项关闭、G09开放、V01/V02/V05移交不计通过，PR22保持草稿，新增关闭0。下一项仅在仓外准备第二段USER32调用顺序的有界对照，尚未执行，不据静态顺序修改产品。详见CURRENT_STATUS.json的 `g09_original_normal_matrix_and_local_handles_20261007`；所有原失败及证据保留，cleanup_ready=false。无需本地化变更：本轮只更新证据文档，无产品文案或布局改动，原main合并check/i18n11/定向20项收据继续有效。
+
+## 历史记录：观察对照与main合并本地门禁
+
+e1 复用旧8e84测试程序，无stdio与无写入stdio各一次，原断言均exit101/candidate_independent_station；两代helper自然退出、Job和原句柄关闭后，原三秒及测试进程退出后LSA仍存在。独审SHA `349a2ebf95d91e8a7b0bc85961642fe32aa4bb88ac1d76c99c37d8aec2b5c0f5`。该stdio控制路径不是本轮残留的必要条件，未定位b1产品持有者。
+
+f1 早查询off/on各一次，终态分别50次/3031ms与50次/3015ms仍存在；B早查询返回已绑定LUID、free=0。exit0仅表示观测完成，不是LSA清理或G09通过；独审SHA `c7ea32060582bc7cff2904fb020db18c13398840bb4c6a90a251932bbe11fcd3`。off本身残留，无法给出早查询因果结论；d2 A单次成功不是稳定基线。f1 A还新增一次event98写盘，不声称与d2 A逐条原生调用相同。
+
+已整合main `4907ebd35eb4d60d11f387db4aca2a600f31d622`，保留ConPTY重置与terminal-binding安全路由，新增两项交错回归。索引树 `71f81cbdc329ba4159e645f9dccecfe1588db70c` 的7207份来源前后不变，check、i18n11及定向nextest20项通过。初次nextest因PATH无工具而未启动测试，原exit101保留；后续仅对子进程使用已有且与归档一致工具。无需本地化变更，无新增文案或布局。
+
+原runner22的[37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367)截至 `2026-10-07T06:57:19.399938+00:00` 为 `in_progress`，只验证8e84。完整收据见CURRENT_STATUS的 `g09_local_observer_controls_20261007`，最新产品结果仍为b1失败。10项关闭、G09开放、V01/V02/V05移交不计通过，PR草稿。正常五场景、三次独立冷恢复与最终同源Linux/Windows门禁尚未完成。仓外原句柄引用计数入口仅在准备，尚未执行；证据保留，cleanup_ready=false。
+
+## 历史记录：桌面对照与原机开始验收
+
+新增关闭0项：G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿。b1首CMD的LSA收尾失败和c3两项原生失败保持，不用后续诊断覆盖。
+
+d1在原caller预创建NULL/CWF_CREATE_ONLY窗口站时返回183、controller exit1；未启动helper、未产生候选新LUID、未到LSA测量，B未执行。不能由此推断新LUID第一段创建同样失败。d2 v1因第二段空lpDesktop不能保证私有桌面干预而未执行并保全；v2使用同一派生helper，两臂各一次、无重试。A两代实际为WinSta0/Default，B两代为WinSta0/本轮nonce桌面；原句柄/Job关闭后，首次LSA查询均为0xc000005f/null、elapsed0ms，controller和两个helper自然退出0。
+
+A本身没有残留，因此该结果仅反对“连接Default足以导致残留”，不是B修复A。与c3相比，controller、stdio keeper/借管道、预建桌面、派生helper及进程时序不同，不能认定单一首因或产品修复；原子新建desktop及对象销毁未分别证明，cleanup_ready=false。只读引用审查未找到新的自有token/process/receipt句柄泄漏正证，不据静态调用顺序更改产品。
+
+d1独审SHA `b99d8bba2c3e11b391b703b55b08b71d778c68233e87e81e4749aa72e347c673`；d2 pair SHA `70498f71a4739f456d6752eb9f23faa29d4ad2d0d58404de13e2329238472969`、独审SHA `ddaab9b25a43b9c6ff7b25f76be90f078dbfd56fe3ec81cbd29b3f5c4cfd8597`。证据根 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/`，细项见CURRENT_STATUS.json的 `g09_local_window_object_controls_20261007`，最新产品结果仍指向b1。
+
+截至 `2026-10-07T06:10:41.427719+00:00`，原runner22的 [37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367) 为 `in_progress`，固定验证8e84，不替代合并main后的最终冻结源码。仓外e1正在准备复用原8e84测试程序，比较已有无stdio/无写入stdio两项；尚未执行，原断言和三秒预算不变。当前7203份非文档来源与通过check/i18n11的合并内容一致，本次仅更新证据文档、未重跑门禁。正常五场景、三次独立冷恢复和最终同源Linux/Windows门禁均未完成；无需本地化变更。
+
+## 历史记录：合并main本地门禁与c3原始失败
+
+本轮新增关闭0项：G01–G08、G10、V03仍共10项关闭，G09开放；V01/V02/V05移交不计通过，PR22保持草稿。正常 witness=false 五场景、三次独立冷恢复和最终同一冻结源码 Linux/Windows 门禁尚未完成；普通安装、已支持只读ACL自动升级及特殊权限安装的既有决定保持。
+
+本机 c3 使用固定 `8e84b737e` 的原测试二进制，两项 stdio 原生测试各一次、均 exit101。实际两级 helper 使用调用方的交互站，在 `candidate_independent_station` 合同失败；写例原生写入44字节，但均未到 Rust 读取、nonce内容核验或模拟检查。helper自然退出0、Job及原句柄/管道关闭、keeper自然退出且caller对象未变；原三秒、关管道后和测试进程退出后的新LUID仍存在。预测站原本不存在，其 gone 不是实际站已回收的证明。该局部现象无需 Node/Codex/AppContainer 即可出现，但尚不能归因于管道或定位 b1 的持有者。
+
+已整合 `main` 的 `cc855835428b8585baed50d3015f314a4f2848ea`。合并内容的7207份来源绑定 index tree `8854d87d3b52ec0d0456314b7accbf8efa40185d`，`cargo check -p warp` 和 i18n11项通过、来源前后不变。中英文各5425个原键与main新增15键完整保留，变量一致；本轮G09证据无需本地化变更，无额外文案或布局改动。本轮状态文档在门禁之后更新，最终冻结同源双平台门禁仍待完成。
+
+原 runner22 的 [37573125367](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37573125367) 固定验证8e84；截至 `2026-10-07T05:28:33.888035+00:00` 仍为queued，不能记通过或替代合并后验证。下一项d1仅在仓外准备默认/私有首次窗口站两臂入口，尚未执行。证据根为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/`；详细摘要见 CURRENT_STATUS.json 的 `g09_local_stdio_control_and_posthoc_tokens_20261007`，原失败保留，cleanup_ready=false。
+
+a4/b1 首CMD比较的59份原件表明归一化manifest/内容合同及station bootstrap字节相同，但worker/supervisor字节不同；两轮实际environment block未保存，不能宣称仅SYSTEMROOT改变。收据 `a4-b1-first-cmd-comparison.safe.json` SHA256为 `1619d1367a3e20d99d849ad361f25392bd8e858bf3161580425ae75588ee546e`。
+
+04:45主token后验快照有196个已核同用户进程、0匹配，194个进程及2个token查询拒绝；04:52线程快照有191个已核同用户进程的2390条线程均ERROR_NO_TOKEN，193个进程及3个主token查询拒绝，两端LSA仍存在。两次范围不同，不能相加成全覆盖，零匹配不证明没有持有者，也不补写原停点。
+
+## 历史记录：局部修复通过普通门禁，真实 CMD 收尾仍失败
+
+原 runner22 的 [37556769074](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37556769074) 已结束为 failure。首个 updated 的实际错误已由冻结源码对应到 `SetFileInformationByHandle(FileRenameInfo)` 返回 `0x80070003`，阶段为 inactive_rename；CMD/PS 候选均输出新版本、退出0并完成原生清理。普通测试1153项中1152通过、1失败；失败测试三次真实尝试的错误依次为 rename 0x80070003、open os_error2、rename 0x8007007b。只归档到 Prepared，原机尾部 buffer 字节及回滚终态仍未知，不能以静态几何认定唯一首因。
+
+本机原生合同对照证明未补 NUL 的 FileRenameInfo 可将已分配缓冲区的尾部字节纳入目标名；现在明确补 UTF-16 NUL，提交长度包含 NUL，FileNameLength 不包含它，保持原身份、父目录锁、映像冻结和不覆盖约束。同时仅在实测使用 caller 站的分支显式创建本次新 LUID 私有站，保留原自动站路径；失败的 station 所有权先转交外层，异常回收最多尝试一次，未确认回收不得删除 profile。
+
+本机 a4 的两候选及站/桌面/DeviceMap/LSA 清理已通过，也到达发布和最终版本检查，但公共 PowerShell 查询仍 CommandFailed；原 worker 未保留该子进程原生码。后续固定输入对照分别定位到公共 powershell.exe、官方 codex.ps1 和验收环境 SYSTEMROOT 的 verbatim 路径表示：三者采用同一对象的安全 Win32 表示后，实际公共 PS 查询退出0、输出0.156.1，未修改执行策略。产品改用 dunce 安全表示并复核 canonical/stamp 身份；驱动仅调整 SYSTEMROOT 的同对象表示，特殊尾点/空格、设备名和长路径继续保留原语义。这些事后对照不能补写 a4 原退出码或其未执行的最终检查。
+
+本轮 b1 冻结7198份来源，基于 aa3b314bc09022f87810a5718668fe299f4af3f8 加修复增量，diff SHA为 `465d37db980606c8fba43b80a3f649d85ff01ba62a569eec26694969f3ec5dbe`。Python31、command40、npm52（1项真实 native 显式忽略）、i18n11、cargo check及默认构建均通过。默认正常 witness=false 五场景实际在首个 updated 的第一代 CMD 收尾停止：CMD/Node/Codex/console均退出0，输出0.156.1，205个调试事件均继续；两级 helper 退出0、Job为空、桌面及 DeviceMap 已关闭、站已不存在，但期限内 LSA 会话仍存在，正常关闭与异常清理均 TimedOut。最终受控退出收据为1、cleanup_confirmed=false；产品 RecoveryRequired，driver退出1、worker退出101；未到 PS 候选、发布或冷恢复。不能将窗口站消失当作 LSA 清理成功，实际持有者尚未确定。
+
+本轮源码在 wrapper 运行前后快照及独审截止2026-10-07T04:38:59.963135Z均匹配；5个程序、3个归档程序和2324份 manager 文件的准备绑定与独审后验重算匹配。原 driver 未到末尾复核，这些后验检查不补造产品已完成步骤。原失败、a4、差分对照与 b1 原件分开保留；详细收据、独审及摘要见 CURRENT_STATUS.json 的 `g09_station_publish_repairs_20261007` 和 `g09_original_native_rename_20261007`。这是局部验证，未替代原 runner 或最终同源双平台门禁。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 正常五场景、三次独立冷恢复、最终同一冻结源码Linux/Windows门禁尚未完成；V01/V02/V05移交不计通过。特殊权限安装决定不变，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：既有中英文错误语义适用，无用户文案或布局变化，i18n11项通过。下一步取得本代 LSA 收尾的持有者证据并验证修复；原始证据保留，cleanup_ready=false。
+
+## 历史记录：本机确认第二段使用调用方站，修复当时待实施
+
+`430b8be416ed6593387dfebc7a93c836a4571cd9` 加内部诊断增量在受控本机入口执行一次正常 `witness=false` 的 updated：第二段返回 `new_logon_station_name_mismatch`／`InvalidData`，`caller_station_matched=true`。实际名称匹配调用方而不匹配预期新LUID站；不能仅凭同名认定继承或自动选择机制。候选root_pid=0、调试事件0，尚未查询站的非交互属性/owner、修改站ACL、发送Ready或执行发布；产品仍为RecoveryRequired，driver退出1、libtest退出101。它没有复现原runner的PersistenceFailed。
+
+本轮异常清理仍失败：aborted-cleanup为TimedOut，两个helper退出码为1；预期站查询已不存在但LSA查询仍存在，两侧无查询错误，cleanup_confirmed=false，缺少first-child-exit收据。退出码1不能区分自然失败与异常终止，预期站不存在不能泛化为全部窗口站回收。旧baseline及a1失败原件保留，不将其结果覆盖为本轮通过。静态审查另发现启动失败的station尚未转交外层即析构，清理错误未传递；拟先保留所有权，再返回原启动错误，并避免析构开启第二轮异常等待。
+
+诊断仅保留固定check_stage、error_kind与已读名称的匹配布尔；不输出站名/SID，不新增原生查询、不改变原校验或返回。command29项、npm46项（1项真实native显式忽略）、i18n11项、cargo check及默认程序构建通过。7198份来源在五个门禁、实际运行前后及文档更新前独审均相同，dirty差异SHA为 `d6d603e00f275d08b903016549f2cbd0b9d8e724e5491d44c26a32eaf674771d`；这不是最终合并源码门禁。独审 `local-station-diagnostic-a2/station-name-failure-audit.safe.json` SHA为 `9710dcfee6aea38f2f83e1ed2451c1c2ca9818fe679dbb6e18e600cb211032c6`，三程序原字节已独立归档。细项、各门禁与归档摘要见CURRENT_STATUS.json的 `g09_local_station_classification_20261007`。
+
+原runner22的[37556769074](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37556769074)仍验证提交430b8be41，已知step44普通回归失败，真实npm结果待定，不预填结论。下一步仅对已观察到的caller站分支显式创建严格私有站，保留服务身份已成功的自动站路径，完成失败所有权修复后再验。本机CLR4.8.9345.0与原runner4.8.9310.0不同，未伪造GITHUB_ACTIONS，也不以换机结果补证原失败。
+
+**新增关闭0项；G09开放，PR22保持草稿。** 正常五场景、三次独立冷恢复、最终同一冻结源码Linux/Windows门禁仍未完成；V01/V02/V05移交不计通过。特殊权限安装可提示原安装工具，普通安装与已支持只读ACL自动升级要求不变。无需本地化变更：仅内部诊断，原用户错误语义、双语资源及布局不变；本轮i18n11项通过。证据保留，cleanup_ready=false。
+
+## 历史记录：原机恢复与事务仍失败，安全日志本机门禁通过、原机待验
+
+提交 `d131dd13f3ddb38713e17dd7258241ec901792be` 的原runner22正常验收[37553787071](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37553787071)失败。step44运行1153项，1152通过、1失败、7108跳过；新增恢复测试 `inactive_image_recovery_keeps_stage_frozen_until_backup_is_restored` 在第92行实际三次返回SourceChanged，汇总重复的TRY3不计第四次。step53的command93项通过、166跳过；i18n11项包含在默认普通测试中，不能因此把整个普通门禁记为通过。
+
+step62首个updated仍为 `PersistenceFailed`：0通过、1失败、8260过滤、110.37秒，退出101。CMD与PowerShell候选均输出 `codex-cli 0.156.1` 并退出0，原字节分别为18B/LF与19B/CRLF；201／372个事件全部继续，根进程等到Node/Codex退出，Job、profile、station、desktop、DeviceMap与LSA均有清理成功收据。探测成功不等于更新事务或回滚成功；后续四场景和三次独立冷恢复均未运行。
+
+可用原件只有Prepared前态checkpoint，没有当前持久化journal、OldMoved、Published或after-tree。只读CMD0.155.1和npm prefix来自更新前准备，不能证明回滚后版本。失败可能处于PS observed日志保存、首次rename或OldMoved日志保存，具体API与原生错误码均未知；不能认定首次rename为首因，也不将控制流推论计为动态回滚验收。67份来源仅完成执行前绑定，末尾源码、二进制与manager复核未到，仍不是最终全仓冻结。
+
+独审 `normal-five-37553787071/normal-updated-failure-boundary-independent-audit.safe.json` SHA为 `17c553fbf0b960423d2ddfa1fdcb642dfc8f69f6f7f27a4a08673e483c630d18`：重算56个所用ZIP成员、67份源码及4个官方SRI，1513项为审计检查数。候选工件11453324653共77成员，SHA `287194e0ebc528581e062b3436eb901eaa893929771195241e4bef7bb1358ec2`；官方日志ZIP SHA `ac62da6ff52c80d538de4aa1b2baf175241ca8a48de16cea2961c9a6245d329d`。证据根仍为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`，当前指针及细项见CURRENT_STATUS.json的 `g09_normal_publish_failure_37553787071_20261007`。
+
+当前工作区仅对两份产品文件补充有限安全日志：journal create/write/sync/persist的phase与原os_error；tree open、parent、freeze、rename原错误，身份失配维度及inactive阶段。原返回值、身份校验和guard生命周期保持；这是定位缺失证据的改动，不是已验证的修复。本轮格式检查、focused46通过（1项真实native显式忽略、8214过滤、0.07秒）与i18n11通过（8250过滤、5.68秒）均有exit0收据，7份来源与Cargo输入前后相同；`npm-publish-errors-check-a1`的cargo check已exit0（1分37秒、14条既有warnings），7份来源与Cargo输入前后一致；收据SHA为 `ec964b1c3b6d2ea1cf5a99510c52138d1eecdf9858cb2976b390f49d804f4356`。本轮安全日志的本机门禁通过，原机仍待验证，不预填后续提交或运行结果。本机真实负例已显示freeze_open原os_error32及rename HRESULT 0x80070005，证明日志可见，不将这些本机负例错误码当作原机失败码。main的38fb011已在本次运行前合入，既有本机合同、504cf65及a4a6等历史证据全部保留。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成；V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：仅增加内部安全日志，既有用户错误语义与界面布局不变；本轮i18n11项已通过。原件保留，cleanup_ready=false。
+
+## 历史记录：持久化修复局部门禁通过，原机待验
+
+提交 `504cf6595f600cff6d351313ea83c55565f6ab60` 的原runner22正常验收[37548517669](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37548517669)按witness=false、scope=all运行，仍为failure。首个updated结果由原ProbeFailed转为 `PersistenceFailed`，accepted=false、model_inputs_sent=0。两个公开候选均输出 `codex-cli 0.156.1` 并退出0：CMD保留18B/LF，PowerShell保留19B/CRLF。PS的Codex在10674ms退出、Node在11024ms退出、PS根在11841ms退出，已正常等到Node结束；这证明本轮版本探测通过，不等于updated事务通过，也不补证旧267候选的freshness或原PSI.WorkingDirectory精确值。
+
+可用原件保存了首个Prepared前态快照，未见后续OldMoved记录；上传工件没有持久化事务journal，不能凭这一缺失指定失败API、宣称根因已确定或回滚已完成。原机冻结句柄相关解释仍未确认；下述本机合同证据和已实现的修复不能补证原失败点。下一步合入main后在原机验证修复，完成正常五场景和三次独立冷恢复；不将探测成功或文档更新计作关闭。
+
+本机针对发布/恢复时映像句柄与目录改名的合同补充了真实文件系统基线：4/4通过，保留SEC_IMAGE但原File已关闭时，底层rename实际返回Ok，freeze仍拒绝。因此修复不能只释放句柄后直接改名。基线收据 `npm-publish-tree-baseline-a1.safe.json` SHA为 `4565162a82810fbdb2170b77c9215708e92a4c7c3096c45afd5c6b4e69da76e1`；这是本机合同证据，不证明原37548517669的具体失败API。
+
+当前工作区已实现 `tree::rename_inactive_images`：父目录租约覆盖freeze/drop、原有不覆盖目标且校验完整身份的rename、目标重新freeze；重新freeze失败返回RecoveryRequired。execute把backup映像guard保留到第二棵树发布后；recover把反向移动后的stage guard保留到旧包恢复后，并在删除stage前释放。已有待恢复事务的recover失败统一为RecoveryRequired，继续保持启动保护。新增6项树测试和1项pending目录日志错误回归均包含在focused实际通过的46项中（1项真实native显式忽略、8214过滤、0.07秒）；另有19项启动保护回归（0.20秒）和11项i18n（7.15秒）通过。三轮均exit0，7份变更来源与Cargo输入前后摘要一致。`npm-publish-check-a1`的cargo check已exit0（1分38秒、14条既有warnings），7份变更来源与Cargo输入前后摘要一致；收据SHA为 `4ad6d5631ef47b1d307e7ef5c2ab7bc1d00a75b9920a7b4ce8a7680080fff021`。本轮局部门禁通过，原机修复仍待验证。格式检查已通过，收据 `npm-publish-format-a1.safe.json` SHA为 `e4ba78e7c4bea16e92917dd4df4ae8f33977cb5a70626e04ab439382a09f62c8`。本机增量、收据和验收边界见CURRENT_STATUS.json的 `g09_npm_publish_local_repair_20261007`。
+
+main已前进到 `38fb011d9c374f37016fd31a88c86c974cd04969`（PR23仅修改macOS ARM64发布架构名校验）；已在局部门禁通过后合入。本次合并未变更 Rust 产品或测试输入，原机正常验收和最终同源门禁仍待完成。
+
+本轮默认nextest1146项（含i18n11）与command93项通过，没有运行witness组。CMD的200个、PS的380个调试事件全部继续，两个候选cleanup及station清理通过。67份来源仅完成执行前Git字节绑定；首个事务失败后，末尾源码、二进制和manager复核未到，不能称全仓冻结或最终同源门禁通过。本轮没有新增运行时模块或异常对象取证，原失败与原双阶段证据继续保留。
+
+权威独审为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/normal-five-37548517669/normal-candidate-failure-audit.safe.json`，SHA `2dc2baca500720c6ca8663e95ac36c6957f97956c0677946f818bcd3c8efb136`，149项审计检查不计为测试数。原件摘要、版本输出字节/摘要、生命周期及当前指针见CURRENT_STATUS.json的 `g09_normal_candidate_persistence_failure_20261007`。此前a4a6固定能力、实际CreateProcess回退、PATHEXT单键未解决原故障及所有历史失败均保留，不重写为通过。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 正常witness=false五场景、三次独立冷恢复和最终同一冻结源码Linux/Windows门禁均未完成。V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示使用原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：本轮发布/恢复失败沿用既有settings-cli-updates-recovery英文与简体中文语义，已复核适用，无UI尺寸变化；本轮i18n11项已通过。仓外原件保留，cleanup_ready=false。
+
+## 历史记录：原机双阶段实证CreateProcess回退，产品验收仍失败
+
+同一提交 `a4a6b4ebd8ff03679f2e1c5e4822ce26c2293c08` 在原runner22完成两轮独审。固定能力[37537472413](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37537472413)通过151项普通测试和唯一native一次（1.694秒、无重试），独审263项检查全部通过；263是审计检查数，不是测试数。准备范围13份来源执行前后逐字节一致，原CLR/DAC身份匹配。该固定轮未触发pre-Start异常，也未触发late延迟重放，不能将这两条原生路径记为本轮通过。
+
+真实PowerShell[37538211705](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37538211705)仍为首个updated的 `ProbeFailed`。实际顺序为pre179→initial181→pre-Start CLR182→Node188→late189：Complete IL0x46的local4（soloCommand）为true、PSI local5的useShellExecute为false；IL0x293的local0为true、同帧PSI为true。首个pre-Start CLR栈顶落在原System的 `Process.StartWithCreateProcess` IL0x3f0，Complete调用帧为IL0xf7。结合原冻结IL合同，这证明实际先尝试CreateProcess、随后走ShellExecute回退及跳过等待的路径；尚未证明失败的具体输入或最终首因。Win32Exception的267仅是LastThrown候选字段，freshness=false，不能写成当前错误码；32帧为有界局部栈，不能称完整栈。实际PATHEXT环境字符串未读取，post分类保持unknown。
+
+PowerShell在12517ms零输出退出1，Codex在17334ms退出0，Node在17726ms退出0。418个PS调试事件全部继续；累计98次存活线程DR恢复和27次恢复前已退出线程分别记账。4个reader及精确Job、进程、station和LSA清理已核，但证据仍保留，cleanup_ready=false。该轮默认nextest1146项（含i18n11）、command93项、诊断150项、Node19及Python15/1/28通过；67份产品来源仅在执行前完成Git字节绑定，失败后末尾复核未到，不能称全仓冻结或最终同源门禁通过。
+
+仓外证据根为 `C:/Coding/InfiniShell-Evidence/g09-20261006-a`。固定独审 `fixture-37537472413/independent-fixed-two-stage-audit.safe.json` SHA为 `2fa4fdf5069e5022bec82cd631ea7acd0eecefe8594dde77b30f0f6723e4c04a`；真实独审 `ps-two-stage-37538211705/independent-two-stage-actual-audit-v2.safe.json` SHA为 `6a7b0852ba41999870d544204ad30dd91971e8c92be6e9ab3b2e619fc5d5cbbd`。生命周期和reader构建独审摘要、原件摘要及边界见CURRENT_STATUS.json的 `g09_two_stage_original_result_20261007`。实际审计v1的4项失败源于审计假设错误，v2按有界栈和产品非零退出的真实合同修正；生命周期脚本v1错键及错误说明保留，v2修正。没有据此修改产品源码、覆盖原件或抹去候选失败。
+
+**新增关闭0项；G01–G08、G10、V03仍共10项关闭，G09开放，PR22保持草稿。** 当前工作区已加入最小产品改动：PowerShell调用原shim前Set-Location到已绑定映射根，本机默认构建的10项npm probe测试、11项i18n与cargo check已通过，三份收据及源码前后摘要见CURRENT_STATUS；原机验证仍待完成。提交后直接在原runner执行正常witness=false、scope=all五场景和三次独立冷恢复；固定观察器13份来源未变，复用原机固定能力的来源验证，不重复固定native或诊断witness候选。原PSI.WorkingDirectory精确字符串和267 freshness仍未知，PATHEXT单键修复未解决原故障的反证保持。正常验收及最终同一冻结源码Linux/Windows门禁均未完成。V01/V02/V05移交后续平台实机验收，不计通过。特殊权限安装可提示使用原安装工具升级，普通安装及已支持只读ACL自动升级要求保持。无需本地化变更：本轮调整受管PowerShell工作目录并同步内部验收证据，用户失败仍通过既有本地化错误路径报告，无用户文案或布局变化。
+
+## 历史记录：双阶段读取本机固定能力通过，原环境待验
+
+基于 `6fe81afb56ec4453ab1d9ab637e92d49c505d119` 的本轮增量已实现同一 Complete 方法首次 Start 前及后续返回点的实际读取。pre-op3 使用固定400B双规格一次交付同帧、同方法版本、同代码/map摘要的两张私有票据；initial op4 在 IL0x46读取已初始化的 local4（soloCommand）与 PSI local5，回收reader并恢复原上下文后换装晚期DR1、正常继续，不等待尚未创建的Node。后续点沿用原批准集合。四reader硬上限不变：pre、initial、late各一次，第四槽由early恢复后Node前首个原worker CLR与post分类互斥使用；后者未读时仍保存原生raw，明确CLR未满足，unknown不折成false。
+
+本机a4通过222项command普通测试（9显式忽略、28过滤）和唯一原生夹具一次（1.37秒、258过滤）。实际顺序为pre73→initial75→late首次76→Node77→late重放78→post156，两个op4的固定Boolean均true、PSI均false；四诊断槽与原四异常链分别核验，169原事件全部继续，目标、后代、readers与精确Jobs回收，无pending。独审SHA `fa4b1d70590f25cb362544a1d6222929c8841b6d27f350f76e55e23beb099d52`；详细源码与日志绑定见CURRENT_STATUS.json的 `g09_two_stage_managed_local_20261007`。这些是本机当前CLR的固定能力，不替代原runner与PowerShell验收。
+
+a2、a3失败原件保留。a3实际证明完整方法代码SHA、allocation/base/type/protection/样本字节相同，仅VirtualQueryEx连续页范围从4096增至8192；已仅在托管映射复核中投影到原方法extent，读取前截断样本，继续严格核allocation、类型、保护、完整覆盖和代码摘要，原生分类返回合同不变。新增真实内存页回归验证方法外增长可继续、方法内代码/权限变化拒绝。受控Local准备入口保持，外部启动器只避免WinPS继承PS7模块，未伪造CI环境。应用测试旧字段编译失败也已保留并修正；带特性诊断回归、i18n与cargo check通过。本机缺nextest的失败另存，定向普通回归采用cargo test，远端仍用已有nextest流程。
+
+**新增关闭0项；G09仍开放，PR22保持草稿。** `67089b6`原runner的PATHEXT单键修复反证不变。下一步先验原runner同提交固定能力，再接真实PS核初始与终态及同停点证据；精准修复、正常witness=false五场景、三次独立冷恢复、最终同一冻结源码Linux/Windows门禁仍欠。V01/V02/V05移交不计通过。无需本地化变更：仅内部诊断、固定夹具和证据，无用户文案或布局变化。仓外原件保留，cleanup_ready=false。
+
+## 历史记录：PATHEXT单键修复未解决原故障
+
+`67089b6098915c85f5d6947a613f15d391b67134`的[原runner22运行37525407224](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37525407224)已正式失败，只有真实npm步骤62失败。编译检查、1146项warp及93项command普通回归、其中i18n11项和142项诊断普通回归通过，不能替代产品验收。唯一产品变化为PS候选PATHEXT=.EXE；本轮仍为updated/ProbeFailed，libtest退出101。
+
+实际pre181→182取得17744/0x4550，Node190后op4191在原Complete IL0x293仍读到Boolean local0=true及PSI local5.useShellExecute=true，所需API全部成功；post分类仍未观察到。PS在12924ms零输出退出1，Codex17669ms、Node18033ms均退出0，无取消。原PS/Node字节与FileID、实际CLR/DAC身份及SMA/System MVID保持；不是换机器结果。pre/op4各32帧partial；CLR193的28帧完整栈和LastThrown候选不证明异常freshness。新增两条CLR仅体现溢出计数，不能定位到pre→Node或认定Win32回退。
+
+三份官方工件及完整日志已保全；候选ZIP SHA为`6c27ea1660a7bbee90a4ffaaa6e5cba57b0123e09590bfefd996fb87c02c2c82`，90成员CRC/SHA通过。终态独审`5451dffd7c668bdf5d873a416570181102a1b597bb1a7669a5c726ec8913a84f`、op4独审`0228962017edfbec12627ac40aa5e60ebcad7e434632c4a2944168f26ad5b0c6`，路径和完整绑定见CURRENT_STATUS.json的g09_pathext_original_counterexample_20261007。67项来源仅执行前逐Git字节核验；失败后driver末尾复核未执行。全部423个PS/202个CMD事件已继续，无pending，三个reader与进程/Job/站/LSA已核清理；90次live恢复与31个先退出线程分开记录，cleanup_ready=false保留。
+
+下一步拟区分同一Complete首次Start前的PSI初值与现有终态，而非再重采原26异常：IL0x46可复用字段及已初始化Boolean local4能力，但必须有真正pre-Node阶段，不能直接套用等待Node的暂停协议。初始false/最终true才支持后续ShellExecute切换；初始true仍需区分环境与直接分类。该观察方案尚未实现或原生验证，不算关闭。此前“.EXE即可修复”的预测按失败保留，不把本机机制实验当原机首因。
+
+**新增关闭0项，G09仍开放，PR22保持草稿。** 正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁仍欠；V01/V02/V05移交不计通过。无需本地化变更。
+
+## 历史记录：取得真实等待分支，PATHEXT最小修复待原机验证
+
+G01–G08、G10、V03共10项关闭；G09开放，新增关闭0项；V01/V02/V05仍移交后续实机、不计通过。PR #22保持草稿，当前不满足合并条件。
+
+同一提交d7610c5在原runner22先完成固定能力37499069138（124普通、唯一native一次通过），再执行真实PS37517610154。真实产品仍ProbeFailed，但pre180实际返回17744/0x4550，Node185后的op4 186在原Complete方法IL0x293成功读取Boolean local0=true及PSI local5.useShellExecute=true，全部所需读取HRESULT=0。实际分支跳过输出读取、WaitForExit及LASTEXITCODE更新，PS13111ms零输出退出1，Node/Codex随后0；不能再把它表述成没有运行时分支证据。op4仍是32帧partial，首CLR188的28帧完整栈及LastThrown候选不证明异常freshness。
+
+414个PS事件全部继续，三个reader/Jobs和进程、desktop、DeviceMap、station、LSA清理已核；累计78次live恢复与28个先退出线程分开记录。执行前67来源逐字节绑定，失败后末尾复核未运行，不称全仓冻结。独立op4审计SHA 52b33ca3946e5d4bcceca537435087fd3e6031dafbd60d3cc10ac186618d151d；生命周期终审SHA 21d42ccf0a509d46b62e6076aef77b570a99cd9a4bf907b5101eca4b8f65b656，均位于仓外ps-classification-37517610154。
+
+本轮只给Codex npm PowerShell候选的空环境显式加入PATHEXT=.EXE，不继承宿主值。官方PowerShell实现会把缺失/空PATHEXT补成.CPL，使.EXE不在原生可执行扩展列表；[官方代码](https://github.com/PowerShell/PowerShell/pull/9828/files)与本机独立实验支持此机制，但本机SMA不同、原目标PATHEXT未直接读取，不能提前宣称首因完整关闭。官方shim、命令、权限、超时和诊断实现均未改。修复前回归实际失败（扩展列表0项，期望1项），修复后该模块8项及i18n11项通过，cargo check -p warp通过；各原件与摘要见CURRENT_STATUS.json的g09_pathext_fix_candidate_20261007。
+
+下一步在原runner验证该最小修复：应实际观察UseShellExecute=false、local0=false及正常输出、等待和退出码；若不符即否定完整原因假设。随后仍须正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁。无需本地化变更：环境键为稳定协议值，无新增或变动用户文案、语义说明或布局。原失败、原26异常和本轮全部仓外证据保留，cleanup_ready=false。
+
+## 历史记录：托管续点本地固定能力阶段
+
+以下内容保留当时状态；最新结论以上文为准。
+
+## 当前接续状态（2026-10-07）：本机托管续点固定能力通过，原环境待验
+
+G01–G08、G10、V03共10项关闭；G09仍开放，新增关闭0项；V01/V02/V05移交后续实机、不计通过，PR #22保持草稿。当前基于374642b的未提交增量已实现Complete原方法的有界托管续点；本机固定能力通过，原runner和真实PowerShell尚未运行本增量，不改变37469893834的ProbeFailed及首因未知结论。
+
+pre原停点只读取得唯一实际MethodInstance、MVID/token、EnC、IL/native映射、代码摘要和原帧身份，绑定单次DR1；op4只在同一原工作线程/帧和批准IL读取Boolean及PSI字段。若父线程续点先于子进程CREATE递送，精确暂停原工作线程一次，以DBG_REPLY_LATER继续原事件；真实Node身份绑定后平衡自有暂停，在同事件重放后读取。helper两端只接受原始首机会单步的延期资格。首次递送、Node、重放分别保存，不改写时序；应用共用原期限、至多四reader，原首CLR预算与NOT_HANDLED语义保持。
+
+本机a8通过124普通（108跳过）和唯一原生夹具一次（1.478秒、231跳过、零重试）。原链为pre71→73→RF skip74→首次续点75→Node76→重放/op4 77→首CLR155→post156→157→其余原异常158/159/160。op4实际MVID 6dfc3e1e-8933-42c8-8a7c-387588962a72、MethodDef100663299、IL162、37项映射/737字节extent；Boolean local4真实类型System.Boolean、位置1、字节1、值true；PSI local2实际引用8字节，System MVID/TypeDef/FieldDef与getter合同匹配，useShellExecute=false。引用GetType/GetName未请求，HRESULT保留E_PENDING。自有Suspend前计数0、Resume前计数1、最终不再拥有暂停；170事件全部继续，原进程/后代/readers/Jobs均回收。独审managed-continuation-a8-audit.safe.json为168947字节，SHA 593f0b4c640ae84e9780ab60f94a651db3eb74d84d6dd081fb050c6f5881e36e。
+
+固定分类方法明确使用NoInlining|NoOptimization，准备收据核实际MethodImpl flags=72，不能外推真实PowerShell的优化后局部可读性。a5的ref和a6的按值参数在IL153均返回Boolean零位置；a7调用返回后的IL162中Boolean与PSI均零位置，全部为unknown/null并失败，不能将其当false或首因。三轮独立失败审计与原件保留；a8仅证明明确固定编译条件下的读值能力，真实PowerShell不改优化、不force JIT、不写IL。a6应用测试编译的两处闭包生命周期错误已修，失败原件保留。
+
+本轮command特性check、Warp check、应用诊断回归和i18n门禁已通过，详细计数及日志摘要见CURRENT_STATUS.json的g09_managed_continuation_local_20261007；20份变动来源和明确测试二进制/reader/fixture前后绑定不等于全仓冻结。无需本地化变更：只有内部诊断、夹具和证据，无用户文案、产品语义或布局变化。仓外证据根C:/Coding/InfiniShell-Evidence/g09-20261006-a，cleanup_ready=false，原失败与26异常均保留。
+
+下一步提交后先验证原runner新固定能力，再运行同提交真实PowerShell，依据真实分支与同停点证据精准修复；正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁仍未完成，合并条件未满足。
+
+## 历史记录：374642b原runner固定能力及真实PS失败
+
+以下保留当时原文；其中“尚未实现”“当前”和“下一步”只描述该历史阶段，最新状态以上文为准。
+
+## 当前接续状态（2026-10-06）
+
+G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。同一提交374642b的原runner固定37469139712通过88普通及唯一native；真实PS37469893834仍为ProbeFailed。pre179→180取得完整17744/0x4550及局部SMA栈，Node185后首异常186取得28帧，首帧映射到ThrowInstruction.Run的rethrow抛出点；ExitException仅为last-thrown候选，freshness未证明。post分类仍0/unknown；PS12228ms零输出退出1，Node/Codex随后0。67来源仅完成执行前逐字节绑定，失败后全套复核未运行；事件继续及清理已核。新增关闭0项；后续直接观察Complete启动后等待决策的只读设计尚未实现，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。
+
+同一提交 `374642b149c9f38e13d9ea6702a965ab4be0885b` 的[固定能力37469139712](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37469139712)在原runner22/同CLR-DAC通过88普通（114跳过）及唯一native一次（1.373秒、201跳过、无重试）。实际链为pre72→74（完整17744、caller IL70）→RF skip75→Node76→首异常153（operation1、Win32 native code1234）→reader回收/同停点恢复→post154→155（完整17744、IL243）→其余原异常156/157/158。原四CLR异常均NOT_HANDLED，169事件全部继续，21次累计live DR恢复、dirty0，原进程/后代/reader/Jobs清理通过。13准备来源与Git逐字节匹配且前后一致；固定能力不代证真实PS成功。独审 `fixture-37469139712/independent-fixed-audit.safe.json` 为102108字节，SHA `e04d3613409b3c9ffe46e96a73076323835db358a75815e2073174e86635da26`。
+
+随后同HEAD的[真实PS37469893834](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37469893834)在原runner22、job112290389147终态failure，仅首updated为ProbeFailed，model_inputs_sent=0。pre179→180完整u64=17744/0x4550；Node185后原worker首异常186为CLR `0xe0434352`、first-chance=1、HRESULT `0x80131501`。operation1取得28帧真实module/MVID/token/IL，SMA MVID `0a210000-3870-4dec-b53e-175f62acb623` 下首帧MethodDef `0x060035e8`/IL24映射到 `System.Management.Automation.Interpreter.ThrowInstruction.Run`：原合同IL0x13为newobj RethrowException，IL0x18为throw。reader的单个 `last_thrown_object_candidate` TypeDef `0x02000238` 按同MVID合同解析为ExitException，freshness未证明；不能将它等同于本次当前抛出的对象，不能据此认定首因。名称与IL语义来自原静态合同，运行时返回的是身份/token/IL；不把静态SMA文件SHA当作本次加载字节SHA。
+
+28帧中没有Complete/Process.Start/Console，不能从缺帧推出未执行；末三帧IL=4294967293为特殊映射值，不当普通IL偏移。post分类selected/returned仍为0、entry/return为null、结果unknown。seq186的DR采样仅证明原root当前事件线程在该停点的地址/配置相符，不证明全线程或整个区间持续性。两个reader（pre180与首异常186）均按原身份回收后恢复，未重新逐项采集原26异常；last-thrown对象链完整不代表tracker完整或当前对象已证。
+
+实际时序为Node11076ms创建，PS12228ms退出1且stdout0字节，Codex15337ms创建/16964ms退出0，Node17337ms退出0，无取消。PS415、CMD198事件received=validated=continued，pending为空；两代原进程/后代、reader/Job、desktop、DeviceMap、station及LSA清理通过。pre和首异常reader前live DR恢复累计56次，最终29线程以原进程退出确认、dirty0，不能称29次live读回恢复。
+
+67份来源与374642b原始Git blob逐字节相同，仅证明执行前绑定；失败后末尾source/binary/manager复核未运行、summary.safe缺失，不称执行后67来源或全仓冻结。reader构建13来源前后一致、11份归档源及实际180/186所用reader原件摘要已核；未归档worker/supervisor/node/npm原件，不冒称离线重算。实际LOAD、180与186读取器的CLR/DAC FileID/大小/SHA均与原失败一致，版本4.8.9310.0；SMA运行时字节SHA未核。
+
+仓外根 `C:/Coding/InfiniShell-Evidence/g09-20261006-a` 保留全部旧失败、原26异常和本轮原件；真实终审 `ps-classification-37469893834/independent-terminal-audit.safe.json` 为176680字节，SHA `92edf1339fc02bd0b1ef06f0a006600771d6a3b438d4e5119c0ebd3afd4a7468`，cleanup_ready=false。首异常186完成收据SHA `61c330fd325300b4a3ad8cb0ed4472b901392072bf483bcddd010b8f91abaa77`；名称/IL解析使用原 `original-evidence/members/11353475918/contract.safe.json`，SHA `d6ae4082fe989adf7622b326bddab86a14deeefa17166578a03d0fd5bdc01baf`。
+
+下一步需直接观测NativeCommandProcessor.Complete在Process.Start之后的实际等待决策；不能从静态路径、Node CREATE、未命中post或缺失栈帧推断原PS首因。后续只读动态设计尚未实现、未执行，不列作已有能力；不能调用目标方法、force JIT、写IL或重采原26异常。先由真实停点与实际可用映射决定最小观察范围，再精准修复；正常witness=false五场景、三次独立冷恢复和最终同一冻结源码Linux/Windows门禁仍待完成。
+
+无需本地化变更：本次只同步内部诊断证据与状态文档，没有用户文案、语义或布局变化。既有本机88普通、command特性check、warp check、i18n11、应用诊断54与唯一native收据保留；不作为G09关闭依据。
+
+## 历史记录：374642b提交前的本地门禁与f3b失败
+
+以下保留当时原文；其中“当前工作树”“待验证”“下一步”仅代表该历史阶段，最新结论以上文为准。
+
+G01–G08、G10、V03共10项关闭；G09开放，V01/V02/V05移交后续平台实机验收、不计通过，PR保持草稿且不得合并。f3b原runner固定77普通及唯一native通过；真实PS37455611629仍ProbeFailed：pre173→174返回完整17744/0x4550并取得同停点SMA局部栈，Node179后post返回仍未知。PS12406ms零输出退出1，Node/Codex随后0，原CLR/DAC身份和退出清理已核。当前工作树新增单次postNode原worker首异常诊断；command普通88、command特性check、warp check、i18n11、应用诊断54与唯一native全部通过，原runner当前增量仍待验证。八源码/测试exe前后绑定不代表全仓冻结，不继承f3b真实候选通过。新增关闭0项，精准修复、正常witness=false五场景、三次独立冷恢复及最终同一冻结源码Linux/Windows门禁未完成。
+
+当前工作树已实现单次postNode原worker首EXCEPTION诊断：core独立一次性票据在原停点核身份并撤下全部自有DR，合法CLR首事件复用operation1，reader与精确Job回收后在同停点复核原完整上下文与期限再恢复观察；非CLR或不合法首事件记unknown并消费该槽，不追逐后续异常。pre/post分类各一次及原选择/成功条件不变；应用三槽共用原deadline，至多启动三个reader，不重采原26异常。唯一固定夹具改为pre→Node→原Win32(1234)异常→post→原其余三异常，沿用四异常而不扩矩阵。本轮command普通/特性check、warp check、i18n、应用诊断特性测试及唯一native全部通过；原runner当前增量仍待验证，这些本地限定门禁不作为产品修复或缺口关闭。无需本地化变更：仅内部诊断、夹具和证据，无用户文案、语义或布局变化。
+
+同一历史验证提交 `f3b7476a4df2bf4b3c32f5867073cd51c1e0638f` 的[固定能力37454947662](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37454947662)在原runner22通过77普通及唯一native（1.338秒），独审SHA `80292e174f9edf4cf1aa9d70f1bfa1069dfb59c58394a7a9e7cc3f90193de361`。随后[真实PS37455611629](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37455611629)在同一runner/HEAD终态failure；本次固定能力不代证真实候选成功，更不代证当前未提交诊断增量。真实终审 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/ps-classification-37455611629/independent-terminal-audit.safe.json` 为141703字节，SHA `c98724e210ee0e240b851a57393e18db353d4130ff31e24fa49767c0d7197fb5`。
+
+真实pre返回及同停点局部栈已取得，启动后分类仍未知：pre173→174、Node179、单线程DR采样180；PS12406ms退出1/输出0，Node/Codex随后0。67来源、原CLR/DAC和进程/reader/Job/station/LSA清理已核，但失败后末尾来源复核未执行，SMA运行时字节SHA未核。原npm ZIP SHA `926d2f9c2716fa641bdc0dcbac8bf339021280f1de03f44de6db4b931bdfe34b`，82成员CRC/SHA完整；局部栈与固定通过不证明首因。新首异常诊断的原runner/真实PS待验，不增加关闭数，也不改变普通安装及已支持只读ACL自动升级要求；特殊权限提示沿用用户已同意的原安装工具升级决定。
+
+本轮已核本地command普通a2共88项通过/114跳过、正确 `native-probe-witness` 特性check a2、`cargo check -p warp` a1及i18n a1共11项通过；八源码与唯一native使用来源逐份相同、各门禁前后摘要不变。应用诊断特性测试a1已54/54通过、8305筛除、4.734秒、exit0，八来源前后不变；本轮全部本地门禁通过。原runner当前增量的固定能力及真实PS仍待后续验证。
+
+综合本地门禁收据 `C:/Coding/InfiniShell-Evidence/g09-20261006-a/post-node-exception-local-integration-gates.safe.json` 为8166字节，SHA `424f90b2387074c042f8acb4f5382cbaac96460c4e5379df2a76856563260f20`；逐份日志、收据和八源码当前值一致。应用诊断完成收据SHA `6d0baae244bee0fba1f6d026db2939ab735ceee65ce92103abcdab6db66e983e`。这些本地结果不回填后续提交SHA，不代表全仓冻结、原runner或真实PS通过。
+
+唯一native a1实际执行一次，1.206秒通过/201跳过、无native重试。真实链为pre entry71→return73（完整0x4550、caller IL70）→RF skip74→Node75→原worker首异常151（operation1、Win32 native code1234）→reader回收并同停点rearm→post entry152→return153（完整0x4550、IL243）→原其余三异常154/155/156。四CLR异常全部DBG_EXCEPTION_NOT_HANDLED，166事件全部继续，21次累计live DR恢复、dirty0、原root/三后代/reader及Jobs回收。独审 `post-node-exception-a1-audit.safe.json` 为139520字节，SHA `623c405eaca8d2a1f7c5f5d17dfe68499f32bf6bec33ae265bbb23369868ad6d`；精确测试exe SHA `ae23a9696a3b3fa7199f4210bdae18070e097279dbff62748525549283b6ecf7`。13准备来源中只有Fixture.cs相对f3b不同，本机CLR/DAC4.8.9345.0不代原runner4.8.9310.0或真实PS；八源码/测试exe绑定不代表全仓冻结。
+
+普通a1六处union访问E0133已修，错误command特性名的check a1在命令层exit101；两份失败原件保留、不计通过。当前源码没有新冻结提交SHA；正常witness=false五场景、三次独立冷恢复、精准产品修复及最终同源双平台门禁仍未完成，G09开放、新增关闭0项，无需本地化变更。
+
+以下为此前阶段按各自提交保留的历史记录；其中“下一步”“待验”不覆盖以上当前状态。
+
+本增量已接入独立一次启动前分类返回及同停点CLR；先恢复全部自有DR、回收reader，再以一次性原停点票据核身份/完整上下文及期限后重新布点。启动后选择条件、一次预算和验收字段保持，新增采样只证明首次受支持root活停点的当前事件线程。唯一夹具扩展同一条执行链，不增加原生用例矩阵。本机77普通、command特性check、warp check、i18n11和应用诊断45项通过，八份修改来源在每项门禁前后相同，综合收据SHA `80d693dc1a242955a6959ddee40f87e1262de540d9f44d7f1abe0a82a949c81b`。
+
+下一步在原runner先复核该提交固定能力，再取同提交真实PS返回/CLR和DR收据。启动前证据不能替代Complete中的启动后门禁；首次未命中原因及原PS首因仍未知。G09开放，新增关闭0项；正常witness=false五场景、三次独立冷恢复、精准修复和最终同源双平台门禁仍待完成。无需本地化变更：只有内部诊断、夹具与证据，无用户文案、语义或布局变化。
+
+以下记录按各自提交与当时范围保留。
+
+同一冻结提交 `02fb1cde5e20fc7863927bc720e9d796821646b3` 的原runner固定能力37442360399通过64普通及唯一native；真实PS37442785591仍失败。首次未选择调用seq182明确在Node187之前，flags=0x2000且路径匹配；启动后selected/returned仍为0，未取得分类返回或同停点CLR。实际PS/Node与原LOAD CLR/配对DAC身份和原失败相同；后者不代表reader已加载DAC或取得SMA栈。PS在9414ms退出1且零输出，Codex/Node随后退出0；420事件全部继续，30线程原退出确认，CMD/PS清理通过。67来源逐字节绑定，终审SHA `0620ef990ad0896908e4b5942753a6a9ec6b0db8eb0e2a77ad6d7df90cbc7aed`。首因仍未知，G09开放，新增关闭0项。
+
+下一增量单独观察首次启动前分类返回及同停点CLR，并在读取器完全回收后恢复启动后观察；仅采一次支持的原root活停点DR配置。启动前证据不替代Complete中的启动后分类门禁，不从无命中推断没有执行。保持唯一原生夹具和四异常，不重采原26异常。精准修复、正常witness=false五场景/三次独立冷恢复及最终同源双平台门禁仍待完成。无需本地化变更。
+
+以下记录按各自提交与当时范围保留。
+
+本提交补首个未选择调用的有界时序/身份/flags/路径比较收据，保留原LOAD已核CLR/配对DAC来源；不改变实际选择或成功门槛。本机64普通、i18n11、应用诊断36与唯一native通过，源码和测试exe前后绑定已审计，SHA `6cee15a6e10cf8a57bb843cfe9a897819c705d0c3666d7821de69cda4a02c789`。原runner固定能力及同提交真实PS仍待执行，原首因未知；G09开放、新增关闭0项，无需本地化变更。
+
+最新 `b12f59967` 原runner固定能力37395058332已通过60普通及唯一native。随后[真实PS37395641796](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37395641796)再次零输出退出1，Node/Codex随后退出0；67来源逐字节匹配、CMD/PS两代进程及station/LSA清理均通过独审。分类selected/returned为0，仅一次未选择调用，缺其时序与排除理由，不能据此推UseShellExecute或首因。原件终审SHA `ef7f790e963ef56e562ad26ebb58d2a9ea0da013770102457d5bd59eaa623539`。下一步补首skip有界证据并复核观察范围；G09仍开放，新增关闭0项，正常五场景/三冷恢复及最终同源门禁未完成。以下失败与当时判断按原范围保留。
+
+[真实PS运行37352397472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37352397472)绑定 `7f6d9d6e3`，在Node创建前seq177因诊断器RF写回的EFlags固定bit1读回差异中止；没有分类返回或同停点CLR栈，原PS首因仍未知。原件独审SHA `e2cc748e7234967ca5cafa0e18be30eff78f90deb1d6b66cde11fe950295c24f`。26线程DR恢复及原root退出已证，但登录会话未消失，整体清理未确认；65/67来源逐字节匹配，两个准备PS脚本的CRLF差异独立保留。
+
+本机60普通及唯一原生夹具通过：preNode skipped71、NodeCREATE73→entry148→return150、完整0x4550、同worker caller IL179、原四异常及164事件继续和退出清理均已核；另有36应用诊断特性及21准备入口测试通过。这些绑定本轮明确dirty源码，不能标成7f6冻结执行，也不覆盖真实PS/LSA清理。下一步先在原runner复核固定能力，再恢复真实PS取证；G09仍开放，正常五场景/三冷恢复和最终同源双平台门禁仍待完成。无需本地化变更。
+
+固定能力后续已在原runner37344743491通过并独审，精确绑定e4e690dd及与原失败相同的CLR/DAC字节；这没有运行真实PS候选，也不关闭G09。真实分类接入、正常五场景/三次冷恢复和最终同源双平台门禁仍待完成。
+
+2026-10-06 Windows接续：本机固定能力55普通、唯一native、28离线来源合同及warp check通过，实际读到0x4550与精确caller IL160；原runner37340942346的DR失败及本地a1–a7失败全部保留。原runner与本机CLR/SMA版本不同，尚未取得真实PS的分类返回与同停点栈，G09仍开放。原10项关闭数不变，V01/V02/V05移交不计通过；五场景、三次冷恢复及最终同源双平台门禁仍未完成，PR保持草稿。细节与摘要见验证结论及CURRENT_STATUS。
+
+更新日期：2026-10-05。历史核对基线为 `3c5910678`，原产品冻结于 `ee839b4fc`、相关原生验证提交为 `50e1515bc`；输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`已继续实现图片与文件卡片，npm 来源绑定另见 `b6f93f662`。历史 Claude 图片双技能在线收据已绑定提交 `2383428dac785fc34ed44120226b596d592ad191`；其他旧在线收据仍按各自源码摘要绑定，不回填最终提交验收。本表固定讨论 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不将历史版本或未登录探针外推为所有版本、账号与模型的能力。
+
+**本次 Goal 按 2026-09-30 用户新指令以 Mac 能力和验收为准，其他平台实机验收移交用户。当前 G01／G02／G03／G04／G05／G06／G07／G08／G10／V03 共 10 项在本次范围关闭，V01／V02／V05 移交后续验收，G09 仍开放；PR #22 保持草稿。** 全平台验收尚未完成，移交不计通过。以下为历史产品源码及门禁记录：`64bb5f6c3988a9ca463d2d8a6d79a81eb543b447`；本机定向证据只覆盖对应记录范围。含该源码的精确分支提交 `301040fe3c18c3ffc806f1b048f2e448bdc81ca5` 已通过 [Linux／Windows 普通门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36503995096)，不含在线模型或 G09 原生失败专项。**安全拒绝、明确降级、原生安装成功或入口可见均不等于对应功能完成。** 原先“P0–P5 全部完成、剩余项为空”的汇总结论不能作为完整 Goal 的验收结论；具体通过记录仍按其实际范围有效。
 
 本表集中记录已确认的边界。目录精简后，历史原始通过、失败、截图与摘要由固定 Git 提交链接追溯，当前树只保留验证结论和必要夹具。功能证据见[验证结论](VALIDATION_REPORT.md)，平台与源码对应见[验证结论](VALIDATION_REPORT.md)，当前用户可用范围见[支持说明](RELEASE_SUPPORT.md)。当前状态和后续工作以本表为准，历史报告中的阶段性“完成”不关闭这些条目。
 
 2026-09-28 主线整合提交 `e5f50d9fc` 已保留main与CLI Agent分支历史；同提交CI36411332886为Linux成功、Windows失败（AI OAuth取消监听后重绑端口返回10048），历史失败保留。后续7dd68cc9b整合Homebrew回滚预检与OAuth测试端口隔离，CI36419778583两平台官方成功；Windows desktop/TUI组660通过含1条LEAK（上下文菜单引用用例），句柄来源仍待查，不称全体普通PASS。main已从693172a26快进至70f65a996；测试精确绑定7dd68，之后仅三份验收文档变化。实际计数、推广及证据见[验收结论](VALIDATION_REPORT.md)。该阶段整合及固定临时目录清理约定均不关闭下列14项必要缺口，也不改变G09或Windows Node/npm既有失败结论。
+
+## 2026-09-30 当前范围
+
+用户明确要求：“如果在 Mac 端验证通过的，我们这次 Goal 任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分。”因此不再以 Linux／Windows 认证、交互桌面或实机验收阻塞 Mac 已完成项；原生能力和 Mac 未满足的关闭条件继续保留。G01 普通未绑定 PTY 不能用专属会话替代，G08 的 Mac SSH 原生消费也不能按其他平台验收移交。
+
+| 项目 | 本次 Goal 状态 | 依据或剩余条件 |
+| --- | --- | --- |
+| G01 | Mac 范围关闭 | 普通未绑定 PTY 的定制原子桥三平台实现与工件齐备，Mac 真实输入、保护、恢复和英中布局已验；最终两平台账本各 19 项及必要源码门禁逐名通过 |
+| G02 | Mac 范围关闭 | 基础 PNG 与 GUI 原有证据，加本轮图片＋单技能→热新增双技能→冷恢复换序的真实生产链 |
+| G04 | Mac 范围关闭 | 固定 Claude 的 JPEG／WebP／静态 GIF 原生 MIME、原字节、回答与冷恢复已逐项通过；PNG 与局部 GUI 证据按原构建保留 |
+| G05 | Mac 范围关闭 | 固定 Claude 的纯 PNG 零文字及同会话冷恢复、PNG＋单技能两轮精确审批和零额外工具、GUI 拒绝保稿／重关联零重投及英中布局，均已补齐原件并独审；最终 Goal 同提交门禁仍保留 |
+| G06 | Mac 范围关闭 | 两款多技能／热新增／恢复按原工件计证，Grok 用户来源及固定技能真实链补齐；英中审计与本轮两平台源码门禁通过，Windows 桌面 LEAK 警告保留 |
+| G07 | Mac 范围关闭 | 三款普通 GUI 的路径卡片、原生实际读取及审批拒绝齐备，失效／不可读保护与英中错误布局已验，最终附件／提交／i18n／Toast 源码门禁通过 |
+| G08 | Mac 范围关闭 | 三 CLI 真实 SSH／tmux 图片、原消费者断连恢复、重复与旧回调保稿、权限拒绝及引用清理齐备；b47 两平台最终源码门禁通过 |
+| V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
+| G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
+| G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
+| G09 | 开放 | d131dd13f原runner正常37553787071失败：step44新增恢复项第92行SourceChanged三次，普通1152通过/1失败；command93通过、默认普通组中i18n11通过均不能覆盖该失败。CMD/PS版本探测均0.156.1+exit0且清理成功，但首updated仍PersistenceFailed，后四场景/三冷恢复未运行。仅Prepared前态，无当前journal/after-tree，具体API、原生码和回滚未知。当前两份产品文件仅补安全错误日志，本机格式/focused46/i18n11通过，cargo check通过，安全日志原机待验，非修复完成。最终同源双平台门禁未完成；全部历史证据及特殊权限安装决定保持 |
+| V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
+
+以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”及“范围待用户决定”均为历史阶段判断；当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准，安全属性范围以 G09 下的2026-10-05用户决定为准。各轮源码、平台、失败和未验边界不变。
+
+## 2026-09-30 范围调整前记录：关闭 0 项，仍开放 14 项
+
+起点已核对为干净的 `codex/cli-agent-parity`／`c2140a873`，PR #22 为草稿。比较 G04、G05、G06 的现有正例和剩余条件后先推进 G04；G05 还需纯图片／Skill 组合，G06 还需两 CLI 热新增、来源及父权限上限，未降低任何关闭条件。
+
+Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可用于验收的固定 Claude `2.1.280` 已认证环境；Windows 在 Session 0、无交互登录用户且 RDP 未启用。仅发现的旧 Claude `2.1.273` 明确报告未登录，不能代替固定版本认证。完整关闭 G04 需要两平台专用已登录账户／配置、可用 `claude-opus-5-5` 及交互式 GUI，已向用户请求这些环境；未复制本机凭据。G01 普通未绑定 PTY 仍缺可信原子提交能力，G09 Windows 交互环境仍缺；未重复相近的拒绝探针。V02 仍缺真实输入法桌面，V05 仍缺真实原生审批。当前没有另一必要条目能在现有环境完整关闭。
 
 ## 记录规则与优先顺序
 
@@ -16,7 +503,7 @@
 - **验收缺口**：已有实现或局部证据不足以证明指定场景通过；不直接推定功能故障。
 - **高**：直接影响原始输入、附件、子任务、升级或平台验收目标，应先处理；**中**：组合输入、扩展场景或持续兼容维护，随后处理。这里的优先级不对应 [PLAN](PLAN.md) 的 P0–P5 阶段编号。
 
-以下条目均未关闭。“替代方式”只是当前可行操作，不是用户已接受的范围删减。关闭功能缺项需要实现和实际验证，并在验证结论中记录来源；若真实上游接口限制无法实现，需要当前认证、版本、模型和模式的证据，并由用户确认范围调整，不能自行把“不支持”改记为完成。原生语义差异应以真实合同和准确 UI 呈现验收，不强求不存在的同回合控制。后续每次关闭还应记录源码提交、平台、版本、模式、正例和失败边界，并同步能力矩阵。
+各项当前状态见上表。“替代方式”只是当前可行操作，不是用户已接受的功能范围删减。关闭功能缺项需要实现和实际验证，并在验证结论中记录来源；若真实上游接口限制无法实现，需要当前认证、版本、模型和模式的证据，并由用户确认范围调整，不能自行把“不支持”改记为完成。原生语义差异应以真实合同和准确 UI 呈现验收，不强求不存在的同回合控制。后续每次关闭还应记录源码提交、平台、版本、模式、正例和失败边界，并同步能力矩阵。
 
 ## 功能与模式
 
@@ -24,19 +511,63 @@
 
 ### G01 — Grok 普通终端富输入自动提交
 
+- **2026-10-01 本次 Mac 范围关闭**：已验 Mac 普通标准首页八条真实原生输入、中文 400 行长文本、草稿／审批／编辑竞态保护、同文新轮、重启不重投，以及后续英中粘贴和最终布局满足原关闭条件。原生 Mac `.3`、Linux `.6`、Windows `.11` 固定工件与宿主绑定齐备；精确 `e3d5e58a05153d4e7fabdc1fc6528c8c96c598d7` 的 [最终源码门禁 36796894945](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36796894945) 两平台成功，逐名核对账本各 19 项及全部必要桥组通过，无本轮 LEAK／FLAKY／重试。归档索引 SHA-256 `8ab217095271a6bebe6f39621a8a0f4b8ac973ccf31128d39aa30d20a3436955`。这不扩大至未绑定工件、官方发行版或普通图片；其他平台实机验收仍移交用户。以下为历史过程，旧失败不改记通过。
+
+- **2026-10-01 最终门禁仍未满足**：[运行 36789334970](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36789334970) 仍在进行，Linux 作业成功但独立逐名审计确认漏跑账本 19 项；Windows Claude 首场景在原生启动后 45 秒内未收到有效匹配通知；第二场景通过，但首场景原 PTY 仅存摘要且已随私有目录删除，不能断言没有 OSC 或归因于 Grok。漏测源于两平台 host 筛选把账本文件名当模块，现已改为精确模块名，本机 19／19、零重试通过，不能回填当前 CI 的覆盖。原 PTY 保全改动及 Python 27 项、本机 check 已通过，仅改善后续诊断；通知故障与最终精确源码门禁仍未解决，G01 开放。收据与摘要见验证报告最新记录。
+
+- **2026-10-01 Windows `.11` 可用工件已绑定，最终宿主门禁待验**：[运行 36780256382](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382) 的 Windows 原生 21 条命令均成功，四库实际 53＋20＋4＋4＝81 项，protobuf 6 项、登录解析 2 项、资源整理 2 项及管道上界 1 项通过；PE 栈预留 8 MiB，实际版本、帮助与经过异步入口的补全启动均通过。源码为 native `77d8004b18b5`，宿主绑定已核验工件 SHA-256 `acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc`；独立核验收据 `01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061`。构建与上传完成后主动取消余下重复验证，整轮为 **cancelled，非 PASS**；保留 `.10` 栈溢出、旧失败和额外符号链接场景 `deferred_not_passed`。Mac `.3` 和 Linux `.6` 绑定不变，三平台实现及工件已补，绑定后精确提交的 Linux／Windows host 门禁仍待验，G01 不关闭。固定 Codex Hook／ConPTY 本轮各 8 条严格 Job 关闭收据通过；Hook 一代回收 5 个自有后代，不称所有后代自然退出，也不推断旧 WinError32 根因已解决。此绑定无需本地化变更，当前计数保持 **4 关闭／7 开放／3 移交**。
+
+- **2026-10-01 Windows 可执行文件启动修复，仍未关闭**：[门禁 36774428641](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641) 的 `.10` 完整原生 check 和 build 通过，但实际 `--version` 主线程栈溢出（`0xC00000FD`），不能绑定为可用工件。四库实际 53＋20＋0＋4＝77 项；shell-terminal 的四项被 Unix cfg 排除，不计通过。当前 `.11` 为正式 Windows CLI 映像设置 8 MiB 栈预留，并移植这四项真实子进程守卫测试，生产原子事务和断言不变；构建脚本要求四库分别命中，并验证实际 PE 头、版本、帮助及经过异步入口的补全命令。目标复验、可用工件绑定和最终源码门禁仍待完成；原失败与取消保留，归档摘要 `85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268`。无需本地化变更。
+
+- **2026-10-01 Windows actor 测试夹具修复**：[门禁 36770502561](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561) 的 `.9` 完整原生 check、管道上界 1 项、底层桥 53 项通过；shell 桥 15 过／5 失败，五项均在上游 actor 夹具把 `/tmp` 转为绝对路径时失败，后二库和最终构建未执行。`.10` 仅将该夹具工作目录改用系统临时目录，保留全部原子准入、队列／审批保护及防重断言；Mac 四库 74 项与完整原生 check 已过。后续四库命令使用 `--no-fail-fast` 保留全部结果，仍要求零失败。原始失败、独立 Codex 文件占用清理失败及整轮取消均保留；Windows `.10` 验证、工件绑定和最终门禁待完成，G01 不关闭。无需本地化变更。
+
+- **2026-10-01 Windows 额外资源测试环境移交**：`.9`／`c0a3c705c` 的 [门禁 36766846873](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36766846873) 已通过宿主 check、protobuf 6 项、登录解析 2 项；资源整理测试实际 2 过／1 失败，创建符号链接返回 Win32 `1314`（无所需特权）。该三项已在 Mac 全过，按用户已授权的外平台实机验收后置范围移交这一项，明确记 `deferred_not_passed`；保留测试源码与全部断言，并固定测试文件摘要防止误扩范围。其余两项、全部原子桥回归、管道上界测试及完整构建继续必验。失败日志摘要 `e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2`；取消不计通过，Windows 工件仍未生成，G01 不关闭。无需本地化变更。
+
+- **2026-10-01 Windows 管道测试编译修复**：`.8`／`8f0b956b2` 的 [门禁 36763693789](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36763693789) 已通过 Windows 宿主 check、protobuf 6 项和登录解析 2 项；下一库在上游 `leader/transport.rs:256` 的字符串拼接处报 E0277，资源测试未运行且没有工件。`.9` 仅改为构造相同长路径的 `format!`，保留原上界断言；Mac 完整原生 check 已过，Windows 定向执行及最终绑定仍待完成。已停止余下通用构建，取消不计通过；G01 保持开放，无需本地化变更。
+
+- **2026-10-01 Windows 库测试可移植性修复**：`.7` 的 [门禁 36756854606](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36756854606) 已实际通过 protobuf 6 项和完整原生 check；随后库测试因 Unix-only 解析辅助函数缺失而编译失败，未产出 Windows 工件。`.8` 向测试开放两个纯解析函数，并将资源路径测试改用各平台原生文件／目录符号链接 API，保留全部拒绝断言；真实登录 shell 捕获仍仅在 Unix 编译。Linux `.6` 已通过 78 项原生回归与构建，以及宿主 1469 项／command 14 项；Windows `.6` 宿主 1308 项／command 36 项及真实 ConPTY 辅助验证通过。Linux 实际 ELF 摘要已绑定，Windows `.8` 实际构建、摘要绑定及绑定后最终源码门禁待完成。两次取消不计整轮通过。G01 仍开放，无需本地化变更。
+- **2026-10-01 Windows 原生构建后续修复**：`9f7962626` 的 [门禁 36752136629](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36752136629) 两平台宿主 check 通过；Windows 原生越过旧 `cc` 锁文件错误后，在公开 `xai-proto-build` 的 `/dev/stdout`／`/dev/null` 硬编码处失败，尚未产出 Windows 工件。原生 `.7`／`d3986df9` 仅修复构建辅助并保留依赖存在性检查，Mac 真实 protobuf 6 项和完整原生 check 通过；宿主 check 通过，运行时代码未变。Linux `.6` 构建及两平台其余回归仍在运行，Windows `.7` 目标复验及最终工件绑定待完成。失败摘要 SHA-256 `d2160647e20df2b07b86d7004f9c1f58ccbfddf066b593948b2431bd42b97ca3`；Mac 原 `.3` 工件已独立归档、摘要与签名复核通过。G01 仍开放，无需本地化变更。
+
+- **2026-10-01 首轮目标失败已定位**：`9fdce3e3e` 的 [CI 36741541617](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 已停止剩余通用作业，整体为 cancelled，不计通过。Linux 宿主 3346 过／1 失败、command 5 过／1 失败，两处均为 `SO_PEERPIDFD` 返回 `ENOPROTOOPT`；没有实测内核版本，不据发行版名称推断。Windows 宿主 3151 过／2 失败：已有目录返回 HRESULT `0x800700B7`，以及仅属性权限的目录句柄不能阻止重命名；原生也发现相同句柄缺陷，须同步修复。Windows 36 项 command、真实原 ConPTY 和 Linux 660 项桌面／TUI 回归独立通过。Linux 已补原生自有 pidfd 与内核凭据的同包握手，不按数字 PID 重开句柄或跳过反例；Windows 宿主及原生均保留原断言并修正目录访问权。定制 `.6` 原生 Mac 编译／74 项共享回归与宿主编译通过，新增平台路径尚待真实执行。完整日志 ZIP SHA-256 `923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2`，失败摘要 `3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f`。修复后工件与门禁仍待完成，G01 不关闭。
+
+- **2026-10-01 目标构建与精确修复**：`9fdce3e3e` 的两平台宿主 `cargo check`、Windows 真实原 ConPTY 步骤及 Linux `.4` 原生构建通过；Windows 原生卡在公开锁文件 `cc 1.2.48` 与 `find-msvc-tools 0.1.13` 的常量类型不兼容。修复仅锁回后者 `0.1.10`，并将 Windows 日志失败夹具改为生产 Journal 的真实权限变化；定制 `.5` 的 Mac check 与 74 项原生回归通过，Windows 修复及最终工件绑定待验。[本轮 CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 其余宿主回归仍在运行，不记整套通过；G01 仍开放。
+
+- **当前跨平台实现增量，尚未关闭**：公开原生源码已提交 `3d1886b11120`，Windows 私有命名管道、响应读取握手及回执沿用既有原子事务；宿主已补 Linux pidfd／实际映像及 Windows 实际映像／原 HPCON 核验，共享持久账本保留旧 Mac task ID。Mac 55 项宿主回归、74 项原生库回归和 11 项 i18n 已过，无需本地化变更；初次拆分漏测试 import 的编译失败已修并保留记录。Linux／Windows 固定工件摘要目前为空，目标门禁尚未运行，不能把拒绝算作可用或关闭。Windows 真实 ConPTY 正例／跨控制台拒绝将通过实际控制台辅助程序验证；两平台工件均须从唯一既有 workflow 构建后绑定。当前仍为 **4 关闭、7 开放、3 移交**，PR 保持草稿。
+
+- **2026-09-30 最新源码门禁与实现前置**：`5629588b7` 的 [Linux／Windows 门禁 36714435483](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 已成功，归档索引 SHA-256 `91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622`；它不覆盖后续 G06 或被 cfg 排除的普通桥。只读源码审查确认 Linux 可复用既有 pidfd／真实 PTY 基础，但仍需 Linux 映像 FD、持久身份及宿主接线和定制 ELF。Windows 官方 API 支持先为私有 helper 关闭调试退出杀进程策略，再对用户 CLI 取得真实映像句柄的合同推导；尚需独立实现，不能直接复用会终止目标的 owned 控制器。两平台没有因此完成，也不因实机后置而豁免实现；G01 仍开放。具体证据见[验证结论](VALIDATION_REPORT.md#2026-09-30g01-旧源码门禁通过外平台接入仍待实现)。
+
 - **状态／优先级／范围**：功能缺项，高；P1 富输入、P2 可信状态、P5 验收。
-- **实际情况与影响**：普通未绑定 PTY 仍拒绝 Grok 自动提交；专属 TUI 入口已接线，Mac 限定 GUI 单图加中文正例见下文。历史 `1.0.41/grok-4.7` 探针确认 `idle_prompt` 在 help 模态、已有未提交草稿及后台工具仍存活时也可能出现，不能证明编辑器为空或 Enter 安全；新启动空会话超过66秒又未产生该事件。因此专属路径使用原生侧车及精确回执，不以该事件或延时授权 PTY Enter。
+- **实际情况与影响**：Mac 普通标准首页 TUI 使用独立定制 `.3` 原生工件时，已取得富输入的八条真实接收与结果证据；其后文本粘贴增量与最后一条中文提示布局均已真实验收，Mac 功能及双语条件满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入已补，实际工件分别绑定 `.6`／`.11`，绑定后的精确最终宿主源码门禁已由 `e3d5e58a0` 两平台逐名通过，本项在当前 Mac 范围关闭。未核验工件的普通 PTY 继续保留拒绝。以下逐轮记录保留各自历史范围，旧 owned／`.1/.2` 不继承为 `.3` 证据。历史 `1.0.41/grok-4.7` 探针确认 `idle_prompt` 在 help 模态、已有未提交草稿及后台工具仍存活时也可能出现，不能证明编辑器为空或 Enter 安全；新启动空会话超过66秒又未产生该事件。因此专属路径使用原生侧车及精确回执，不以该事件或延时授权 PTY Enter。
 - **本轮实现**：新增固定 macOS arm64 owned TUI 启动、真实 PTY 内核身份、原生 leader 侧车、SQLite 一次领取和精确 ACK；通知插件 `0.1.5` 观察原生权限，缺失／变化即撤销。生产路径在真实 shell PTY 完成两轮中文输入、独立模型标记、重复拒绝和进程清理；未经过 GUI，审批、编辑／重连、冷恢复及 Linux／Windows 尚待接通验收，不能关闭本项。原始证据与范围见验证报告。
 - **恢复增量**：本次侧车改为异步接收；退出清单保留，SQLite 恢复前同步置忙，旧回调及定时器隔离，普通 TUI 禁止进入托管新建/恢复。macOS 本地回归与两轮原生输入通过；空白 GUI 双语启动不代替真实会话重启验收，未接通消费者自动发送。
 - **持久目录增量**：新清单与临时 socket 分离，绑定目录内核身份；两轮原生输入通过，首轮退出恢复的 `leader.lock` 残留失败保留，修复后在原退出现场独立复验清理通过。旧启动不可重派，GUI、真实重启与其余关闭条件仍未完成。
 - **未验证代码增量**：macOS arm64 与 Linux x86_64 的 GUI 启动、原生侧车输入、精确回执、恢复占用及菜单已合入主工作区。Linux 通过真实 PTY、pidfd 和 SO_PEERPIDFD 绑定进程，缺少内核能力时不使用裸 PID 替代；不能声明全部 Linux 版本可用。Windows 已合入原始 ConPTY shell 句柄、创建时原子 Job 归属、命名管道侧车、PowerShell 启动及恢复接线；原生 Job／控制台／管道链仍须真实校准。任务列表历史继续也已接同UUID --resume、新generation CAS及活跃原PTY只读关联；最后实机链仍欠。之前“GUI 尚未接线”描述对应已提交基线。
 - **上下文补接**：`debed8c51` 已将有效本地／远端专属 Grok 的代码／评审／diff 上下文接入恢复后的同代草稿队列，已打开会话也保持连续追加顺序；新增四项回归本地通过，英中操作提示已同步。普通未绑定 PTY 的拒绝不变，三平台真实发送与双语布局待验，G01 不关闭。
 - **2026-09-27 `e2eba8596` 实际 GUI 增量**：Mac ARM64 固定 `1.0.41/grok-4.7/default` 专属入口已通过中文加单图一次发送、原生同 prompt ACK/end_turn、精确图片字节与识色回答；ACK 清草稿、应用重启不自动重投及局部英中布局通过。普通未绑定 PTY 拒绝保持；多行长文本、审批、活跃／冷恢复和其他平台仍待验，不关闭本项。
-- **当前替代方式**：保留草稿，明确点击复制，关闭富输入后由用户粘贴到原生 CLI；也可使用已验证的托管文本输入。
+- **2026-09-29 `2383428da` 当前 GUI 增量**：Mac 独立签名版专属 TUI 真实完成英文与中文两行文本各一轮，原文进入同一原生会话、取得回执及回复；普通未绑定 TUI 拒绝并保留草稿。重启后从任务面板继续同一原生 ID，历史两条各一次，新 run 2 第三条回答 `4`。第二轮模型精确标记答错；旧会话关闭的 hook 警告和任务面板未保存最终结果保持未解。图片粘贴、权限审批、Linux／Windows 和普通未绑定 PTY 安全自动提交仍待验，G01 不关闭。
+- **2026-09-29 `bd4612887` 失败提示修复**：专属会话消失或输入租约登记失败时，提交不再静默返回，复用既有双语提示并保留草稿；会话消失与 PTY 零写入的定向回归通过。普通未绑定 PTY 的可信提交与旧 run 结果持久化没有因此完成，G01 不关闭。
+- **2026-09-29 当前分支结果持久化增量**：固定 Grok `1.0.41/grok-4.7` 的独立 Mac 专属 PTY 两轮在原生 ACK 后保存完整历史核验的最终正文及完成水位，任务结果按代次持久化；另一次真实链在两轮 ACK 后让应用侧测试进程退出，保持同一原生 TUI/leader 存活，由第二进程只读补查旧代和当前代，消息与原生用户回合均保持 2→2，第三进程在原生退出后重新读取两代结果。44 项定向回归、i18n 11 项和 `cargo check -p warp` 通过；安全归档 `g01-native-cold/r-G5hcBT9a` 索引 SHA-256 `6264fbdc909f5c25392e33211abd7a1114187f33bc570b5a3808f5f220335bd7`。这是专属本机原生会话的结果补写，不覆盖普通未绑定 PTY、图片、审批、GUI 双语新提示或 Linux／Windows，G01 不关闭。
+- **普通未绑定 PTY 可行性复核**：固定 `1.0.41` 的 `idle_prompt` 既可出现在帮助模态、未提交草稿与后台工具运行时，也可能在空会话长期不出现；`permission_prompt` 不能证明 Enter 不会批准。当前侧车仅绑定从启动时受控的 `--leader-socket`／原生会话，已运行的普通 TUI 没有可认证的连接或编辑器状态查询。安全覆盖该入口需要原生提供经进程与会话身份核验的接入，以及带编辑器修订、模态和审批状态检查的原子 `submit_if_idle` 与一次性回执；仅增加通知或发送前检查仍有状态变化竞态。现有无条件拒绝必须保留，直至该合同与三平台实际回合验收完成或用户明确调整范围。
+- **2026-09-30 发行包扩展点复核及判断更正**：本机固定 `1.0.41 (4220f3b224a6)` 映像 SHA-256 `9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d` 与仓库固定工件定义一致；npm 清单仅分发启动脚本和原生二进制。对应版本随附 Hook 文档中 Notification 为被动事件，UserPromptSubmit 发生在用户提交后，不能原子检查并提交普通 TUI 草稿；所查 Plugin／ACP 文档未给出满足上述语义的接入合同。这些发行包和探针事实保留，但不能由此推导“没有可修改源码、只能等待上游”；此前这一结论错误。
+- **2026-09-30 官方源码已确认可改**：[xai-org/grok-build](https://github.com/xai-org/grok-build) 已公开 CLI／TUI／agent runtime 源码；[README](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/README.md) 和 [Apache-2.0 许可证](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/LICENSE) 支持本地修改构建，[不接收外部 PR](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/CONTRIBUTING.md) 不阻止本地补丁。原生工作树已固定到公开 `1.0.41` 快照 `07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，其 [SOURCE_REV](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/SOURCE_REV) 为 `84745de98b3d3996729aefcefd518890ffb73930`，与已验发行版 `4220f3b224a6` 不同，不能冒充原发行二进制或继承其验收。下一步是在该源码实现可认证的普通 TUI 接入、编辑器修订／模态／审批状态原子检查及一次性提交回执，再独立构建、绑定源码和二进制并完成 Mac 普通 PTY 真实验收；这些工作尚未完成，普通入口拒绝继续保留。本轮更正不关闭 G01，当前仍为 3 项关闭、8 项开放、3 项移交。
+- **2026-09-30 官方源码补丁检查点**：已在独立定制源码 `2a13b48618b9` 补齐普通 TUI 私有接入、状态租约、actor 原子准入、持久回执及只读恢复，并阻断登录／额度／Hook 自动重投及旧客户端混用。Mac 原生编译、61 项定向回归和独立构建通过，可重建补丁及身份见 [原生来源清单](../../native/grok-build/source.json)。InfiniShell 普通终端生产调用方和 Mac 实际回合尚未验收，普通入口拒绝仍保留；不计 G01 关闭。
+- **2026-09-30 普通 PTY 原生正例与宿主接线**：定制原生 `2a13b486` 在普通未绑定 TUI 取得 26,597 字节中文长文本逐字节一次接收、审批界面拒绝且未写目标文件、同会话重启后新输入及精确结果。英文立即断连仍为 Unknown／零输入，不计成功。安全证据索引 SHA-256 `fdfb486c7a14088b7db28d92184c77144300fb6d90ec1f7a537213b5af3c441f`。宿主已补固定工件／真实 PTY 核验、持久一次领取和普通富输入调用方；未知只查询，明确未发送允许下一次用户提交，已接收同文须明确选择新一轮。联合门禁、真实 GUI 与英中布局尚待完成；本轮仍未关闭 G01。
+- **旧 run 结果落盘诊断**：旧私有 profile 中第 1 代两条、第 2 代一条输入均已获 `NativeProtocol/end_turn` ACK，但 task `result` 仍为 `None`。专属 TUI 从 TerminalView 直接建任务，未经过常规 pane 的 `bind_local_task`；旧实现的 ACK 只保存投递状态，不含模型正文。直接补绑定还会与逐次输入 checkpoint 争用 revision。当前分支已按上文实现同 leader 完整历史、水位和身份核验后的旧代结果 CAS，以及应用侧退出后的只读补写；旧 profile 的结果并未据此回填，仍按原件记为缺失。
+- **当前替代方式**：未核验原生桥时保留草稿，可关闭富输入后在 Grok 中直接键入，或使用已验证的托管文本输入。普通 Grok 文本粘贴不能作为原生插入承诺；最新修复仅恢复／追加本地富输入草稿，待显式提交。
 - **源码／证据**：[普通终端提交与拒绝路径](../../app/src/terminal/view/use_agent_footer/mod.rs#L1153)、[历史明确复制验收](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/OFFICIAL_40_RECOVERY_AND_INPUT_GUARDS.md)。
 - **关闭条件**：固定版本的真实普通 PTY 能在可信输入就绪时自动发送中文、多行和长文本；审批、旧会话、重连与重复点击不得误批准、丢失或重投。取得实际回合接收与结果证据后，才可移除无条件拒绝。
+- **2026-09-30 标准首页 GUI 失败与修复中**：旧定制原生在标准首页返回 `no_active_agent`，此前 `--minimal` 不覆盖该入口；当前新增显式首页准备，复用原生会话创建与确认，固定 agent／session／binding 后再领取正文，`State` 仍只读。失败轮宿主消息与原生桥收据均为 0，屏幕英文回复不计桥正例；证据摘要 `e8978af44a79234a84db5b3b770c45d40737c0dc55fe4471b3febd9a2809d973`。英中提示已修正普通会话能力边界，新原生与宿主联合门禁及真实 GUI 仍待完成，G01 不关闭。
+
+- **2026-09-30 新宿主门禁通过、GUI 仍未投递**：定制 `.2` 原生 68 项与宿主 633 项测试、`cargo check` 和构建通过；冻结宿主收据摘要 `70c425b96d38fab4ef525c586c3c1f14330326ec6e4cf51386efce227df62c48`。标准首页独立 GUI 已完整粘贴两行英文，但默认 Return 和 ABC 对照均未观察到投递，宿主消息／原生桥收据为 0，失败收据摘要 `f24705326cf58863ed81ec300f0229d182d917f23bc71443b8ddd771feb68c13`。首页闲置动画持续撤销代际与按键路径仍待定位，不能据猜测放宽准入或冒称成功；G01 保持开放。
+
+- **2026-09-30 `.3` 普通 GUI 八条正例，G01 仍开放**：原生 `1491b486`／`1.0.41+infinishell.terminal-bridge.3` 编译、74 项库回归和构建通过；宿主 `r-hgmsd_pn` 的 check、48 项桥、11 项 i18n 与构建通过，peer 最初零命中由 `r-joflf1h5` 两项有效回归补齐。普通标准首页 GUI `r-wudipm8z` 已完成英文两行、41,751 字节中文 400 行双 Return 只接收一次、原生非空草稿保护及清空后明确发送、真实审批拒绝后保留稿发送、同文防重后明确新一轮、发送期间编辑取消后明确发送，以及双重重启同 SID 的旧输入零重投和新输入。八条唯一原文与 ACK、七个 `end_turn`／一个审批拒绝后的 `cancelled`，目标文件未创建，英中局部提示与结果可读；两代退出和短目录清理已核实。摘要 SHA-256 `3c72d7d6bd6496ea5537b30e3cda385aa98afbd5875429f477e6b90aa47b63fa`，源码与工件绑定见[验证结论](VALIDATION_REPORT.md)。
+- **本项剩余**：上述 GUI 使用 `c3b509622` 基线加冻结源码，未包含随后修复的文本粘贴路由。新修复只打开富输入并恢复／追加本地草稿，绝不写 PTY／socket 或自动提交；英中回退不再要求不可执行的原生粘贴。粘贴修复的 `r-zxk8iqk7` 已通过 check、52 项桥、两项 peer、两项既有粘贴回归、11 项 i18n 及构建；后续 `r-g91qynam` 已补英文 131 字节／中文 128 字节各一次真实输入、ACK、精确答案与 `end_turn`，原生字面草稿 `123` 保护及无桥回退保稿／零新增通过。英文回退提示完整，中文截断已通过单行缩短及 `r-ni936aln` 零模型输入的布局复验解决；`r-fdaad6hh` 最终本地七门禁通过。Mac 功能与双语条件已满足，但用户仅后置外平台实机验收；Linux 宿主普通桥接入、Windows 原生传输及宿主接入必须继续实现，不能以 CI 通过或安全拒绝代替。当前仍保持 3 项关闭、8 项开放、3 项移交。该轮摘要 SHA-256 `5576b8c0b7378cbf7556a71b5b758fe70a0aa2da9b5844892b114a719620bd6b`。第 39 张截图误点不计成功，第 41 张和独立审计才证明重启后防重；不声称旧 Unknown 在新原生 instance 自动转为 ACK。
+
+- **范围更正与后续工作**：此前“仅待精确提交 CI”漏掉外平台实现缺项，现已更正；三轮 Mac 原始摘要、回合与清理事实保持不变，范围更正收据 SHA-256 `33411686223414380743cc838f1d1179cc578d315c740a75ef486476449ae863`。当前宿主模块仅编译 macOS arm64，原生传输仅 Unix；[CI 36714435483](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 绑定 `5629588b77b15e27c9e046cc6326171370297dc6`、仍在运行，不验证被 `cfg` 排除的桥能力。先推进可完整闭合的 G07 小项；G01 外平台实现继续列入工作，不归为等待上游或环境阻塞。
 
 ### G02 — Grok 托管图片输入
+
+- **当前状态：本次 Mac 范围关闭**。`d290fd713` 的固定 `1.0.41/grok-4.7`、Inherit 根任务、私有独占 leader 在 `r-58hxh5i1` 完成 PNG＋alpha 新建、同连接新增 beta 后 PNG＋alpha/beta、自然停机后同原生 ID 冷恢复 PNG＋beta/alpha。三轮原生 typed 图片与持久附件原字节完全一致，首技能原文展开、其余技能实际 `read_file` 的字节与随机标记逐轮匹配，图片答案准确；原生历史恰好三次输入，两代均自然 exit 0 并确认清理。基础 PNG GUI／应用重关联保持原构建证据，本轮组合经生产适配器真实消费和入口回归验收，不冒称新增 GUI／SQLite 证据。安全收据 SHA-256 `de37c2de73bfc2e1f3a2e1475ed8753d925134fc40e8077caf09f0faba9c2ee4`，完整小证据索引 SHA-256 `3d9a3911dca8e3d88bdf16cb81e06656239024eac129943d242baf15caf6799e`。英中 Inherit／固定版本／PNG／技能目录提示已复核，本轮无需本地化变更。其他平台实机验收移交用户；G06 的用户级来源及 G10 固定权限范围不因此关闭。
 
 - **2026-09-27 组合代码增量 `ba73c4df3`**：在固定版本／模型与 Inherit 根会话下接通 PNG＋单／多技能，组合额外要求私有独占 leader、逐项目录来源和完整注册确认；准备、排队及刷新后均重新校验。Mac ARM64 原生两轮已验证单技能＋图片及同历史冷加载双技能＋图片的原字节、技能读取和独立识色；应用适配器、GUI、热新增组合和其他平台仍待验，不关闭本项。
 
@@ -48,16 +579,51 @@
 
 ### G03 — Grok 普通终端图片粘贴
 
+- **2026-10-04 本次 Mac 范围关闭**：用户确认 `6296fb36a`／固定 `.5` 的新会话未先打开富输入时，首拖即可展开并出现图片卡；原普通 PTY 粘贴、拖放、多图原字节与顺序、正确 SID／prompt、一次 ACK、焦点／审批保稿及英中布局已逐项满足，三平台原生实现与固定工件齐备。功能审计 SHA `66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3`；独立关闭审计 SHA `35d962eb93191715cc9c5cc24df8d6fb21cd09a9d8a2086dd97ff2291e296226`。精确 bfb [Linux 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37153388911) 5444 次普通 PASS，精确 ce49 [Windows 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37150103944/job/111282010601) 5085 次普通 PASS，两 job 无 FAIL／LEAK／RETRY／FLAKY，i18n 各 11 项通过；首拖回归仅 Linux／Mac 实际执行，不计 Windows 执行。ce49→bfb 只改测试同步与文档，生产字节一致；8 份 G03 关键源码在 ce49／bfb／73fc／7c977 一致，本项阶段关闭不冒称最终 Goal 同提交门禁。ce49 Linux 原 1 FAIL、整轮 failure、历史 LEAK 及 hook 2 SKIP 保留。无需本地化变更；首拖唯一现场保留 `cleanup_ready=false`，不新增人工要求。**本轮关闭 G03；10 关闭／G09 开放／V01、V02、V05 移交，PR 草稿。**
+
+- **2026-10-04 功能验收齐备，最终源码门禁仍开放**：真实首拖用户确认和原普通 PTY 图片、焦点、审批保稿、多附件顺序及英中证据已逐项审计，收据 SHA `66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3`，不再要求重复人工操作。`ce49b12c7` 的[源码门禁 37150103944](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37150103944) Linux 官方日志确认真实通知 23 通过、fish/zsh 缺失 2 跳过；生命周期步骤 3767 通过、结果桥重复交付测试 1 失败。失败发生于第二次等待固定轮询耗尽，未证明 CPU 或 SQLite 为根因。测试现改用生产桥完成通知和已有私有 SQLite 回执期限，本机 8 项及 cargo check 通过，生产逻辑与时限不变。修复提交的最终源码门禁待验，Windows 原轮仍运行；新增关闭 0 项。无需本地化变更。
+
+- **2026-10-04 真实首拖通过，最终门禁待验**：用户确认修复后真实首拖已满足预期：`6296fb36a` 的私有 Mac 窗口 `r-r6gr9mus`、固定 Grok `1.0.41+infinishell.session-notifications.5`，未先打开富输入，一次拖入上方终端即可展开并出现图片卡。人工收据 SHA `07afe5f25c1f5b1f182a9dce0827444d0b33471eaee089f44838b641224b096f`；未据此声称新截图、模型 ACK 或新的隐藏重拖操作。G03 的真实首拖阻塞解除，仅待最终源码门禁。 `f5763d34e` 的 [Linux 门禁 37145283547](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145283547) 终态失败。官方完整日志确认 SSH 用例在独立协议查询启动 508.508874ms 后 ETIMEDOUT/SIGKILL，stdout/stderr 均零字节，发送未调用；慢启动原因未知，不回填 6296 的旧故障根因。终审 SHA `d13a4285d59dcffbf16a732f80b84706bcb8e4a621f9ef68d3947c3e1400c3e6`。本次将协议核验合入一次发送，完整写入后才返回精确协议收据；原期限、帧预算、锁和终端绑定不变、不重投。插件升为0.1.6，0.1.5原配方及备份保护保留。本机check/build、97项定向、i18n11项及真实已就绪worker24项通过（另fish1项跳过），最终两平台源码门禁待完成；G09的Windows完整原生更新验收仍运行。无需本地化变更，既有英中失败/恢复提示语义一致，README同步中英文合同说明。 **新增关闭0项，PR仍草稿。**
+
+- **2026-10-04 首拖源码门禁终审，仍开放**：`6296fb36a` 的[37140741806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37140741806)已结束，Windows success、Linux failure，整轮 failure。Linux 普通 nextest 5428 项通过，新首拖用例逐名普通PASS；原生通知 Python 24项为21通过／1失败／2跳过，SSH无bootstrap用例PTY零字节超时。Windows 普通 nextest 5056项通过，另1条 `terminal::input::tests::test_ai_context_menu_preserves_lock_state` LEAK单列保留；首拖夹具受Unix cfg限制，不能计Windows执行。两边check及各11项i18n通过，另各81项rust-genai通过；无nextest FAIL／RETRY／FLAKY不代表整轮成功。完整终审SHA `e7718d52358061a948207c871dba9253d554c2ef7bede47e0e7c708534b3a3f4`，仓外 `6296fb36a-ci/final-review.safe.json`。新 `f5763d34e` 的[Linux37145283547](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145283547)已通过编译／生命周期组，但通知步骤37再次失败；具体用例及新诊断待官方完整日志，不假定同因。其[Windows37145335699](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145335699)完整原生更新验收已开始，尚无结果。Mac修复窗口及未操作的首拖现场保留待用户确认。**本轮新增关闭0项，9关闭／G03、G09开放／V01、V02、V05移交，PR保持草稿。**
+
+- **2026-10-04 精确新构建已准备，真实首拖待用户确认**：`6296fb36a` 的 Mac GUI 已构建并启动，右侧固定 Grok `.5` 标签尚未打开富输入，保留现场等待单次首拖；未产生新模型提交或ACK。构建收据SHA `8a9c6c96a656c444230efc79aad4589c60acf52d9eea57da90c9465b25d24488`。同提交[源码门禁37140741806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37140741806)的Linux新首拖回归普通PASS、普通nextest5428项通过，但真实SSH通知测试在2秒内PTY收0字节而失败；该失败根因未定，不能归因旧EAGAIN或提高超时。Windows仍在执行。本轮仅为失败夹具接入既有固定字段诊断，12项合同测试通过；诊断不修复或关闭通知故障，原失败保留。**G03仍开放，新增关闭0项。**
+
+- **2026-10-04 首拖初始化修复，本机门禁通过，仍开放**：在已打开CLI输入的附件路径中，同步刷新图片选项后再检查容量并读图；修复非空启动命令保留旧Disabled状态导致首图丢失。旧代码下真实WarpUI窗口事件回归先超时，修复后121项通过，覆盖首次开框、隐藏重拖保留原图/中文草稿/顺序以及失效目标零PTY写入。i18n11项和`cargo check -p warp`通过，独审无阻断；无需本地化变更，既有英中提示语义已复核。门禁收据SHA `1df6ca6d131d6341fd3265608661c07270e1cf7f07769942bbcf1289c64f1dc4`，仓外`g03-preparation/first-drop-fix-local-gates-v1.safe.json`；三条绿灯短根已清理，红灯及夹具历史保留。精确新构建的真实首拖、最终Linux/Windows源码门禁尚待完成；**新增关闭0项**。
+
+- **2026-10-04 人工拖放补证与首拖缺陷，仍开放**：用户在固定`.5`普通PTY确认直接拖入富框，以及富框已展开时拖入上方终端区域均出现图片卡；另开`1.0.46`的观察不合并为固定工件验收。新会话尚未点击Rich Input时，第一次拖图只展开富框没有图片卡，再拖一次正常；初始化后隐藏再拖也正常。该明确复现需要修复，不能把已有入口正例当作整项完成。人工/GUI收据SHA `faf8751e3e68ec41dcbdbe9119e78639135886d45d559ba2d40248a86c5df517`，用户原截图SHA `f9da8e77200e53af1da591108059c78c6a7bd21b6bb1c4425249d1c1cba06f89`，仓外`g03-preparation/r-zvc31qhz-ordinary-images-gui`；本轮未发送模型输入或新ACK。**新增关闭0项**，待修复后新会话复验及最终门禁。
+
+- **2026-10-03 授权 CGEvent 拖放实测，仍开放**：Finder内部校准实际移动成功且inode/摘要不变；同固定`.5`的普通未绑定PTY真实拖放后没有图片卡、PTY路径或新提交。独立新TextEdit富文本对照也未收到图片，不能把未交付单独归因为InfiniShell路由。精确时序排除观察与手势重叠；零模型输入/零新ACK，未再重复手势。普通GUI23件索引 `d19190ac85f7c202229840fe43277c4e04fe8528772975109b1681c8d9d3876c`，TextEdit17件索引 `f3187508f58ad02a439d331fb635558316507d7d917f824f010698ee7af214fc`；相关进程退出，校准/对照短根清理，唯一GUI失败现场保留。仍需可交付的跨应用手势或人工实测，以及最终源码门禁；**新增关闭0项**，无需本地化变更。
+
+- **2026-10-02 Windows `.5` 工件已绑定，仍开放**：精确 `95d16846d` 的 [原生步骤 36967571751](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36967571751) 已审计：Linux 32 条命令／542 次测试（533 个唯一名）、Windows 31 条／520 次（516 个唯一名）全过，两平台新增 PNG 17 项逐名通过。Windows 普通桥加入实际 PE 摘要 `168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9`；旧 G01 文本身份、Mac/Linux 原有 `.5` 及 remote owned `.4` 绑定保留。新 Linux 工件只记录构建证据。整 job 元数据已观察两平台 success，完整日志审计另记，不等同新宿主门禁；Finder 原生拖放和绑定后最终源码门禁仍待完成。无需本地化变更，旧失败及原后置范围不改写。
+
+- **2026-10-02 原生构建元数据前置修复，仍开放**：精确 `f3cbb6093` 的 [CI 36940578820](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36940578820) 两平台均因 `cross_platform_build` 残留旧补丁摘要而在原生构建前失败，未运行原生测试、没有新工件。宿主新 G10 回归各 12／12 通过，不能覆盖该失败。现仅同步源码提交／tree／补丁摘要，旧工件不重标；实际仓库源码包回归先复现失败，修正后 5 项与提交前 cargo check 通过，收据 `e5b9d8470359b90601236e42371c60d79c394de41b97f0c212804d6f7ab29dcb`。Windows 旧审批通知超时尚未复验，Finder 拖放和最终源码门禁仍待完成。
+
+- **2026-10-02 图片能力拒绝双语实窗补齐，仍开放**：同 `69c17fce3` 产品构建的 `r-goa_c41x` 使用旧 `.3` 文本工件，在中文及英文界面分别一次 Return；约 2 秒及 5 秒的画面均显示完整提示，中文单行、英文两行，无截断，文字与单图卡片始终保留。约 0.5 秒与 9 秒的画面没有提示，不据此回填此前未观察到 Toast 的旧轮。视觉收据 SHA-256 `366f8c8647f890e305ede598419a88f4bc21362bfd0093d3bfbe37548b6ab227`；三代 GUI 正常退出，首次 finish 的 Preview 图片映射已释放，最终收尾 `a4b17a803aaf398de7c8e979eccfa14643ef76c4dff6d8fb0950bfc37aecb73d`，唯一历史继续保留。Linux `.5` 官方工件已完成来源、实际版本和测试审计；Windows 同版审批通知测试在 5 秒外层等待超时，尚无可绑定工件，不把 Linux 通过覆盖该失败。Finder 原生拖放与最终源码门禁仍待完成，本轮不关闭 G03。
+
+- **2026-10-02 普通 PTY 图片实窗正例，仍开放**：`69c17fce3/r-idckjva9` 的 `.5` 普通未绑定 Grok 在英文 GUI 接收纯 PNG，原生唯一 claimed/dispatched/ACK 与产品清卡一致；模型识别后自行探索被手动取消，不计完整回答。随后中文文本加红蓝／绿黄双 PNG，原生顺序、规范字节、完整识色回答和清稿均通过；审批期间第三次输入未派发，焦点往返及失败 Return 保留文字和图片，原生人类输入仍 3、图片领取仅 2。英中卡片和既有占位可读；新能力拒绝 Toast 尚未观察，不能计双语拒绝布局通过。旧 `.3` 同轮能力负例没有领取或模型输入且保稿，原因审查不以此关闭功能。GUI 观察 `eae1971deed36c4e9206956224edc4c47f78701ac9ebf7a38b4e6bc04aa116a0`，收尾 `710bf723a55702a7baf9591ba1dc1ece96d5be28127b34f67357bafe7df6ee4c`；两代 GUI 和已知后代退出，唯一历史保全。Finder 原生事件仍缺证；[69c17 新两平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36927434162) 尚在执行，Windows Claude SessionStart 空格路径负例已失败，另一特殊路径正例不覆盖失败，原生 `.5` 工件未提前计通过。
+
+- **2026-10-02 普通 PTY 原生 PNG 已实现，真实验收待完成**：核实公开 Grok 源码后，新增 `.5/8644e7f68a5c` 的有序 typed PNG 整批提交、独立能力与摘要；Mac 签名工件 `b5432ea1a6b4` 已接普通桥，旧 G01 文本工件及远程 owned `.4` 保留。宿主保存当前 scope 的图片引用，领取前核完整帧及能力；旧回执在文字或附件变化时整批保留新草稿。普通剪贴板与完整拖放批次已接线，131 项回归、i18n 11 项和最终 check 通过，收据 `3edc7062a01deed42f4d0a4f6f255321eb91f83a8be19415cd8a2519cb26d073`；两项新夹具先前失败及原生未知 LEAK 保留。三条英中提示已同步，实窗布局、普通 PTY 纯图／多图／焦点／审批等待，以及 Linux／Windows `.5` 构建和最终宿主门禁尚待完成；Finder 原生拖放仍有下述独立手势限制。测试及构建不计关闭，G03 继续开放。
+
 - **状态／优先级／范围**：功能缺项，高；P0、P1、P5。
 - **实际情况与影响**：普通未绑定终端图片门禁仍保留；专属 TUI 选择器路径已有下文 Mac 单图 GUI 正例，粘贴／拖放仍欠验。历史原生 Ctrl+V 后再粘贴 bracketed text 会重复附图；改用普通 UTF-8 输入及 Alt+Enter 换行虽得到单图识色正例，却没有剪贴板消费 ACK 或可信输入就绪，不能用该手工操作代替应用自动链。G02 的托管 ACP 正例也不替代本项。
 - **未验证代码增量**：专属 TUI 会话新增 PNG 类型化输入，图片先校验后持久化为当前数据库 scope 的哈希文件；独立富消息主题保存文本和图片引用，worker 重读核验后发送同一 session/prompt，沿用单次领取和原生回执。纯图、文字加多图、粘贴／拖放进富输入框及失败保留已接线；不再依靠剪贴板时序。macOS arm64、Linux x86_64 与 Windows x86_64 已共用固定 1.0.41/grok-4.7/default 输入；Windows ConPTY 入口已整合。已开展的自动化门禁见[最新门禁](VALIDATION_REPORT.md)，图片模型及真实 GUI 验收仍待补。
 - **2026-09-27 `e2eba8596` 实际 GUI 增量**：修复选择图片误用内置模型能力及其他面板切换模型清除草稿。Mac 专属 TUI 的选择器单图加中文已取得产品收据、原生图片原字节及识色正例；英中单图卡片与输入控件可读。证据属于选择器路径，不替代粘贴／拖放、纯图、多图、审批失效或其余平台验收。
+- **当前分支拖放修复与双图 GUI 正例**：专属 Grok 富输入打开时，双图依序进入附件，混合或纯非图片整批拒绝；会话身份失配时也先拦截，不能退回 PTY 路径写入。失配路径修复前定向测试捕获 1 次 PTY 写入，修复后双图／混合／纯非图／失配零写入 1 项通过，`cargo check -p warp` 通过。首次私有 Mac GUI 双图卡片试验因人工提前按 Return 启动普通未绑定 TUI，随后发送被保护分支拒绝，任务仍 queued 且原生消息数为零；此负例不回填。重新签名并确认专属绑定后，固定 `1.0.41/grok-4.7` 的 GUI 富输入按顺序粘贴两张不同图片、一次提交、取得原生 ACK；原生请求为文字＋图片＋图片，inline 字节与产品持久附件及原生资产两两一致，模型精确回答 `RED BLUE GREEN YELLOW`，同一最终结果及完成水位落盘。此正例属于 GUI 粘贴，不等于 Finder 拖放事件、普通未绑定 PTY、审批失效或 Linux／Windows 验收；新英中文案虽同步，真实双语拒绝提示布局仍待验，G03 不关闭。
+- **Finder 拖放独立补验**：新私有签名 Mac GUI 已精确绑定固定 Grok `1.0.41` 的专属会话，富输入打开后以 CUA 从 Finder 向应用拖动两次，均只改变 Finder 选择，应用没有可观察的 drop event、图片卡或提示；任务仍 queued，未发送模型请求。该轮只能证明自动化手势没有交付，不能判定产品拖放成功或失败，也不能充当英中拒绝提示布局检查。安全索引 `g03-finder-drop/r-d_2ajoia/index.json` SHA-256 `c870674c58bfe26b5e0067591db47f82178928782d95f4b17825b316fdcda5d6`；私有进程和短目录已核验清理，G03 不关闭。
+- **Finder 手势校准**：另以隔离文件在 Finder 自身测试 CUA 拖放：列表视图和图标视图都未将 `source.txt` 放入同窗口 `destination`，后者仅选中目标文件夹。由此不能把前述 Finder→应用的零事件解释为产品缺陷；本轮没有启动应用或发送模型输入。小型安全收据 `g03-drag-calibration/g03-drag-656c43b2.safe.json` SHA-256 `3dbb7e4df18ee5c0f531e74c7fca9da4de05b8c025b9b82078ced9e77847daa3`，短测试目录已按身份、打开文件和归档核验后清理。真实 Finder 事件仍待可交付原生拖放的手势或人工实测，G03 不关闭。
+- **真实事件路由缺口与修复 `64bb5f6c3`**：只读审查发现富输入 editor 作为 child 会先消费拖放，把混合批次分成图片附件和非图片路径，从而绕过顶层的 owned 身份与整批拒绝守卫。现仅在专属 Grok 富输入打开时让外层先接收完整文件批次，再走原有守卫；该外层不发送 terminal resize。Mac arm64 真实渲染树的模拟窗口 `DragAndDropFiles` 用例 1／1 通过：焦点明确在 editor，混合批次出现整批拒绝且附件／草稿不变，纯图片附加一张，身份失配出现不可用提示且第二张未附加，PTY 写入计数零；既有 owned drop 1／1、i18n 11／11、`cargo check -p warp` 通过。安全收据 `resume-20260929/g03-event-routing/r-c4ddbd5f.safe.json` SHA-256 `66786d39135ed3a2a09fde8c947e6e0204cc4b42020644e839eeb95d62e28560`，短 TMPDIR 经进程、launchd、打开文件核验后清理。两条既有英中拒绝文案语义已复核，无需本地化变更；模拟 Event 不等于 Finder 原生手势，真实双语提示布局与 Linux／Windows 仍待验，G03 不关闭。
 - **当前替代方式**：使用文字描述，或使用已经验证的其他 CLI 图片入口；不能把手工粘贴成功当作现有应用自动路径已通过。
 - **源码／证据**：[图片按键策略](../../app/src/terminal/view/use_agent_footer/mod.rs#L96)、[图片投递门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)。
 - **关闭条件**：分别确认三平台固定 Grok 原生图片接收方式，并在普通 PTY 实测剪贴板／拖放、焦点、审批等待与多附件顺序，证明图片进入正确会话且失败保留草稿。
 
 ### G04 — Claude 托管图片格式扩展及验收
 
+- **当前状态：本次 Mac 范围关闭**。按用户授权后置其他平台验收。逐格式原生合同／MIME／原字节／图片回答／恢复依据为下述 `47ac3a79e` 三次真实链；大小、像素、整帧预算、损坏和动态 GIF 拒绝由现有输入门禁及回归覆盖。`84102bb1c` 的 JPEG／纯 PNG GUI 与英中检查保留原构建来源，不外推为三格式全部 GUI 重启实测。英中格式提示、版本提示与静态 GIF 拒绝语义已复核；本次不改用户功能，无需本地化变更。Linux／Windows 实机验收移交，原全平台 G04 不宣称通过。
+
+- **同提交两平台定向门禁**：`47ac3a79e` 的 [run36602515307](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36602515307) Linux／Windows 均成功，图片与回执组 47／47、46／46，新增 10 项在两平台逐名 PASS，Python 各 15＋24 项；两平台 `cargo check` 通过。没有原生在线模型图片输入，不能替代目标平台识图、恢复或双语界面验收；G04 仍开放。
+- **2026-09-30 当前源码 Mac 三格式复验**：`47ac3a79e` 的 JPEG、WebP、静态 GIF 各完成一次图片回答和同原生会话进程冷恢复，共 6 次产品输入。精确原生历史确认实际模型 `claude-opus-5-5`、声明 MIME、图片字节和两次答案摘要；每条产品输入各一次，原生图片元数据伴随项另记。六代均自然 `exit 0` 且清理确认；验收监督程序复用 `282f5c4a8` 的等价产品源码二进制，不冒称当前提交重建。首轮 JPEG 的配对前 ACK 被旧验收误拒，原失败及非自然退出保留；仅修正验收时序，没有放宽生产身份合同。安全索引 `resume-20260930/g04-readiness/index.safe.json` SHA-256 `adf6a7b4cddc2e2c65ac89defd3f8489e87a24a50d0e5f9d7d658148d0879916`。不覆盖应用重启／SQLite、真实 GUI 或 Linux／Windows 在线链；G04 保持开放。仅验收代码与工作流变化，无需本地化变更，目标平台双语布局仍待验。
+- **双平台离线编码回归**：精确提交 `38f66c88e` 的 [run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 在 Linux／Windows 均成功；固定 Claude 图片与技能定向组分别通过 37／37、36／36（平台条件编译造成计数不同），覆盖格式、纯图片、组合及刷新竞态。该组没有原生 CLI 或在线模型输入，不代替两平台识图、字节消费和恢复验收；G04 保持开放。
 - **状态／优先级／范围**：模式限制，中；P1 附件、P5 验收。
 - **实际情况与影响**：本次输入增量已扩展固定 `2.1.280` 的 PNG、JPEG（含 jpg MIME 归一化）、静态 GIF、WebP，校验真实格式、字节、像素、整批原生帧预算及持久文件。macOS、`claude-opus-5-5` 的生产适配器 JPEG/WebP/静态 GIF 识图与冷恢复回忆已通过。随后补严 Claude 单帧 GIF 首次/恢复校验，保留 Codex 原行为；该后续修正在 `84102bb1c` 的本地门禁及静态 GIF 在线窄复验通过，另有此提交 GUI JPEG 原字节与识色正例；Linux／Windows 对应在线链仍待补，旧 WIP 收据不重标。
 - **当前替代方式**：使用本次已接通的明确格式；其他格式仍须先转换，跨平台通过范围不外推。
@@ -66,6 +632,14 @@
 
 ### G05 — Claude 托管纯图片及图片与技能混用
 
+- **2026-10-04 原条件补验完成，本次 Mac 范围关闭**：固定 `2.1.280/claude-opus-5-5`、Inherit 根任务，`4ff41b614` 的纯 PNG 零文字原生输入、原字节、识图和同会话冷恢复已验；`7a8c03bd2` 的 PNG＋单技能新建／冷恢复每轮仅一次所选 Skill 与精确 AllowOnce，图片整数组、图色和技能标记对应，零额外工具／零重投，两代自然退出 0。`087283721` 产品等价 GUI 的拒绝保稿、实际图＋技能、正常重启同 host／原生会话、历史字节不变及英中布局已验。联合关闭索引 SHA `924275d81ad7c606250e631541f38e90f1cf707a7a448043e06af68be658f902`；各构建分别绑定，历史失败及原件限制保留，详见[补验结论](VALIDATION_REPORT.md#2026-10-04g05-原条件补验完成)。无需本地化变更；其他平台实机移交，最终 Goal 同提交源码门禁仍待完成。
+
+- **2026-10-04 较早复核历史记录：当时待补证**：不再将旧索引不可达直接视为仅迁移问题。现存固定 Git v7 收据证明分轮图片回答和一般恢复，工具仅 Read，不能替代纯 PNG 零文字及同轮原生 Skill；插件刷新竞态收据只覆盖失败原子性。原图片技能生产链与后续 GUI 原件尚不能完整复核，当前 G05 移回待补验，不宣称功能退化或唯一原件丢失。充分性审计 SHA `dda27a5f4d8974f76b888c405e925c3782c1794d2d93faef9505fd61c61c1a19`。Mac 单技能验收器已与双技能共用已登记短目录，16 项离线回归通过、短根已清理，尚未执行新模型输入；该准备不计关闭。无需本地化变更。
+
+- **较早 Mac 范围关闭记录，原件补验结论见上**。固定 Claude `2.1.280/claude-opus-5-5`、Inherit 根任务的纯 PNG 与 PNG＋单技能已分别完成原生编码、图片原字节、实际回答／Skill 执行和恢复验收；GUI 图片＋单技能及修复后的同宿主重关联保持三条输入、不重投。生产适配器、模型轮次和恢复程序保持各自源码／二进制来源，见验证报告的图片合同与 GUI 恢复记录。多技能及父权限仍按 G06／G10 处理，不宣称所有图片格式的所有组合均实测。既有英中相关说明、技能列表、消息及历史结果可读；本次不改用户功能，无需本地化变更。Linux／Windows 实机验收由用户后续执行。
+
+- **双平台离线组合回归**：上述 [run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 的 Linux 37／37、Windows 36／36 包含纯图片、图片加技能和刷新竞态；无原生图片理解或 Skill 执行，G05 不关闭。
+- **2026-09-29 插件刷新竞态回归 `074cbb5fb`**：图片加单技能提交在等待 `reload_plugins` 回执时，先移除附件，再收到成功注册回执；测试确认整轮以 `RequestFailed` 拒绝，用户帧、原生写入与任务轮次均未产生。本机 Mac 定向 1／1 通过。它只证明输入变更后的失败原子性，不替代真实在线组合、GUI 冷恢复或 Linux／Windows 验收；无需本地化变更。
 - **状态／优先级／范围**：模式限制，中；P1 组合输入、P4 继续与恢复。
 - **实际情况与影响**：本次输入增量已接通纯图片，以及精确注册单技能加图片的原生 Skill 工具指令，不注入任意技能正文或绕审批。macOS `2.1.280/claude-opus-5-5` 生产适配器纯 PNG（零文字图片块）识图与冷恢复回忆通过；同轮图片加单技能已有本次整合工作区生产适配器新建与同会话冷恢复正例，两次精确 Skill AllowOnce、图片原始字节、独立识色及自然退出清理分别计证；后续 Mac GUI 已有 PNG加单技能及修复后应用重启重关联正例，三条消息和原生历史未重投；不同构建分别绑定，跨平台仍待补。更早原生 stream-json 正例的审批次数未单独计证，不被新收据回填。原先裸 slash 数组未执行技能的失败及探针指令冲突失败仍保留。
 - **当前替代方式**：纯图片已有 84102 GUI 和生产适配器正例；图片加单技能已有 Mac 生产适配器和实际 GUI 正例，其他平台仍待补验。
@@ -74,37 +648,259 @@
 
 ### G06 — Claude／Grok 多技能与会话内新增的实现及验收
 
+- **2026-09-30 当前状态：本次 Mac 范围关闭。** 官方 Grok `1.0.41 (4220f3b224a6)/grok-4.7` 的用户来源生产链 `r-z26hw4l7` 已通过：初始 local alpha＋user beta、同连接热新增 user gamma、同原生 ID 冷恢复 gamma/alpha；原生准确 reload／目录确认、所选限定名与原路径、技能实际字节、答案、单次接收和零重投逐项核验，三次原生输入、两代自然 exit 0。固定 `GrokRestrictedSkillsV1` 新链 `r-j2y3ivom` 已通过真实 Skill 拒绝→允许→冷恢复允许，未选 beta 两代均在生产控制器拒绝且零原生派发；固定集合与注册副本保持、两代 exit 0／native wait status 0。父集合子集核验是生产策略函数证据；该用例未创建真实子任务，不计作 G10 父子模型链。
+- **实现与本轮门禁**：固定技能调用按本轮选择顺序编码，权限集合仍规范排序；Inherit 多技能尾部追加仅含原生已核 `qualifiedName/path` 的引用，不复制正文，保持 slash 块及用户文本／图片顺序、完整帧预算和零额外工具审计。固定受审 `.41 --no-leader ... stdio` 的已拥有进程仅 EOF 收尾改为 8 秒有界宽限、40 秒确认，普通／取消／断连仍沿用原期限。Mac `r-y_b99yo6` 的 check、测试编译、564 项定向回归、11 项 i18n、34 项 Python、actionlint 与最终构建全部通过。中英文策略总说明已准确限定读取／文件策略，`r-vjchihj0` 四张真实 GUI 原图独立复核通过；该布局轮零模型输入。用户链、布局与最终固定链分别绑定各自构建，不冒称同一二进制重跑。
+- **保留失败与关闭证据边界**：`r-ph4ikgm5` 错读未选 local beta 路径仍为严格审计失败；`r-spl5ejar` 原审计失败及两代 SIGKILL 不改记自然退出；`r-4fii2p5z` 四段 bundle ID 导致监督程序初始化失败、原生会话为空且零输入，是验收封装失败。新固定链使用修正三段 ID 的监督程序 `r-b0dvdqb5`。实现已提交 `625ffcb98b09d0ecbefa9e21356ecb8401a7407c`，84 份冻结源码与提交逐文件相同；[本轮 Linux／Windows 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615) 已成功，新增技能顺序及四项 EOF 合同回归在两平台均逐名 PASS；Windows 桌面上下文菜单用例另有 1 条 LEAK，根因未确认，完整日志和警告保留。其他平台实机验收由用户后续执行。新固定轮临时目录已独立核验并清理，完成收据摘要见本轮验证。详情及摘要见[本轮验证](VALIDATION_REPORT.md#2026-09-30g06-本次-mac-范围关闭)。
+
+- **Claude 双平台定向回归**：同一 [run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 验证图片／技能组合和注册期间输入变更的离线边界；Linux 37／37、Windows 36／36。没有在两平台启动已认证 Claude 或检查原生多技能调用，G06 不关闭。
+- **2026-09-29 同提交在线正例 `2383428da`**：Claude `2.1.280/claude-opus-5-5` macOS 生产适配器图片加双技能新建和同原生会话冷恢复均通过；两张不同 PNG 的原生字节和结果、每轮两个 Skill 的精确审批及执行、自然退出与清理按收据分别计证。随后同一签名二进制的 Mac GUI 新建任务也验证一张 PNG 加 alpha/beta 两技能独立审批、原生执行顺序与结果；GUI 冷恢复因同 bundle ID 的归属不明旧实例无法精确绑定而在发送前停止。证据见[验证结论](VALIDATION_REPORT.md)。这些正例不覆盖其他平台、父权限上限或这一构建的 GUI 会话内热新增／冷恢复，不关闭 G06。
+
 - **2026-09-27 Grok 组合增量 `ba73c4df3`**：图片与技能已接同一类型化输入帧，单技能 slash 在图片前，多技能按所选顺序保留独立引用；首技能原生展开、其余原生文件读取的真实语义不改变。新增十项适配器回归，原无技能图片范围不收紧。原生两轮合同不能代替产品组合及跨平台验收，固定策略未扩权。
 
 - **2026-09-27 代码增量 `3dbe79e58`**：固定 Claude 图片与多技能已接通，共用全部技能名称预算和类型化图片编码；原生注册完整确认、固定父权限与独立审批均保留。新增回归覆盖顺序、原字节、重投、部分注册、未知版本、注册副本改变及父集合。本地编译、i18n及定向模块门禁通过，真实组合和双语布局未验；普通 Inherit 零／单技能编码保持，固定技能的单技能图片前缀已变，须另验。
 - **状态／优先级／范围**：模式限制，中；P1 技能、P4 会话继续。
-- **实际情况与影响**：当前工作区已接通固定 Claude `2.1.280` 的无图多技能与会话内新增，整合后本地门禁通过；Grok 工作区已接入固定 1.0.41/grok-4.7、Inherit、私有独占 leader 的多技能及空闲热新增；固定策略禁用技能仍见 G10。新增 macOS Claude `2.1.280/Opus 5.5` 原生 PTY/stream-json 证据已证明同轮顺序调用两技能、会话中新增及 reload_plugins 注册、冷恢复读取新标记；每次 Skill 单独审批。另有实现来源 `3b4d8e8a3` 的生产适配器三轮正例：多技能、新增技能、同会话冷恢复，6 次真实 Skill 单次审批，重复消息未重复执行。实现采用准确 reload_plugins 确认、失败回滚、旧回调隔离及接收后持久化；固定文件策略仍禁技能。Claude macOS GUI 首轮 alpha/beta、同会话新增后 alpha/gamma 均逐次 AllowOnce 并返回独立标记；同原生会话和 runtime、逻辑代次 1→2，SQLite 累积三项 selected_skills。第三轮 PNG加alpha 已有原生字节/识色/Skill正例；热技能导致的重启身份误判已修，GUI重关联同宿主/原生进程、同代3和三条输入，未重投，正常断开清理通过。中文说明/技能列表/历史可读；真正身份冲突另保留终态并禁恢复，技能回执先于清单落盘，ACK或清单写入失败后的幂等重放已通过真实SQLite回归，零重复发送。跨平台未完成。Grok 默认 profile、显式 leader 的原生校准已证明同轮首技能正文展开、后技能由 read_file 完整读取，以及新增后显式 reload 才可见；同 leader 两个已信任目录均被刷新，sessionId 不提供局部作用域。早期探针零审批请求，不作父权限上限证明。后续 macOS 生产适配器 v3 已通过双技能→热新增→同原生 ID 冷恢复三轮，按实际原生展开、read_file 字节和结果分别计证；调用不保证串行。GUI 首轮双技能、v4 同会话热新增、两次应用重启同宿主重关联、新进程同原生 ID 冷恢复第三轮均通过；三条 NativeProtocol ACK、零自动重投，两代原生退出 0 并清理。未信任目录、握手顺序和热新增入口旧失败保留，未改变全局审批。macOS 中英文完整滚动区域可读；v3/v4 分别绑定源码与二进制，未变模块按摘要复用，不宣称同一二进制全量重跑。同提交云端门禁与两平台已认证模型／GUI、Grok 用户级技能来源扩展及固定权限模式仍欠验，G06 不关闭。仓外 `validation/grok-g06-20260926/index.safe.json` 摘要 `3606b77b9c1e716e1d85f4a1705213dea5170c8b4ca694ea029635482acb3710`。
-- **未验证代码增量**：固定 Grok 的技能目录新增严格的 `user:<name>` 来源绑定，与既有 `local:<name>` 一起核对唯一名称、规范路径与文件摘要；初始选择、热新增和冷恢复统一接线。原生用户级目录及模型链待最终验收，固定策略仍禁技能。
-- **当前替代方式**：两款按固定版本、无图和继承模式的已验证范围使用；Grok 热新增必须在空闲时等待原生确认，不能把目录刷新视为调用成功。未信任项目需通过原生项目信任流程处理，应用不自动写入信任。
+- **历史实际情况与影响（按原提交保留）**：当前工作区已接通固定 Claude `2.1.280` 的无图多技能与会话内新增，整合后本地门禁通过；Grok 工作区已接入固定 1.0.41/grok-4.7、Inherit、私有独占 leader 的多技能及空闲热新增；固定策略禁用技能仍见 G10。新增 macOS Claude `2.1.280/Opus 5.5` 原生 PTY/stream-json 证据已证明同轮顺序调用两技能、会话中新增及 reload_plugins 注册、冷恢复读取新标记；每次 Skill 单独审批。另有实现来源 `3b4d8e8a3` 的生产适配器三轮正例：多技能、新增技能、同会话冷恢复，6 次真实 Skill 单次审批，重复消息未重复执行。实现采用准确 reload_plugins 确认、失败回滚、旧回调隔离及接收后持久化；固定文件策略仍禁技能。Claude macOS GUI 首轮 alpha/beta、同会话新增后 alpha/gamma 均逐次 AllowOnce 并返回独立标记；同原生会话和 runtime、逻辑代次 1→2，SQLite 累积三项 selected_skills。第三轮 PNG加alpha 已有原生字节/识色/Skill正例；热技能导致的重启身份误判已修，GUI重关联同宿主/原生进程、同代3和三条输入，未重投，正常断开清理通过。中文说明/技能列表/历史可读；真正身份冲突另保留终态并禁恢复，技能回执先于清单落盘，ACK或清单写入失败后的幂等重放已通过真实SQLite回归，零重复发送。跨平台未完成。Grok 默认 profile、显式 leader 的原生校准已证明同轮首技能正文展开、后技能由 read_file 完整读取，以及新增后显式 reload 才可见；同 leader 两个已信任目录均被刷新，sessionId 不提供局部作用域。早期探针零审批请求，不作父权限上限证明。后续 macOS 生产适配器 v3 已通过双技能→热新增→同原生 ID 冷恢复三轮，按实际原生展开、read_file 字节和结果分别计证；调用不保证串行。GUI 首轮双技能、v4 同会话热新增、两次应用重启同宿主重关联、新进程同原生 ID 冷恢复第三轮均通过；三条 NativeProtocol ACK、零自动重投，两代原生退出 0 并清理。未信任目录、握手顺序和热新增入口旧失败保留，未改变全局审批。macOS 中英文完整滚动区域可读；v3/v4 分别绑定源码与二进制，未变模块按摘要复用，不宣称同一二进制全量重跑。同提交云端门禁与两平台已认证模型／GUI、Grok 用户级技能来源扩展及固定权限模式仍欠验，G06 不关闭。仓外 `validation/grok-g06-20260926/index.safe.json` 摘要 `3606b77b9c1e716e1d85f4a1705213dea5170c8b4ca694ea029635482acb3710`。
+- **历史未验证代码增量（已由上述本轮证据更新）**：固定 Grok 的技能目录新增严格的 `user:<name>` 来源绑定，与既有 `local:<name>` 一起核对唯一名称、规范路径与文件摘要；初始选择、热新增和冷恢复统一接线。原生用户级目录及模型链待最终验收，固定策略仍禁技能。
+- **当前使用边界**：两款按固定版本、已验证的图片组合及具体权限模式使用；固定读取／文件策略和独立所选技能策略分别判断。Grok 热新增必须在空闲时等待原生确认，不能把目录刷新视为调用成功。未信任项目需通过原生项目信任流程处理，应用不自动写入信任。
 - **源码／证据**：[每轮数量限制](../../app/src/ai/cli_agent_runtime/local_skills.rs#L209)、[启动登记检查](../../app/src/ai/cli_agent_runtime/task_manager_input.rs#L287)、[Grok 单技能与恢复收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/grok-selected-skill-v7.safe.json)。
 - **关闭条件**：验证多技能与会话中新增技能的真实接口及调用顺序；补齐路径与权限边界、准确注册确认、历史恢复和失败原子性。若原生不支持，按具体 CLI／模式记录证据，不从文件出现在目录推断技能已可调用。
 
 ### G07 — 三款普通终端的文件附件卡片
 
+- **2026-10-01 本次 Mac 范围关闭**：固定 Codex `0.156.1`、Claude `2.1.280` 与定制 Grok `.3` 的普通 GUI 卡片已分别证明英文空格／中文路径、原生实际读取和独立原生审批拒绝；Grok 真实删除／mode 000 保稿、共用提交前整批复核与 Claude 新构建英中完整错误布局满足失效／权限条件。语义限定为本地绝对路径引用，由原生工具审批后读取，实际模型证据为 UTF-8 文本，不承诺任意二进制理解。`e3d5e58a0` 最终两平台附件／提交／i18n 源码门禁及 Windows Toast 通过；Linux Toast 沿用 `142c635412` 同产品源码的 10 项正例，不冒称本轮重跑。各 CLI 原件及拒绝的取消终态按原构建保留，其他平台实机移交；共享服务归属不明的 Claude 目录继续保留，不宣称已清理。
+
+- **2026-10-01 新构建 Claude 双语与读取／拒绝、Codex 原生拒绝补验**：`142c635412a21e92161111fba5148b6583c8334a` 的实际新 Mac 构建完成 Claude `2.1.280` 普通 GUI 双文件读取、独立 Read 审批 No，以及英中成卡后删除文件的整批拒绝；长文件名和完整提示两行可读，草稿与双卡保留、持久活动零新增。`r-9g0qj9u3` 索引 `393fcc8081f99bb25628f973909b5fa1480fed4c9d267c4519d46adf6ff4284b`；两代 App 自然退出，但共享系统服务归属未满足清理门禁，`cleanup_ready=false`，现场保留（收据 `46bee2e555e68fccea99530b1701f4787c6b8fa9828bdfe906dd71b7ea6d0249`）。固定 Codex `0.156.1` 的 `r-__g9v72o` 仅一次输入，精确 `/bin/cat` 原生审批选择 No；同 call 的拒绝输出与同 turn 的 `turn_aborted` 对齐，零成功读取／替代／重投／标记泄露，不能把 UI “Ran” 当执行成功，也不虚构模型终答。28 文件索引 `9ac093a4beb0dcbbdec65868381ace2ec9c9430380472c9410a8b19b5db52271`；外层自然 exit 0 且短目录已清理。Grok 和旧固定 Codex 正例仍按各自原构建计证；最新精确源码门禁仍待完成，**G07 仍开放，维持 4 关闭／7 开放／3 移交**。详细收据见验证报告最新记录。
+- **历史新构建布局负例（后续修正由上述 Claude 双语实窗核验）**：`8f860ed43` 的 `r-0zfrzk4y` 英文第 07 图仍裁切长文件名，零新增输入、草稿与双卡保留；失败索引 `8b113f8a550e2dd491dc4c45dbd4a1cba5bf7ed99bd883e9b0b985688faac04e`。当时尚须新英中实窗复验，该失败不改写为通过；私有认证副本身份门禁拒绝清理，现场保留。
+- **2026-10-01 普通 Grok 真实双文件与拒绝链，仍开放**：独立 Mac GUI `r-i4txg6p2` 从普通收起态打开文件选择器，英文空格名与中文空格名两张卡按顺序提交；正文仅带原绝对路径 JSON，不含夹具标记。原生两次 `ReadFile` 的真实路径、原字节结果、两行精确答案及 `end_turn` 与宿主 ACK／两账本摘要分别核对，清稿清卡。正例收据 SHA-256 `e2240262d915d4dc03092a9d665442aad36c6ff88d42bd505932bb649722e12e`。同 SID 随后的独立 Read 审批明确拒绝，仅一次工具尝试、零成功读取、零替代工具，拒绝文件标记未进入历史；终态为 `permission_rejected/cancelled`，没有 `READ_DENIED` 模型回答，已 ACK 的输入不恢复为未发稿。拒绝收据 `cf4f3a8e67e69521181606ceeeb2a8da3b201983d42aa31ce4e2b92aa5c012ec`。另在双卡形成后删除第二文件（ENOENT）及恢复原字节后设 mode 000（EACCES），两次提交均保留草稿／双卡、宿主消息／原生回合／桥回执零新增；未测精确 PTY 写入字节。证据索引 `e70e0e66e7487a5c12d8183a26c8ee5b4561d8773ab5d10e5fa7d71bfdea6528`。
+- **前轮来源与当时剩余（最新补验见本节首条）**：GUI 构建来源是 `582596a090f9`，后续 `8e1f1fcaf` 只读审查通过，**不是在 `8e1f1fcaf` 重建**；运行原生仍为已验 Mac `.3`，不用 Windows `.11` 冒充本轮输入证据。当前文件错误 Toast 截断，英中提示已改为短两行，但须新构建和两语言完整布局验收；Claude 普通 GUI 双文件读取及必要失败／拒绝链、固定 Codex 0.156.1 原生读取审批拒绝仍待补；旧 Shell 模式保护不替代原生拒绝，旧 TextEdit 拒绝原件未复核，不作为本轮关闭依据。G07 不关闭。App 与已拥有进程退出、认证副本删除、白名单小证据归档后，外层 `exit 0`、`cleanup_ready=true` 且短目录已清理，日志 SHA-256 `9b8996c38bdb44f6901ccd0856273ce994f904a7f7d81fe55aeec65312aeaf5e`；profile／数据库保留，不宣称完整原生历史已导出。
+
 - **状态／优先级／范围**：功能缺项，高；P1 附件和文件上下文。
-- **实际情况与影响**：本次输入增量把本地文件卡片转为明确路径引用：整批校验绝对路径、普通文件及当前账号可读性，以 JSON 保留中文/空格/引号边界，交由 CLI 原生读取与审批，失败保留草稿；不发送任意二进制内容，远程文件卡仍拒绝。三款 macOS 原生 PTY 手动路径投递均有读取独立标记正例，Claude 另有原生拒绝；此前 GUI 入口只插入正文路径的负例已保留，后续四文件增量已接通选择器 PendingFile 卡片并保留 CLI 锁定输入模式与旧回调校验。macOS Codex `0.156.1/gpt-6-luna` 真实 GUI 两卡片一次发送，原生 shell 实际读取中文/空格路径的两份文件并返回独立标记；英文和简体中文布局可读。中文首轮模型转向 TextEdit、审批被拒的读取失败仍保留，不冒充正例。Grok `1.0.41` 两卡片可创建，发送仍受 G01 阻止并完整保留草稿；Claude 认证有效但普通终端首次向导未完成，本轮 GUI 链待补。失效文件、拒绝链和 Linux/Windows 完整验收仍欠。
+- **实际情况与影响**：本次输入增量把本地文件卡片转为明确路径引用：整批校验绝对路径、普通文件及当前账号可读性，以 JSON 保留中文/空格/引号边界，交由 CLI 原生读取与审批，提交前失败保留草稿；不发送任意二进制内容，远程文件卡仍拒绝。三款 macOS 原生 PTY 手动路径投递均有读取独立标记正例，Claude 另有原生拒绝；此前 GUI 入口只插入正文路径的负例已保留，后续四文件增量已接通选择器 PendingFile 卡片并保留 CLI 锁定输入模式与旧回调校验。macOS Codex `0.156.1/gpt-6-luna` 真实 GUI 两卡片一次发送，原生 shell 实际读取中文/空格路径的两份文件并返回独立标记；英文和简体中文布局可读。中文首轮模型转向 TextEdit、审批被拒的读取失败仍保留，不冒充正例。普通 Grok `.3` 已在本轮接通双卡原生读取与真实 Read 拒绝，成卡后删除／mode 000 保稿零新增也已取得证据；Claude 普通 GUI 双文件读取、真实 Read 拒绝与共用错误 Toast 英中完整布局，以及固定 Codex 0.156.1 原生读取审批 No 已由上述新构建补验。最终源码门禁已满足，本项在当前 Mac 范围关闭；Claude 现场因共享服务归属未明保留，Linux／Windows 实机按用户授权后置。
+- **2026-09-29 `bd4612887` Shell 模式防护**：Codex／Claude 锁定 Shell 模式与本地文件卡片组合时，`!` 前缀会把路径说明带入原生命令模式；现于写入 PTY 前拒绝并保留草稿及卡片。含中文、英文空格路径的双卡片零写入回归通过。实际 GUI 的收起入口、Claude 首次向导和三平台原生读取仍待验，G07 不关闭。
+- **2026-09-29 Mac 私有 GUI 补验**：独立签名应用从收起态打开系统文件选择器，中文路径和英文空格路径各形成一张文件卡；锁定 Shell 模式的 `!printf` 提交出现拒绝提示，草稿与双卡保留。原生输入框未见新文本或输出块；同域既有单测验证 PTY 零写入，但本轮 GUI 未取得精确 PTY 写入计数。原生 Codex 为 `0.155.1`，不计固定 `0.156.1` 文件读取正例；GUI 截图仅在 CUA 回执，未归档原图。私有进程与短测试目录已精确清理，收据 `g07-gui-r-hq0ITed6/receipt.json` SHA-256 `71d082c6866d8c0e8b5a9b317939863054b946ad10da0dc30bbf6e86356b2a5b`。Claude 首次向导、Grok 真实文件卡投递与 Linux／Windows 仍待验，G07 不关闭。
+- **同日固定 Codex 复验**：从官方归档私有复制签名 `0.156.1`，核二进制 SHA 与独立 `CODEX_HOME` 登录状态后，以本分支签名 Mac GUI 从收起态系统选择器生成英文空格和中文路径双卡。一次提交在同一原生回合产生两个独立 `exec_command` 读取，工具结果各含对应合成文件标记，最终回答逐行匹配；卡片与草稿清空。正例脱敏收据 `g07-fixed-codex-r-fdZbGmBG/positive.safe.json` SHA-256 `ea732f8c52e6b277b5b6a45b5c09ffae00dd3310e053545c4be828b72932b062`。同会话锁定 Shell `!printf`＋双卡被拒，草稿与卡片保留，原生 rollout 摘要、用户消息、工具调用和任务启动计数均不增加；负例收据 `negative.safe.json` SHA-256 `b3ab89b9a16ddac5f4666f6e18d2c0661e78aca6ca5ccd3072e555fdbe18aee2`，整轮索引 `index.safe.json` SHA-256 `139bf593d75de9bdf57e8340721f702689d72e77f9ab58ab2524b541e78ef95a`。私有进程、launchd 和文件占用精确核对后短目录已清理。该链不含 GUI 精确 PTY 字节数、Claude 首次向导、Grok 投递、失效文件／权限拒绝与 Linux／Windows，G07 不关闭。
+- **固定 Claude 私有 GUI 首次向导**：官方签名 `2.1.280` 在独立配置中可由本分支签名 GUI 启动，首次向导到达登录方式选择；原生 `auth status` 为未登录，因此没有选择登录方式、创建文件卡或发送模型输入。日常配置大小及修改时间未变，私有进程、launchd、打开文件与短目录已核验清理；仓外安全索引 `g07-claude-r-5d36ab53/index.safe.json` SHA-256 `d95d5da8e32099fb27df77fd383965735ca34b245b00428a5cd9a4f11ecebf1f`。Claude 双文件读取与拒绝链仍须在独立测试配置登录后实测，G07 不关闭。
+- **成卡后文件失效回归 `611aac0a4`**：Codex／Claude 本地双卡先成功建立，再删除第二文件；同类权限用例在成卡后将第二文件改为 mode 000。Mac `file_submission_tests` 6／6 通过，提交时整批拒绝，草稿与两卡保留，`WriteBytesToPty` 为零；`cargo check -p warp` 通过。脱敏收据 `resume-20260929/g07-dfaec474/receipt.safe.json` SHA-256 `9eaec29c252d67428dbeb0a84eea77cb321e1f4004c5b44baae56fe78a80ffbf`，测试日志 SHA-256 `5764ee7e7d6947aed36c6ff6c67643b106bb3ffc8884b04a87bd4579db09b315`；私有进程与短 TMPDIR 经记录核对后清理。仅补强既有提交前复核的时序，不改变用户可见文案，无需本地化变更。路径引用从验证到原生 CLI 实际读取仍可能被外部修改，不能把此回归计为三款 CLI 文件读取验收，G07 不关闭。
+- **Windows 同源回归补验**：精确提交 `e745a1a9dec1b8ad38ea7afb764bc251aeaecdc8` 的 [定向门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36521497826) 成功；508／508 项中，上述“成卡后删除第二文件”用例逐名 PASS，Codex／Claude 两种构造共用该用例。Windows `cargo check` 通过，日志无 LEAK／RETRY／FLAKY。该轮未运行 Linux、Windows 实际 GUI 文件选择或原生 CLI 读取，也未运行仅 Unix 的 mode 000 权限用例；G07 仍开放。
+- **Windows 成卡后读取受阻复验**：首版私有文件空 DACL 夹具在 [run36522975704](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36522975704) 中未制造拒绝，`File::open` 实际成功，509 项为 508 通过／1 失败（该项重试三次均失败）；不计 ACL 正例。修正版 `5b3246c6f15d28f532b4d6f140b9c12f6ccd04be` 使用仅作用于本轮临时文件的独占句柄，先确认 Windows 错误 32，再提交 Codex／Claude 双卡；[run36523921149](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36523921149) 逐名 PASS、509／509、`cargo check` 通过，整批拒绝并保留草稿和卡片、PTY 零写入，释放句柄后内容仍可读。成功日志无 LEAK／RETRY／FLAKY。此项证明文件共享冲突下的失败原子性，不是 ACL 拒绝或三款原生 CLI 读取验收；仅测试变化，无需本地化变更，G07 仍开放。
+- **Windows 文件提交等待回归**：`79bfce90f` 仅将目标用例的异步完成等待扩至 20 秒，并在超时时输出任务、PTY 写入和提示信息。[run36572437241](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36572437241) Windows x64 作业成功，`file_only_submission_delivers_exact_path_once_and_clears_accepted_cards` 首次 PASS（0.730 秒）；主回归最终 3080／3080，但另一个 `history_model` 用例首次失败、重试通过，标记 1 FLAKY。桌面／TUI 660／660 首次通过，rust-genai 81／81；Linux／Mac Intel 未选。完整 Windows job 日志 SHA-256 `f5661f206a8728549becec6bae5a671a0e4efb28f4d2ed4fc63f61dd98a73dc5`，仓外归档 `resume-20260929/cloud-run-36572437241`。本次一次首次通过不能证明目标间歇问题永久消失，也不覆盖原生 CLI 文件读取；仅测试改动，无需本地化变更，G07 仍开放。
 - **当前替代方式**：使用 CLI 可访问的文件路径或现有文件上下文入口，明确确认引用的文件；不承诺二进制文件由模型直接理解。
 - **源码／证据**：[文件附件投递](../../app/src/terminal/view/use_agent_footer/mod.rs#L694)。
 - **关闭条件**：界定支持的文件种类和投递语义，完成三款普通 PTY 的附件转换、正确路径／字节接收、空格与中文路径、失效文件和权限拒绝验收；不能只删除拒绝分支。
 
-- **未验证入口增量**：CLI 富输入收起时点击选择文件，现改为携带当前输入代次打开富输入，待草稿恢复事件完成后复用附件选择器，生成文件卡片。新入口不再直接插入裸路径；旧异步路径回调仍可处理。该入口真实 GUI 验收仍待补，已开展的平台自动化回归见[最新门禁](VALIDATION_REPORT.md)。
+- **入口增量**：CLI 富输入收起时点击选择文件，现改为携带当前输入代次打开富输入，待草稿恢复事件完成后复用附件选择器，生成文件卡片。新入口不再直接插入裸路径；旧异步路径回调仍可处理。Mac GUI 该入口的固定 Codex 正例见上，Claude／Grok 及其他平台仍待补，已开展的平台自动化回归见[最新门禁](VALIDATION_REPORT.md)。
 
 ### G08 — 远程 CLI 图片传输
 
-- **状态／优先级／范围**：功能缺项，中；P1 附件、P5 SSH／tmux。
-- **实际情况与影响**：远程图片的上传、会话绑定和三款 CLI 原生消费者均已接线，未满足来源／会话合同的输入仍拒绝；真实 SSH／tmux 投递、消费及恢复验收尚未完成。
-- **未验证代码增量**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。各路径均未运行本轮实测，不以可靠拒绝代替完成。
+- **2026-10-02 本次 Mac 范围关闭**：真实三 CLI 的 SSH／tmux 图片、原消费者完整断线重连、Claude 待批重复投递与旧请求完成保留新稿、Read No 及引用清理，按原构建和原生 SID 分别计证；英中界面已审计。功能条件审计 SHA-256 `300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085`。Linux `.4` 的实际摘要和完整版本已绑定，精确 `b47a86ff71d64eb033030da8f80205fd7e00e0c6` 的 [最终源码门禁 36916171947](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 两平台成功：Linux lifecycle 1872、Windows lifecycle 1532，相关 command／监督者、Windows 原 ConPTY 与 670 项桌面／TUI 均通过，本轮零失败／重试／LEAK。Linux installed hook 的 15 项实际功能和 10 项诊断通过，缺少 fish／zsh 的 2 项跳过单列，不外推已验。终态审计 SHA-256 `22f33836c2ed44e640e29264fd3afdc576ce2ecdb19b924960294fe9758ba1e8`。旧 `.3` 图片证据按已审影响范围沿用，不声称在 `.4` 重跑六次模型请求；G03 `.5` 普通 PTY 图片仍独立待验。历史失败／LEAK、Codex 逆序回答错误及其他平台实机移交均保留。
+
+- **2026-10-02 原条件内 Mac 功能已齐，最终源码门禁待结束**：三款真实 tmux 图片／重连、Claude 待批重复与旧回调保稿、拒绝清理及英中布局按各自原构建完整计证，审计 `300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085`。Linux `.4` 实际工件已在 b47 绑定；正在等待 [b47 两平台宿主门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 的终态与逐项结果，不重复六次模型验收、不提前关闭。G03 新 `.5` 只进入普通 PTY 桥，远程 owned 仍用 `.4`。
+
+- **2026-10-02 Linux 通知原生工件已绑定，最终宿主门禁未结束**：[51b0 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 的官方 Linux 工件已核验 ZIP 摘要、公开基线／补丁、实际 ELF 及完整版本。`.4` 二进制 SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`，完整版本含 `07e35a3dfeed`；实际 525 次测试执行、516 个唯一名称全部通过，版本／帮助／异步启动通过。审计摘要 `001f4bb378bf66fc7555d880e3b3963d6745e9fc3846fb8c9a6a3cb0cb46058b`。Linux／Windows 最终宿主门禁仍在执行，不关闭 G08；旧 Mac LEAK 及其他平台实机边界保留。
+
+- **2026-10-02 `7b7fc36fc` 三 CLI 真实 tmux 图片与恢复链完成，最终门禁待修**：`r-hx4at14_` 的 Mac 签名 GUI 经实际回环 SSH／tmux 产品入口分别提交 Grok、Codex、Claude 首图；三款均在完整 SSH 断开、重连及恢复原消费者后接收第二条新内容。六条原生请求的 typed PNG 与规范上传字节一致，双方确认及图片引用释放齐备。Claude 在原生 Read 待批时重连，相同内容产生新上传但未产生 claim／queue／原生输入；旧请求获允许并完成后，新草稿与原卡保留，随后不同内容正常消费并自动清稿。权限拒绝沿用 `c3ff/r-u10vfmtu` 的真实 Read No／retired 清理，不伪称本轮重跑。Codex 第二图要求逆序却仍答正序，明确保留模型语义失败，不影响已核实的新请求及图片输送事实。功能证据索引 SHA-256 `a869d1ff4b0dda5cb675a8356c320a286f803a0e43f6ca46413686f5c957be85`；全部自有进程已退出，唯一历史与 profiles 保留。Grok `.3` 正常退出的 SessionEnd／Stop 通知仍失败，归入 V03 继续修原生；[7b7 平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266) Linux 测试和 Windows 原生门禁失败，尚未取得最终源码通过结论。本轮不关闭 G08，不再重复上述同类模型验收。
+
+- **2026-10-01 首图协议拒绝已定位，仍开放**：`4aeab1a51/r-e2yx7g07` 真实 tmux 单次 Grok 首图未消费。锁定 ACP SDK 要求扩展线上方法带 `_`，宿主 Mac／Linux 漏此前缀；现精准修正，两处权限／身份守卫不变。Mac 54项定向、i18n11项及check通过，收据 `d85565eb09daf8fcc1bea4116e86afdd08bf63a71287fe99100ae5aabfebd110`；另修正Codex测试夹具初始FIFO顺序，Windows原失败仍待目标复验。无需本地化变更；真实修复版三CLI图片／恢复链与最终平台门禁待验，详见验证报告，不关闭缺口。
+
+- **2026-10-01 原生`.3`及tmux恢复接线，仍开放**：Claude/Grok只恢复经当前绑定复核的Unknown／Closed身份；Grok新增驻留actor只读权限/描述符查询与保留busy队列语义的原子接收前置。原生975d815fec8e完整117文件补丁可重建，新Mac工件5c1bdc369735已绑定并通过签名/启动检查；新增17项原生测试/check通过，原并发1项LEAK保留。宿主488项经夹具修正后487通过/1失败，最后两行夹具修正的2项独立PASS，i18n11及最终check通过，分轮收据 `c3573942ccfdfb5abdd348dfd12361b2c8972ac0535c68f896ddaa6b3f5e41f6`，不合称单轮全过。英中新增状态未确认提示已审计，真实布局待验；b38 Linux通过，Windows下载失败、独立Codex等待超时及Vim LEAK保留。新版三CLI真实tmux图片消费、恢复异常链和新平台源码门禁待验，不关闭G08。
+
+本检查点补充门禁：环境增量后的tmux定向19项、真实API1项和最终check通过；其余101文件与前轮396项/i18n快照一致，分轮收据 `fb2143a28aae68efbfc2701b06bbdb5d89509b4b89ea7ea852e74280872417f6`。源码检查不关闭G08。
+
+- **2026-10-01 tmux 产品启动、图片恢复与连接代次整合，仍开放**：三款新窗格菜单、持久启动意图、当前 pane/原生消费者身份、新 scope 查询及精确旧图片 ACK/回收已接线。修正跨 daemon 的全局图片预算恢复及旧连接 EOF/握手覆盖新连接；完整 remote_server lib 与 Warp 定向 `r-iv1v21o2` 396/396、i18n 11项、check、来源合同 Python 4项和 actionlint通过，收据 `cec5f49756678c9d3022dcb1fc79a70333958102a515558246dd20436440f3cc`。随后发现旧 tmux server 缺宿主变量会静默丢失通知，仅新 pane 用固定协议/构建值注入；真实 API `r-j95bnz9z` 验证原/普通 pane 缺键、新 pane 正确值且 server/session 环境不变，收据 `5818779c26e16abf354014b28ae49b232f55c98fc01be5afa0c24efc557aa128`，无 CLI/model 输入。源码还确认完整 SSH block 结束后 Claude/Grok listener 被移除而原进程不会重发 SessionStart，现有 Restore 尚不能恢复输入；正在补只读身份重建，不能重放旧状态冒充当前就绪。9条英中消息已同步，真实双语布局及三款 tmux 图片消费仍待验；本轮关闭0项。
+- **本轮平台与原生边界**：`737b07f32` 的 [CI 36856818302](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36856818302) Linux check因两处Netlink比较cast失败；Windows app/native check及旧桥81项通过，通知测试因测试代码 `read_to_end` 歧义未编译。已停止旧源码后续构建，整轮为 cancelled，非通过；9份官方工件摘要/ZIP CRC核验归档 `fbf03c9ada1e1c18c87915c8e20011dd87a6bb934237f6cdaa3ae1c0167572fa`。Linux显式类型及Grok原生 `8855bbe86680` 单行测试限定调用已修，目标复验待完成；完整公开补丁可重建，相对a9的非测试4155树项不变，Mac工件仍绑定a9。早先真实通知失败不因此回填通过。
+
+- **2026-10-01 `879d719be` Codex 零暖身首图与退出重连通过，仍开放**：`r-9ojwgeap` 的固定 `0.156.1` 经产品菜单单次启动和原生项目 trust 后，首图直接取得正确只读线程绑定；唯一 `input_image` 的 328 字节规范 PNG 与宿主／服务端引用一致，单次完成回答 `Red, Blue`、零工具调用。自动收起重开为空稿／0卡，原生 `/exit` 后 TUI／server 退出、票据 released、socket 消失；同 SSH 重连未新增输入且历史摘要不变。消费／退出重连收据 SHA-256 分别为 `7242e781cb44480d6e51e5c8a0cb78f88c1de5bcd13210eaca49df3bb04a7061`、`efe857bbea22d64a96bf272972dbdca0ecf4143841846ba75ef00cc767029d01`。英中两组新短标签完整可见，语言切换未重启，不宣称完整中文成功流程。App／sshd exit0、daemon自然退出、finish确认全部自有进程退出，现场及profiles保留。旧 [ea74 CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36835106269) 已终态失败：Linux控制TTY通知缺失、Windows原生11失败及桌面1条LEAK均保留，最终审计摘要 `97b18c039fdd1205375430be9577c0ccceaebd6483bc028bf363441e63ab2f69`。tmux产品启动与图片消费、其余异常组合和最终源码门禁仍待完成；新增关闭0项。
+
+- **2026-10-01 Codex 首轮只读绑定已实现，仍开放**：固定原生唯一 loaded thread、metadata-only cwd、票据/TTY/进程/socket 身份及排他 SID 已接通，界面不伪造 rich hook、不发送暖身回合。Mac check、42 项未变的队列/身份等回归及修正夹具后 17 项 UI、11 项 i18n 分轮通过；原失败保留，收据摘要 `971e9f6ce5e4d81f824b3ce9f3ce3badfab360d2752a6921bfddb74507f2b765`。新构建首图和英中短标签布局未验。Grok aa 原生增量仅测试夹具，旧 Linux 控制 TTY 与 Windows 通知失败不回填；tmux 产品接线、异常恢复及最终源码门禁仍缺，新增关闭 0 项。
+- **2026-10-01 `0a7ab86e9` 英文 SSH 修复版复验，仍开放**：`r-ezc4sbpx` 的 Grok `.2/a9c27a25fe22` 经产品菜单单次启动，原生初始插件 SessionStart 成功；单次首图得到唯一 text＋typed PNG 和 `Red, Blue`，规范 PNG 字节与宿主／服务端 finished、ACK 一致。自动收起后重开草稿为空、卡片为零，没有手动清稿；原生 `/exit` 后 retired／released 成功，原生 socket、锁及私有 socket 目录均已回收，没有外部信号。消费／退出收据摘要分别为 `d5dc0991614bc28f741211c88f6864e8981d139a5c5305c8173d299a1ebb7b67`、`f42de49ab54bbf4504476c1d67691d6a2aa1ce5e63bdd31f25fa09f6adb00963`。同轮 Codex 通知参数已显示 active／Trusted，却没有首轮富输入；固定官方源码将 SessionStart 延后到首个模型回合，形成首图绑定循环依赖，仍需只读原生线程绑定。零图片／零模型退出收据 `a8247892e1da24b191d1e35b1129acaab41b92d8bffc2802ca5aa24e900be7e0`。真实 tmux 3.7c 单窗格开启 passthrough 后，专属远端两入口均缺失，收据 `88983684ec7a33e08543665f18f3611a03bb35cd50a32ec24eddb0f44f5f6250`；不以通知传输探针代替产品入口与图片消费。英文 Codex 菜单截断已定位，双语短标签改动待新构建验证；中文成功布局、异常组合与最终源码门禁仍待完成，新增关闭 0 项。
+- **2026-10-01 Grok 真实首图通过，清稿／退役及 Codex 通知参数仍需修复版复验**：`ea74/r-co3bb00k` 中文实际 SSH 的 Grok `.2` 初始插件通知已生效；单次 PNG 输入、原生 typed 字节、双方 finished／ACK 与回答“红色，蓝色”一致，但重开仍保留原稿和单卡。实际 `/exit` 后 TUI／leader 已退出，0644 原生 PID 锁被宿主错误套用私有 JSON 权限合同，未释放票据；没有外部 TERM。Codex 已进入真实 TUI，但五个精确通知状态键因原生 `-c` 左侧按点拆分而被忽略；未手动信任、零模型输入，原生退出后 released=true。三处精准修复已写入，Mac／Linux 锁合同同步；Mac 85 项回归、i18n 11 项与最终 check 已通过；新构建真实复验及 Linux 专属测试仍待完成。证据摘要与边界见验证报告，不关闭 G08。
+
+- **2026-10-01 真实启动仍失败，继续开放**：`400fe985f/r-vpukvpd7` 的 Grok 原生初始会话漏装插件 hooks，Codex app-server 已就绪但 TUI helper 标准描述符为 null。宿主现补 TUI 继承及经过持久身份核验的物理 socket 参数；Grok 成功 Reserve 后绑定连接回收票据，断连／Drop 不再依赖首次图片输入。21 项断言通过但有 1 条 LEAK，i18n 11 项及 check 通过；无需本地化变更。Grok 原生 `.2/a9c27a25fe22` 已补初始插件装配并通过真实 ACP／通知 45 项及 check，Mac 工件已绑定，整合后串行零重试 21 项无 LEAK 通过，前轮并发 LEAK 根因仍未明；最终源码门禁继续执行。两款本轮均零图片／模型输入；Grok 残留 leader 经精确单次 TERM 退出不计产品回收，旧失败保留。新构建消费、回收、异常链、英中 GUI 及最终源码门禁仍待验，详见验证报告；新增关闭 0 项。
+
+- **2026-10-01 Codex 长 socket 别名导致真实启动失败，已修复连接目标**：`c3ff/r-9u32vjqt` 中文实际 SSH 中，产品菜单单次启动产生原生 app-server 和94字节物理socket，但宿主连接121字节别名而超出macOS地址容量，20秒ready等待失败；TUI从未执行、模型输入为零，原生进程因同一路径的reap缺陷残留，现场保留。不是原生bind失败。现 readiness、首次绑定/回收及shared/owned消费统一连接已验证物理路径，别名/物理inode、父目录、peer与进程代次检查仍保留。白名单SHA `ed4efbd300331e3f5633d09ba2a8316d24bd573f1b0c58cb78aa4cc60ac5a552`；12项定向测试含3项真实socket通信/替换拒绝、i18n11项通过，最终check `r-uh0w0jy3` 通过，日志SHA-256 `0734ca67fa982dd062c0d2b9d25070241a55503ec9bffbb8cf1a651cd2950643`，短目录已清理。无需本地化变更；真实修复版及跨平台待验，不关闭G08。
+- **2026-10-01 `c3ff0bba8` 英文实际 SSH 清稿与拒绝退出回收复验，仍开放**：新签名 Mac GUI `r-u10vfmtu` 的固定 Claude `2.1.280/claude-opus-5-5` 首图仅一次提交，Read 允许后的 typed PNG 与规范上传 PNG 同为 328 字节且摘要相同，回答 `Red, Blue`；宿主/服务端 confirmed、释放及完成账本一致，自动收起后重开输入区为空、图片卡为零，未手动清稿。第二图 Read 选 No，原生错误且无 typed 图片，原中文稿和单卡保留；实际 `/exit` 后双方 retired、释放及宿主完成均落盘，远端图片删除，退休不改称消费。原生退出后重连同 SSH，两次提交、宿主/服务端记录和原生历史均未变化，每笔请求仍各一次；本轮未执行拒绝后重投，不扩为全部防重/旧回调条件通过。白名单首图收据 SHA-256 `0f33428e316c16437051f84a1bbe0c30e2dbe77740e599e318d8e90fc06ff498`、退出收据 `f75671d8d63036e973ffc34eecf8e6ec02ccb202f4dff4b323b9396567e0b2ef`、重连比较 `e81be712bb7bb1da3bc456b5a6e6c5ff27aa874b8d6c054e1407c872373b3ff8`。英文布局已实观，中文未验；截图仅 CUA 工具输出、没有外置原图，未观察到消费 Toast，不宣称 Toast 通过。App/sshd 均 exit 0，宽限等待后的 finish 收据确认全部自有进程退出，外层 exit 0；状态为 completed/retained、cleanup_ready=false，现场保留。`c3ff` 的 [CI 36822357366](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36822357366) 本次记录时仍运行；旧 `367279c7a` Windows LEAK 保留。Codex/Grok、tmux及其他异常组合仍待验；维持 **6 关闭／5 开放／3 移交**。
+- **2026-10-01 Grok 原生通知工件与宿主整合，门禁未完成**：原生 `13a09e440e297bf52b8a0941b7af5bf42e882013` 的独立 `1.0.41+infinishell.session-notifications.1` 工件已在 Mac 构建、签名及三个零模型入口验证，SHA-256 `0f3d4aa695e1d596c120be296dc68d1942dacc8c2a6320dc887cda127d0ea3f0`；新公开补丁 `2bca441da55912b1f463e732e8a0889bb505c2706941993ee055cc8f9aaf1019` 精确重建 tree `e8537e6cf1b788320882c4d65eb6dbf9d429da0a`。最终原生 `r-ihrmtr2u` 通知44项及check通过；旧桥原轮73通过/1个namespace失败保留，该项由 `r-1hv5iwt5` 单独通过，不能合成一次全量通过。18个宿主/CI/来源文件已整合，冻结摘要 `ff79d75fc90d455e86f60ea250219bf015ad868318d1e6e254655a43d4908aad`；`r-qbicqrss` check通过，但 `r-tq_tvb8i` 定向67项为54通过/13失败，已定位新夹具默认 `0777 & umask` 生成 `0755` 与私有 `0700` 要求不符；仅三份测试文件六处创建改为显式 `0700`，`r-nc7llcn1` 单独复验新增及版本关联 14 项全过，日志 `048a32e06604b3c64a2df5194ab031098902d61fcd1ab852a59ec784b86a8b69`，exit 0 且已清理；原失败保留，不改称原轮全过，i18n `r-zleu1c4y` 11 项通过且已清理，最终check `r-vbxjs18d` 通过且已清理，最终 v2 冻结 `fe3f747818dc9de3b5665e2e7288ecc4f81f9291675abafa1b820fa9fe65093e` 仅三份测试夹具文件变化；新增量跨平台源码门禁待验。两组英中文案已同步，真实布局未验；旧G01工件/tb1不变、Linux通知工件仍未绑定。本增量未取得真实远端Grok PNG与通知归属证据，不关闭G08。
+- **历史记录：2026-10-01 清稿、退休响应与 Codex 通知接线修复，当时真实复验待完成**：Claude 自动收起/恢复后仅保留原提交的只读清稿凭证，写租约仍撤销；原笔回调按 generation 与 submission ID 释放租约，不能清新稿或释放新提交。客户端接受原消费者已退出的 retired 回执用于回收，不把退休当成消费。Codex 专属入口冻结五类通知、八份脚本及 SessionFlags，app-server/TUI 使用相同固定参数，不改用户 HOME、CODEX_HOME 或审批配置。客户端 9 项、本机 app 原轮 229 项通过；10 项新连接绑定用例因共享夹具遗漏真实 BlockMetadata 而失败，修正夹具后 10 项独立通过，原失败保留。i18n 11 项及最终 `cargo check -p warp` 通过；收据 `g08-ui-client-local-gates-v1.safe.json` SHA-256 `61e792488c73bcc94bc836f72d49945962fbc32f823c7929d080bf76e9cb007f`，短目录已清理。无需本地化变更；新构建真实英中 GUI、Codex/Grok、tmux 和异常链仍待验，新增关闭 0 项。
+- **2026-10-01 `367279c7a` 真实消费及退出回收复验，仍开放**：新签名 Mac GUI 的实际 SSH Claude 首图已得到 typed PNG、正确回答 `Red, Blue`、服务端 confirmed 与文件释放、宿主确认／释放／完成账本；自动收起后重新打开却仍保留原稿与卡片，确认为界面清稿缺陷。第二图原生 Read 选 No，无图片消费或替代读取，原稿／卡片保留；真正键入 `/exit` 并核实原进程结束后，服务端 retired／释放成功，但客户端拒绝 retired 响应，宿主未记录完成，SSH 重连后也未恢复。第三次相同 Return 没有新增原生请求，同时存在 CLI 等待守卫，不能单独记为持久防重分支通过。独立业务审计 `resume-20261001/g08-preparation/r-caeh0l9f-claude-ssh-gui/acceptance-review.safe.json` SHA-256 `414055d94ab25cf1c86b9426f07ba474bb27a0f35e282af0dd99fbb17c73d470`；所有自有进程已退出，远端 slot 同设备无覆盖移入本轮保留目录，唯一历史及 profile 保留。客户端修复定向 9／9 通过；界面修复首次 check 因跨线程 Rc 失败，修正和新构建复验仍待完成。该提交 [CI 36814148707](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36814148707) 两作业成功，Linux 新 23 项、Windows 新 4 项首次通过；Windows 桌面有 1 条 LEAK，不能称最终门禁全绿。新增关闭 0 项。
+- **2026-10-01 真实首图消费与回收缺陷修复，仍开放**：`e8233ac67` 新签名 Mac GUI 在实际 SSH 内，固定 Claude `2.1.280` 的全新 SID 起始无历史；一次图片提交、仅本文件 Read 审批后，原生 typed PNG 的 328 字节与上传后的规范 PNG 完全相同，回答 `Red, Blue`。原 137 字节夹具经过 PNG 规范化，不称上传字节与原编码相同。真实历史在请求和 Read 之间串入四个 `attachment`，原解析遗漏这些祖先节点，故尚无消费终态及图片回收；草稿／卡片保留也不能独立判定消费失败。选定元数据收据 `resume-20261001/g08-preparation/r-p7h47_62-claude-ssh-gui/first-image-native-consumption.safe.json` SHA-256 `c66dd5eb6c92da18425d376396e29f3c1e475c7789908f91b8af7d56508fdf6d`。现仅把同 SID、非 sidechain 的原生附件作为祖先节点，不能以其内容伪造 Read／图片证明；另补首写前持久拒绝、原消费者内核生存期及退出后的引用退休。退休只回收文件，不确认消费、不清草稿、不解除未知投递的防重锁；旧无生存期记录继续保留。Mac check、定向 nextest 136／136（新增 22 项）、i18n 11／11 均通过；收据 `resume-20261001/g08-preparation/g08-consumption-release-local-gates-v2.safe.json` SHA-256 `542d123c414997aa4cf8fa599c2fc4a8374953f8279d97910f376953da83b624`。真实修复版、英中布局、其余 CLI／tmux 与异常组合及本轮跨平台源码门禁待验；无需本地化变更，不新增关闭项。
+- **2026-10-01 首图历史延迟创建修复，仍待真实验收**：原 Claude 会话绑定和队列入口要求 `<SID>.jsonl` 已存在，首图前尚未落盘时会拒绝。现显式保存等待历史创建的 Pending 领取记录，锚定既存私有目录；首次观察原生文件后，在同一存储锁下另存不可覆盖的 inode 绑定，再按原同请求 Read／typed image 原字节规则确认。旧记录格式和 inode／offset 保持兼容，领取后、写前历史意外出现时零发送并保留 Unknown，冷恢复不重选文件或自动重投。Mac check、相关 nextest 114／114（含新增 20 项）、i18n 11／11 通过，短目录已核验清理；本地收据 `resume-20261001/g08-preparation/g08-first-image-local-gates.safe.json` SHA-256 `a92596f30bfd4ccbff12adc463dd6cfda69cc5d0ade7cdd1d76be5e64ab174dd`。`observed_len` 仅为首次观察长度下限，不承诺识别所有离线截断后恢复长度；新 SSH／tmux 消费、异常恢复、双语实窗及 Linux／Windows 源码门禁仍待验。既有英中语义已复核，无需本地化变更；本轮新增关闭 0 项。
+- **2026-09-29 回环 SSH 暂存验收**：签名 `2383428da` 产品二进制经私有 macOS 回环 sshd 的二进制 stdio proxy 上传 70 字节 PNG，远端 Verify 和独立 SSH 读取均与源图 SHA-256 一致；并发连接不能读取另一连接的未发布传输，半图断连后清理，同 host 重连可按凭据查询、旧 epoch／错误 key 被拒，显式 release 删除原图。三条 SSH 代理及私有 sshd／daemon 退出，七轮临时目录经身份和打开文件核验后清理。验收工具 `eaee5261e` 的 4 项离线测试通过；执行时工作树另含未提交产品增量，因此只绑定上述旧签名二进制和限定传输行为。不含 GUI、PTY 中的原生 CLI 图片消费或模型回合，G08 不关闭，收据见[验证结论](VALIDATION_REPORT.md)。
+- **隔离认证前置核查**：固定 Claude `2.1.280` 在全新私有 `HOME`／`CLAUDE_CONFIG_DIR` 且不继承 API 环境时，原生 `auth status --json` 返回未登录；进程与短临时目录清理确认。该轮未发送模型输入，也未取得远端原生 `Read` 或历史图片字节。继续实测须先让私有测试配置完成原生登录，不借用日常配置推定认证。G08 不关闭。
+- **固定 Grok 隔离认证复核**：固定 `1.0.41` 在新私有 `HOME`／`GROK_HOME`、独立 leader socket 且不继承认证环境时，单轮模型标记探针退出 1、没有标记或 `auth.json`；没有发送图片。脱敏收据 `resume-20260929/g08-isolated-grok-r-6574681e/receipt.safe.json` SHA-256 `f640ca4ad9bded5aad4ca880cb3959869f3e8e1ad847950c50f41bfdb6ba5e76`，私有进程与短目录已核验清理。离线审查未发现可在无认证条件下确定复现的远端消费缺陷；这只说明本轮认证前置不满足，G08 仍需专用登录及交互式 SSH／tmux 的原生消费验收。
+
+- **状态／优先级／范围**：本次 Mac 范围关闭；中；P1 附件、P5 SSH／tmux。其他平台实机验收移交，不计通过。
+- **实际情况与影响**：三款 CLI 的实际 SSH／tmux 图片消费、完整断连重连、重复投递和旧请求保护已完成限定验收，详见本节 2026-10-02 记录；本次 Mac 范围及 b47 精确两平台源码门禁已通过，G08 在本次范围关闭；历史失败按原轮保留。未满足来源／会话合同的输入继续拒绝。
+- **历史未验证代码增量（以下为当时状态，后续验收见本节 2026-10-02 关闭记录）**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。Claude 的实际 SSH 首图消费与释放、成功后重开清稿/清卡、拒绝后退出的宿主 retired 回收及退出后重连无新增，已由 c3ff/r-u10vfmtu 在英文 GUI 的限定链复验；367旧缺陷与失败仍按原轮保留。中文布局、Codex／Grok 与 tmux 原生图片消费及其他异常组合仍待实测，不以可靠拒绝或暂存正例代替完成。
 - **恢复补接**：`5aac3f7d0` 增加同会话 Claude 原生事件后的有限只读补查，并在 Grok 确认未进入 Submit 时保存精确未派发终态，允许用户主动重试；未知 RPC 不重投、不清新草稿。新增十项回归本地通过，英中提示同步；真实远程延迟审批／回收及布局待验，G08 不关闭。
 - **当前替代方式**：用户先将图片放到目标环境，再使用该 CLI 已验证的远程文件路径读取方式；本机附件路径不能直接当远程路径。
 - **源码／证据**：[远程图片门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)、[SSH 现有覆盖](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)。
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-07 原机恢复项与事务再次失败，安全日志待验**：`d131dd13f`的37553787071普通1152通过/1失败，恢复项第92行实际三次SourceChanged；真实updated仍PersistenceFailed，后四场景及三冷恢复未运行。CMD/PS版本探测和清理成功，不能替代事务通过或回滚验收。仅Prepared前态，具体失败API/原生码未知。两份产品文件补原始错误和身份失配维度的安全日志，原控制流、校验、guard生命周期不变，本机格式/focused46/i18n11通过、cargo check通过、原机待验；最新独审及证据见顶部和CURRENT_STATUS.json的 `g09_normal_publish_failure_37553787071_20261007`。**新增关闭0项，G09与最终同源门禁仍开放，PR草稿。**
+
+- **2026-10-07 本机发布/恢复合同修复，局部门禁通过、原机待验**：4项真实FS基线证明仅保留SEC_IMAGE时底层rename可成功、freeze仍拒绝；不能只drop后rename。当前实现父租约贯穿freeze/drop→完整身份且不覆盖的rename→目标重新freeze，execute持backup guard至第二树发布后，recover持stage guard至旧包恢复后，失败保持RecoveryRequired启动保护。格式检查、focused46（含新增6树+1日志错误回归）／启动保护19／i18n11通过，cargo check通过、原机待验；原37548517669具体失败API未知。已在局部门禁后合入main的38fb011，原机验收和最终冻结待完成。**新增关闭0项，G09仍开放，PR草稿。**
+
+- **2026-10-07 原机正常版本探测通过，事务持久化失败**：`504cf65`的37548517669按witness=false、scope=all运行，CMD与PS均输出codex-cli 0.156.1并退出0，PS等到Node结束；首updated仍为PersistenceFailed。Prepared前态快照及缺失的事务journal不能证明确切失败API或回滚，冻结句柄假设未确认。最新审计及边界见本文件顶部和CURRENT_STATUS.json的 `g09_normal_candidate_persistence_failure_20261007`；旧失败与证据保留。**新增关闭0项；G09、正常五场景／三冷恢复及最终同源双门禁未完成，PR草稿。**
+
+- **2026-10-07 原机两阶段值已实证，候选仍失败**：`a4a6b4e`的固定37537472413通过151普通及唯一native；真实37538211705取得pre179→initial181（PSI=false）→原System.StartWithCreateProcess抛出182→Node188→late189（PSI=true），对应ShellExecute回退。267仅LastThrown候选，32帧局部栈不等于完整栈；具体失败输入和最终首因尚未证实。工作区已加入Set-Location到已绑定映射根，本机门禁及原机待验；随后直接验证正常witness=false五场景和三次独立冷恢复，不重复诊断候选。最新审计、清理和源码绑定边界见本文件顶部及CURRENT_STATUS.json的 `g09_two_stage_original_result_20261007`；历史记录继续保留。**新增关闭0项；G09、正常五场景／三冷恢复及最终同源双门禁仍开放，PR草稿。**
+
+- **2026-10-06 真实PS接入候选前取消，映射路径绑定修正待原生验证**：`b1150f4a4`的[37349685626](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37349685626)在源码检查阶段主动取消；reader/真实候选均未启动，取消独审SHA `9c782642a6f0bc9039a3d34b8a81220312f2144b34eba6f4626e9b2e479210b7`。旧诊断把Node宿主物理路径直接用于参数匹配，未证明与本代私有DeviceMap路径等价；现已接入同一spawn的原目录/Node租约和已验证映射根，不改候选命令、权限或期限。本机warp check、34诊断测试及独审通过；该接线缺口不是原PS首因，实际返回仍待验，原失败、原静审及取消工件保持。无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
+- **2026-10-06 修正固定目标选择及原句柄回收，原生待验**：保留控制台夹具，只让原CREATE的路径／FileID／SHA及出生身份全部匹配者成为唯一固定目标；其他有效身份后代不计正例，也必须按原句柄确认退出及出生身份。固定路径身份未知或改变立即失败。核心从原句柄显式复制所需等待权限，保留WAIT_FAILED原OS码；清理保留首错及阶段，不能继续的pending立即停止。warp check、i18n11、Windows普通／诊断目标metadata检查和源码复审通过，本机门禁汇总SHA `451f0250c8d4db16f9e94322386a4581b12dd898235532162da456bec043e5ad`；45普通项及唯一原生项尚待Windows执行。原失败和所有原生正例、预算、期限不变；无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
+- **2026-10-05 固定分类夹具首个后代绑定失败，尚未取得返回**：精确`8bdbeec004277cb2a3222d00e6d8e9c8dd6f3896`的[37335113246](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37335113246)正式失败，38普通项通过；seq6在根工作线程创建／CLR绑定前收到另一进程CREATE，夹具错误地将第一个后代直接当作固定子模式，复合身份守卫失败。原件未保存具体失配分项，不能命名该进程。无分类入口／返回、无CLR观察、自有DR从未修改；根已回收且Job空，但debug事件未确认排空、子退出未确认，cleanup_ready=false保持。25来源、9构建输入和29工件成员已独审，SHA `d2b261fceccb0d30d248e71556e5b506ada52797a95a14b40fd069362c33e6a8`。正在修正目标选择及原句柄退出确认，不原样重跑或改控制台子系统避开。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
+- **2026-10-05 原生分类返回能力准备，尚未用于真实候选**：针对原PS失败唯一尚缺的分类返回值，新增一次已绑定Node的SHGetFileInfoW入口／返回观察，以及独立operation 3的CLR frames-only读取。原工作线程、出生身份、栈、代码映射及DR恢复必须在同一pending事件核对；无命中保持unknown，不推断ShellExecute分支。先用固定工作线程、无害本地子进程及原四异常回归验证，真实Windows能力结果待验。普通更新命令、权限、期限与五场景／三冷恢复要求不变。无需本地化变更；**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
+- **2026-10-05 实际异常类型已映射，具体退出分支仍待确定**：[b163静态运行37328199520](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37328199520)已采齐39方法/9类型；仅既有两个no_body使整轮failure/partial，未执行候选。187–203为ExitException/RethrowException传播，175–179的四条为模块发现ItemNotFoundException；不是已证实的启动权限错误。静态实现存在末端原生命令在ShellExecute/Windows应用分类为真时跳过等待及退出码写入的分支，但实际布尔值未取得，不能宣称首因。26结果均保留候选对象与不完整EH tracker边界，178/179读取调用预算耗尽。b7eb [Linux门禁37305012082](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37305012082)终审完成：5526 nextest PASS、23离线通过、hook23通过/2跳过；终审SHA `b82cb67164b401e3c85e342431e9f21af12574ef71f43fb1ae4a2d5231230998`，不解释旧超时或替代最终同源双平台门禁。**新增关闭0项，G09仍开放，PR草稿。**
+
+- **2026-10-05 原PS组合终态失败，已取得同进程异常记录**：`a74ba3c8f`的[37299690314](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314)首updated实际返回ProbeFailed；PowerShell在13917ms退出1，Node/Codex随后均退出0，完整原生工件SHA `65c109949aea234133dd0dd9eb0379f7fec9cebb35810b54d7c6d1fd784c1b17`及182成员CRC已核。26异常记录含8 observed/18 partial，实际晚期帧未在原71方法静态合同中，不能推断唯一首因。本次仅追加原MVID绑定的39方法和9异常类型静态解析，本机14项及warp check通过；原候选、权限、期限及验收要求不变。b7eb Linux源码门禁官方success、终审待完整归档；无需本地化变更。**新增关闭0项，G09及最终同源门禁开放，PR草稿。**
+
+- **2026-10-05 Linux 外层超时诊断补齐，原失败仍开放**：原Node调用只增加PID、Linux出生字段、kill前状态/时刻与原超时输出长度，未知保留null；8秒、原命令和POSIX清理/异常语义保持。离线23项及warp check通过，无真实hook重跑或远端派发，不以离线通过解释`74ddcaa42`原失败，也不声称具体后代持有管道。当前a74 Windows原轮继续；无需本地化变更。**新增关闭0项，G09和最终同源门禁仍开放，PR草稿。**
+
+- **2026-10-05 原运行页面确认离线夹具权限错误，真实候选继续**：`a74ba3c8f`的[37299690314步骤13](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37299690314/job/111729240747#step:13:49)页面原日志为Python28项中27通过/1错误，唯一错误是测试创建符号链接时WinError1314；ctime三项均通过，完整终态日志尚待统一归档。现仅离线测试改为直接模拟文件/父目录reparse元数据并调用真实driver，断言在解析/打开前拒绝；Unix真实symlink仍保留，未提权或跳过整条测试。28项、Windows分支选择器模拟及warp check本机通过，不冒充Windows原生链接或升级验收。当前运行继续、验证引用不动；无需本地化变更。**新增关闭0项，G09仍开放，PR草稿。**
+
+- **2026-10-05 原PS组合取消前已有两项失败，修正后待新源码实跑**：[37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804)完整官方日志确认Python25项唯一失败为预期`clr_reader_binding`却提前得到`clr_reader_changed`；Windows普通libtest另有复合表达式cfg的E0658/移除表达式/E0061，不能记成仅人工取消。真实升级步骤未运行。时间字段路径已由`13d443281`修正，本次测试调用先绑定并共用原deadline，保留命令、权限、时限和断言。本机warp check与真实调用片段的Windows MSVC普通/诊断两配置检查通过，片段不替代完整应用门禁。Mac原条件只读复核未发现新增必要实机缺项；无需本地化变更。**新增关闭0项，G09和最终同源门禁仍开放，PR草稿。**
+
+- **2026-10-05 共享 CLR 能力通过，原PS组合仍待验**：精确 `e84e80047` 的 [37288696146](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37288696146) 已独审通过20普通项与唯一四异常原生夹具；原工作线程/出生身份、四条完整链、1234/5678及实际throw IL均核，53事件全部Continue，fixture自然退出0且所有Job为空。18来源/9编译输入/36工件成员已核，独审SHA `9a70fb8a9d929537382e649a7b49ee208daf49ad8e4e194892d67201efb36bcc`。同提交原PS组合 [37289665804](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37289665804) 的Python驱动门禁已失败、整轮仍运行，完整首因待审。独立源码核实固定CPython3.13.15的路径ctime为创建时间、fstat ctime为变更时间，现只改为同API前后比较，保留跨API文件身份、mtime和SHA校验；本机28项及warp check通过，不据此提前认定本轮首因或升级通过。**新增关闭0项；无需本地化变更，PR草稿。**
+
+- **2026-10-05 共享读取器接入原首PS候选，尚待原生验证**：固定夹具与PS改为复用同一Rust控制器；首代授权以私有sidecar绑定generation和原启动清单摘要，reader配置不进入CLI环境。保留原CREATE线程句柄、逐个first-chance停点及原HRESULT低32位，合法partial/unavailable仅留证不替代候选判定；候选先终止、reader精确回收后才Continue，原期限不变。PS额度按既存SMA/宿主完整文件上界预先固定24MiB，夹具保持16MiB，无失败后增额。共享9普通加原11普通及原四异常用例尚待新冻结源码的Windows执行。本机warp check、Windows command目标check、首代记录测试1项、i18n11项、Python25项、workflow19项和静态格式/语法门禁通过；两组静态独审无确定阻断。所有本机登记根已清理，早期缺文件编译和格式/脚本调用失败原件保留。无需本地化变更。**新增关闭0项，真实升级故障与最终同源门禁仍开放。**
+
+- **2026-10-05 固定 CLR 四异常能力通过，实际升级仍失败**：精确`1d85bdb36`的[37277365566](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37277365566)为11普通PASS／唯一原生PASS。四条真实异常链完整，两个Win32原码1234/5678未混淆；原工作线程与出生身份一致，实际抛出帧IL为16/16/36/24，第三项direct、其它三项严格terminal-map校验，原E_NOINTERFACE与PARTIAL保留。55事件全部Continue，fixture自然退出0，全部reader已回收、Job空、无pending。独审SHA `2871934437a1a19181b9c1925c704bb7e8c712473ea8428ae8e2c9b605ad992e`，官方ZIP摘要与36成员CRC及16来源／9编译输入已核。该结果只解除异常读取原生能力缺失，不解释原PowerShell故障；下一步接入原授权首PS候选，实际完整升级矩阵及最终同源门禁仍待满足。无需本地化变更。**新增关闭0项。**
+
+- **2026-10-05 实际MT字段通过两个停点，完整夹具仍失败**：精确`a8766acff`的[37275551089](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37275551089)为11普通PASS／唯一原生FAIL。两个停点取得完整Win32字段与1234/5678，约4.924MB且未耗额度；throw帧IL仍E_NOINTERFACE。第二个reader根退出后Job即时查询非空，原fixture被精确终止，后两包装异常未执行，不能声称动态inner链通过。51原事件及退出清理已核，原失败保留；仅修原期限内的Job等待语义，并继续核映射合同。**新增关闭0项。**
+
+- **2026-10-05 四异常原生夹具仍失败**：精确`9578948db`的[37272950186](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37272950186)为11普通PASS／唯一原生FAIL。两个同HRESULT停点分别取得当前1234/5678，但字段预算、内链派生类型及IL映射未满足完整条件，4份读取均partial。原生53事件、退出和Job清理已独审，收据SHA `94acfa2d8c652a8137a7d7d5b7fd82890af8a863278a9dac7bafd74257022d32`。后续按真实MethodTable修字段，并修正原停点栈上下文及首帧顺序。DAC字段API会整块载入元数据，按已有System/mscorlib原件文件大小及原4MiB其它读取量、1MiB夹具上界，固定规划16MiB诊断读取额度；这不是当轮metadata大小实测，不保证通过。8192次、4层、32帧、所有期限及功能断言不变，原失败保留。**新增关闭0项。**
+
+- **2026-10-05 原生夹具与Linux门禁仍失败**：[Windows 37271419406](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37271419406) 已越过MSVC编译，真实CLR的CurrentExceptionState在first-chance停点给出空或前一次对象，三个读取均partial；目标绑定及退出清理不代替对象验收。正修复定位器，并加入相同HRESULT、不同原生码的四事件顺序断言，保留PARTIAL原状态、预算和期限。[Linux 37267752920](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37267752920) 本轮外层Node8秒超时且preload/trace缺失；上次refreshed用例本轮ok不解释旧超时。两轮原件均已独审，不增加相近探针、不放宽期限。**新增关闭0项；无需本地化变更。**
+
+- **2026-10-05 固定 CLR 夹具编译失败，最窄修复待验**：精确 `bd6ecb498` 的 [37269594308](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37269594308) 正式失败；Windows类型检查和7普通项通过，MSVC在`GetFlags`实参报C2664，真实夹具未执行。现仅把`state_flags`从`ULONG`改为接口要求的`ULONG32`；不强转指针、不降低告警或验收条件。官方ZIP及完整日志已保留，旧PowerShell故障未解决；新增关闭0项。
+
+- **2026-10-05 Windows 固定 CLR 夹具准备**：原异常线程／当前异常对象／InnerException／Win32原码及方法帧读取、期限内reader回收均有明确夹具条件；本机Windows目标类型门禁、warp check及18项workflow校验通过，MSVC与真实Framework读取尚未执行。只验证诊断原生能力，不执行实际CLI候选，不计G09关闭；无需本地化变更。
+
+- **2026-10-05 Mac 显式空 ACL 真实事务通过，仍开放**：精确 `74ddcaa42ada3e3f7306adab1fd5b7b69df30d13/r-f6ta9tcm` 的 `updated` 公开入口升级至2.1.280，`swap_receipt_missing` 经独立libtest冷恢复2.1.278且完整after等于before。两场景before／prepared／after的README均精确保留显式空ACL，包根与两CLI文件保留非空只读ACL；四份官方归档、19份Git源码、签名后二进制及两代原生退出／清理绑定已独审，登记短根已清理。独审 `g09-claude-npm-empty-acl-macos-runs/r-f6ta9tcm/independent-native-empty-acl-review.safe.json` SHA `7571567a5e135478b59ae0ce92f734603d0021c1b3edafa419f95d5a53e5a9d2`。仅两场景／一次冷恢复，不计新增相对路径、GUI或原完整5/2重跑；Linux后续37267752920仍运行，Windows固定CLR夹具尚未原生验证，原失败和最终同源门禁保留。**新增关闭0项，G09开放；无需本地化变更。**
+
+- **2026-10-05 Mac 显式空 ACL 修复准备（历史阶段）**：真实原fd证据确认旧读取路径漏掉44字节空ACL，先前APFS归一化解释不成立。原语25项及包树／链接2项通过，版本化两场景／一次冷恢复夹具已接；Mac更新385项、i18n11项及warp／warp_tui check通过；当时真实事务仍待验，不以测试关闭G09。Linux专用feature通知阶段记录用于原失败进程定位，原期限保持。无需本地化变更。
+
+- **2026-10-05 PowerShell 实际实现只读取证**：`d0d61069c` 的 [37264336924](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37264336924) 已结束；69个托管方法IL已逐指令核验，2个原生PInvoke无IL使正式整轮为failure／partial。没有执行升级，也不回填a5实际失败分支。原始stderr无候选错误字节，已有首16次CLR异常又全部早于Node CREATE，仍缺失败窗口内的具体异常和方法位置。根复核SHA `41970d6b52c672b1ed5d1172594053990b4fdf07b0632443cb33b106c76dbce3`；**G09开放，新增关闭0项**。
+
+- **2026-10-05 用户范围决定**：允许带额外共享写权限、文件保护标志或特殊链接权限的安装提示使用原安装工具升级；普通安装和已支持只读ACL安装仍要求自动升级，来源、身份、权限及恢复核验保持。现有英中 `settings-cli-updates-unsupported-source` 已明确提示原安装工具，无需本地化变更。该决定不把拒绝记为自动升级成功，不豁免Windows原矩阵失败、Linux通知send超时或最终同冻结源码双平台门禁；**G09仍开放，新增关闭0项，PR草稿**。以下逐轮待决表述保留当时历史状态。
+
+- **2026-10-05 Mac 只读 ACL 真实事务通过，仍开放**：`b5d9d9fb6/r-t3ha378w` 的 `updated` 真实公开入口为2.1.280，`swap_receipt_missing` 经独立进程冷恢复为2.1.278；两场景的非空ACL、15节点完整快照和官方归档成员均已独审，冷恢复后整份快照与原件字节相同。两代原生退出0并确认清理，两份签名二进制已完整归档，短根已核身份和退出后清理。独审 SHA `c0a7d802e3143f687b494a61a5b8ff88f585e8ae1bd6f2b45211557383ed5ad5`，根复核30份小原件 SHA `111a3076ef0b08918a312fe942c053194378505f49f6665bc1b12f287f5e9842`。本轮严格为两场景／一次冷恢复，不替代原五场景／两冷恢复，也未覆盖新增相对路径。另已复现Mac新增路径错误采用包根组（20）而非最终父组（12），现仅修Mac新节点组继承，Linux原安装策略保持；379更新回归、i18n11及check通过，修复独审无阻断。[Linux源码门禁37215103046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37215103046) 绑定b5，尚未结束。Windows原矩阵失败、特殊安全属性范围和最终同源双平台门禁仍开放；无需本地化变更，新增关闭0项，PR草稿。
+
+- **Windows a5 原矩阵终审补充**：正式小原件确认首 `updated` 为 `ProbeFailed`，CMD退出0并输出18字节固定版本；PS根在Codex创建前退出1、捕获stdout0字节，随后Node/Codex均退出0。202／415调试事件均验证并继续，两代Job／AppContainer／helper／desktop／DeviceMap／窗口站／LSA清理成功；后四场景／三冷恢复未执行。原生独审 SHA `f9ea149c550e3eeaa258bd6a7367ef0806e8ba3cf06c38470302b55f16fe27fc`，71份小原件索引 SHA `bca8978a66be934b840cd8bad7448f0ab0996a0fdaa6406f56a2f8be84a3c9c5`。新管道尚未取得可验版本输出，内部句柄与首次创建错误未观测，不猜根因、不重复相近探针。
+
+- **2026-10-04 Unix 只读 ACL 实现与本机门禁通过，仍开放**：通过原fd捕获和复核有界Mac/Linux ACL，保留既有节点权限，新节点按最终父目录继承；摘要和恢复账本绑定ACL，旧无ACL格式保持兼容。修复快照后新增硬链接会先改树外别名权限的问题，以及Grok回滚先交换再发现镜像ACL变化的顺序问题。更新378项、i18n11项、driver22项与check通过；门禁索引 SHA `be0bd7b83f5d3fdeb42c41bd3441836cf77fa0322c17a91fc8060b6c57368595`。真实官方CLI的ACL更新／冷恢复尚未运行，额外安全属性、显式空ACL归一化及链接ACL不计支持。Windows [37209945616](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37209945616) 正式失败；普通1233 PASS、66必需与i18n11各一次通过；首updated失败的原生证据见上条终审补充，根因仍未确定。无需本地化变更；新增关闭0项，PR草稿。
+
+- **2026-10-04 Mac 与 Linux musl 平台绑定完整回归通过，仍开放**：`a5ecc6848` 的 Mac `r-kgcnezst` 五场景／两次独立冷恢复全部接受，实际 Latest 降级拒绝为 `ChannelMismatch` 且没有计划，四代原生退出0并确认资源清理；独审 SHA `f22d22d83bc0ff82e73267b72948287c0e3981c70e8e5367a78e0447b1097280`。初次本机目录清理失败保留，剩余内容／元数据已完整保全后清理；两轮旧失败也已保全并清理，不改写失败。成功轮监督程序已有同字节签名归档，测试worker仅来源和执行摘要仍在，未重建冒充原件。Linux源码 `926af2b65/run37204698590` 的5482次nextest及新增30项通过；同 `a5ecc6848` 的 [musl正式验收37207590339](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37207590339) 五场景／两冷恢复／四代退出0并清理通过独审，普通2060项及必需41项各一次通过。busy模型用例的15行EOF错误日志保留，不称日志无错误。Windows [原矩阵37209945616](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37209945616) 已启动、witness关闭，尚无功能结论。无需本地化变更；新增关闭0项，额外ACL／安全属性及最终同源门禁仍待完成。
+
+- **2026-10-04 PS 管道兼容候选与 Mac 降级验收修订，仍开放**：Windows 仅为受管官方 `codex.ps1 --version` 请求空输入和流式输出管道，并显式传递原退出码；固定盘根、官方包、Node 选路、权限、版本判定、取消和清理标准均保持。独审 SHA `b046e46011afa93d08f678cfcdc8fe3a864bbc0f43d8a192cf31d0ea1d4f858b`，不证明旧 stdout 为空的根因或修复成功。`cf18c6cdd` 的 Mac `r-75gduwee` 前四场景通过，含两次独立冷恢复；第5场景错误期待 InvalidRelease，源码合同对 Latest 的280→278要求 ChannelMismatch。仅修精确错误预期，保留无计划／安装树不变，增加实际拒绝字段收据；原失败现场保留，不能把尚未记录的错误类型倒填为已观测值。完整矩阵待重新验收；无需本地化变更，新增关闭0项。
+
+- **2026-10-04 Claude musl 实现已补齐，真实验收未完成**：固定四版官方八归档逐成员合同独审通过；主程序保持密封 memfd 执行，系统 musl 加载器绑定身份／摘要，npm 从实际安装取得平台并贯穿计划、提交、候选与冷恢复，旧无平台账本兼容及两种显式降级合同保留。本机 check、342 更新回归、i18n11、共享 npm Python117／环境10通过，新增 Linux12 尚未执行。门禁索引 SHA `2ebb1fab9b6de2370b61a62f9d1a6e15ed84850b37002ba7cd43669e4f5b5498`；无需本地化变更。真实 musl 与新平台捕获 Mac 事务待验，Windows run37200286598 正式失败待独审；额外 ACL／安全属性范围仍待用户决定。新增关闭0项。
+
+- **2026-10-04 部分解栈准备修订，本机门禁通过、Windows待验**：仅 PS 原线程诊断先整体核验来源身份及地址重叠，再排除坏异常表并保留模块身份、目录和具体失败分支；原主线程身份／CPU／context 不再依赖全部异常表可用，未知 PC 仍停止展开。单表 768KiB／累计 4MiB 请求预算保持且失败不退款，CMD 严格路径及原权限／取消／期限不变。新增 7 项 Windows 回归，feature 总 89 项待验。Mac `cargo check -p warp`、i18n 11 及定向格式通过，三个登记短目录已清理；门禁索引 SHA `a9d015c90620dd6ac8526ded6781624df78b79135847b08dbe763dc65df630cd`，独审无阻断。无需本地化变更；实际 PS 停滞未解决，不算缺口关闭。
+
+- **2026-10-04 模块绑定已通过，原线程采样仍被异常表准备阻止**：精确 `9d31cdf46` 的 [run 37188635472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37188635472) 为 failure。普通 1221 PASS（1133 warp＋88 command）、63 必需各一次 PASS；feature 82 各一次 ok，含新增 8 项，i18n 11 已含在 warp 内。真实 `updated` 为 0 PASS／1 FAIL、395.55 秒、`ProbeFailed`。PS 212 个事件均已验证并继续，上轮 `module_binding` 未再失败；6 次 PE32 和超过模块上限后的 17 次跳过均标记部分覆盖。15／240 秒两次采样均在 `root_prepare_modules` 返回 `invalid_exception_directory`，尚未取得 CPU／context／栈，不能将 `complete=true` 当作现场获取成功，也不能确定失败模块或具体目录分支。PS 未创建 Node，约 289248ms 控制取消；本轮取消 stderr 收据确证封存文件为 0 字节，不代表系统无错误或旧 SPM 已修。CMD 版本成功、退出 0，原拒绝访问及 PATH 警告保留；两代原生资源清理确认，不外推整轮目录删除。正式小原件 72 份，提取清单 SHA `ffed289c3ca9c1c2092dc97f232ae97352c4df0b439120e0d189b3049eaf9831`；完整日志独审 SHA `9fb96d66bdae6330aac2c66291a549ef0d868233b59cf02390dd2c14db6bbd90`。原完整矩阵及最终同提交门禁未完成，新增关闭 0 项。
+
+- **2026-10-04 诊断模块绑定修订，本机门禁通过、Windows待验**：仅 PS DLL 的额外取证复用普通 LOAD 已有租约；System32 仍绑定原文件／锁定目录身份与拒写句柄。已授权 PE32 DLL 标记原生解栈覆盖不完整，身份／IO／损坏头仍失败，CMD/root 严格路径保留。新增 8 项 Windows 回归（witness 总 19）待实际运行；Mac `cargo check -p warp`、i18n 11 和定向格式检查通过，3 个登记短目录均已清理。门禁索引 SHA `41c8f0dc443f3b504f4dc7e9edc6224ec816ec46b07ad1026ed60efc8eab19f8`。无需本地化变更；不据此确认旧 PS 初始化问题修复，新增关闭 0 项。
+
+- **2026-10-04 首PS诊断被模块绑定阻止，仍开放**：精确 `926729445` 的 [run 37183471233](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37183471233) 为 failure。本轮仅 `updated`，0 PASS／1 FAIL、107.31 秒、`ProbeFailed`；普通 1221 PASS（1133 warp＋88 command）、63 必需各一次 PASS，feature 74 各一次 ok，i18n 11 已含在 warp 内。CMD 真实版本输出 18 字节、退出 0，仍保留“拒绝访问。”及 `CODEX_HOME`／PATH aliases 警告。PS 的 LOAD 序号 91 约 4138ms 在诊断 `module_binding` 返回 Other，未到 15 秒，无早晚快照、CLR 或 Node／Codex；不能称旧 SPM／停滞已修或复现。两代 Job／AppContainer／桌面／DeviceMap／窗口站／LSA 清理确认；`witness.cancelled` 只是错误清理标记，不证明控制取消；没有取消 stderr 收据，不推断原 stderr 为空。源码确认额外租约参数及 PE32+ 限定与生产授权不等价，但没有失败模块身份／内部子阶段，具体触发分支未证；修订中且待门禁。原生审计 SHA `9eae08158f5bbdcfee072f390726bde30680cfcc87b2d9b8630942d2900ed277`，清理独审 SHA `ff52e1be875d72b337041acb627e16e6fca47626ae2b4f6900711f5dc5dbbb0b`，首因审查 SHA `f9c93f2cc4b09f928a6a23e973fa9f79c4ed7436d0af3e44e031f57922c8aed0`，均位于仓外 `g08-build-preparation/926729445-windows-ci`；总索引 SHA `5216af442b6068145b7c232a67c2b51b86fa504081ceb082576669d4a3ab1cf5`。后四场景／三冷恢复未执行，完整原矩阵及最终同提交门禁未完成，新增关闭 0 项。
+- **原范围冲突仍待用户决定**：`g09-final-condition-map-20261004.safe.json`（SHA `b946f1667c72a76ecc5fe8ef9de4ee77d0866c24031eae1be2eba43f203d613f`）与根复核（SHA `ee2a7fb93cfe5be9b700f2481f4987c1f964638dadf499ea1ead21ef4058c083`）明确 Unix 额外 ACL／安全属性、Claude Linux npm musl 的起点文档范围冲突尚未获用户决定；不把不支持／拒绝或其他平台实机移交当豁免，不无条件声称只剩 Windows。既有 Mac 功能证据和全部失败历史保留。
+
+- **2026-10-04 定向诊断已准备，未新增关闭**：取消时最多保全 8192 字节原 stderr；仅首 PS 原主线程 15/240 秒配对快照，额外诊断模块上限不放宽原映像授权。工作流复用既有 scope 保持 25 输入与默认 CMD。本机 check、Windows command 类型检查、中英文 11、驱动 22／范围 8 与语法检查通过；门禁索引 SHA `43406b6dc7537b6afae035d1c31958e931f63ce921844e86fcd9d0e4029d11cb`。无需本地化变更。实际取证、原 5 场景／3 冷恢复与最终同源门禁仍未通过。
+- **2026-10-04 路径修订后仍停在 PowerShell，原矩阵失败**：精确 `542a2d81a` 的 [run 37178488175](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37178488175) 为 failure。普通 1217 PASS、59 必需逐名各一次 PASS、i18n 11，通过范围不含原生更新；原生首 `updated` 为 0 PASS／1 FAIL、386.17 秒。CMD 实际输出固定版本并退出 0，既有警告保留；PS 未创建 Node，在原期限后控制取消，最终 exit 1。最初 16 条 first-chance CLR 事件、3 条溢出不足以确定根因。两代最终 Job／AppContainer／站／LSA 回收已证，但 PS 内层 Interrupted 仍保留；取消检查使原 stderr 在读取前关闭删除，不能据宿主日志缺文认定旧 SPM 问题已解除。49 份精确源码及 23 份小原件根审 SHA `0a773146053f7c80b804cff52221e9ce1d146bf116d6b4603bb65fa907640b4c`，日志独审 SHA `13a317bbab6c69d4fcd6e1bfca48021ddb44fe55333822b1b1115b2d29c985a5`；原件位于仓外 `g08-build-preparation/542a2d81a-windows-ci`。后四场景、三冷恢复与最终同源门禁未完成；先补有界取消 stderr 和首 PS 线程取证，不将诊断准备计为缺口关闭。
+
+- **2026-10-04 启动路径兼容修复待原生验收，仍开放**：helper 最终 application 路径对齐 Rust 1.92 的短路径规范化，直接核同 FileID；canonical 请求、argv0、映像租约与原审核不变。另保留最初 16 条 CLR HRESULT，避免被后续事件覆盖；不改变权限或期限，不称完整内层异常链。Mac check、Windows command 测试类型检查、i18n 11、Python 21 通过，门禁索引 SHA `69ae482c4d7d794714afd56f3e975c190371bce4a6bf05c30315fe61ac7e6097`。来源 49 份、必选 59 项已接线，原矩阵实际结果待验，尚不能认定 PowerShell 故障解决。无需本地化变更，新增关闭 0 项。
+
+- **2026-10-04 输出隔离实际验收：CMD成功、PS初始化失败，仍开放**：`5d8075c524ee33fedef71c301484a9441a7679f9` 的 [run 37175216018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37175216018) 正式 failure；普通 1209 PASS（1129 warp＋80 command）、必需 51 项及新增 output 8 项逐名通过，i18n 11 通过，普通组无 FAIL／LEAK／RETRY／FLAKY。首场景 `updated` 为 `ProbeFailed`：CMD 实际创建 Node／Codex、输出固定版本并退出 0，但 `CODEX_HOME` 拒绝访问和 PATH aliases 创建失败警告保留；PowerShell 的 `System.Net.ServicePointManager` 初始化异常、退出 -65536、零输出且未创建 Node，底层异常原因未证。两实际代次的 Job／AppContainer／桌面／DeviceMap／窗口站／LSA 清理均确认成功。后四场景与三次冷恢复未执行，远端现场保留，不能声称完整事务或其他前缀／配置全树验收通过。终审索引 SHA `2295a35ec843716440c0ea8a75694285351d1715b14a3e6ee593f5d8b37bbcbc`，根复核 SHA `a71d4433a6baa0ab142163eedffe010ec29001d195fc0857a49b89c9214cbab2`；索引位于仓外 `g08-build-preparation/5d8075c52-windows-ci/final-delivery-index.safe.json`。本轮新增关闭 0 项；完整原矩阵与最终同提交双平台门禁仍待完成。
+
+- **2026-10-04 候选输出隔离已实现，仍开放**：只为固定 npm 版本候选捕获私有普通文件；真实退出和严格 Job 空后封存、关闭候选句柄，再做原站／LSA 清理，最后重放原字节。stdin、官方 shim、权限和原期限保持；输出错误与取消不标成功。Mac check、Windows command 测试类型检查、i18n 11、Python 21 及工作流门禁通过，收据 SHA `9719596188e21d33bf4167bd9b658afcbb60dda1a0ca49986762f611f3e86c88`；源码独审无阻断。新增 8 项 output 回归及来源绑定已接线，实际 Windows 原矩阵和最终同提交双平台门禁待验，不能计为 G09 关闭。无需本地化变更。
+
+- **2026-10-04 标准流持有路径已原生复现，生产待修**：`3c470921a` 的 [run 37173643101](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37173643101) 中，不写管道例 PASS；写入／读取例在 helper 全部退出、Job 空及站消失后，原三秒内 LSA 仍在，原 FAIL 保留。管道缓存 AuthenticationId 与新 LUID writer 相同，取证 token 关闭／Revert／join 已确认；仅关管道、保持原旧宿主存活后 LSA 消失，宿主随后自然退出。26 份二进制原件逐项核验，说明该路径可以持有登录会话；仍不能冒称实际生产矩阵已修复。正在隔离候选 stdout／stderr 生命周期，G09 不关闭。
+
+- **2026-10-04 标准流对照编译失败，病例未执行**：`17c583371` 的 [run 37173102898](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37173102898) 在固定 C helper 的 `/W4 /WX` 门禁报 C4701（局部 `size` 可能未初始化），两例尚未启动，不能得出任何 LSA 新结论。当前仅补显式零初始化，原成功判定、字节数、期限及告警门禁不变；Mac check 已过，修订的 Windows 目标结果仍待验。原失败完整保留，G09 不关闭。
+
+- **2026-10-04 标准流差分待原生执行**：前四例未覆盖生产仍持有的 Rust `Stdio::piped`；新增不写／写 nonce 两例，保留原三秒 LSA 结果，再只关管道而保留旧宿主作单次后查。写例包含读取和缓存安全上下文取证，不能单独归因 WriteFile 或替代完整 AppContainer／console／debugger 组合。本机类型／check／i18n／脚本门禁已过，Windows 原生结果尚无；诊断不计关闭，4ff 生产残留和原矩阵仍是阻塞。
+
+- **2026-10-04 设备映射／空 Job 对照已核，仍开放**：`999ff00d6` 的[Windows 37168344636](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37168344636)正式成功，637 项普通 PASS（565 warp＋72 command）、i18n 11，以及四个 ignored 原生病例各一次通过。四例使用互异新 LUID／nonce，8 个 helper 自然退出 0；26 份原始二进制收据独立解码、身份和摘要吻合。四例原查询均为 LSA `0xc000005f`、站 `0x80070002`；保留空 Job 的两例在关闭 Job 前已经回收，两映射例精确创建／删除及 FileID 绑定通过。独审 SHA `cf99093f259d58dc413e19a0a2faf2e59cfc4897ae191c82ff96776bc7222307`，根复核 SHA `170b7778baf2378530493900e39934558b8162b937c268aabe520051308881f6`。只排除这些因素在本轮高 IL、Session 0 两段 helper 对照中足以重现留存，不外推生产 AppContainer／控制台／调试／标准流及多层 Job 组合。生产代码未改；4ff 的 LSA 残留、原五场景／三冷恢复和最终同提交源码门禁仍待解决。不再重复相近映射／一般空 Job 对照。**新增关闭 0 项**；无需本地化变更。
+
+- **2026-10-04 LSA 回收阻塞已分离，仍开放**：`4ff41b614` 的[完整 Windows 原矩阵](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37163186787)失败；1193 项普通 PASS、43 项必需具名测试及 i18n 11 通过。首 CMD 链正常输出固定 Codex 版本，196 个事件均验证并继续，四个候选进程退出 0；两个 helper 退出 0，Job 为空，桌面关闭，局部盘映射精确移除。正常与 abort 收据均为 `station_absent=true`、`logon_absent=false`、查询无错误，原件 SHA 均为 `0b98c92df109ac1612c942c6cb077224d1695c1b73100aaa87eeecbed2dd6ae2`。App 与 command 普通句柄路径未找到确定遗留引用，本轮 witness 未启用；不把空 Job 或文件租约推定为根因。解除条件是定位实际残留对象／生命周期差异并修复，再通过原五场景／三冷恢复及最终门禁；不延长期限或降低清理条件。终审索引 SHA `301a6428fc1941b6965e215850dc63597131b62f2449caaabe598a20dda464b7`。
+
+- **2026-10-04 首 CMD 原生执行成功，完整回收失败，仍开放**：`087283721` 的[完整 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37160171946)已终态 failure。普通 1191 项 PASS，41 项必需测试逐名一次通过，i18n 11 通过；首 CMD→Node→Codex 实际输出 `codex-cli 0.156.1`，四个候选进程及两个 helper 均正常退出 0，203 个调试事件均继续，桌面关闭及 DeviceMap 移除已确认。但窗口站／LSA 登录会话的联合消失确认超时，正常和 abort 清理均未通过；原收据不能区分两侧。`updated` 为 RecoveryRequired，未执行 PowerShell、其余四场景或三次冷恢复，不将局部正例计为更新成功。三份官方 ZIP 已校验，唯一观察器已退出并清理，终审索引 SHA `1d0cc1eb67fd8abfbd843f26c99b683665ba6c2685b56c92f0d8cb691e6c6506`。
+
+本次仅补两侧独立查询及各自终态安全收据，查询失败仍为未知；保留原绝对期限、错误优先级、严格 Job 所有权和两侧均消失的成功条件。源码审查尚未找到可确证的句柄遗漏，不将诊断改动称为原生修复。新收据已被现有工件选择覆盖，两条新测试纳入原 Windows 筛选；实际回收仍待下一次完整原矩阵。无需本地化变更，产品文案、权限与布局不变。
+
+- **2026-10-04 Windows 测试编译错误已修，本机门禁通过，仍开放**：`73fc6bb3a` 的[原 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37154098574)生产 check 通过，但 step44 在执行用例前编译失败。IAB 原日志两处 E0277 位于 `managed_process_atomic_windows_tests.rs:1463/1481`：`unwrap_err()` 额外要求成功值 `DEBUG_EVENT` 实现 Debug。仅改两处为显式取错，保留取消／截止错误种类、trace 边界及零事件消费全部原断言；生产源码不变。本机 cargo check 和按仓库 2024 配置的定向格式检查通过，短根 `r-gpty5j95` 已清理；无需本地化变更。修复收据 SHA `e4c9dce85c33d27c13877c22ffc1a097ed31135195b8ba92e35926c21236a20c`。原 job 后续步骤按实际结果另计，不将尚未执行的 app 回归、五场景或冷恢复记通过；完整 Windows 修复门禁和最终同提交两平台源码门禁仍待完成。**新增关闭 0 项，10 关闭／G09 开放／3 移交，PR 草稿。**
+
+- **2026-10-04 目标登录会话内创建与调试已接通，Windows 原生验收待验**：第二 helper 改为在同一真实线程创建候选并执行 Wait/Continue，经认证管道转交原事件句柄，原登录身份、映像/FileID、Job两阶段授权、零 capability、三标准流及绝对期限均保留。复制失败可续取原事件，在途 Continue 不重放；首次绑定失败先终止原挂起候选再终止子 Job，正常 Close 要求排空并释放共享句柄。最终独审确认私有桌面名称正确传入；曾针对中间态提出的遗漏结论已撤销。本机 cargo check、35项进程/控制回归、i18n11项、Python来源合同21项及actionlint通过；command Windows测试交叉check通过，新增10项command及5项app回归尚未原生执行。来源绑定42→46、生产嵌入90→92，原f576失败保留。收据 SHA `342b6ccc5c719f65845c281d92771cd89b53683facd0c08ecafbac6eb7abd093`，仓外 `g09-station-debugger-v1/local-gates-final.safe.json`。完整app Windows编译、CMD/PowerShell、五场景/三冷恢复和资源回收均待真实门禁，G09仍开放。无需本地化变更：既有英中失败提示语义和布局不变。
+
+- **2026-10-04 完整 Windows 原生更新失败，仍开放**：`f5763d34e` 的[37145335699](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145335699) 普通 1173 项及 i18n 11 项通过，但首个 `updated` 原生场景在恢复候选前失败，报“候选进程没有继承局部盘映射的登录身份”；第二 helper 的局部盘/FileID 已核验，原件不足以细分候选身份失配字段。清理再等 5007ms 后未确认；候选尚未恢复，不计 Node 执行、PowerShell、其余四场景或冷恢复通过。官方原件、三工件和 42 项来源均已审计，索引 SHA `040dbe35d7937575a4dbc2cc1c99c5d711de83f03cf5ea414e1d5dc82e008856`，原生审计 SHA `fd31ff65766b5b2041ee5a8cc2169401b9665e9a67118192824aa322f4639cd2`。需修复实际创建进程的登录上下文及首个绑定失败时的挂起候选清理，再完成原定更新/恢复验收；安全拒绝和测试通过均不关闭 G09。
+
+- **2026-10-04 私有盘根原生实现已补，本机门禁通过，仍开放**：固定 Node 对原卷根 `C:\` 的路径查询仍按旧实测记 EPERM；新实现在第二 helper 的独立登录会话内，将原候选目录按 FileID 绑定为局部 D–Z 盘根，以该 helper 原句柄提供候选父进程及 DeviceMap。仅三路标准句柄复制到选定父进程后进入继承白名单，创建后精确释放；物理 cwd、固定 Node／npm shim、零 capability 和时限保持原约束。监督程序保留唯一外层 Job 句柄，经有界双阶段控制协议先接管 helper、再核验候选确属原 Job；候选创建后绑定失败保留调试清理所有权并禁止恢复。退出时释放原进程／线程句柄，再完成盘符、站和登录会话清理。Mac check、35项定向回归、i18n11项、Python来源合同21项通过；Windows command及测试代码交叉check通过，但不计原生执行。来源绑定35→42、嵌入生产表87→90，新增盘映射测试已接入Windows门禁；actionlint通过。无需本地化变更：内部路径与归属修复沿用英中既有失败提示，无文案或布局改变。收据SHA `6f6281994111e692bf5d4e963bfd2455cfea8d575e0e946780ec4068e42b845c`，仓外 `g09-private-device-map-v1/local-gates-final.safe.json`，本地完成短根已按记录清理。**完整CMD/PowerShell更新、5场景恢复矩阵和原生清理仍待Windows实测，新增关闭0项。**
+
+- **2026-10-04 profile修复越过CMD停滞，Node卷根访问仍失败**：精确`d5ec5dbc9`的[37132673681](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37132673681)为failure；Windows check、普通1153项和feature68项通过，含新增8项及增强清理回归。真实更新0通过／1失败、85.85秒；Node在2049ms创建并进入CJS模块加载，`lstat`卷根`C:\`返回`EPERM/-4048`，Node2489ms、CMD2497ms退出1，无取消及旧超时停滞，PowerShell未到达。35项来源精确匹配、113个debug事件均验证并继续；Job/profile/站/LSA及helper清理获证，整夹具根删除未证。独审SHA `a7758755bcf90e462ba0cd73a16d202ff62eb98e826c4673c87e442c739fa47a`，根核15原件及35源码SHA `02620a0911358784504c014155f521d657591939630136f6269167ec6b6e7b64`，仓外`d5ec5dbc9-ci`。本轮未采新TMP/TEMP长度，不沿用旧283单元；首行CP936拒绝访问仍未归属具体调用。所需受限路径元数据能力尚待实现，不放宽共享ACL或重复相近候选；真实CMD/PowerShell成功及最终源码门禁待完成，**新增关闭0项**。
+
+- **2026-10-03 原生 profile 路径修复，目标平台待验**：使用显式原进程 token 查询原生 LocalAppData，并按 fresh SID 查询 profile；逐级拒绝重解析目录，以只读且不共享删除的句柄绑定祖先身份，启动前重验。仅替换候选环境唯一 LOCALAPPDATA，其余私有配置及零 capability、严格 Job、时限不变；清理顺序在删除 profile 前释放存储句柄。新增8项纯回归并增强原空Job/ACL清理测试，尚未在Windows执行。Mac含取证feature的cargo check、i18n11项、Python合同21项通过，三个短根已清理；门禁收据`96473f38bcf62c06de8b71e7b78130abfbb0c27a8f47202b56839478a26e409a`，完整来源绑定扩至35项。无需本地化变更：内部路径错误沿原英中错误映射，无布局变化。真实CMD/PowerShell成功及最终源码门禁仍待完成，**新增关闭0项**。
+
+- **2026-10-03 原生临时路径观察定位不足重试，仍开放**：精确`50c64e9e3`的[37125688198](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37125688198)前置nextest1145项及feature libtest68个预期全名各一次通过；真实首CMD仍ProbeFailed，0通过／1失败、366.85秒，PowerShell未到达。早晚三段代码及三项IAT全部匹配固定原件；运行TMP/TEMP各283个UTF16单元且偏离构造208，USERPROFILE209一致，两次读取稳定但不证明全进程原子性。早期可信重试帧status `0xc0000023`、Length=MaximumLength=566字节，与不足重试遗漏结束符容量数值闭合；晚期缺可信帧，不回填早期栈。微软[原生合同](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)明确AppContainer重定向TMP/TEMP；实际字符串及具体改写调用点未采。33源绑定、同原出生身份、51事件全部Continue及Job/profile/站/helper清理获证，远端整根删除未证。根审`b51cde2422a4e0c4d87cb2096365ee55cd271fc6fd64b0140f984c50cdae1796`，独审`21699a9deff7563f99b8d3c0e6e117a87d2f3298f9fa78ad3a44476e39536824`，仓外`50c64e9e3-ci`。下一步修复fresh profile原生路径绑定；观察及安全清理不计完成，**新增关闭0项**。
+
+- **2026-10-03 标准堆修复实测仍失败**：精确`a53b3c49e`的[37118252587](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37118252587)前置nextest1145项（warp1102、带native-probe-witness的command43）及feature libtest48项通过，新增两项环境测试实际Windows通过。真实首CMD仍ProbeFailed，0通过／1失败、372.38秒；PowerShell未到达。15.109至240.071秒同原主线程消耗224.25秒用户及0.46875秒内核CPU；早期为普通RtlFreeHeap→GetTempPathW/AppCompat创建链，晚期仅一个未知地址，不沿旧轮套符号或调试堆结论。49事件全Continue、31源及启动/退出绑定一致；本代Job、AppContainer、helper、窗口站和登录会话清理获证，整个远端夹具删除未证。根审`db1c5263080caa5b8283f588ab42e38e60bb16148bb2cc30a275ba1fb7f96ebf`，仓外`a53b3c49e-ci`。限定堆配置未解决阻塞，不再重复同一候选；先核查已获GetTempPathW调用点。**新增关闭0项**。
+- **2026-10-03 同原主线程配对实测，仍开放**：精确`2e9f8d60f`的[37112613018](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37112613018)普通nextest1143项（warp1100、带native-probe-witness的command43）与feature libtest48项通过；真实用例1项失败，首CMD仍ProbeFailed。同PID/TID及两种创建时间绑定的15.118／240.046秒样本，用户CPU增加224.703125秒、墙钟224.928秒；早期调试分配、晚期调试释放/尾部校验均位于同CreateProcessW→AppCompat→GetTempPathW链，原暂停均0→1→0，失败字段均空。此证据支持限定CMD私有标准堆修复候选，但不证明修复成功。31源及启动/退出绑定一致，本代Job/AppContainer/私有站清理通过，整个远端夹具删除未证；根审`b99873d2467ad91b3e7cc6ca6a2b2cd024b6160f02dc3f201d2e9b8f3d7055c1`。**新增关闭0项**。
+
+- **2026-10-03 排除固定 CMD 的显式暂停分支，补齐原主线程配对观察**：同SHA映像中，b3返回帧`0x24a6c`对应普通IAT的CreateProcessW调用；前置直线块的flags为`0x80000`，不含CREATE_SUSPENDED，并复制GetStartupInfoW的lpDesktop字段。根代理独立核13处指令字节，收据 `fc3030bc9884b8b7e2fed9ae78cab8a8b6cdbb6ddfd59b68a9409c08cbe243c9`；不据此推定动态内存或实际桌面。现仅默认关闭的取证功能优先用原CREATE句柄做15秒主线程基线，240秒再采同一对象，CPU按完整创建身份和单调累计值求差；取消/截止优先，原16线程上限及严格清理保持。修正取证误用未定义exitTime判断活体的问题，不加句柄权限。该增量仍非停滞修复，目标Windows复验及最终源码门禁待完成，**新增关闭0项**。
+
+- **2026-10-03 固定映像与符号复核，仍开放**：精确9773abe49的[37109159914](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37109159914)仅只读收集四份固定系统映像，全部SHA与b3原快照一致；没有再次运行候选。匹配微软PDB并以同映像`.pdata`交叉核对后，约15秒的CMD主线程位于CreateProcessW→应用兼容检查→GetTempPathW→堆分配，顶帧对应RtlpAllocateHeap；单次采样不能解释约286秒后的最终停滞。普通导入有两个具名创建入口，但延迟导入含未识别的Wldp ordinal 2，不能宣称完整创建覆盖。独审20件大小/SHA通过，收据 `421a5faa99a25d69fb0838b9fef7ef9ae47e31b4040469676eb5ddf2978d4ff8`；详见最新验证结论。未改生产权限、环境或超时，不重复相近探针，**新增关闭0项**。
+
+- **2026-10-03 首 CMD 真实取证结果，仍开放**：精确b3的[37103876288](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37103876288)普通1143项与feature41项通过，新增环境五项双配置逐名通过。首CMD已实际启动但ProbeFailed；创建观察因delay-import覆盖限制未启用，15秒快照中Node主线程原暂停计数1且取证Suspend/Resume平衡，桌面与根因仍未知。47个调试事件均继续，Node CREATE只在取消后到达，不能误作取消后才创建。本代Job/AppContainer/私有站清理通过，整个远端根删除未证；两官方ZIP核验，终审索引 `afb174088621343e4c3d8e0a99d1cff1440fb445a27b93b7d181e7ad884c1335`。仍需解决原生失败及最终源码门禁，**新增关闭0项**；无需本地化变更，PR草稿。
+
+- **2026-10-03 验收环境合同修复，仍开放**：精确33的[37098941047](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37098941047)普通1138项、feature取证25项及ce6 11项通过，runner来源绑定已越过；但validate漏接显式ALLOW取证开关而报inherited_environment，首CMD与exercise未执行，worker后续绑定未到达。终审索引 `28233569189db2e4802b83842419ac9d95fa01f93fd088f4d602db0085219552`。现仅验收合同按feature＋updated/execute＋固定值接纳该键，新增五项直接合同回归且接入Windows筛选；生产权限、超时及环境白名单未变。本机check、i18n11、Python21、actionlint和隔离原字节Mac四项双配置通过；Windows五项元数据检查不算实际运行。六个短根已清理，准备器首错保留，门禁索引 `07a0c5158a1b71bdf40f8abdf00d6f6040ea4e47c92c54be3d9ebf3f0e6bb22c`。修复后的Windows真实复验与最终源码门禁待完成，原生停滞未解决；远端失败现场未证完整清理。**新增关闭0项**，无需本地化变更，PR草稿。
+
+- **2026-10-03 来源绑定前置修复与 hooks 实测结果，仍开放**：精确363的[37094078558](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37094078558)编译、普通1138项、取证25项和feature ce6 11项通过，随后Python `supervisor_source_binding` 失败，首CMD与原生事务均未启动；终审索引 `205b5f267425d47b1e8e343138a9f3939ace02912cd230ca39bff1ad27aa7d00`。当前保留全部31来源，明确21生产/10验收，监督嵌入表81→86、worker绑定19→31，并列出具体缺失项；本机21项Python、check、i18n11项和Mac监督程序实际嵌入扫描通过，扫描收据 `edeeafb1fa6649e6e10c40b02d34d06848fd6601ddadfcf0dfbb657041eda521`；七个短根已清理，两次准备/测试失败保留，门禁索引 `3e3284e388c53fff5fca6ddfb671f8cd35586ab4166803a5d3151c6f8113648f`。Windows执行及最终源码门禁待验。独立34的[37095262392](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37095262392)为success：51合同测试、8个app-server自然退出0，5s/3s时限不变，Job/EOF/回滚清理获证；终审索引 `bdec8d0e6b3e3d27725ca1b8fc63c0f350cfe5cc741dab30ead68b9ad46f2940`。不据此解释或覆盖6726旧失败根因，不外推npm或ConPTY。**新增关闭0项**；G03/G09开放、PR草稿，无需本地化变更。
+
+- **2026-10-03 固定 Codex hooks 缩小复验范围，仍开放**：既有工作流新增独占codex_hooks choice，复用同一0.156.1探针、退出时限和证据合同，不重复其他原生矩阵。actionlint、28范围组合、旧结构/原命令等价与check通过，短根清理；门禁索引 `11c0552ca3e21fc9547d6ccd5888c4db8f65acead4e330f1b08a45dd62e09931`。原生结果仍待独立复验；不影响当前363首CMD运行。无需本地化变更，**新增关闭0项**。
+
+- **2026-10-03 取证夹具共享冲突修复，仍开放**：精确822的[37089624639](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37089624639)普通1138项通过、ce6和i18n各11项，取证feature已编译；snapshot首组8项中4通过/4失败，原件为ReOpenFile Win32 32，其余17项取证、feature ce6再验与首CMD未执行。完整日志及唯一官方环境ZIP已核验，终审索引 `a8b15e6dd5bb424fea6017f418634d52e698ccb3e03f449ffc8995a6a36ae01b`。锁定tempfile在Windows以share_mode(0)打开匿名文件，现仅四处测试夹具改为生产等价只读租约，保留原解析/游标/边界断言并核拒写/改名；生产共享和权限不变。源码索引 `173fb523057b9cbbed6edb9d1667d9b1e06d8b12b654a8d64e00ab84583dd738`，本机check、i18n11项与Windows22项元数据类型检查通过，三个短根清理，门禁索引 `a4847fd637c2f208979acd299fd9d163b888ff732ca2437dd82118f36b28469f`；元数据不等于测试执行，目标复验待完成。无需本地化变更；原生更新停滞及Codex关停失败未解决，**新增关闭0项**，PR草稿。
+
+- **2026-10-03 Linux 修复复验通过，Windows 旧平台断言待复验**：873门禁37076566107的Linux5427普通PASS、17新增/增强逐名PASS，另rust-genai81通过，i18n11唯一，无FAIL/LEAK/RETRY/FLAKY/TIMEOUT；两个官方ZIP核验，终审索引 `228a6a620d06bffd284f56616d3e2f08cf45817544fbf210ae605513e248e583`。远端辅助临时根仍retained，Windows未选择。原fcd门禁Windows步骤44为3358通过/1失败，旧断言误将现已支持限定降级的Windows当作不支持主机；按生产拒绝语义单列InvalidRelease/RecoveryRequired，未扩大允许集。独审、本机check、聚焦14项和i18n11项通过，短根全清，门禁索引 `e89f6959238c94b7ca77fa923cb80bbc77d0dde235f995f58c565fa43b4ccda3`；原run完整终审与修正的Windows复验待齐。既有原生CMD/Node停滞及Codex hooks失败保留，现有runner可补取因果证据，归档取证代码未执行。**新增关闭0项**；无需本地化变更，PR草稿。
+
+- **2026-10-03 精确门禁捕获 Linux 平台遗漏，修复待复验**：旧770门禁37063514848两平台成功，Linux5411／Windows5015普通PASS、i18n各11唯一，无FAIL/LEAK/RETRY/FLAKY；终审 `1041bba3460c38feeb735633f82cb04e88d5675525dc86b879594a8da62c71a8`，Linux辅助临时根仍retained，不外推后续源码。最新fcd门禁37074002886的Linux check失败：迁移调用的文件清单、单文件校验和不覆盖改名仍仅Mac可用，6个缺方法错误与4个级联类型错误；普通Rust回归未执行，Windows同run仍在编译。现补齐Linux同fd原子不覆盖改名，并启用/增强空目录保护回归，未放宽权限；两文件独审、Mac check、372普通回归及i18n11项通过，短根清理，门禁索引 `c81be511610e35ce51455c15ac5913b3fff4168e19ea4991629cbcf7b49a7f64`。平台复验待完成，历史原生失败保持。**新增关闭0项**，G03/G09开放、PR草稿；无需本地化变更。
+
+- **2026-10-03 WinGet 合法降级与三方恢复实现，仍开放**：已接Windows x64 Claude286→Stable285独立意图、固定完整manifest/PE、实时Stable复核、ARP和渠道配置发布。ConfigPublishing前恢复旧PE/ARP并保留外部配置变化；之后三方完整前滚才成功和清理，旧280账本兼容。官方原件审计 `808583c3a143b6b7e998672af67bc18dc78a81fb39165d37f3c2ba8912431dab`、12文件源码索引 `3e5519bb649c442d6359617e399f7f0ccd920340a9fccd628cd9e96cd48cc9b7`；独审无阻断。Mac check、372项普通回归及i18n11项通过，短根均清，门禁索引 `a40dc0b73cd4f2613c9f9115c3946964197f58ebd230634b44f005a95685cda3`。Windows专属回归和最新两平台源码门禁待完成，未执行真实WinGet事务；已证Windows npm和Codex hooks退出失败仍保留。有限复核未再定位明确未实现原生分支，不等于运行已验收。**新增关闭0项**，G03/G09开放、PR草稿。无需本地化变更。
+
+- **2026-10-03 Windows npm 合法降级实现，仍开放**：已接独立Windows x64 Claude287→Stable285意图、官方完整归档/原树/候选树、双shell探针、配置发布和离线恢复；旧schema1缺省字段及三参280合同保持，新四参仅285，实时Stable不符则拒绝。原件静态审计 `32bfada515686525d34bc9aa7a2ef5511c71fe4213c5d16954492965db6c82c5`、16文件源码索引 `975a39232cae2fe4ec6be891165a829bb913fa4b0bf8e96ed62e669946563ee9`；独审无阻断，Mac check、368项普通回归和i18n11项通过，短根已清，门禁索引 `461ba8b910984eeb535b1d95f352189f08fe959c3587959f64a1e30395724276`。Windows专属代码/测试待对应平台门禁，未执行Windows真实事务；WinGet降级仍待实现，既有Windows原生npm及Codex hooks退出失败不变。**新增关闭0项**，G03/G09开放、PR草稿。无需本地化变更。
+
+- **2026-10-03 原生缺项复核与 Linux 合法降级实现，仍开放**：Linux Homebrew 原代码拒绝所有合法降级，不属于设备验收后置。已接固定官方 Latest287→Stable285 的来源、跨 cask 迁移、候选与离线恢复；Stable 历史无278，未拼造cask。两Linux完整native与官方manifest/cask一致，原件审计 `d72cadf4e1d2501d7991450a716f8f6a11321561fd334713820df700ab660917`；新源码12文件索引 `5a4dd0641fac942342a0880a3fa2e79e01a049e0bb25a4688ea9987f077416b0`。生成计划前拒绝无执行合同的升级边，仅新增固定285候选，不扩大系统库权限、Linux npm或普通280事务。check、364项普通回归及i18n11项通过，三个短根已清理，本机门禁索引 `8303bb015be46163608ce1b1503fadd3dab702da2d9c2f9496f3196b3fd6299d`；新增7项Linux回归及精确平台源码门禁待完成，未执行Linux真实事务。另确认Windows npm和WinGet也缺少明确来源/渠道/配置/恢复绑定的Claude合法降级合同，属于待实现项，与既有Windows npm原生运行失败分别保留；不能写成只待其他设备。**新增关闭0项**，G03/G09开放、PR草稿。无需本地化变更。
+
+- **2026-10-03 Grok 真实 Homebrew 中断恢复与中文重试通过，仍开放**：等价 v4 源码签名 GUI 在真实 7.0.4 安装上将 41 更新至实时 Stable46，在完整新树、双入口和三补全已发布的 ExchangeIntent 仅中断本轮 GUI 一次。正常重启自动完整还原旧41及双入口/三补全，英文失败提示保留；中文单次重试成功46，两公开命令均实际返回 `grok 1.0.46 (2765805b9442)`。完整恢复独审 `e7a09b8e18bcc8b31e1feb2d56c3e624b7e89a76086031e9c33a71832caedfe1`，成功独审 `8f219008c482038312040be3ab25ca7ee42fb0319076a48bd12a09c4b93a734a`，两轮共20原生代退出/清理闭合，GROK_HOME不变。英中实际状态布局完整，无需本地化变更。按原包管理器条件复核，Mac功能链齐备；Windows原生npm失败与最新源码门禁仍待解决，**新增关闭0项**。
+
+- **2026-10-03 Grok 真实 npm 更新与用户镜像通过，仍开放**：原v4等价源码GUI将官方1.0.41一次更新至实时Stable1.0.46；完整29文件与prepared身份、两级链接、用户目录镜像及原配置核验一致，Node/npm等5928项未变，唯一原生代次exit0及清理闭合。npm和用户目录公开入口均在GUI实际返回 `grok 1.0.46 (2765805b9442)`；最终独审 `2180c2d5e5e45d4621811feae01ac2241cda10a5e9a16c9118b79da10c46191e`，86件索引 `09b08e18bd688ed872a22e76a5f7cb173dfbcd37755d1fcb06e095e3441742d9`。英文渠道/状态/插件提示完整，无需本地化变更；本轮私有GUI/观察器目录全清，真实安装保留。尚缺Grok Homebrew多入口恢复、Windows原生npm与最终源码门禁，新增关闭0项。
+
+- **2026-10-03 `6726e7359` 最终门禁失败，Windows 原生阻塞保留**：[37045744557](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37045744557) Linux成功；Windows普通5011项通过，但固定Codex关闭专项及真实npm首CMD候选失败。实际debugger同线程、已接47事件全部Continue、pending为空，Node CREATE仅在取消清理交付，不能认定遗漏事件继续；仍缺取消前原生栈/等待原因及CreateProcess返回边界，未找到可安全修改的根因。不改ACL/超时、不重复相近探针，PowerShell/发布/恢复未到达。14官方ZIP/105条目核验完毕，终审索引 `754a149e13cfaabd416c764dd2ec8827b4804b3e578987a6935e43b465dc95ec`；`279630` 新源码门禁仍待完成，不用旧轮或部分通过替代。
+
+- **2026-10-03 Codex 真实 npm 消费者更新通过，仍开放**：原 v4 构建与 `279630e44` 的9份源码逐SHA等价，真实 GUI 自动发现官方 npm 0.156.1→Latest0.160.0，一次更新后公开入口实际输出正确版本。47文件完整树/48成员执行闭包、原生exit0及清理闭合，Node/npm/Claude等5953项保持；最终独审 `49ed70daf4a4a7e9fa0500ece6fab4cd259a4240002505c6ea15d0ec29f78b0d`，76项索引 `a4d2c5370a5b12d26a8cf383b01375bfb80f451a3b84c4d1e5e778f563e69a0b`。本轮英文版本/来源/渠道与两个插件提示布局完整，沿用既有英中语义审计，无需本地化变更。GUI及观察器正常退出，本轮私有数据已清，真实安装保留；不扩展为新的忙碌/中断矩阵。Grok消费者/Homebrew恢复、Windows原生npm及最终源码门禁仍欠，新增关闭0项。
+
+- **2026-10-03 Claude 真实 Homebrew 跨 cask 降级与应用冷回滚通过，仍开放**：已补官方 `claude-code@latest` 287→`claude-code` 285 的显式 Stable 迁移，绑定两个 cask、完整旧/新树、公共入口与配置；独立 journal 支持离线恢复，应用启动保护覆盖各来源未收敛事务。真实 Homebrew 7.0.4 原安装经 GUI 忙碌预约，关闭旧会话后自动继续；交换公共入口、发布配置前仅中断本轮 GUI 一次，正常重启自动完整还原 287，英文失败提示保留。中文单次重试成功 285，公开入口实际输出正确版本、完整新树和配置核验通过，Codex 65 项未变。中断现场 `491c6b81edebe254026144f781ec8d2fee85a03b6c44aed28c4a4d2d05a0866e`，完整回滚 `58bfddf487f7e55bf4b5ec96347fdff9bd2cb3fe452301164950529de5e8bf4b`，重试独审 `1eb44201ce90eedecac82dbaf3422fd7c35e7cc3720bafcd911fdb36dbd47df5`。本机 check、i18n 11 项、定向 364 项普通 PASS；英中失败/重试/状态布局通过，无需本地化变更。自动化错误重启的未知来源画面单列保留，不计产品失败或通过。其余消费者来源链、Grok Homebrew 多入口恢复、Windows 原生 npm 与最终源码门禁仍欠，**新增关闭 0 项**。
+
+- **2026-10-03 Claude npm 真实忙碌延期补齐，仍开放**：精确 `6726e7359` 签名 GUI `r-2pmgk97b` 在原 285 CLI 会话活跃时单击空闲更新，完整旧树不变、无 journal/stage/原生代次；通过应用关闭该测试终端后，自动更新 287，无第二次点击，公开入口版本正确。原 CLI 的 Ctrl-C/Ctrl-D 未退出，不宣称其自然退出 0；候选版本探针退出 0、完整树与资源清理已核。独审 `65061910e72fdadcff2a9da340fb3eb1442f2ffba387edec039cb21ce30e3ba4`，最终索引 `4b1472296b8e985c528aa878f39a448c3e61c875e649bb8418f7d1f581115dd7`，本轮短根及私有 GUI 数据已清理。Homebrew 跨渠道降级/中断恢复和 Windows 原生 npm 仍待完成，不单独关闭 G09。
+
+- **2026-10-03 Claude 真实 npm 硬链接修复与应用冷回滚通过，G09 仍开放**：冻结 `4e4758dcc+diff` 新构建只为官方两固定名称、同 inode／nlink2／固定 SHA 接纳原安装，普通树及候选仍严格单链接。原真实 npm `2.1.287` 经 GUI 合法降至 Stable `2.1.285`、升回 Latest `2.1.287`，公开入口均返回正确版本；再于真实交换后、配置发布前中断本轮 GUI，正常启动自动还原完整旧 287 树与原配置，中文单次重试成功 285。完整树／原生退出清理、英中失败与状态布局均按新签名构建验收；降级审计 `658b912caa296d130a56f70876b843e3666f7defd1ce766807e085f8d5dd8919`，交换现场 `bd09b3012ed022ae4aaaf5f5394e817cc0d43e18007a52b8e287a34dbfdb9c18`，恢复树 `6e92019b416badfd4387636ce0a1a58637b700b10da60dfdaeb853b31e028a00`，重试 `25d68cf5b3a6a1b20ba498fc99469cf866db383c13a569bf7ec5eab20ff0df73`。旧安装拒绝和两个零信号辅助脚本失败保留；check／i18n11项通过，定向为332普通PASS＋1个既有Homebrew边界测试LEAK，17条新回归均普通PASS。无需本地化变更；其余消费者来源、Homebrew中断恢复、Windows真实npm与最终源码门禁仍缺，**新增关闭0项**。
+
+- **2026-10-03 真实消费者链增量，仍开放**：精确 `4e4758dcc` 的私有真实 Homebrew Codex `0.156.1→0.160.0` 已由 GUI 完成：实际原生会话忙碌时旧树保持，Ctrl-D 正常退出后自动继续，公开入口返回 `codex-cli 0.160.0`；原登记环境冷重启及英中状态／两个插件提示布局通过。42 文件／10 目录、真实 tab、三补全与 7 个原生探针的版本／退出／清理闭合，后置审计 `9dde348b1dddb2303a9de536b5fea1ea0169d59d183f4932cb988790c571a05c`；完成后冷重启不等于中断事务恢复。真实 npm 安装 Claude `2.1.287` 则暴露包内双名硬链接未支持：GUI 识别 Stable `2.1.285` 后实际更新被拒，原树完整、零候选；原失败 `8e9519938f796ef166165adc16d5276a95ef39f6e6e0f48bc34f51c6521d568b` 保留，修复与合法降级复验待完成。Windows 只读审计排除无站句柄即必回旧站的推断，实际 npm 阻塞仍未定位；不再运行相近探针。当前源码门禁 [37031319203](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37031319203) 的 Linux 已安装 Grok hook 步骤失败，尚待完整日志；不称最终门禁通过。G09 原关闭条件不变。
+
+- **2026-10-03 当前消费合同与私有Homebrew原生修复**：Mac的Codex0.160、Claude2.1.285/287及Grok1.0.46 npm/cask完整合同已接线；显式Claude287→285与旧意图分离，Codex恢复拒156/160误标。真实Homebrew7.0.4已安装Codex0156.1，尚未执行GUI更新。仅私有0700前缀内0775 Caskroom获窄事务/原生快照支持，普通包及G01权限不放宽；check、i18n11、定向316通过，门禁审计`1e3a9cca0f12275000b9fdcf5a63d0912b2a21832a64861b5f74873bb3dbf9b2`。消费者真实更新、忙碌、降级、应用重启恢复及精确源码门禁仍缺，不关闭G09。
+
+- **2026-10-02 Windows生产窗口站已验，npm仍失败**：精确`e9d93e133`的[37018916543](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37018916543)编译与1086普通回归通过，7项bootstrap普通PASS；真实npm首updated/CMD候选ProbeFailed，1项ignored libtest FAIL，PowerShell及其余四场景未执行。两段生产helper、新窗口站与完整退出清理通过；调试事件循环停滞仍待定位，不能算npm成功。三份官方ZIP、19份源码及完整日志已核，终态审计`8537ee1b346579a29822d340c3e1afec1bb40cb7a51a98ce07efa2f0c255fb44`。Mac消费者与真实Homebrew验收仍缺，G09不关闭。
+
+- **2026-10-02 Windows 生产引导器已接，真实 npm 待验，仍开放**：固定同目录引导器已进入 GUI/TUI 打包和事务身份闭包；两段原句柄/新LUID/精确Job/认证管道、新站 AppContainer SID 授权与退出后站/LSA消失核验已实现，业务身份及zero-cap隔离不变。桌面恢复和失败强制回收已补齐，失败不变成功。Windows全目标类型检查、Mac check、Python15项、i18n11项及脚本解析通过，短TMPDIR已归档清理；20文件源码索引 `a7fd229cccfd495eb4eae958094a3ff916a6efdc4604b4c44632cee2d8702e9e`。真实CMD/PowerShell→Node/npm、五场景事务及安装器仍未通过；Mac消费者原条件不变。前一插件提交798f的[双平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37012577482)已成功，两端新增20项+增强1项逐名普通PASS，独立审计 `4f231826362e1cf15f9d6818a9a910490ed256478a43ae2b2ef63b67ab579724`；该门禁不覆盖新引导器。无需本地化变更：既有英中错误语义适用，无新UI文案。
+
+- **2026-10-02 插件复检实装与 Windows 原生前置通过，仍开放**：检查及成功更新后已接只读完整树复检，使用本次真实入口/版本，通知和编排插件结果分别显示，不改变未知托管版本门禁或回滚已提交的 CLI。Mac check、i18n11项、定向484项及英中实窗通过；私有夹具实际复检显示缺失、禁用、文件不符和未知版本未验证，文件未改写，审计 `3aa29a7f0c6bc80206eb1e024fc615ea81eb679ca18e4dd4093d49ce8fb19dec`。首次旧Codex树误判已按既有严格合同修复，原失败保留；更新后的Linux/Windows源码门禁待验。另 [04a874d7a Windows候选](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37008880591) 的新LUID两段站身份及退出回收已通过，独立审计 `615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774`；尚未接生产AppContainer/Node/npm，不外推普通交互用户。真实消费者渠道、忙碌延期、合法降级、GUI更新和应用重启恢复等其余原条件不变。
+
+- **2026-10-02 完整条件复核，仍开放**：Mac 三款 npm 的既有固定后端正例不覆盖真实消费者渠道、实际忙碌延期、合法降级、GUI 更新、插件复检及应用重启恢复；跨 PID worker 冷恢复不能直接替代应用启动入口。Claude Homebrew 四场景采用人工登记和派生 cask 元数据，不证明真实 Homebrew 来源；Codex/Grok Homebrew 实际升级、回滚和冷恢复仍未见通过记录。降级拒绝和失败回滚均不能代替合法降级。11:59 UTC 只读取得 Claude 官方 Stable `2.1.285`、Latest `2.1.287`，超出当前 npm 升级 `2.1.280`／降级 `2.1.278` 审核合同；固定测试渠道不能冒充实时渠道。审查索引 `fe2aa3f9623d217e39956c5d8b4c9da1173a363496e876f6d401605dd10f9980`，公开渠道原件索引 `c4306be2c543776688c5e0f7bbaaea204834baea915415c571c6a80054932d6e`，详见验证报告。原关闭条件不变，不把 Windows 当作唯一剩余项。
+- **2026-10-02 窗口站候选前置核验修正，仍未执行两段链**：`596d439c1` 的 [Windows 37007022817](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37007022817) 已通过 helper 编译，唯一候选在 `EnumWindowStationsW` 前置检查返回失败（记录 hresult 0），未调用第一段创建，六份原生收据均不存在；调用者对象不变、精确 Job 清理确认。完整原件索引 `ee0526ea72a38c335b66af523b10be0199f4777193294258ea89598659f81b91`。官方枚举只覆盖有 WINSTA_ENUMERATE 权限的对象，本就不能证明任意目标站不存在。当前测试改为原挂起进程的新 AuthId 预测单一站名，恢复前仅接受该名字查询的 ERROR_FILE_NOT_FOUND，第二段实际对象名必须匹配，退出仍查同名及新 LUID；不把失败当空列表，不预设 AuthId 与 logon SID 恒等，不改变创建方式、权限或关闭条件。新源码原生结果待验，G09 不关闭。无需本地化变更。
+
+- **Windows 新原生候选 `1ac53f4da`**：仅新增测试 helper 与独立 `g09_netcredentials` 工作流范围，验证非管理员服务身份的两段新登录会话窗口站；原生产身份、隔离和权限合同不变。双有效 Admins=false 硬门禁、挂起进程原句柄／精确 Job 核验与有界清理均已接；高完整性服务正例即使成立，也不代表普通交互用户、zero-cap AppContainer、Node/npm 或 G09 通过。本地 Windows 类型检查、应用 check、PowerShell 解析及 actionlint 通过，首轮类型错误与既有编译警告保留；[Windows 37001996114](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37001996114) 已失败：MSVC `/W4 /WX` 在 helper 的 `TOKEN_ELEVATION` 局部变量报告 C4701，helper 尚未链接，原生候选未执行，不能据此判断窗口站路径。完整日志及三份官方工件已保全，索引 `9fd5a56d49b1ac5e3dc56825c4f3577f022ef73d7f0aa3dc7ec6c369ad8ee8c3`。后续仅显式零初始化该结构，仍要求 TokenElevation 查询成功，未放宽任何权限或结果断言；目标复验待完成，未重跑旧 NUL/Node/未命名站对照。无需本地化变更。
 
 - **2026-09-28 Mac Claude cask后端恢复 `ae37daf19`**：修复非Committed恢复先回退入口、后发现目录外改而断链；回滚写前检查新树/旧backup和公共链接，三项回归通过。本地Python15/i18n11/更新207及check/build通过，新worker和supervisor执行固定`2.1.278→2.1.280`四场景均独立通过：正常更新、跨PID冷恢复、外部改动保留、候选改动启动前拒绝；三次真实候选清理、一项零generation分别计证。官方Ruby字段派生且明确标记的元数据与人工私有登记不等于真实消费者来源或brew安装验收；实时渠道、GUI、忙碌/插件、其他平台及Windows正式npm失败仍欠。205份小原件和完整APFS映像保留并正常卸载；无需本地化变更。同提交CI36403642011的Linux/Windows定向门禁均通过；Linux新brew三项逐项通过，Windows本轮不编译/运行这些Unix测试。本项及14项必要缺口不关闭。
 
@@ -131,6 +927,10 @@
 - **2026-09-27 `e3f44c29c` 隐藏控制台对照**：Windows编译、普通504项、command11项和loader3项通过；原生16通过／6失败。新增三组均在根进程初始断点前自然退出`0xc0000142`，CMD launcher尚未执行shim或创建Node；旧NoWindow的CMD基线仍成功，Node根／子则在初始断点后失败，两种阶段不得混同。六组Job／AppContainer清理确认、无取消或日志丢弃。runner收尾另清理一个conhost（PID2004），现有日志不能归属至具体对照，不能据六组收据宣称机器级无残留。隐藏模式不能接入生产；下一步先只读核对runner窗口站／桌面与隔离令牌访问边界，不修改全局ACL或弱化隔离。真实npm未重跑，G09仍开放。
 - **2026-09-28 `5ea2614e0` 环境实测**：Windows编译、普通504项、command11项、loader3项及新增环境4项通过；原生仍16通过／6失败，不重试。六组14次观察一致：runner为Session0／高完整性／已提升、不可见非WinSta0窗口站；候选为同会话低完整性AppContainer，Win32k禁用策略为0、严格句柄策略为3。目标线程桌面查询无有效值且hresult为0，不能记作已证实拒绝访问；未评估DACL或完整运行时访问。失败阶段和六组清理结果与上轮一致，runner收尾本轮仅记录vctip，不能回填旧conhost归属。下一步只读模拟实际token对runner窗口站／桌面描述符的访问；真实npm未重跑，G09不关闭。
 - **2026-09-28 `f7e0801f1` DACL实测**：Windows编译、普通504项、command11项和诊断10项通过；原生仍16通过／6失败。六组14次实际token观察的窗口站／桌面固定掩码及MAXIMUM_ALLOWED共56次模拟全部拒绝，成功CMD基线也相同；仅检查runner当前对象，MIC未评估，不能据此确定候选实际目标或Node根因。目标线程桌面仍为query_failed（hresult=0），不是已证实拒绝。NoWindow Node根／子首断点后失败，隐藏三组root首断点前仅3条DLL即退出0xc0000142；旧NUL失败保留。六组内外层清理确认，runner另清理的conhost PID31528无法归属。真实npm未重跑；私有窗口站／桌面对照仅为计划，G09及14项必要缺项保持开放。
+- **2026-09-29 受限令牌 NUL 诊断 `97a647351`**：同提交 Windows [run36498757238](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36498757238) 编译通过，私有 warp libtest 辅助映像经 SHA／大小绑定并进入零 capability AppContainer／严格 Job，却在 `CreateFileW` 调用前以 `0xc0000142` 退出；`helper_report_present=false`，没有普通文件或 NUL 的实际令牌结果。Job／profile 清理及收据匹配均为 true。外层 nextest 的既有 60 秒限额将该失败记为 TIMEOUT，额外标准流工件上传因本轮无输出文件而失败；不能将其解释为 NUL 拒绝。完整 Windows 日志和两个成功上传的官方工件归档，日志清单 SHA-256 `df8d021420a14d971e44a3e7be090821628490c45f0f20e515d1c8962bf5d30f`。后续提交 `c31d61fa7` 仅对这项大型诊断设置 150 秒 nextest 预算，并新增测试专用现有非交互窗口站私有桌面对照；真实原生结果见下项同提交运行，生产隔离默认路径不变。G09 不关闭。
+- **2026-09-29 私有桌面实测 `c31d61fa7`**：同提交 Windows [run36499906695](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36499906695) 编译及前置 508／24／1／14 项检查通过，两个显式原生诊断均失败且零重试。大 helper 仍于 `CreateFileW` 前退出 `0xc0000142`，现记为 FAIL 而非 TIMEOUT，实际 NUL 访问仍无收据。固定 Node `20.9.0` 的现有非交互窗口站私有 desktop 已创建并读回核验，持有对象关闭和 Job／profile 清理确认；Node 仍以 `0xc0000142` 退出、无版本输出，故单独私有 desktop 不足以修复初始化。未修改现有窗口站 ACL 或生产默认隔离，真实 npm 发布／恢复未运行。三份官方工件及完整日志归档，清单 SHA-256 `bdd5d3509e7b37c7e67eb5433bedfb92b9931eda61532a981899225949508544`；G09 不关闭。
+- **2026-09-29 小型 CreateFile 夹具首次运行 `10f99d6df`**：同提交 Windows [run36501584604](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36501584604) 中，仓库内 Kernel32-only C 源由 runner 的 MSVC 编译，普通 runner 令牌基线实际运行并验证固定 120 字节收据；随后 `warp` libtest 的新解析闭包以 E0277（`Vec<u32>` 被 `i32` 索引）编译失败，实际 AppContainer 进程没有启动。Agent 生命周期与 Grok 安装步骤亦因同一编译错误失败，Grok 工件未生成；不能从这轮推断受限 NUL 访问。完整日志与唯一成功上传的官方工件已归档，日志清单 SHA-256 `1b84e9652376a3c5270be33f57b195cc1737100b51137a0bd2006bdced922fa7`。后续 `2d3297089` 修正了两个 `usize` 调用索引，首次运行的失败结论保留。
+- **2026-09-29 实际受限令牌 NUL 结果 `2d3297089`**：同提交 [run36502343517](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36502343517) Windows job success，前置主回归 508／508、command 24／24、未命名站 1／1、环境 14／14、原生对照 1／1，未见重试。小型 C 夹具由本提交源编译并通过普通 runner 令牌基线；私有复制映像在零 capability AppContainer／严格 Job 内正常退出 0，120 字节收据有效。`GENERIC_WRITE` 与 `FILE_GENERIC_WRITE` 下同目录普通文件均打开为磁盘文件并正常关闭；`NUL` 与 `\\.\NUL` 均未打开，立即 `GetLastError` 为 5（访问被拒）。Job／profile 清理和匹配收据确认。完整日志与两份官方工件已归档，清单 SHA-256 `d6e57a4c32313b37cf913407ce328194c5b9fe251df807f59ed304e4810890f8`。这直接定位本轮受限令牌的按名 NUL 访问失败；既有 CMD 控制流正例与本轮受限调用不同，不能直接断言官方 shim 必因该拒绝停止，也不能解释固定 Node 的 `0xc0000142`。真实 npm 发布／恢复仍未完成；G09 不关闭。
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。
@@ -150,13 +950,37 @@
 
 - **Mac Grok 私有APFS补验 run-03**：复用冻结worker与bb78监督程序，在318c干净检出的17/15关联源码等价边界下，正常更新、缺失完成记录冷回滚、外部变更保留、候选篡改拒绝四项同批通过，实际公开版本依次1.0.41/1.0.40/1.0.41/1.0.40，独立复核全部通过。新卷0700、原SanDisk0775保持，noowners未改，不声称原布局修复或多用户隔离。172份收据/日志及完整映像已留存，普通卸载确认；本轮cargo check通过，无需本地化变更。原失败保留，G09/14项必要缺口仍开放。
 
-- **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。 后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。定向套件一项伪句柄夹具错误另修，未据此关闭缺项。
+- **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。`2383428da` 的 [Windows CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36453314472) 原子进程专项 3 项中 2 项仍失败：NUL 重定向输出为空但前后普通命令成功，固定 Node 根进程在首断点后以 `0xc0000142` 退出，均确认严格 Job 清理；未命名窗口站探针 `created=false`，未建立对象。现有 NUL DACL 仿真不能证明真实 CreateFile 或 Node 根因，不能据此改 ACL 或隔离；真实 npm 仍未通过，G09 保持开放。
+- **当前分支诊断对照**：在上述同一 CMD／目录／令牌的 NUL 失败用例前增加普通文件 stderr 重定向正对照，并逐项核对输出、错误流与独立文件身份；原 NUL 失败断言保留。同提交 [Windows 专项 36497300508](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36497300508) 中，普通 CMD 正例、普通文件 stderr 和四个普通文件的独立 FileID 均通过；`2>NUL` 的输出仍为空且脚本错误级别为 0，固定 Node `20.9.0` 根进程在初始断点后自然退出 `0xc0000142`、无版本行。三项 1 通过／2 失败，严格 Job／AppContainer 清理确认；两项失败不能据此归为同一根因，真实 npm 事务仍未通过。G09 继续开放，本增量无需本地化变更。
 
 ### G10 — Claude／Grok 子任务限固定权限策略
 
+- **2026-10-02 本次 Mac 范围关闭**：前轮真实功能与英中实际审批已齐备，原关闭条件不变；精确 `04ac0d46f` 的[最终两平台源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809)均 success，两条 Grok 搜索输入／取消回归在两平台逐名普通 PASS。完整日志与清单审计 `9335eca2537bfe5dd55a9c0056c732ad5a569a34675cc501eb9de5d4a01a52b0`：Linux nextest 5335 次普通 PASS，Windows 4962 次普通 PASS，另有菜单锁状态用例 `test_ai_context_menu_preserves_lock_state` 的 1 条 LEAK；无 FAIL／RETRY／FLAKY，次数不代表去重测试数。该警告根因未明，不称无残留、已修或全日志无异常，独立保留且不扩展 G10 原条件。Mac 汇总 `c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06`；本次仅关闭文档变化，cargo check 通过、无需本地化变更。当前 **9 关闭／2 开放／3 移交**，PR 继续草稿。
+
+- **2026-10-02 Mac 真实功能及英中审批已满足，仅待最终源码门禁**：修复后的 `04ac0d46f/r-0aa9cs1x` 在官方 Grok `1.0.41/grok-4.7` 完成父子 Skill、Grep、命令拒绝后新请求允许、实际输出、父自动结果回传及 beta 越界子任务拒绝。原外层 exit 2 来自审计器误要求原生 user_message_chunk 含 promptId；按公开合同做同轮离线对账，保留原有 167 项断言并增加 3 项，通过身份、完整输入、ACK、历史及清理核验，不重跑模型或改写原失败。`r-1u9ov31_` 实际宿主审批先英文后中文，完整提示、实际参数和按钮均可读；两层各一次允许后命令退出 0，原生与保存结果一致、资源清理确认。先前 Claude 真实允许／拒绝、运行取消、越界、双向 ACK 和冷恢复按各自原源码计证。Mac 汇总摘要 `c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06`；[04ac 最终两平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809)已启动，普通广筛包含 Grok profile。G10 暂不关闭，不增加模型／策略排列验收；其他平台实机仍移交用户。
+
+- **2026-10-02 原生合同双证据修复，仍开放**：`4a78fc3f0/r-agu5bntu` 真实 Claude 运行命令取消通过：Interrupt ACK 直接接 Cancelled，无 RequestFailed，原始输入无重投、命令成员和三资源域清理及无晚写独立审计通过（`8c8f03120838ae1f33df604c1f0396ac9fe7ba67acfa4d9c038bf46463e7b818`）；父后续第 2 代 unconfirmed 不记完成。Grok `r-m9z049qc` 已实际派发子任务并完成 Skill，但官方 `Grep` 输入被误按 `GrepSearch` 校验，继而 `PermissionCancelled` 被误拒；现按公开源码和固定官方原件精准修复，保留全部权限边界。真实失败审计 `1770b16462f27d76fba44d156efb657b1d0153d54780242ce9fa9204d45677ff` 与现场保留。476 项 Grok 回归、i18n 11 项已过，修复后的真实链、实际审批双语布局及最终门禁仍待完成；静态权限说明可读和测试通过不计整项关闭。
+
+- **2026-10-02 真实取消晚回复缺陷与 Grok 夹具修复，仍开放**：`c53965568/r-2_vfuh68` 已实际启动命令并收到 Interrupt ACK，清理后的内部工具回复却被误报为 RequestFailed，随后才发布 Cancelled；严格失败保留。现仅吞掉精确已取消调用的内部清理晚回复，保留外部响应和错误身份拒绝；新增 4 项、完整 Claude runtime 141 项、i18n 11 项、原生元数据 6 项及 cargo check 通过；最终跨平台门禁和真实复验待完成。`r-_gr57x9b` 因真实技能目录未注册而没有子任务；仅修 ignored 驱动的生产技能目录与两层调用 ID 审批关联，权限上限不变。零模型 GUI 的固定/全局 CLI 差异已定位为不同 GUI 进程，未改全局配置，真实审批双语布局待验。两个失败现场均保留，不把原生清理回执写成现场已删除；仍为 8 关闭／3 开放／3 后置，PR 保持草稿。
+
+- **2026-10-02 新验收驱动合同修复，整项仍开放**：同 `87821e107` 的取消链已到真实 Grep 和两层命令允许，但在 CLI exec 前后 PID version 的错误全等检查处失败，预定 Interrupt 未派发；Grok 链在启动前因错误模型覆盖被拒，未有模型回合。已按生产身份与 Grok 默认模型／技能登记合同精准修驱动，原生权限和超时不改；原失败保留，新真实复验待完成，详见验证结论。
+
+- **2026-10-02 真实受审命令自动结果复验通过，整项仍开放**：同 `f3cbb6093` worker/libtest 的 `r-1cem30qq` 在固定 Claude `2.1.280/claude-opus-5-5` 完成首条 Deny 后新请求 Allow、顺序 A/B 两命令与清理；父首轮结束后，同 SID/runtime 的第 2 代取得真实子结果、两标记和原第 1 代消息的 NativeProtocol ACK。原生父 2 输入、子 1 输入逐条匹配持久消息，无重投；审计 SHA-256 `139342271058682a9849f5d845baff24eb7334a7f3f1a3b6b53625e098af1967`。libtest exit 0，外层原 exit 1 保留：其固定“两次 Ready”误拒了同父会话第 2 回合；只修身份分组判据后，原始 46 事件的其余全部断言通过，未重跑模型或覆盖原件。两原生与两命令退出清理均确认，唯一原件保留。Grok 新固定权限父子链、运行命令取消等剩余原关闭条件继续开放，不把单条命令链计整项完成。
+
+- **2026-10-02 Completed 父结果回传修复，本机门禁通过**：补齐 Claude 在线已完成父任务的专用结果入口、精确领取与原代 NativeProtocol ACK；多个子结果按单槽串行消费，跨代须逐代核同 runtime／SID、真实自动结果 ACK、冻结正文与亲缘，用户主动新轮及换进程断链，晚到旧结果保留但取消派发。首轮 166 项为 163 过／3 失败；仅修两处测试夹具（子 SID 重复、非真实 Submit 正文）后，三项定向复验通过，生产校验和原断言未改，不称单轮 166 全过。i18n 11 项及 `cargo check -p warp` 通过，短目录均清理；汇总收据 SHA-256 `1b5a06138f987a47a802588d7abdcb3a0537a6807321553ab3823098286cd098`。无需本地化变更，既有英中错误边界已复核。新构建真实受审命令链及两平台最终源码门禁仍待验，G10 不关闭。
+
+- **2026-10-02 真实受审命令链发现自动结果回传缺陷**：`d49c24be6/r-62nv09__` 的固定 Claude `2.1.280/claude-opus-5-5` 父子链，首条命令被拒后由原生重新请求，再允许 A、B，两条均实际退出 0 且清理确认；子任务结果含两条标记。父首轮已完成，自动结果却仍 queued、没有 NativeProtocol ACK，450 秒后验收失败。源码确认普通 endpoint、worker 请求准入及持久领取均未允许已完成的 Claude 父任务消费迟到子结果；不能以旧 Skill 测试仅检查 `PARENT_QUEUED` 冒称此链已验。两原生 runtime 均已退出并确认清理，原失败现场保留；诊断收据 SHA-256 `a715c43c9c840bf76d094071111512698e91742d8fab7142931f24635c2b0387`、原生最终审计 `22518c319458643c85b0c211ee4cf9db4218bd92bea1d9b02dafa1de96c982fc`。修复与真实复验待完成，G10 仍开放。
+
+- **历史 Mac 失败轮**：提交 `1b6eefb89` 增加固定 Claude `2.1.280` 父子 Skill 权限、拒绝后允许及原生结果的忽略测试；`cargo check -p warp --tests` 通过。后续隔离运行先后暴露测试包签名复制、测试上下文初始化和输入入队问题；修正后 `e79152da9` 一轮仍在原生宿主报告 `OwnerClaimed`、`SessionReady` 后未向测试侧交付协调器事件，父输入保持 queued，450 秒等待及 60 秒清理均超时。该轮 `g10-skill-live-4432e831` 的私有原件已归档，遗留的四个精确 PID 与 launchd 标签退出，文件占用核空、三个专属目录按身份清理；清理清单 SHA-256 `c46bf00ed7888cd5adcdefbf03c6294e7bf24c227bbfb29f30c54a3cd657a07c`。提交 `34167fe3e` 当时仅加入协调器错误早读诊断，尚未再次实测，故该轮没有取得父子原生 Skill 权限正反链。
+- **后续 Mac 父子 Skill 正例**：`282f5c4a8` 修复 Claude 版本配对前暴露原生会话 ID 的事件合同，并使忽略测试在无事件时定期读取协调器错误。同提交签名监督程序和固定官方 Claude `2.1.280/claude-opus-5-5` 的 `g10-skill-live-fixed-3b1f82a0` 真实链通过：父 `run_agents` 单次允许，子 Skill 首次 DenyOnce、再次 AllowOnce，两次原生解决确认，子结果含技能标记，父子两条任务、独立原生会话及保存的权限上限核对通过；未选技能由父上限派生检查拒绝。两份原生退出及资源清理回执有效，私有原件归档后，精确 PID、launchd 标签、文件占用核空，短目录与专属应用状态按身份清理；清理清单 SHA-256 `527e27a081190e56478052a31061cf5e14db27973ea95163f55706d37b9e1d90`。该旧收据没有实际派发越界 `run_agents`；后续新收据见下一条。
+- **Mac 原生越界派发拒绝正例**：`9ddca1e92` 的同一父子 Skill 测试再提交含未选 `beta` 技能的第二次 `run_agents`，固定 Claude `2.1.280/claude-opus-5-5` 原生请求与审批均到达，协调器持久保存错误结果，父任务第二回合完成，任务仍只有原父子两条。两份原生退出与清理回执有效；安全收据和清理清单 SHA-256 分别为 `b9a5c304db9380c882f9b3cb5f2b846111cd8fde87d55ceb293d4e5c3dffe4b7`、`cd205861ba73ce6c2b380e33226ecb411792a65d16341cb8b512ad97d8d71b78`。该轮未覆盖 GUI、冷恢复、其它受审命令、Grok 及 Linux／Windows 在线链；后续 Mac 冷恢复见下一条，G10 保持开放。
+- **Mac 父子 Skill 待审批冷恢复正例**：`79bfce90f` 的两个独立测试进程在固定 Claude `2.1.280/claude-opus-5-5`、已认证默认账号和同产品源码签名监督程序下运行。第一进程保存父子任务、独立原生会话及子 Skill 待审批状态后退出；第二进程冷重接两宿主，核对原生 ID、父权限上限、同一审批 ID 与用户输入未重投，再单次允许子 Skill，最终结果包含技能正文标记。两份原生退出及清理回执有效；安全收据 SHA-256 `705f26cbf0b89f7ad32a7fdd5d5f949404f0254d81a7aff8849ea93f7d6630e2`，清理索引 SHA-256 `8a2ad15d14ba8749507f3e61dcc7299cdd282ace815a6992c8f02d1d3d427a63`。第一次运行因外层预建同名记录被运行器拒绝，在启动测试前退出；失败收据 SHA-256 `e7eebed2ffe573eb8a236a90d36621554ebe35779f958f413eee59bcad6681f5`，私有目录已清理。此项补齐 Mac 测试宿主的 Skill 待审批冷恢复，不覆盖真实 GUI、其它受审命令、Grok 及 Linux／Windows 在线链，G10 仍开放；没有用户可见文案变化，无需本地化变更。
+- **同源码跨平台离线门禁**：[run36561236364](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36561236364) 精确绑定 `282f5c4a8`，Linux／Windows 作业成功，未配对原生 ID 回归逐名通过。Windows 文件提交用例首次失败、重试通过，桌面／TUI 组另有 1 项 LEAK 标记；完整计数及仓外工件摘要见[验证结论](VALIDATION_REPORT.md)。该门禁未运行两平台已认证父子 Skill，G10 继续开放。
+- **2026-09-29 V2 Write 待审批取消正例**：固定 Claude `2.1.280/claude-opus-5-5` 的 Mac 生产父子链在父 `run_agents` 单次允许后，子原生精确 `Write` 停在待审批且目标文件不存在；子回合 `Interrupt` ACK 后审批撤销，同一审批 ID 的迟到 `AllowOnce` 被拒，目标始终未创建。持久父子身份及权限上限核对通过，父子原生进程分别退出，Job／资源域清理均确认。最初从外置盘启动的监督 worker 在 dyld 装载阶段超过握手预算，后续从外置盘启动的 Claude CLI 也出现初始化超时；将同 SHA、签名和固定版本的测试程序、worker、CLI 放到内置私有测试盘后，本链独立通过。原失败及无模型正对照保留，不因环境对照修改产品超时。此正例仅关闭 V2 待审批取消这一子项；该链未覆盖冷恢复，后续 Mac Skill 冷恢复正例见上。G10 其余工具／技能权限、GUI 及 Linux／Windows 仍未完整在线验收。
+
 - **状态／优先级／范围**：模式限制，高；P3 权限、P4 子任务与双向消息。
-- **实际情况与影响**：Claude 原有子任务要求 `ClaudeRestrictedFilesV1`；当前工作区新增独立 `ClaudeRestrictedFilesV2`，仅固定 `2.1.280` 开放受审 `Write` 创建或覆盖项目内文件，V1 父任务不可扩为 V2；macOS `claude-opus-5-5` 的真实生产父子链已证明精确 Write 允许生效、拒绝不改文件、双向 ACK／结果回收及两代正常清理，另有真实 V1 父扩为 V2 在发送原生输入前拒绝的独立链；Grok 子任务仅在相应固定读取／文件策略和已核验 SDK 合同下开放，继承设置不能证明完整父权限上限。固定策略禁用原生 shell、hooks 和技能；Claude V1 工具限 `Read`／`Edit`，V2 仅增加 `Write`；V1 的 `Write` 及两策略的 `Bash`、`Skill` 等仍被拒绝。新 V2 的待审批取消、活跃重关联、冷恢复、GUI 和跨平台尚未在线验证。现有父子消息、结果回收真实通过，不等于已提供可任意运行命令和技能的通用编码子任务。**固定策略不是操作系统文件或网络沙箱。**
-- **未验证代码增量**：ClaudeRestrictedFilesV3／GrokRestrictedFilesV2 的文件与搜索策略已接线。新增 ClaudeRestrictedSkillsV1 固定创建时技能及完整资源树，子任务仅取父集合子集；原生插件注册确认后逐次 Skill 审批，禁技能自行授权、隐式文件引用及动态 shell。旧策略不扩权。GrokRestrictedSkillsV1 也已接原生 user 技能目录与逐次 Skill 审批，旧策略不扩权。Claude/Grok ReviewedCommandsV1 及 ReviewedCommandsSkillsV1 已接精确 argv/cwd/timeout、父集合子集、逐次审批及整代清理后恢复，三目标平台现统一接固定 SDK MCP 的宿主受审命令，原生 shell 保持关闭。每条命令有独立监督代、稳定调用身份、审批和真实清理回执；前条清理后可在同一 CLI 会话继续下一条。运行中 Submit 已接回原生合并/后续排队语义；取消先结束未执行请求，已运行命令仍需真实清理。命令使用当前系统账号，不宣称操作系统沙箱。技能与命令英中说明已同步；本地资源门禁、同提交 Linux／Windows 编译及定向回归状态见[最新门禁](VALIDATION_REPORT.md)。真实命令／模型链和双语布局验收仍待补，不计验收完成。
+- **实际情况与影响**：Claude 原有子任务要求 `ClaudeRestrictedFilesV1`；当前工作区新增独立 `ClaudeRestrictedFilesV2`，仅固定 `2.1.280` 开放受审 `Write` 创建或覆盖项目内文件，V1 父任务不可扩为 V2；macOS `claude-opus-5-5` 的真实生产父子链已证明精确 Write 允许生效、拒绝不改文件、双向 ACK／结果回收及两代正常清理，另有真实 V1 父扩为 V2 在发送原生输入前拒绝的独立链；Grok 子任务仅在相应固定读取／文件策略和已核验 SDK 合同下开放，继承设置不能证明完整父权限上限。固定策略禁用原生 shell、hooks 和技能；Claude V1 工具限 `Read`／`Edit`，V2 仅增加 `Write`；V1 的 `Write` 及两策略的 `Bash`、`Skill` 等仍被拒绝。V2 待审批取消仅 Mac 已验证；活跃重关联、冷恢复、GUI 和跨平台尚未完整在线验证。现有父子消息、结果回收真实通过，不等于已提供可任意运行命令和技能的通用编码子任务。**固定策略不是操作系统文件或网络沙箱。**
+- **其余未验代码增量**：ClaudeRestrictedFilesV3／GrokRestrictedFilesV2 的文件与搜索策略已接线。新增 ClaudeRestrictedSkillsV1 固定创建时技能及完整资源树，子任务仅取父集合子集；原生插件注册确认后逐次 Skill 审批，禁技能自行授权、隐式文件引用及动态 shell。旧策略不扩权。GrokRestrictedSkillsV1 也已接原生 user 技能目录与逐次 Skill 审批，旧策略不扩权。Claude/Grok ReviewedCommandsV1 及 ReviewedCommandsSkillsV1 已接精确 argv/cwd/timeout、父集合子集、逐次审批及整代清理后恢复，三目标平台现统一接固定 SDK MCP 的宿主受审命令，原生 shell 保持关闭。每条命令有独立监督代、稳定调用身份、审批和真实清理回执；前条清理后可在同一 CLI 会话继续下一条。运行中 Submit 已接回原生合并/后续排队语义；取消先结束未执行请求，已运行命令仍需真实清理。命令使用当前系统账号，不宣称操作系统沙箱。技能与命令英中说明已同步；本地资源门禁、同提交 Linux／Windows 编译及定向回归状态见[最新门禁](VALIDATION_REPORT.md)。受审命令、其余固定技能的真实模型链和双语布局验收仍待补，不计整项验收完成。
 - **当前替代方式**：在固定策略内拆分允许的文件任务；需要原生 shell 或技能时使用用户明确启动的继承设置根任务，不把它称为具有同等父权限保证的受控子任务。
 - **源码／证据**：[子任务派发限制](../../app/src/ai/cli_agent_runtime/coordinator_tools.rs#L590)、[Claude 固定工具与参数](../../app/src/ai/cli_agent_runtime/claude_profile.rs#L13)、[Claude 空 hooks 验证](../../app/src/ai/cli_agent_runtime/claude_profile.rs#L612)、[Grok 固定工具与空技能／hooks](../../app/src/ai/cli_agent_runtime/grok_profile.rs#L316)、[Grok 父子实链](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/grok-parent-child-v8.safe.json)。
 - **关闭条件**：先明确允许扩展的子任务工具范围，验证真实可约束的父权限上限，再逐项接入命令／技能等能力；审批允许／拒绝、越界拒绝、取消后进程清理、双向 ACK、冷恢复及结果必须有真实链。不得以固定绕过审批或修改用户全局配置换取可用性。
@@ -207,8 +1031,18 @@
 
 ### V03 — SSH／tmux 远端组合与 Codex 关闭透传负例
 
-- **状态／优先级／范围**：验收缺口，高；P2 通知、P4 重连、P5 SSH／tmux。
-- **实际情况与影响**：当前固定版本三款链主要覆盖 Mac 到本机隔离 OpenSSH，并包含 tmux 断连重接；不覆盖远端 Linux、Windows、WSL 等组合。Codex 关闭 tmux 透传补测虽观察到产品接收 0，但未独立证明内层原生 hook 实际发送，不能仅用 Claude／Grok 的公共解析器正例补齐 Codex 原生证据。
+- **2026-10-02 本次 Mac 范围关闭**：八项原关闭条件均已有真实证据和对应源码合同，完整审计 SHA-256 `dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f`。包括三款实际 SSH／tmux 通知与交互、原 SID 重连，Claude 待批重复与旧请求完成、Codex 取消后真实晚到 ToolComplete 不使 GUI 离开 Blocked、三款运行回合取消，以及 Codex 关闭透传时内层真实发送／外层零接收的独立双端原件。Grok `.4` 正常退出四 hook 成功另按原现场计证；不把零输入通知冒称回合 Stop，也不把 Claude／Codex Blocked 冒称原生 cancelled hook 或整棵工具树停止。精确 b47 的 [两平台最终源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 已逐项通过，本轮零重试／LEAK，终态审计 `22f33836c2ed44e640e29264fd3afdc576ce2ecdb19b924960294fe9758ba1e8`。既有英中状态和控件已复核；本次仅状态文档变化，无需本地化变更。Linux／Windows／WSL 实机仍按用户决定移交；历史失败和旧 LEAK 保留，PR 继续草稿。
+
+- **2026-10-02 Mac 原条件完整复核，最终源码门禁待结束**：`b47/r-o5rrajvm` 已补正式 Claude 插件就绪后的真实流式 Ctrl-C，以及 Codex 工具运行 Escape／迟到 ToolComplete 后 GUI 保持 Blocked；原生分别记录 Interrupted／turn_aborted，不伪称存在 cancelled hook 或取消整棵工具树。Grok 取消沿用 `51b0/.4` 正例。八项原条件逐项审计 `dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f`，包括 Codex 关闭透传的独立双端原件；当前只剩 b47 最终两平台源码门禁，V03 仍开放。全部自有进程已退出，现场及唯一历史保全，其他平台实机验收仍移交用户。
+
+- **2026-10-02 真实取消与本地按键修复，仍开放**：`51b0/r-myk6vj3w` 的 Grok 单次输入后真实工具运行中 Ctrl-C，原生 Cancelled 与同 SID／prompt 宿主通知一致；后台 sleep 自然结束，不声称按键清理进程树。Codex 单次输入后 Escape 取得原生 turn_aborted，但没有取消通知，后续 ToolComplete 也不能证明仍运行。源码已补本地实际转发边界的 Ctrl-C／Codex 独立 Escape 观察，确认超时仅为 Unknown，迟到工具完成保持未知。Claude 第四次人工输入取得真实生成中断，前三次不足；本轮私有配置缺通知插件，不能计完整宿主链。四文件定向 83 项、i18n 11 项、check 全通过，收据 `3c4a6c3d347dc675adf5645c04f753a676e470104ae6747d9e9cf99f2b68db70`。新构建真实复验与更新后平台门禁待完成，无需本地化变更。
+
+- **2026-10-02 `.4` 正常退出实窗正例**：`51b0e4aed/r-dpopymbl` 的冷启动中文 GUI 经真实 SSH／tmux 产品菜单启动固定 `.4`，空会话只执行一次 `/exit`。同一 SID 的 global/plugin SessionEnd、Stop 四项成功，原 pane shell／TUI／leader 退出，retired/released 与原 manifest 一致，私有 socket 回收；退出收据 `1be89a860de809d0d7c07f89ffe1e40bbd114224c69bc9740e63a0fc9f7a6f83`。宿主 ANSI 入口收到两条退出通知，零回合按插件合同降为 `notification`，不能冒称模型回合 Stop 或现场证明 listener 内存退役顺序。另一次误开日常 Grok 的输入已取消并单列，不属于此 SID 的零输入证明。旧 pager LEAK 原因仍未知；[修复提交源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 待完成，V03 保持开放。
+
+- **2026-10-02 原生退出修复待实窗复验**：公开 Grok 源码提交 `ba8ce6d346aa`／`.4` 将正常 owned 退出改为在原 IPC 与终端仍附着时等待闲置 actor 的 SessionEnd／Stop，然后撤销原代际路由；繁忙会话只脱离、不新增取消，意外断连仍立即撤销。Mac check、真实 actor 四 hook 正例及签名构建通过；主仓定向、GUI `/exit` 和新 Windows console broker 门禁待验。旧 `.3` 通知失败与测试 LEAK 保留，不以进程退出代替通知完成，不关闭 V03。
+
+- **状态／优先级／范围**：本次 Mac 范围关闭；高；P2 通知、P4 重连、P5 SSH／tmux。其他平台实机验收移交，不计通过。
+- **实际情况与影响**：本次固定三款 CLI 的 Mac 到本机隔离 OpenSSH／tmux 通知、双向交互、断连恢复与取消，已按本节 2026-10-02 关闭记录补齐；远端 Linux、Windows、WSL 实机组合仍移交用户，不计通过。早期 Codex 关闭 tmux 透传补测仅观察到产品接收 0、缺少内层发送证据的问题保留为历史。2026-09-29 独立本机回环补测在固定 `0.156.1` 的原生 `SessionStart`／`UserPromptSubmit` hook、私有 tmux `3.7c` 且 `allow-passthrough=off` 下，确认 pane 内两条通知与外层 SSH 输出零通知。该双端负例只证明相应传输边界；本次产品 UI 交互、恢复与取消另由本节后续真实验收计证，不外推未验远端组合。
 - **当前替代方式**：按已测 Mac→本机组合说明支持，不把本机 CLI 安装检出当作远端就绪。
 - **源码／证据**：[三款 SSH／tmux 场景表](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)、[Codex 关闭透传原收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/codex-tmux-off-one-input-v2.safe.json)。
 - **关闭条件**：明确后续目标远端组合，在真实目标 CLI、插件与 PTY 上验证通知、双向交互、重复／乱序、断连恢复和取消；Codex 关闭透传须同时独立观察内层原生发送与外层无接收，不能把未触发误判为成功拦截。
@@ -223,14 +1057,17 @@
 
 ### V05 — Linux／Windows Grok 专属双语视口
 
+- **双平台模拟审批卡交互**：[run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 精确绑定 `38f66c88e`，Linux／Windows 各在英文与简体中文、800×600 与 1280×800 真窗口运行；每组原始 PNG 记录审批前、AllowOnce 后、DenyOnce 前后，共 32 张。测试注入两张同代审批卡并真实点击，核对 task／generation／approval ID、命令入队和按钮禁用；八组关键画面已目视复核，文字和控件可读、无明显重叠。收据明确 `model_inputs=0`、`native_approval_requested=false`、`native_approval_resolved=false`、`v05_complete=false`。官方工件及日志清单 SHA-256 分别为 `87b768067d99a9ace4938aacefd91b9a5d2693ee0cf84fdb16cbc647d4c186e0`／`1a87098a91418270f1aca6bfc0b6db2f9c8d894172a0708f1e4b1dd8fa7306fc`。真实模型审批仍待验，V05 不关闭；测试没有用户可见文案变化，无需本地化变更。
+- **双平台静态视口子项**：精确提交 `7f847473f` 的 [run36530752934](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36530752934) Linux／Windows 作业均成功；固定 Grok `1.0.41` 的真实窗口在各平台英中两语、800×600 与 1280×800 各采 7 张原图，八组实际滚动范围均大于零。原图目视复核了固定权限说明、技能禁用、滚动顶部和底部：文案可读、换行与按钮未发现重叠，底部操作可滚动到达。Linux／Windows 原图官方工件 SHA-256 分别为 `fd81ab5664f88cf27fc29ca1c9e7fff0402059ce89fe02a6b763611d6ae88e9f`／`e9be5a5d9baf7d3ebda74f6c2a86c2389b5f1864bbd34035cb7e74bbf1a95d53`；日志与工件完整归档索引 SHA-256 `3904682a1a6e3077ea97d6a6d32c1dad0e0a17863ea4f1a8ba20bc2f0c365cca`。测试无模型输入、未触发原生审批，收据 `v05_complete=false`；真实审批交互仍待验，V05 整项不关闭。仅测试代码变动，无需本地化变更。
+- **2026-09-29 静态视口验收工具补正**：首轮 [run36525713293](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36525713293) 的 Windows 测试将同一路径的 `grok.EXE`／`grok.exe` 按大小写比较，在截图前失败；第二轮 [run36527383544](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36527383544) 产生英文紧凑视口四张策略原图，但远超内容高度的滚动目标被框架重置到 0，未完成底部或其他三组截图；第三轮 [run36529053069](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36529053069) 的 Windows 509 项前置回归通过，GUI 集成测试编译因新增分段滚动 helper 未从平台模块导出而失败，Linux 在同一已知缺陷的编译阶段主动取消。三轮均不计完整布局通过；原失败、取消和四张原图已归档。导出修正 `7f847473f` 已推送，双平台新 run 结果另计；仅测试代码变化，无需本地化变更。
 - **状态／优先级／范围**：验收缺口，中；P1 入口、P3 权限、P5 本地化布局。
 - **实际情况与影响**：两平台现有英文／简体中文截图主要选择 Codex，证明所见按钮、输入与附件标签；未完整覆盖 Grok 固定权限说明、技能禁用提示、滚动后区域及相应交互状态。本轮 macOS 已检查 Grok 英中权限、附件、技能限制、消息与历史结果完整滚动区，无截断遮挡；不能替代两平台布局或未执行的审批交互。
 - **当前替代方式**：保留现有可见范围通过，同时明确未检查视口，不能用 Fluent 键一致性代替实际布局。
 - **源码／证据**：[Grok／Claude 排队与模式提示视图](../../app/src/ai/cli_agent_runtime/task_manager_view.rs#L1790)、[Linux GUI 原记录](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/final-same-commit-20260925/run-36103244022/linux/linux-gui.safe.json)、[Windows GUI 原记录](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/final-same-commit-20260925/run-36103244022/windows/gui-review.safe.json)。
 - **关闭条件**：两平台分别启动实际英文和简体中文界面，选择 Grok 并覆盖继承、固定读取／文件策略、技能禁用、审批及完整滚动区域；按支持窗口尺寸检查截断、换行、控件与焦点，并保留原图和构建来源。
 
-## 阶段合并与完整验收的区别
+## 本次合并门禁与历史阶段证据
 
-本表不要求为了文档整理再次运行全部测试，也不将阶段性合并等同于发布或 Goal 完成。合并说明应公开这些条目、已实现范围与现有证据；原始失败被保留是可追溯性要求，不表示修复后独立通过记录无效。完整 Goal 的后续关闭应逐项解决功能缺项与验收缺口，并明确处理真实原生差异，不能再以“已可靠拒绝／已记录不支持”代替实现与验收。
+本次用户已授权后置其他平台实机验收；仍须关闭本节当前范围中的能力与 Mac 验收缺口，并通过最终源码门禁后才可合并。PR 保持草稿，原生能力不能因验收平台移交而删减。文档整理本身无需重复全部测试；原始失败被保留是可追溯性要求，不表示修复后独立通过记录无效。后续关闭应逐项解决功能缺项与验收缺口，并明确处理真实原生差异，不能以“已可靠拒绝／已记录不支持”代替实现与验收。
 
-本次输入增量包含用户功能变化，英文与简体中文图片/文件说明已同步；macOS 当前 WIP 布局范围见验证结论。整合工作区本地门禁已通过，最终提交绑定与相关平台验收仍待补；本段所述产品增量不能沿用此前“仅文档、无需本地化变更”的描述。本次仅更新五份状态文档，无需本地化变更。
+历史输入增量包含用户功能变化，英文与简体中文图片／文件说明已同步；各构建的 macOS 布局范围见验证结论，目标平台验收仍按条目补齐。本轮仅修正验收测试、运行器、工作流和状态文档，无需本地化变更；不将静态文案审计记作新的双语界面验收。

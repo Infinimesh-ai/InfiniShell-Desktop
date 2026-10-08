@@ -2,12 +2,386 @@
 
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
+import re
 import selectors
 import stat
+import struct
 import subprocess
+import sys
+import tempfile
 import time
+
+
+DIAGNOSTIC_LIMIT = 4096
+NATIVE_ERRORS = (
+    "protocol_mismatch", "invalid_payload", "frame_too_large", "input_unavailable", "input_timeout",
+    "terminal_unavailable", "tmux_unavailable", "lock_unavailable", "lock_timeout",
+    "write_failed", "write_timeout",
+    "send_timeout_prepare", "send_timeout_terminal", "send_timeout_cache",
+    "send_timeout_lock_open", "send_timeout_lock_wait", "send_timeout_frame_write",
+    "send_timeout_unknown", "send_unavailable",
+)
+DIAGNOSTIC_ERRORS = {"unknown", "ETIMEDOUT", "ENOENT", "EACCES", "ENOEXEC", "EAGAIN",
+                     "ENOMEM", "ENOBUFS", *("cli_agent_notify_" + value for value in NATIVE_ERRORS)}
+DIAGNOSTIC_SIGNALS = {"other", "SIGHUP", "SIGINT", "SIGQUIT", "SIGILL", "SIGABRT", "SIGFPE",
+                      "SIGKILL", "SIGSEGV", "SIGPIPE", "SIGTERM", "SIGTTIN", "SIGTTOU", "SIGBUS"}
+NATIVE_TRACE_RECORD = struct.Struct("<4sB3xIIQ16s8x")
+NATIVE_TRACE_LIMIT = 32 * NATIVE_TRACE_RECORD.size
+NATIVE_TRACE_STAGES = ("main", "fluent_begin", "fluent_end", "lease_begin", "lease_end",
+                       "worker", "input_begin", "input_received", "prepare", "terminal",
+                       "cache", "lock_open", "lock_wait", "frame_write", "frame_written",
+                       "reply_begin", "reply_end", "main_ok", "main_error")
+
+
+def native_worker_diagnostics(raw, nonce):
+    # 仅输出定长字段；无首标不能区分 exec/加载/调度/授权失败，不推测 Fluent 阻塞。
+    identity = {"wire_bytes": len(raw), "wire_sha256": hashlib.sha256(raw).hexdigest()}
+    if not raw:
+        return {"status": "missing", **identity}
+    if len(raw) > NATIVE_TRACE_LIMIT:
+        return {"status": "over_budget", **identity}
+    if len(raw) % NATIVE_TRACE_RECORD.size:
+        return {"status": "invalid", **identity}
+    rows = []
+    for index in range(0, len(raw), NATIVE_TRACE_RECORD.size):
+        record = raw[index:index + NATIVE_TRACE_RECORD.size]
+        magic, stage, sequence, pid, timestamp, actual_nonce = NATIVE_TRACE_RECORD.unpack(record)
+        if (magic != b"INW1" or not 1 <= stage <= len(NATIVE_TRACE_STAGES)
+                or record[5:8] != bytes(3) or record[40:] != bytes(8)
+                or actual_nonce != nonce or sequence != len(rows) or pid == 0
+                or (rows and (pid != rows[0]["pid"] or timestamp < rows[-1]["monotonic_ns"]))):
+            return {"status": "invalid", **identity}
+        rows.append({"stage": NATIVE_TRACE_STAGES[stage - 1], "sequence": sequence,
+                     "pid": pid, "monotonic_ns": timestamp})
+    return {"status": "captured", **identity, "events": rows, "invocation_nonce": nonce.hex(),
+            "missing_stages_are_unknown": True}
+
+
+class NativeWorkerTrace:
+    # 每次原调用各一对匿名管道；读端保持至原调用结束，不等待 EOF、不增加发送次数。
+    def __init__(self, *, enabled=None):
+        self.enabled = sys.platform == "linux" if enabled is None else enabled
+        self.reader = self.writer = None
+        self.nonce = None
+        self.authorization = None
+        self.raw = bytearray()
+        self.failed = False
+
+    def __enter__(self):
+        if self.enabled:
+            try:
+                self.nonce = os.urandom(16)
+                self.reader, self.writer = os.pipe()
+                for descriptor in (self.reader, self.writer):
+                    os.set_blocking(descriptor, False)
+                    os.set_inheritable(descriptor, False)
+                info = os.fstat(self.writer)
+                self.authorization = f"v1:{info.st_dev}:{info.st_ino}:{self.nonce.hex()}"
+            except OSError:
+                self.failed = True
+                self.close()
+        return self
+
+    @property
+    def pass_fds(self):
+        return () if self.writer is None else (self.writer,)
+
+    @property
+    def binding(self):
+        return None if self.writer is None else {"fd": self.writer, "authorization": self.authorization}
+
+    def summary(self):
+        if not self.enabled:
+            return {"status": "not_enabled"}
+        if self.failed:
+            return {"status": "unavailable"}
+        try:
+            # 总记录小于 PIPE_BUF；一次有界非阻塞读取即可，无读线程或 join。
+            remaining = NATIVE_TRACE_LIMIT + 1 - len(self.raw)
+            if remaining > 0:
+                self.raw.extend(os.read(self.reader, remaining))
+        except BlockingIOError:
+            pass
+        except OSError:
+            self.failed = True
+            return {"status": "unavailable"}
+        return native_worker_diagnostics(bytes(self.raw), self.nonce)
+
+    def close(self):
+        for name in ("reader", "writer"):
+            descriptor = getattr(self, name)
+            if descriptor is not None:
+                setattr(self, name, None)
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    # 诊断释放错误不能替换原调用的返回或异常。
+                    self.failed = True
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+
+def linux_timeout_snapshot(pid, starttime, diagnostic_fd):
+    # 仅在原调用已经超时后读取；不暂停进程，也不给业务调用新的成功窗口。
+    started = time.monotonic_ns()
+    result = {"status": "unavailable", "started_monotonic_ns": started,
+              "thread_limit": 8, "read_byte_limit": 65536, "soft_budget_ns": 50000000}
+    consumed = 0
+
+    def budget():
+        if consumed >= 65536 or time.monotonic_ns() - started >= 50000000:
+            raise TimeoutError()
+
+    def read(path):
+        nonlocal consumed
+        budget()
+        if consumed + 2049 > 65536:
+            raise TimeoutError()
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0))
+        try:
+            value = os.read(descriptor, 2049)
+            consumed += len(value)
+        finally:
+            os.close(descriptor)
+        if len(value) > 2048:
+            raise OverflowError()
+        return value
+
+    def process_stat(path, expected_pid):
+        raw = read(path / "stat")
+        number, rest = raw.split(b" ", 1)
+        fields = rest.rsplit(b")", 1)[1].split()
+        if int(number) != expected_pid or fields[0] not in (b"R", b"S", b"D", b"Z", b"T", b"t", b"X", b"I"):
+            raise ValueError()
+        # 不导出 comm；其中可能含有用户数据或括号。
+        values = {name: int(fields[index]) for name, index in (
+            ("ppid", 1), ("pgrp", 2), ("session", 3), ("minor_faults", 7),
+            ("major_faults", 9), ("user_ticks", 11), ("system_ticks", 12),
+            ("threads", 17), ("starttime_ticks", 19))}
+        return {"pid": expected_pid, "state": fields[0].decode("ascii"), **values}
+
+    def identity(info):
+        return {"device": info.st_dev, "inode": info.st_ino, "type": stat.S_IFMT(info.st_mode)}
+
+    def observe(operation):
+        try:
+            budget()
+            return {"status": "observed", "value": operation()}
+        except TimeoutError:
+            return {"status": "budget_exhausted"}
+        except OSError as error:
+            return {"status": "unavailable", "errno": error.errno}
+        except (ValueError, IndexError, OverflowError, UnicodeError):
+            return {"status": "invalid"}
+
+    def numbers(path, count):
+        fields = read(path).split()
+        if len(fields) != count:
+            raise ValueError()
+        return [int(value, 0) if value.startswith(b"0x") else int(value) for value in fields]
+
+    def wchan(path):
+        value = read(path).strip()
+        if not re.fullmatch(rb"[A-Za-z0-9_.]{1,128}", value):
+            raise ValueError()
+        return value.decode("ascii")
+
+    def syscall(path):
+        fields = read(path).split()
+        if fields == [b"running"]:
+            return {"running": True}
+        # 内核只给出系统调用号、参数数值和寄存器地址；不解引用或读取内存。
+        if len(fields) not in (3, 9):
+            raise ValueError()
+        values = [int(value, 0) if value.startswith(b"0x") else int(value) for value in fields]
+        if len(values) == 3 and values[0] != -1:
+            raise ValueError()
+        return {"number": values[0], "numeric_fields": values[1:]}
+
+    root = Path(f"/proc/{pid}")
+    try:
+        before = process_stat(root, pid)
+        if before["starttime_ticks"] != starttime:
+            result["status"] = "instance_changed"
+            return result
+        result["clock_ticks_per_second"] = os.sysconf("SC_CLK_TCK")
+        result["root_before"] = before
+        executable = observe(lambda: identity((root / "exe").stat()))
+        result["executable_before"] = executable
+        parent_fd = os.fstat(diagnostic_fd)
+        result["parent_diagnostic_fd"] = {**identity(parent_fd), "size": parent_fd.st_size}
+        child_fd = observe(lambda: (root / "fd" / str(diagnostic_fd)).stat())
+        if child_fd["status"] == "observed":
+            info = child_fd["value"]
+            child_fd["value"] = {**identity(info), "size": info.st_size,
+                                 "matches_parent": identity(info) == identity(parent_fd)}
+        result["child_diagnostic_fd"] = child_fd
+        tids = [pid]
+        hit_thread_limit = False
+        with os.scandir(root / "task") as entries:
+            for entry in entries:
+                budget()
+                if entry.name == str(pid):
+                    continue
+                if len(tids) == 8:
+                    hit_thread_limit = True
+                    break
+                tids.append(int(entry.name))
+        result["threads_truncated"] = hit_thread_limit or before["threads"] > len(tids)
+        result["tasks"] = []
+        for tid in tids:
+            path = root / "task" / str(tid)
+            first = observe(lambda: process_stat(path, tid))
+            if first["status"] != "observed":
+                result["tasks"].append({"tid": tid, "status": "binding_unconfirmed", "before": first})
+                continue
+            task = {"tid": tid, "before": first,
+                    "schedstat": observe(lambda: numbers(path / "schedstat", 3)),
+                    "wchan": observe(lambda: wchan(path / "wchan")),
+                    "syscall": observe(lambda: syscall(path / "syscall")),
+                    "after": observe(lambda: process_stat(path, tid))}
+            task["same_instance"] = (first["status"] == task["after"]["status"] == "observed"
+                                     and first["value"]["starttime_ticks"] == task["after"]["value"]["starttime_ticks"])
+            if not task["same_instance"]:
+                task = {"tid": tid, "status": "binding_unconfirmed", "before": first, "after": task["after"]}
+            else:
+                task["status"] = "bound"
+            result["tasks"].append(task)
+        after = observe(lambda: process_stat(root, pid))
+        result["root_after"] = after
+        result["executable_after"] = observe(lambda: identity((root / "exe").stat()))
+        result["status"] = ("bound" if after["status"] == "observed"
+                            and after["value"]["starttime_ticks"] == starttime
+                            and executable["status"] == "observed"
+                            and result["executable_after"] == executable else "binding_unconfirmed")
+        if result["status"] != "bound":
+            result.pop("tasks", None)
+            result.pop("child_diagnostic_fd", None)
+    except TimeoutError:
+        result["status"] = "budget_exhausted"
+    except OSError as error:
+        result["errno"] = error.errno
+    except (ValueError, IndexError, OverflowError, UnicodeError):
+        result["status"] = "invalid"
+    finally:
+        # proc 读取没有严格墙钟保证；真实额外耗时必须留下，不能声称仍在原截止点。
+        result["read_bytes"] = consumed
+        result["finished_monotonic_ns"] = time.monotonic_ns()
+    return result
+
+
+def diagnostic_preload(worker, descriptor, native_trace=None):
+    # 只在测试 Node 外层加载；除显式诊断授权外，原参数/环境/期限与重抛保持。
+    # 成功的 execFileSync 不暴露 stderr，明确记 null，不能把未知字节数写成零。
+    source = r'''"use strict";
+const fs = require("node:fs");
+const child = require("node:child_process");
+const execute = child.execFileSync;
+const expected = __WORKER__;
+const nativeTrace = __NATIVE_TRACE__;
+const allowedErrors = new Set(__ERRORS__);
+const allowedSignals = new Set(__SIGNALS__);
+function emit(row) {
+  try { fs.writeSync(__FD__, JSON.stringify(row) + "\n"); } catch (_) {}
+}
+function byteLength(value) {
+  return typeof value === "string" || Buffer.isBuffer(value) ? Buffer.byteLength(value) : null;
+}
+emit({stage: "preload", elapsed_ms: 0, exit_code: null, signal: null,
+  stdout_bytes: 0, stderr_bytes: 0, error_code: null});
+child.execFileSync = function(file, args, options) {
+  const stage = file === expected && Array.isArray(args) && args[0] === "cli-agent-notify"
+    ? args.length === 1
+      || args.length === 3 && args[1] === "--require-protocol" && args[2] === "1" ? "send"
+      : args.length === 2 && args[1] === "--protocol-version" ? "protocol" : null : null;
+  if (!stage) return execute.apply(this, arguments);
+  const started = process.hrtime.bigint();
+  const elapsed = () => Math.min(60000, Number(process.hrtime.bigint() - started) / 1e6);
+  // 捕获原本丢弃的 stderr；超过既有 maxBuffer 会额外触发 ENOBUFS，诊断结果须保留此边界。
+  // 原 argv/timeout/maxBuffer 和同步返回/重抛仍保持；环境只可追加下方测试授权。
+  const observed = {...options, stdio: [...options.stdio]};
+  observed.stdio[2] = "pipe";
+  // 只给精确守卫发送增加独立 FD3；不改原标准流、argv、payload 或任何期限。
+  if (process.platform === "linux" && nativeTrace && stage === "send"
+      && args.length === 3 && args[1] === "--require-protocol" && args[2] === "1"
+      && observed.stdio.length === 3
+      && !Object.prototype.hasOwnProperty.call(options.env || process.env, "INFINISHELL_TEST_NOTIFY_TRACE")) {
+    observed.stdio.push(nativeTrace.fd);
+    observed.env = {...(options.env || process.env), INFINISHELL_TEST_NOTIFY_TRACE: nativeTrace.authorization};
+  }
+  try {
+    const result = execute.call(this, file, args, observed);
+    emit({stage, elapsed_ms: elapsed(), exit_code: 0, signal: null,
+      stdout_bytes: byteLength(result), stderr_bytes: null, error_code: null});
+    return result;
+  } catch (error) {
+    const stderr = typeof error.stderr === "string" || Buffer.isBuffer(error.stderr)
+      ? error.stderr.toString() : "";
+    const native = /^Error: (cli_agent_notify_[a-z_]+)\r?\n?$/.exec(stderr);
+    const code = native && allowedErrors.has(native[1]) ? native[1]
+      : allowedErrors.has(error.code) ? error.code : "unknown";
+    emit({stage, elapsed_ms: elapsed(),
+      exit_code: Number.isInteger(error.status) ? error.status : null,
+      signal: error.signal ? allowedSignals.has(error.signal) ? error.signal : "other" : null,
+      stdout_bytes: byteLength(error.stdout), stderr_bytes: byteLength(error.stderr), error_code: code});
+    throw error;
+  }
+};
+'''
+    return (source.replace("__FD__", str(descriptor))
+            .replace("__NATIVE_TRACE__", json.dumps(native_trace))
+            .replace("__ERRORS__", json.dumps(sorted(DIAGNOSTIC_ERRORS)))
+            .replace("__SIGNALS__", json.dumps(sorted(DIAGNOSTIC_SIGNALS)))
+            .replace("__WORKER__", json.dumps(str(worker))))
+
+
+def worker_diagnostics(raw):
+    # 独立诊断 FD 也是不可信输入；拒绝额外字段、任意文本与异常数量，绝不回显原字节。
+    if not raw:
+        return {"status": "missing"}
+    if len(raw) > DIAGNOSTIC_LIMIT:
+        return {"status": "over_budget"}
+    try:
+        rows = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
+        if not 1 <= len(rows) <= 3 or not raw.endswith(b"\n"):
+            raise ValueError
+        fields = {"stage", "elapsed_ms", "exit_code", "signal", "stdout_bytes", "stderr_bytes", "error_code"}
+        for row in rows:
+            if (not isinstance(row, dict) or set(row) != fields
+                    or row["stage"] not in ("preload", "protocol", "send")
+                    or type(row["elapsed_ms"]) not in (int, float)
+                    or not math.isfinite(row["elapsed_ms"]) or not 0 <= row["elapsed_ms"] <= 60000
+                    or row["signal"] not in DIAGNOSTIC_SIGNALS | {None}
+                    or row["error_code"] not in DIAGNOSTIC_ERRORS | {None}):
+                raise ValueError
+            for name, maximum in (("exit_code", 2147483647), ("stdout_bytes", 1048576), ("stderr_bytes", 1048576)):
+                value = row[name]
+                if value is not None and (type(value) is not int or not 0 <= value <= maximum):
+                    raise ValueError
+            if row["exit_code"] == 0 and (row["signal"] is not None or row["error_code"] is not None):
+                raise ValueError
+        # 新发送在同一进程内守卫协议；不能补造一次未发生的独立查询。
+        # 保留旧 hook 的分阶段诊断，但仍拒绝重试、乱序和混合序列。
+        if tuple(row["stage"] for row in rows) not in (
+                ("preload",), ("preload", "send"), ("preload", "protocol"),
+                ("preload", "protocol", "send")):
+            raise ValueError
+        if len(rows) == 3 and (rows[1]["exit_code"] != 0 or rows[1]["error_code"] is not None):
+            raise ValueError
+        return {"status": "captured", "events": rows}
+    except (ValueError, TypeError, UnicodeError, OverflowError):
+        return {"status": "invalid"}
+
+
+def hook_failure(reason, diagnostics, native_trace=None):
+    safe = json.dumps(worker_diagnostics(diagnostics), ensure_ascii=True, separators=(",", ":"))
+    native = "" if native_trace is None else "; native_worker_diagnostics=" + json.dumps(
+        native_trace.summary(), ensure_ascii=True, separators=(",", ":"))
+    return ValueError(f"{reason}; worker_diagnostics={safe}{native}")
 
 
 def plain_file(path, expected_sha256, root=None, executable=False):
@@ -63,16 +437,29 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, worker, worker_s
     process = None
     selector = selectors.DefaultSelector()
     chunks = {"tty": bytearray(), "stdout": bytearray(), "stderr": bytearray()}
+    diagnostic_file = None
+    preload_name = None
+    native_trace = NativeWorkerTrace()
+
+    def observed_failure(reason):
+        return hook_failure(reason, os.pread(diagnostic_file.fileno(), DIAGNOSTIC_LIMIT + 1, 0), native_trace)
 
     def controlling_terminal():
         os.setsid()
         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
 
     try:
+        native_trace.__enter__()
+        # 匿名文件 FD 避免诊断管道背压扰动原生调用；父进程只读固定字节预算。
+        diagnostic_file = tempfile.TemporaryFile(mode="w+b", dir=root)
+        preload_fd, preload_name = tempfile.mkstemp(prefix="hook-diagnostic-", suffix=".cjs", dir=root)
+        with os.fdopen(preload_fd, "w") as preload:
+            preload.write(diagnostic_preload(worker, diagnostic_file.fileno(), native_trace.binding))
         # 保留控制终端；stdout 单独捕获，不能把它误判为原生通知通道。
-        process = subprocess.Popen([str(node), str(hook)], cwd=root, env=env,
+        process = subprocess.Popen([str(node), "--require", preload_name, str(hook)], cwd=root, env=env,
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, pass_fds=(slave,),
+                                   stderr=subprocess.PIPE,
+                                   pass_fds=(slave, diagnostic_file.fileno(), *native_trace.pass_fds),
                                    preexec_fn=controlling_terminal)
         process.stdin.write(payload)
         process.stdin.close()
@@ -84,14 +471,14 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, worker, worker_s
         while True:
             now = time.monotonic()
             if now >= deadline:
-                raise ValueError("hook_main_timeout")
+                raise observed_failure("hook_main_timeout")
             for key, _ in selector.select(timeout=min(.05, deadline - now)):
                 descriptor = key.fileobj if isinstance(key.fileobj, int) else key.fileobj.fileno()
                 chunk = os.read(descriptor, 16385)
                 if chunk:
                     chunks[key.data].extend(chunk)
                     if len(chunks[key.data]) > 16384:
-                        raise ValueError("hook_output_budget_exceeded")
+                        raise observed_failure("hook_output_budget_exceeded")
                 else:
                     selector.unregister(key.fileobj)
             if process.poll() is not None:
@@ -100,11 +487,11 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, worker, worker_s
                 if time.monotonic() - exited_at >= .1:
                     break
         if process.returncode != 0 or chunks["stdout"] or chunks["stderr"]:
-            raise ValueError("hook_main_channel_invalid")
+            raise observed_failure("hook_main_channel_invalid")
         prefix = b"\x1b]777;notify;warp://cli-agent;"
         raw = bytes(chunks["tty"])
         if not raw.startswith(prefix) or not raw.endswith(b"\x07"):
-            raise ValueError(f"hook_main_notification_missing:tty_bytes={len(raw)}")
+            raise observed_failure(f"hook_main_notification_missing:tty_bytes={len(raw)}")
         notification = json.loads(raw[len(prefix):-1])
         if (set(notification) != {"v", "agent", "event", "session_id", "plugin_version", "event_id"}
                 or type(notification["v"]) is not int or notification["v"] != 1
@@ -123,14 +510,22 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, worker, worker_s
                 "hook_sha256": hook_sha256, "worker_sha256": worker_sha256,
                 "session_id_matches": True, "node_exit_code": 0,
                 "stdout_bytes": 0, "stderr_bytes": 0, "credentials_provided": False,
-                "model_input_submitted": False}
+                "model_input_submitted": False,
+                "native_worker_diagnostics": native_trace.summary()}
     finally:
-        if process is not None:
-            if process.poll() is None:
-                os.killpg(process.pid, 9)
-            process.wait(timeout=5)
-            for stream in (process.stdout, process.stderr):
-                stream.close()
+        try:
+            if process is not None:
+                if process.poll() is None:
+                    os.killpg(process.pid, 9)
+                process.wait(timeout=5)
+                for stream in (process.stdout, process.stderr):
+                    stream.close()
+        finally:
+            native_trace.close()
         selector.close()
+        if diagnostic_file is not None:
+            diagnostic_file.close()
+        if preload_name is not None:
+            Path(preload_name).unlink()
         os.close(master)
         os.close(slave)

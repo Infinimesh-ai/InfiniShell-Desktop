@@ -1,8 +1,156 @@
 use std::sync::mpsc;
 
+use windows::Win32::Foundation::GENERIC_WRITE;
+use windows::Win32::Storage::FileSystem::{
+    FILE_GENERIC_WRITE, FILE_SHARE_DELETE, FILE_SHARE_WRITE, OPEN_EXISTING,
+};
 use windows::Win32::System::Threading::PROCESS_SYNCHRONIZE;
 
 use super::*;
+
+#[test]
+fn npm_debug_trace_bounds_recent_events_without_losing_totals() {
+    let generation = Uuid::new_v4();
+    let mut trace = NpmDebugTrace::new(generation, 71);
+    // 跨越环形记录上限；总计不能随最旧事件一起丢弃。
+    for process_id in 101..=118 {
+        trace.received(
+            &DEBUG_EVENT {
+                dwDebugEventCode: CREATE_THREAD_DEBUG_EVENT,
+                dwProcessId: process_id,
+                dwThreadId: 29,
+                ..Default::default()
+            },
+            7,
+            71,
+            false,
+        );
+        trace.validated(NpmDebugResult::from_io(Ok(()), Duration::ZERO, 71), "node");
+        trace.continued(
+            NpmDebugResult::from_io(Ok(()), Duration::ZERO, 71),
+            DBG_CONTINUE.0,
+        );
+    }
+
+    assert_eq!(trace.generation, generation);
+    assert_eq!(
+        (trace.received, trace.validated, trace.continued),
+        (18, 18, 18)
+    );
+    assert_eq!(trace.dropped_events, 2);
+    assert_eq!(trace.recent.len(), 16);
+    assert_eq!(trace.recent.front().unwrap().sequence, 3);
+    let last = trace.recent.back().unwrap();
+    assert_eq!(last.sequence, 18);
+    assert_eq!((last.process_id, last.thread_id), (118, 29));
+    assert_eq!(last.code, CREATE_THREAD_DEBUG_EVENT.0);
+    assert_eq!(last.received_on_thread_id, 71);
+    assert_eq!(last.mode, "normal");
+    assert_eq!(last.role, "node");
+    assert_eq!(last.continue_status, Some(DBG_CONTINUE.0));
+}
+
+#[test]
+fn npm_debug_trace_waits_preserve_hresult_without_inventing_events() {
+    let mut trace = NpmDebugTrace::new(Uuid::new_v4(), 71);
+    let timeout = HRESULT::from_win32(ERROR_SEM_TIMEOUT.0);
+    trace.wait_finished(Duration::from_millis(100), 71, Some(timeout));
+    trace.wait_finished(Duration::from_millis(90), 72, Some(timeout));
+    let denied = HRESULT::from_win32(5);
+    trace.wait_finished(Duration::from_millis(3), 72, Some(denied));
+
+    assert_eq!(trace.wait_calls, 3);
+    assert_eq!(trace.wait_timeouts, 2);
+    assert_eq!(trace.wait_elapsed_ms, 193);
+    assert_eq!(trace.longest_wait_ms, 100);
+    assert_eq!(trace.last_wait_hresult, Some(denied.0));
+    assert_eq!(trace.last_boundary, "wait_failed");
+    assert_eq!(trace.last_call_thread_id, 72);
+    assert_eq!(trace.spawn_thread_id, 71);
+    assert_eq!(
+        (trace.received, trace.validated, trace.continued),
+        (0, 0, 0)
+    );
+    assert!(trace.recent.is_empty());
+}
+
+#[test]
+fn npm_debug_summary_binds_generation_and_omits_sensitive_failure_text() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    assert!(session.package_debug_summary(Ok(0)).is_none());
+    session.npm_diagnostics = Some(NpmProcessDiagnostics::new());
+    let generation = Uuid::new_v4();
+    session.bind_package_diagnostics(generation);
+    session.bind_package_diagnostics(Uuid::new_v4());
+    session.record_package_spawn_result(Ok(()), Duration::from_millis(9));
+    let event = DEBUG_EVENT {
+        dwDebugEventCode: LOAD_DLL_DEBUG_EVENT,
+        dwProcessId: 31,
+        dwThreadId: 32,
+        ..Default::default()
+    };
+    session.pending_event = Some((31, 32, LOAD_DLL_DEBUG_EVENT));
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .as_mut()
+        .unwrap()
+        .received(&event, 12, 71, false);
+    let denied = HRESULT::from_win32(5);
+    let api_failure = io::Error::other(WindowsError::from_hresult(denied));
+    session.record_event_validation(Err(&api_failure), Duration::from_millis(4));
+    let failure = io::Error::other(r"C:\private\credential-and-environment-sentinel");
+
+    let fields = session.package_debug_summary(Err(&failure)).unwrap();
+    assert_eq!(fields["generation"], generation.to_string());
+    assert_eq!(fields["spawn_result"]["ok"], true);
+    assert_eq!(fields["spawn_result"]["elapsed_ms"], 9);
+    assert_eq!(fields["spawn_thread_id"], fields["spawn_return_thread_id"]);
+    assert_eq!(fields["last_call_thread_id"], fields["spawn_thread_id"]);
+    assert_eq!(
+        fields["pending_event"],
+        serde_json::json!([31, 32, LOAD_DLL_DEBUG_EVENT.0])
+    );
+    assert_eq!(fields["last_boundary"], "validation_failed");
+    assert_eq!(fields["validated"], 0);
+    assert_eq!(fields["continued"], 0);
+    assert_eq!(fields["recent"][0]["sequence"], 1);
+    assert_eq!(fields["recent"][0]["validation"]["ok"], false);
+    assert_eq!(fields["recent"][0]["validation"]["hresult"], denied.0);
+    assert_eq!(fields["recent"][0]["validation"]["elapsed_ms"], 4);
+    assert!(fields["recent"][0]["continuation"].is_null());
+    assert!(
+        !fields
+            .to_string()
+            .contains("credential-and-environment-sentinel")
+    );
+    assert!(
+        !fields
+            .to_string()
+            .contains(&fixture.directory.path().display().to_string())
+    );
+    let raw_failure = io::Error::from_raw_os_error(5);
+    let raw = session.package_debug_summary(Err(&raw_failure)).unwrap();
+    assert_eq!(raw["failure_codes"]["win32_error"], 5);
+    assert!(raw["failure_codes"]["hresult"].is_null());
+    // 原生非零退出并非 io::Error，仍须保留失败事件，不能标记成成功。
+    let native_failure = session.package_debug_summary(Ok(17)).unwrap();
+    assert_eq!(native_failure["native_exit_code"], 17);
+    assert_eq!(native_failure["failed"], true);
+    assert!(native_failure["recent"].is_array());
+    // 无失败时不输出逐事件详情，避免正常消费者更新产生大段日志。
+    assert!(
+        session
+            .package_debug_summary(Ok(0))
+            .unwrap()
+            .get("recent")
+            .is_none()
+    );
+}
 
 #[test]
 fn npm_event_roles_distinguish_remaining_console_and_reused_process_identity() {
@@ -381,7 +529,7 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
         fs::create_dir(root.join(relative)).unwrap();
     }
     let script = root.join("nul-control.cmd");
-    // 同一 CMD、目录与 token 只改变 stderr 的 NUL 重定向；脚本不启动外部命令。
+    // 同一 CMD、目录与 token 对照普通文件和 NUL 的 stderr 重定向；脚本不启动外部命令。
     // NUL 加扩展名仍是保留设备名，stdout 标记必须使用普通文件名。
     fs::write(
         &script,
@@ -389,6 +537,8 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
             "@echo off\r\n",
             ">tmp\\plain.txt echo builtin-control\r\n",
             ">tmp\\plain-status.txt echo %errorlevel%\r\n",
+            ">tmp\\regular.txt 2>tmp\\regular-stderr.txt echo builtin-control\r\n",
+            ">tmp\\regular-status.txt echo %errorlevel%\r\n",
             ">tmp\\redirected.txt 2>NUL echo builtin-control\r\n",
             ">tmp\\nul-status.txt echo %errorlevel%\r\n",
             ">tmp\\after.txt echo builtin-control\r\n",
@@ -461,24 +611,55 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
     );
     assert_eq!(result.unwrap(), 0);
     let plain_status = fs::read_to_string(root.join("tmp/plain-status.txt")).unwrap();
+    let regular_status = fs::read_to_string(root.join("tmp/regular-status.txt")).unwrap();
     let nul_status = fs::read_to_string(root.join("tmp/nul-status.txt")).unwrap();
     let plain = fs::read(root.join("tmp/plain.txt")).unwrap();
+    let regular = fs::read(root.join("tmp/regular.txt")).unwrap();
+    let regular_stderr = fs::read(root.join("tmp/regular-stderr.txt")).unwrap();
     let redirected = fs::read(root.join("tmp/redirected.txt")).unwrap();
     let after = fs::read(root.join("tmp/after.txt")).unwrap();
+    let file_id = |name: &str| {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+            .open(root.join("tmp").join(name))
+            .unwrap();
+        inspect_handle(&file).unwrap().id
+    };
+    let distinct_regular_files = {
+        let names = [
+            "plain.txt",
+            "regular.txt",
+            "regular-stderr.txt",
+            "redirected.txt",
+        ];
+        let ids = names.map(file_id);
+        ids.iter()
+            .enumerate()
+            .all(|(index, id)| ids[..index].iter().all(|other| id != other))
+    };
     let expected: &[u8] = b"builtin-control\r\n";
     eprintln!(
         "atomic_windows_nul_control={}",
         serde_json::json!({
             "plain_errorlevel": plain_status.trim().parse::<u32>().unwrap(),
+            "regular_errorlevel": regular_status.trim().parse::<u32>().unwrap(),
             "nul_errorlevel": nul_status.trim().parse::<u32>().unwrap(),
             "plain_marker_matches": plain == expected,
+            "regular_marker_matches": regular == expected,
+            "regular_stderr_empty": regular_stderr.is_empty(),
+            "distinct_regular_files": distinct_regular_files,
             "nul_marker_matches": redirected == expected,
             "after_marker_matches": after == expected,
             "cleanup_confirmed": true,
         })
     );
     assert_eq!(plain_status.trim(), "0");
+    assert!(distinct_regular_files);
     assert_eq!(plain, expected);
+    assert_eq!(regular_status.trim(), "0");
+    assert_eq!(regular, expected);
+    assert!(regular_stderr.is_empty());
     assert_eq!(after, expected);
     // 此断言失败只证明公共 shim 所需 NUL 重定向不可用，不把它当成 npm 挂起的唯一根因。
     assert_eq!(
@@ -487,6 +668,198 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
         "同一 AppContainer 中的 NUL 重定向失败"
     );
     assert_eq!(redirected, expected);
+    record_debug_native_exit(name);
+}
+
+const NUL_CREATEFILE_REPORT_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT";
+const NUL_CREATEFILE_ORDINARY_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY";
+const NUL_CREATEFILE_HELPER_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER";
+const NUL_CREATEFILE_HELPER_SHA256_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER_SHA256";
+
+fn parse_createfile_receipt(bytes: &[u8]) -> Option<serde_json::Value> {
+    if bytes.len() != 120 {
+        return None;
+    }
+    let words: Vec<u32> = bytes
+        .chunks_exact(4)
+        .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
+        .collect();
+    if words[..6]
+        != [
+            0x4e55_4c31,
+            1,
+            GENERIC_WRITE.0,
+            FILE_GENERIC_WRITE.0,
+            (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE).0,
+            OPEN_EXISTING.0,
+        ]
+    {
+        return None;
+    }
+    for result in words[6..].chunks_exact(4) {
+        if result[0] > 1 || result[3] > 1 || result[0] == 0 && result[3] != 0 {
+            return None;
+        }
+    }
+    let result = |access_index, target_index| {
+        let offset = 6 + (access_index * 3 + target_index) * 4;
+        serde_json::json!({
+            "opened": words[offset] == 1,
+            "win32_error": words[offset + 1],
+            "file_type": words[offset + 2],
+            "close_confirmed": words[offset + 3] == 1,
+        })
+    };
+    let compare = |access_index| {
+        serde_json::json!({
+            "desired_access": words[2 + access_index],
+            "regular": result(access_index, 0),
+            "nul": result(access_index, 1),
+            "device_nul": result(access_index, 2),
+        })
+    };
+    Some(serde_json::json!({
+        "share_mode": words[4],
+        "creation_disposition": words[5],
+        "generic_write": compare(0usize),
+        "file_generic_write": compare(1usize),
+    }))
+}
+
+#[test]
+#[ignore = "实际受限 AppContainer 令牌须直接打开 NUL 和同目录普通文件"]
+fn npm_appcontainer_token_createfile_nul_vs_regular() {
+    let name = "console_binding::npm_appcontainer_token_createfile_nul_vs_regular";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_LARGE_IMAGE_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    for relative in ["home", "config", "cache", "data", "tmp"] {
+        fs::create_dir(root.join(relative)).unwrap();
+    }
+    let source = PathBuf::from(std::env::var_os(NUL_CREATEFILE_HELPER_ENV).unwrap())
+        .canonicalize()
+        .unwrap();
+    let expected_source = ExpectedFileIdentity::capture(&source).unwrap();
+    assert_eq!(
+        expected_source.sha256,
+        std::env::var(NUL_CREATEFILE_HELPER_SHA256_ENV).unwrap(),
+        "固定 Win32 helper 摘要不匹配"
+    );
+    let source_lease = prepare(&expected_source).unwrap();
+    let mut source_file = source_lease.program.try_clone().unwrap();
+    source_file.rewind().unwrap();
+    let helper = root.join("createfile-helper.exe");
+    let mut destination = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&helper)
+        .unwrap();
+    assert_eq!(
+        io::copy(&mut source_file, &mut destination).unwrap(),
+        expected_source.size
+    );
+    destination.sync_all().unwrap();
+    drop(destination);
+    let expected_helper = ExpectedFileIdentity::capture(&helper).unwrap();
+    assert_eq!(expected_helper.sha256, expected_source.sha256);
+    assert_eq!(expected_helper.size, expected_source.size);
+    let mut lease = prepare(&expected_helper).unwrap();
+    lease
+        .set_package_images(vec![expected_helper.clone()])
+        .unwrap();
+    let cwd = prepare_directory(&AtomicDirectoryIdentity::capture(&root).unwrap()).unwrap();
+    let execution_cwd = PathBuf::from(root.to_str().unwrap().strip_prefix(r"\\?\").unwrap());
+    assert_eq!(execution_cwd.canonicalize().unwrap(), root);
+    let report = root.join("tmp/createfile-actual.json");
+    let ordinary = root.join("tmp/ordinary.txt");
+    let mut environment = super::super::super::version_probe::resolved_environment(&root).unwrap();
+    environment.push((
+        NUL_CREATEFILE_REPORT_ENV.into(),
+        report.clone().into_os_string(),
+    ));
+    environment.push((
+        NUL_CREATEFILE_ORDINARY_ENV.into(),
+        ordinary.clone().into_os_string(),
+    ));
+    let mut debugger = lease.prepare_image_debug_session().unwrap();
+    let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+        lease.execution_path(),
+        "--createfile-control".as_ref(),
+        cwd.execution_path(),
+        &execution_cwd,
+        &environment,
+        &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+        &[helper],
+    )
+    .unwrap();
+    // 授权后创建，令普通文件继承私有 tmp 的 AppContainer ACE；两个目标均以 OPEN_EXISTING 打开。
+    fs::write(&ordinary, b"ordinary-control").unwrap();
+    let cancellation = Arc::new(AtomicBool::new(false));
+    debugger.bind_cancellation(cancellation.clone());
+    let (completed, completion) = mpsc::channel();
+    let watchdog = thread::spawn(move || {
+        if completion.recv_timeout(Duration::from_secs(60)).is_err() {
+            cancellation.store(true, Ordering::Release);
+        }
+    });
+    let result = (|| -> io::Result<u32> {
+        process.resume()?;
+        debugger.verify_package_initial_image_in_container(&process)?;
+        debugger.drain_package_in_container_until_exit(&process)?;
+        process.exit_code()
+    })();
+    let _ = completed.send(());
+    watchdog.join().unwrap();
+    let termination = if result.is_err() {
+        process
+            .terminate_job()
+            .and_then(|()| debugger.drain_terminated_package_in_container(&process))
+    } else {
+        Ok(())
+    };
+    drop(cwd);
+    let receipt = root.join("appcontainer-cleanup-v1");
+    let cleanup = termination.and_then(|()| process.write_cleanup_receipt(&receipt));
+    let receipt_matches = fs::read(&receipt)
+        .is_ok_and(|bytes| bytes == b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n");
+    let report_bytes = fs::read(&report).ok();
+    let observation = report_bytes.as_deref().and_then(parse_createfile_receipt);
+    eprintln!(
+        "atomic_windows_actual_createfile_control={}",
+        serde_json::json!({
+            "helper_sha256": expected_helper.sha256,
+            "native_exit_code": result.as_ref().ok().copied(),
+            "failure_kind": result.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
+            "os_code": result.as_ref().err().and_then(io::Error::raw_os_error),
+            "helper_report_present": report_bytes.is_some(),
+            "helper_receipt_valid": observation.is_some(),
+            "observation": observation,
+            "cleanup_confirmed": cleanup.is_ok(),
+            "receipt_matches": receipt_matches,
+        })
+    );
+    cleanup.expect("CreateFile 对照必须恢复 ACL、删除 profile 并清空 Job");
+    assert!(receipt_matches);
+    assert_eq!(result.unwrap(), 0);
+    let observation = observation.expect("实际令牌未写入 CreateFile 收据");
+    for (name, mask) in [
+        ("generic_write", GENERIC_WRITE.0),
+        ("file_generic_write", FILE_GENERIC_WRITE.0),
+    ] {
+        assert_eq!(observation[name]["desired_access"], mask);
+        assert_eq!(observation[name]["regular"]["opened"], true);
+        assert_eq!(observation[name]["regular"]["file_type"], FILE_TYPE_DISK.0);
+        assert_eq!(observation[name]["regular"]["close_confirmed"], true);
+        for target in ["nul", "device_nul"] {
+            if observation[name][target]["opened"] == true {
+                assert_eq!(observation[name][target]["close_confirmed"], true);
+            }
+        }
+    }
     record_debug_native_exit(name);
 }
 
@@ -898,6 +1271,15 @@ fn npm_fixed_node_root_with_private_desktop() {
     );
 }
 
+#[test]
+#[ignore = "现有非交互窗口站内的私有桌面须由固定 Node 根进程和完整清理原生对照"]
+fn npm_fixed_node_root_with_existing_station_desktop() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_fixed_node_root_with_existing_station_desktop",
+        WorkerStdioControl::NodeRootExistingStationDesktop,
+    );
+}
+
 #[derive(Clone, Copy)]
 enum WorkerStdioControl {
     BoundCmd,
@@ -907,6 +1289,7 @@ enum WorkerStdioControl {
     HiddenNodeChild,
     HiddenNodeRoot,
     NodeRootPrivateDesktop,
+    NodeRootExistingStationDesktop,
 }
 
 // 只回显固定 API 阶段和数值；不输出错误正文、对象名称、SID 或路径。
@@ -926,9 +1309,16 @@ fn private_desktop_failure_summary(failure: &io::Error) -> serde_json::Value {
                 "read_object_flags",
                 "original_station",
                 "original_desktop",
+                "existing_station",
+                "read_existing_station_name",
+                "read_existing_station_flags",
+                "read_existing_desktop_name",
+                "read_current_desktop",
+                "verify_existing_station",
                 "create_station",
                 "select_station",
                 "create_desktop",
+                "create_existing_station_desktop",
                 "restore_station",
                 "restore_desktop",
                 "verify_restored_station",
@@ -1006,6 +1396,13 @@ fn private_desktop_failure_keeps_only_fixed_stage_and_numeric_hresult() {
             "private_object_api_stage": null,
             "hresult": 2147942405_u32,
         })
+    );
+
+    let existing_station =
+        io::Error::other("私有桌面 create_existing_station_desktop 失败：HRESULT=0x80070005");
+    assert_eq!(
+        private_desktop_failure_summary(&existing_station)["private_object_api_stage"],
+        "create_existing_station_desktop"
     );
 }
 
@@ -1105,8 +1502,15 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         WorkerStdioControl::NodeRoot
             | WorkerStdioControl::HiddenNodeRoot
             | WorkerStdioControl::NodeRootPrivateDesktop
+            | WorkerStdioControl::NodeRootExistingStationDesktop
     );
-    let private_desktop = matches!(mode, WorkerStdioControl::NodeRootPrivateDesktop);
+    let private_desktop = matches!(
+        mode,
+        WorkerStdioControl::NodeRootPrivateDesktop
+            | WorkerStdioControl::NodeRootExistingStationDesktop
+    );
+    let existing_station_desktop =
+        matches!(mode, WorkerStdioControl::NodeRootExistingStationDesktop);
     let hidden_console = matches!(
         mode,
         WorkerStdioControl::HiddenBoundCmd
@@ -1135,6 +1539,11 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         WorkerStdioControl::NodeRootPrivateDesktop => {
             ("node_20_9_0_root_private_desktop", "v20.9.0", "--version")
         }
+        WorkerStdioControl::NodeRootExistingStationDesktop => (
+            "node_20_9_0_root_existing_station_desktop",
+            "v20.9.0",
+            "--version",
+        ),
     };
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_stdio_fixture_in_strict_job(name, case, expected_line);
@@ -1257,7 +1666,12 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     };
     // 私有桌面只在独立 driver 中创建；此入口固定 --version 与 NoWindow。
     let mut process = if private_desktop {
-        match AppContainerProbe::spawn_package_suspended_with_private_desktop(
+        let spawn = if existing_station_desktop {
+            AppContainerProbe::spawn_package_suspended_with_existing_station_desktop
+        } else {
+            AppContainerProbe::spawn_package_suspended_with_private_desktop
+        };
+        match spawn(
             lease.execution_path(),
             cwd.execution_path(),
             &execution_cwd,
@@ -1272,7 +1686,7 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
                     "atomic_windows_private_desktop_control={}",
                     serde_json::json!({
                         "case": case,
-                        "phase": "spawn_private_desktop_failed",
+                        "phase": if existing_station_desktop { "spawn_existing_station_desktop_failed" } else { "spawn_private_desktop_failed" },
                         "environment_control_established": false,
                         "private_objects_verified": false,
                         "private_objects_closed": null,
@@ -1398,12 +1812,13 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
             serde_json::json!({
                 "case": case,
                 "phase": private_desktop_phase,
+                "desktop_mode": if existing_station_desktop { "existing_noninteractive_station" } else { "new_private_station" },
                 "console_mode": "no_window",
                 "shim_executed": false,
                 "environment_control_established": private_objects_verified,
                 "private_objects_verified": private_objects_verified,
-                "object_verification_scope": "retained_private_object_handles",
-                "private_objects_closed_scope": "owned_handles",
+                "object_verification_scope": if existing_station_desktop { "retained_private_desktop_and_borrowed_station_identity" } else { "retained_private_object_handles" },
+                "private_objects_closed_scope": if existing_station_desktop { "owned_private_desktop_only" } else { "owned_handles" },
                 "private_objects_closed": cleanup.is_ok().then_some(true),
                 "cleanup_confirmed": cleanup.is_ok(),
                 "receipt_matches": receipt_matches,

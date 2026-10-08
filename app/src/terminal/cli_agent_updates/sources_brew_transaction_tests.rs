@@ -2,6 +2,157 @@ use std::os::unix::fs::PermissionsExt as _;
 
 use super::*;
 
+fn acl_probe_fixture() -> Fixture {
+    let mut fixture = fixture();
+    let mut value = serde_json::to_value(&fixture.journal).unwrap();
+    value["original"]["root"]["acl"] = serde_json::json!({
+        "format": "MacV1", "extended": {"flags": 0, "entries": []}
+    });
+    value["prepared"]["root"]["acl"] = value["original"]["root"]["acl"].clone();
+    fixture.journal = serde_json::from_value(value).unwrap();
+    fixture
+}
+
+#[test]
+fn old_acl_probe_binding_does_not_change_when_prepared_tree_appears() {
+    let mut fixture = acl_probe_fixture();
+    let prepared = fixture.journal.prepared.take();
+    let program = fixture.journal.parent().join("codex/0.155.1/bin/codex");
+    let arguments = vec![OsString::from("--version")];
+    let original_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                fixture.journal.id,
+                &program,
+                <[u8; 32]>::from(Sha256::digest(b"old public binary")),
+                &arguments,
+            ))
+            .unwrap()
+        )
+    );
+    let (digest, acl_base_digest) =
+        acl_probe_digest(&fixture.journal, &program, original_digest).unwrap();
+    let probe = Probe {
+        generation: Uuid::new_v4(),
+        program,
+        digest,
+        acl_base_digest,
+        version: None,
+        arguments,
+        completed: false,
+        output_sha256: None,
+    };
+    assert_eq!(verify_probe_acl(&fixture.journal, &probe), Ok(()));
+    fixture.journal.prepared = prepared;
+    assert_eq!(verify_probe_acl(&fixture.journal, &probe), Ok(()));
+}
+
+#[test]
+fn acl_probe_recovery_rejects_stripped_base_digest_and_changed_candidate_acl() {
+    let mut fixture = acl_probe_fixture();
+    let program = fixture
+        .journal
+        .parent()
+        .join(fixture.journal.stage_name())
+        .join("0.156.1/bin/codex");
+    let arguments = vec![OsString::from("--version")];
+    let original_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                fixture.journal.id,
+                &program,
+                <[u8; 32]>::from(Sha256::digest(b"new public binary")),
+                &arguments,
+            ))
+            .unwrap()
+        )
+    );
+    let (digest, acl_base_digest) =
+        acl_probe_digest(&fixture.journal, &program, original_digest).unwrap();
+    fixture.journal.probe = Some(Probe {
+        generation: Uuid::new_v4(),
+        program,
+        digest,
+        acl_base_digest,
+        version: None,
+        arguments,
+        completed: false,
+        output_sha256: None,
+    });
+    let saved = serde_json::to_value(&fixture.journal).unwrap();
+    let loaded: Journal = serde_json::from_value(saved.clone()).unwrap();
+    assert_eq!(
+        verify_probe_acl(&loaded, loaded.probe.as_ref().unwrap()),
+        Ok(())
+    );
+
+    let mut stripped = saved.clone();
+    stripped["probe"]
+        .as_object_mut()
+        .unwrap()
+        .remove("acl_base_digest");
+    let stripped: Journal = serde_json::from_value(stripped).unwrap();
+    assert_eq!(
+        verify_probe_acl(&stripped, stripped.probe.as_ref().unwrap()),
+        Err(Error::RecoveryRequired)
+    );
+    let mut changed = saved;
+    changed["prepared"]["root"]["acl"]["extended"]["flags"] = 131072.into();
+    let changed: Journal = serde_json::from_value(changed).unwrap();
+    assert_eq!(
+        verify_probe_acl(&changed, changed.probe.as_ref().unwrap()),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[test]
+fn no_acl_probe_keeps_legacy_digest_and_rejects_an_unneeded_acl_field() {
+    let fixture = fixture();
+    let program = fixture.journal.parent().join("codex/0.155.1/bin/codex");
+    let arguments = vec![OsString::from("--version")];
+    let original_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(
+                fixture.journal.id,
+                &program,
+                <[u8; 32]>::from(Sha256::digest(b"old public binary")),
+                &arguments,
+            ))
+            .unwrap()
+        )
+    );
+    let (digest, acl_base_digest) =
+        acl_probe_digest(&fixture.journal, &program, original_digest.clone()).unwrap();
+    assert_eq!(digest, original_digest);
+    assert_eq!(acl_base_digest, None);
+    let mut probe = Probe {
+        generation: Uuid::new_v4(),
+        program,
+        digest,
+        acl_base_digest,
+        version: None,
+        arguments,
+        completed: false,
+        output_sha256: None,
+    };
+    let bytes = serde_json::to_vec(&probe).unwrap();
+    assert!(
+        !String::from_utf8(bytes.clone())
+            .unwrap()
+            .contains("acl_base_digest")
+    );
+    let loaded: Probe = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(verify_probe_acl(&fixture.journal, &loaded), Ok(()));
+    probe.acl_base_digest = Some(original_digest);
+    assert_eq!(
+        verify_probe_acl(&fixture.journal, &probe),
+        Err(Error::RecoveryRequired)
+    );
+}
+
 struct Fixture {
     _temporary: tempfile::TempDir,
     parent: Directory,
@@ -10,6 +161,80 @@ struct Fixture {
 
 fn fixture() -> Fixture {
     publication_fixture(false)
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn private_caskroom_fixture() -> Fixture {
+    let mut fixture = fixture();
+    let prefix = &fixture.journal.prefix;
+    fs::set_permissions(prefix, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(prefix.join("Caskroom"), fs::Permissions::from_mode(0o775)).unwrap();
+    let directory = Directory::open(prefix).unwrap();
+    fixture.journal.prefix_identity = directory.identity().unwrap();
+    fixture.journal.parent_identity = directory.homebrew_caskroom().unwrap().1;
+    fixture.journal.verify_external().unwrap();
+    fixture
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_caskroom_recovery_rejects_changed_prefix_permissions() {
+    let fixture = private_caskroom_fixture();
+    fs::set_permissions(&fixture.journal.prefix, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(fixture.journal.verify_external().is_err());
+    assert_eq!(
+        fs::read(&fixture.journal.entry).unwrap(),
+        b"new public binary"
+    );
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_caskroom_recovery_rejects_replaced_prefix_or_parent() {
+    for replace_prefix in [false, true] {
+        let fixture = private_caskroom_fixture();
+        let path = if replace_prefix {
+            fixture.journal.prefix.clone()
+        } else {
+            fixture.journal.parent()
+        };
+        let saved = path.with_extension("saved");
+        fs::rename(&path, &saved).unwrap();
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(
+            &path,
+            fs::Permissions::from_mode(if replace_prefix { 0o700 } else { 0o775 }),
+        )
+        .unwrap();
+        assert!(fixture.journal.verify_external().is_err());
+        assert!(saved.exists());
+    }
+}
+
+#[test]
+fn replaced_public_manager_link_preserves_the_original_manager_and_package() {
+    let mut fixture = fixture();
+    let prefix = &fixture.journal.prefix;
+    let manager = prefix.join("Homebrew/bin/brew");
+    fs::create_dir_all(manager.parent().unwrap()).unwrap();
+    fs::rename(prefix.join("bin/brew"), &manager).unwrap();
+    symlink(&manager, prefix.join("bin/brew")).unwrap();
+    fixture.journal.manager = stamp(&prefix.join("bin/brew")).unwrap();
+    fixture.journal.verify_external().unwrap();
+    let other = prefix.join("Homebrew/bin/other-brew");
+    fs::write(&other, b"another manager").unwrap();
+    fs::remove_file(prefix.join("bin/brew")).unwrap();
+    symlink(other, prefix.join("bin/brew")).unwrap();
+
+    assert!(matches!(
+        fixture.journal.verify_external(),
+        Err(Error::SourceChanged)
+    ));
+    assert_eq!(fs::read(manager).unwrap(), b"unchanged manager");
+    assert_eq!(
+        fs::read(&fixture.journal.entry).unwrap(),
+        b"new public binary"
+    );
 }
 
 fn publication_fixture(with_alias: bool) -> Fixture {

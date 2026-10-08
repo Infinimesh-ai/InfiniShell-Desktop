@@ -77,6 +77,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "{#TargetProfileDir}\{#MyAppExeName}"; DestDir: "{app}\versions\{#MyAppVersion}"; Check: ShouldInstallVersion
+Source: "{#TargetProfileDir}\infinishell-station-bootstrap.exe"; DestDir: "{app}\versions\{#MyAppVersion}"; Check: ShouldInstallVersion
 Source: "{#WindowsAssetsDir}\conpty.dll"; DestDir: "{app}\versions\{#MyAppVersion}"; Check: ShouldInstallVersion
 Source: "{#WindowsAssetsDir}\OpenConsole.exe"; DestDir: "{app}\versions\{#MyAppVersion}\{#Arch}"; Check: ShouldInstallVersion
 Source: "{#WindowsAssetsDir}\vcruntime140.dll"; DestDir: "{app}\versions\{#MyAppVersion}"; Check: ShouldInstallVersion
@@ -207,7 +208,7 @@ begin
   end;
 end;
 
-function IsCompleteVersionDir(Path: string): Boolean;
+function IsCompleteVersionDir(Path: string; RequireStationBootstrap: Boolean): Boolean;
 begin
   Result :=
     FileExists(AddBackslash(Path) + '{#MyAppExeName}') and
@@ -216,7 +217,9 @@ begin
     FileExists(AddBackslash(Path) + 'vcruntime140.dll') and
     FileExists(AddBackslash(Path) + 'vcruntime140_1.dll') and
     FileExists(AddBackslash(Path) + 'msvcp140.dll') and
-    DirExists(AddBackslash(Path) + 'resources');
+    DirExists(AddBackslash(Path) + 'resources') and
+    ((not RequireStationBootstrap) or
+      FileExists(AddBackslash(Path) + 'infinishell-station-bootstrap.exe'));
 end;
 
 function ReadPointer(Path: string; var Value: string): Boolean;
@@ -305,7 +308,7 @@ begin
   end;
 
   TargetVersionDir := VersionDir(WizardDirValue(), '{#MyAppVersion}');
-  InstallVersionFiles := not IsCompleteVersionDir(TargetVersionDir);
+  InstallVersionFiles := not IsCompleteVersionDir(TargetVersionDir, True);
   if InstallVersionFiles and DirExists(TargetVersionDir) and
     not DelTree(TargetVersionDir, True, True, True) then
   begin
@@ -325,7 +328,7 @@ begin
   if CurStep <> ssPostInstall then
     exit;
 
-  if not IsCompleteVersionDir(VersionDir(ExpandConstant('{app}'), '{#MyAppVersion}')) then
+  if not IsCompleteVersionDir(VersionDir(ExpandConstant('{app}'), '{#MyAppVersion}'), True) then
     RaiseException('The installed InfiniShell TUI payload is incomplete');
 
   BinDir := GetBinDir('');
@@ -344,7 +347,8 @@ begin
     (CompareText(CurrentVersion, '{#MyAppVersion}') <> 0) then
   begin
     CurrentVersionDir := VersionDir(ExpandConstant('{app}'), CurrentVersion);
-    if IsCompleteVersionDir(CurrentVersionDir) then
+    // 已发布旧版本可能尚无窗口站引导，仍保留其原有完整布局作为回滚版本。
+    if IsCompleteVersionDir(CurrentVersionDir, False) then
       WriteAtomicTextFile(
         AddBackslash(ExpandConstant('{app}')) + 'previous',
         CurrentVersion

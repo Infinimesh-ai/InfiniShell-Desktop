@@ -23,20 +23,68 @@ DEPENDENCY = "node_modules/@openai/codex-win32-x64/"
 CASES = ("updated", "old_moved", "published_receipt_missing", "external_change_preserved", "candidate_changed_preserved")
 COLD_CASES = CASES[1:4]
 TEST = "terminal::cli_agent_updates::sources::npm_windows::live_tests::real_codex_windows_npm_update_without_model"
-SOURCE_FILES = (
+# 监督程序必须嵌入生产源码；构建配置、测试与运行器只属于验收来源。
+# 两类都由 libtest 的编译字节绑定，并在运行前后逐文件核验，不能靠后缀猜测角色。
+SUPERVISOR_SOURCE_FILES = (
     "app/src/terminal/cli_agent_updates.rs",
     *["app/src/terminal/cli_agent_updates/" + name for name in (
         "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_codex_windows.rs",
-        "sources_npm_codex_windows_tree.rs", "sources_npm_codex_windows_contract.rs",
-        "sources_codex_npm_windows_live_tests.rs")],
+        "sources_npm_codex_windows_tree.rs", "sources_npm_codex_windows_contract.rs")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
-        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
+        "managed_process.rs", "managed_process_probe_control.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
+        "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_snapshot.rs",
+        "managed_process_atomic_windows_snapshot_temp.rs",
+        "managed_process_atomic_windows_witness.rs", "managed_process_atomic_windows_clr.rs",
         "managed_process_npm_probe_windows.rs")],
+    "crates/command/src/windows.rs",
+    "crates/command/src/managed.rs",
     "crates/command/src/windows_appcontainer.rs",
+    "crates/command/src/windows_appcontainer_witness.rs",
+    "crates/command/src/windows_appcontainer_desktop.rs",
+    "crates/command/src/windows_appcontainer_output.rs",
+    "crates/command/src/windows_clr_reader.rs",
+    "crates/command/src/windows_shell_classification.rs",
+    "crates/command/src/windows_station_bootstrap.rs",
+    "crates/command/src/windows_station_device_map.rs",
+    "crates/command/src/windows_station_debugger.rs",
+    "crates/command/src/windows_station_debug_event.rs",
+    "crates/command/src/bin/infinishell-station-bootstrap.rs",
     "script/cli-agent-parity/codex_0156_package_manifest.json",
+)
+ACCEPTANCE_SOURCE_FILES = (
+    ".github/workflows/cross-platform-preflight.yml",
+    "app/Cargo.toml",
+    "crates/command/Cargo.toml",
+    "app/src/terminal/cli_agent_updates/sources_codex_npm_windows_live_tests.rs",
+    *["app/src/ai/cli_agent_runtime/" + name for name in (
+        "managed_process_tests.rs",
+        "managed_process_atomic_windows_tests.rs",
+        "managed_process_atomic_windows_creation_witness_tests.rs",
+        "managed_process_atomic_windows_snapshot_tests.rs",
+        "managed_process_atomic_windows_snapshot_temp_tests.rs",
+        "managed_process_atomic_windows_witness_tests.rs",
+        "managed_process_atomic_windows_clr_tests.rs",
+        "managed_process_probe_control_tests.rs",
+        "managed_process_npm_probe_windows_tests.rs")],
+    "crates/command/src/managed_tests.rs",
+    "crates/command/src/windows_station_bootstrap_tests.rs",
+    "crates/command/src/windows_station_device_map_tests.rs",
+    "crates/command/src/windows_station_debugger_tests.rs",
+    "crates/command/src/windows_station_debug_event_tests.rs",
+    "crates/command/src/windows_appcontainer_tests.rs",
+    "crates/command/src/windows_appcontainer_console_tests.rs",
+    "crates/command/src/windows_appcontainer_output_tests.rs",
+    "crates/command/src/windows_clr_reader_tests.rs",
+    "crates/command/src/windows_shell_classification_tests.rs",
+    *["script/ci/g09-clr-reader/" + name for name in (
+        "reader.cpp", "wire.h", "sos_layout.h", "README.md", "sources.safe.json",
+        "vendor/clrdata.h", "vendor/xclrdata.h", "vendor/sospriv.h", "vendor/LICENSE.TXT")],
+    "script/ci/g09-clr-fixture/build-reader.ps1",
+    "script/ci/g09-clr-fixture/preparation-context.ps1",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
 )
+SOURCE_FILES = SUPERVISOR_SOURCE_FILES + ACCEPTANCE_SOURCE_FILES
 # 完整官方 registry 固定版本 SRI；平台包仍注册为 @openai/codex 的 npm alias。
 INTEGRITIES = {
     OLD: "sha512-02fAAGyBtlA1zPjEo3kTj/bOSYbPz5DvjLwRZJdV7weFFEDzNFOMjQGmZ/+5CuirYV0hE+AZTrnjzwXYU4AdAQ==",
@@ -141,7 +189,8 @@ def expected_files(wrapper, platform_package):
 
 def environment(root, binaries, system_root, step):
     result = {name:str(root / relative) for name,relative in ENV_PATHS.items()}
-    result.update(SYSTEMROOT=str(system_root), WINDIR=str(system_root), COMSPEC=str(system_root / "System32/cmd.exe"),
+    # WinPS 的系统模块发现需要原生盘符呈现；只转换同一目录，身份清单保持 canonical。
+    result.update(SYSTEMROOT=npm_path(system_root), WINDIR=str(system_root), COMSPEC=str(system_root / "System32/cmd.exe"),
         PATH=os.pathsep.join((str(Path(binaries["node"]["path"]).parent), str(system_root / "System32"),
                              str(system_root / "System32/WindowsPowerShell/v1.0"))),
         PATHEXT=".COM;.EXE;.BAT;.CMD", LANG="C", LC_ALL="C", DISABLE_AUTOUPDATER="1",
@@ -255,13 +304,15 @@ def fixture(args, case, binaries, sources, old, manager_tree, system_root):
     manifest = dict(schema=1,scope=SCOPE,case=case,root=str(root),source_sha256=sources,
         old_public_sha256=sha(root / "prefix/node_modules/@openai/codex/bin/codex.js"),
         npm_install_sha256=sha(root / "npm-install.safe.json"),npm_tree=manager_tree,shims=shims,**binaries)
+    if args.clr_reader is not None:
+        manifest["clr_reader"] = args.clr_reader
     write(root / "npm-registered-tree.safe.json", actual)
     write(root / "manifest.private.json", manifest)
     return root, manifest
 
 
 def verify_embedded(supervisor, repo):
-    names = [name for name in SOURCE_FILES if not name.endswith(("_live_tests.rs", ".py"))]
+    names = SUPERVISOR_SOURCE_FILES
     needles = [(repo / name).read_bytes() for name in names]
     found, maximum = [False] * len(needles), max(map(len, needles))
     with Path(supervisor).open("rb") as stream:
@@ -271,7 +322,8 @@ def verify_embedded(supervisor, repo):
             for index,needle in enumerate(needles):
                 found[index] |= needle in data
             tail = data[-maximum:]
-    require(all(found), "supervisor_source_binding")
+    missing = [name for name, present in zip(names, found) if not present]
+    require(not missing, "supervisor_source_binding: missing=" + ", ".join(missing))
 
 
 def verify_product(root, case, old, target):
@@ -302,15 +354,66 @@ def parser():
     result.add_argument("--repo", type=Path, required=True)
     result.add_argument("--output", type=Path, required=True)
     result.add_argument("--official-inputs", type=Path)
-    for role in ("test-binary", "supervisor", "node", "npm-cli"):
+    for role in ("test-binary", "supervisor", "station-bootstrap", "node", "npm-cli"):
         result.add_argument("--" + role, type=Path, required=True)
         result.add_argument("--" + role + "-sha256", required=True)
     result.add_argument("--case", choices=CASES, action="append")
+    result.add_argument("--native-witness", action="store_true",
+                        help="仅首个 updated 选定模式候选的一次原生取证；不视为完整验收")
+    result.add_argument("--native-witness-mode", choices=("cmd", "powershell"), default="cmd",
+                        help="默认保留 CMD 因果取证；PowerShell 仅采原主线程快照")
+    result.add_argument("--clr-reader", type=Path)
+    result.add_argument("--clr-reader-sha256")
     return result
+
+
+def native_witness_permit(requested, mode, cases):
+    require(mode in ("cmd", "powershell"), "witness_mode_invalid")
+    require(requested or mode == "cmd", "witness_mode_requires_witness")
+    require(not requested or cases == ["updated"], "witness_requires_one_updated_case")
+    return "codex-npm-first-" + mode + "-v1" if requested else None
+
+
+def clr_reader_configuration(requested, mode, cases, path, expected):
+    permitted = requested and mode == "powershell" and cases == ["updated"]
+    require((path is not None and expected is not None) if permitted
+            else path is None and expected is None, "clr_reader_scope")
+    if not permitted:
+        return None
+    require(re.fullmatch(r"[0-9a-f]{64}", expected) is not None, "clr_reader_sha256")
+    # 解析前拒绝原路径及祖先的链接；摘要必须来自同一个普通文件句柄。
+    original = Path(path).absolute()
+    for parent in original.parents:
+        require(stat.S_ISDIR(plain(parent).st_mode), "clr_reader_parent")
+    before = plain(original)
+    require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
+            and 0 < before.st_size <= 64 * 1024 * 1024, "clr_reader_file")
+    bound = canonical(original)
+    identity = lambda info: (info.st_dev, info.st_ino, info.st_nlink, info.st_size, info.st_mtime_ns)
+    with bound.open("rb") as stream:
+        opened_before = os.fstat(stream.fileno())
+        require(identity(opened_before) == identity(before), "clr_reader_changed")
+        digest = hashlib.sha256()
+        length = 0
+        for block in iter(lambda: stream.read(65536), b""):
+            length += len(block)
+            require(length <= before.st_size, "clr_reader_changed")
+            digest.update(block)
+        opened_after = os.fstat(stream.fileno())
+        # Windows CPython 3.13 的路径 ctime 为创建时间，fstat ctime 为变更时间；各自前后核验。
+        require(length == before.st_size and identity(opened_after) == identity(before)
+                and opened_after.st_ctime_ns == opened_before.st_ctime_ns, "clr_reader_changed")
+    after = plain(original)
+    require(identity(after) == identity(before) and after.st_ctime_ns == before.st_ctime_ns
+            and canonical(original) == bound and digest.hexdigest() == expected, "clr_reader_binding")
+    return {"path":str(bound), "sha256":expected}
 
 
 def main():
     args = parser().parse_args()
+    witness_permit = native_witness_permit(args.native_witness, args.native_witness_mode, args.case)
+    args.clr_reader = clr_reader_configuration(args.native_witness, args.native_witness_mode,
+        args.case, args.clr_reader, args.clr_reader_sha256)
     require(platform.system() == "Windows" and platform.machine().lower() in ("amd64", "x86_64"), "windows_x64_only")
     args.repo = canonical(args.repo)
     args.official_inputs = canonical(args.official_inputs) if args.official_inputs else None
@@ -320,11 +423,15 @@ def main():
     require(not any(char in str(args.output) for char in '\n\r\x00%&|<>"'), "fixture_path_metacharacters")
     require(shutil.disk_usage(args.output).free > 4 * 1024**3, "fixture_space_insufficient")
     binaries = {}
-    for key,role in (("worker","test_binary"),("supervisor","supervisor"),("node","node"),("npm_cli","npm_cli")):
+    for key,role in (("worker","test_binary"),("supervisor","supervisor"),
+                     ("station_bootstrap","station_bootstrap"),("node","node"),("npm_cli","npm_cli")):
         path = canonical(getattr(args, role))
         expected = getattr(args, role + "_sha256").lower()
         require(re.fullmatch(r"[0-9a-f]{64}", expected) and sha(path) == expected, "binary_binding")
         binaries[key] = {"path":str(path),"sha256":expected}
+    require(Path(binaries["station_bootstrap"]["path"])
+            == Path(binaries["supervisor"]["path"]).parent / "infinishell-station-bootstrap.exe",
+            "station_bootstrap_not_packaged_sibling")
     node, npm_cli = Path(binaries["node"]["path"]), Path(binaries["npm_cli"]["path"])
     require(node.name.lower() == "node.exe" and npm_cli == node.parent / "node_modules/npm/bin/npm-cli.js", "same_node_npm_installation")
     manager_root = npm_cli.parent.parent
@@ -345,8 +452,13 @@ def main():
     require(re.fullmatch(r"[0-9a-f]{40}", revision), "source_commit_invalid")
     status = subprocess.check_output(["git", "status", "--porcelain"], cwd=args.repo, text=True, encoding="utf-8")
     write(args.output / "source.safe.json", {"commit":revision,"source_sha256":sources,"binaries":binaries,
+        "clr_reader":args.clr_reader,
         "working_tree_dirty":bool(status.strip()),"npm_version":manager_manifest.get("version"),"cmd_shim_registrations":shim_sources,
-        "platform":"windows-x64","consumer_channel_discovery_covered":False})
+        "source_roles":{"supervisor_embedded":SUPERVISOR_SOURCE_FILES,"acceptance_only":ACCEPTANCE_SOURCE_FILES},
+        "platform":"windows-x64","consumer_channel_discovery_covered":False,
+        "native_witness_requested":args.native_witness,
+        "native_witness_mode":args.native_witness_mode if args.native_witness else None,
+        "native_witness_scope":"first_codex_" + args.native_witness_mode + "_generation" if args.native_witness else None})
     cache = args.output / "official-inputs"
     cache.mkdir()
     packages = {version:official_package(version, cache, args.official_inputs) for version in INTEGRITIES}
@@ -356,7 +468,10 @@ def main():
     for case in args.case or CASES:
         require(shutil.disk_usage(args.output).free > 4 * 1024**3, "fixture_space_insufficient")
         root, manifest = fixture(args, case, binaries, sources, old, manager_tree, system_root)
-        run_test(binaries["worker"]["path"], TEST, root / "project", environment(root, binaries, system_root, "execute"), root / "execute", True)
+        execute_environment = environment(root, binaries, system_root, "execute")
+        if args.native_witness:
+            execute_environment["INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW"] = witness_permit
+        run_test(binaries["worker"]["path"], TEST, root / "project", execute_environment, root / "execute", True)
         result = json.loads((root / "result-execute.safe.json").read_bytes())
         if case in COLD_CASES:
             require(result.get("needs_cold_recovery") is True and result.get("accepted") is False, "checkpoint_not_observed")
@@ -367,10 +482,14 @@ def main():
                 "both_public_entries_required")
         verify_product(root, case, old, target)
         require(all(sha(value["path"]) == value["sha256"] for value in binaries.values())
+                and (args.clr_reader is None or clr_reader_configuration(True, "powershell", ["updated"],
+                    Path(args.clr_reader["path"]), args.clr_reader["sha256"]) == args.clr_reader)
                 and all(sha(args.repo / name) == digest for name,digest in sources.items())
                 and inventory(manager_root) == manager_tree, "source_or_manager_changed_during_run")
         cases.append({"case":case,"root":str(root),"result":result})
     write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"cases":cases,"model_inputs_sent":0,
+        "native_witness_requested":args.native_witness,"full_case_matrix_covered":not args.native_witness and not args.case,
+        "native_witness_mode":args.native_witness_mode if args.native_witness else None,
         "fixed_release_test_hook_used":True,"consumer_channel_discovery_covered":False,"gui_covered":False,
         "busy_or_plugin_recheck_covered":False,"private_npm_registration_executed":True,
         "npm_lifecycle_executed":False,"npm_installer_tree_cleanup_covered":False,

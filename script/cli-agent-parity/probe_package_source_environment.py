@@ -41,6 +41,25 @@ def path_identity(path):
     }
 
 
+def musl_loader():
+    # 只读固定解释器的元数据；存在不等于生产闭包校验或真实执行成功。
+    path = "/lib/ld-musl-x86_64.so.1"
+    entry = path_identity(path)
+    result = {"entry": entry, "execution_verified": False}
+    if entry["state"] != "present":
+        return result
+    try:
+        value = os.stat(path)
+        result["target"] = {"state": "present", "regular_file": stat.S_ISREG(value.st_mode),
+            "uid": value.st_uid, "gid": value.st_gid, "mode": stat.S_IMODE(value.st_mode),
+            "device": value.st_dev, "inode": value.st_ino, "bytes": value.st_size}
+    except FileNotFoundError:
+        result["target"] = {"state": "absent"}
+    except OSError as error:
+        result["target"] = {"state": "unreadable", "error_code": error_code(error)}
+    return result
+
+
 def id_map(path):
     try:
         with open(path, "rb") as source:
@@ -247,6 +266,7 @@ def probe():
         identity = linux_identity()
         result["linux"] = {
             "identity": identity,
+            "musl_x64_loader": musl_loader(),
             "landlock": landlock_abi(),
             "user_mount_namespace": probe_namespaces(identity),
             # rootless 映射可将宿主 root 显示为 65534；这里不判断生产祖先 UID 门禁。

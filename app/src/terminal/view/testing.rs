@@ -14,6 +14,7 @@ cfg_if::cfg_if! {
             resource_center::TipsCompleted,
         };
         use crate::terminal::model::session::Sessions;
+        use crate::terminal::model::session::command_executor::NoOpCommandExecutor;
         use crate::terminal::model_events::ModelEventDispatcher;
         use crate::terminal::view::WARP_PROMPT_HEIGHT_LINES;
         use crate::terminal::{SizeInfo, TerminalModel};
@@ -96,7 +97,10 @@ impl TerminalView {
             None,  /* startup_directory */
         )));
 
-        let sessions = ctx.add_model(|_| Sessions::new_for_test());
+        // 模拟终端的视图测试不应在引导时启动真实 shell 查询。
+        let sessions = ctx.add_model(|_| {
+            Sessions::new_for_test().with_command_executor(Arc::new(NoOpCommandExecutor::new()))
+        });
         let model_events =
             ctx.add_model(|ctx| ModelEventDispatcher::new(events_rx, sessions.clone(), ctx));
         let prompt_type =

@@ -213,6 +213,8 @@ struct Journal {
     claude_policy: super::ClaudeUpdateScope,
     phase: Phase,
     intent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    downgrade: Option<super::claude_downgrade::Intent>,
 }
 
 pub(super) fn supports(agent: CLIAgent, target: &str) -> Result<(), Error> {
@@ -222,7 +224,7 @@ pub(super) fn supports(agent: CLIAgent, target: &str) -> Result<(), Error> {
     if !cfg!(target_arch = "x86_64") {
         return Err(Error::UnsupportedPlatform);
     }
-    if target != contract::VERSION {
+    if !matches!(target, contract::VERSION | "2.1.285") {
         return Err(Error::InvalidRelease);
     }
     Ok(())
@@ -279,10 +281,21 @@ async fn download(url: &str, root: &Path, limit: u64) -> Result<NamedTempFile, E
 }
 
 fn verify_archives(
+    version: &str,
     wrapper: &VerifiedNpmArchive,
     platform: &VerifiedNpmArchive,
 ) -> Result<(), Error> {
-    let mut expected = contract::archive_files();
+    let mut expected = contract::archive_files_for(version).ok_or(Error::InvalidRelease)?;
+    let modes = contract::archive_modes_for(version);
+    if version != contract::VERSION {
+        let (wrapper_digest, platform_digest) =
+            contract::archive_sha256_for(version).ok_or(Error::InvalidRelease)?;
+        if hex(&wrapper.compressed_sha256) != wrapper_digest
+            || hex(&platform.compressed_sha256) != platform_digest
+        {
+            return Err(Error::InvalidRelease);
+        }
+    }
     for (prefix, archive) in [
         (PathBuf::new(), wrapper),
         (PathBuf::from(contract::DEPENDENCY), platform),
@@ -293,6 +306,8 @@ fn verify_archives(
                 if file.length != length
                     || hex(&file.sha256) != digest
                     || file.executable != executable
+                    || version != contract::VERSION
+                        && modes.as_ref().and_then(|modes| modes.get(&path)) != Some(&file.mode)
                 {
                     return Err(Error::InvalidRelease);
                 }
@@ -310,8 +325,8 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-fn verify_candidate(snapshot: &tree::Snapshot) -> Result<(), Error> {
-    let mut files = contract::files();
+fn verify_candidate(snapshot: &tree::Snapshot, version: &str) -> Result<(), Error> {
+    let mut files = contract::files_for(version).ok_or(Error::InvalidRelease)?;
     let mut directories = BTreeSet::from([PathBuf::new()]);
     for path in files.keys() {
         directories.extend(path.ancestors().skip(1).map(Path::to_owned));
@@ -334,7 +349,24 @@ fn verify_candidate(snapshot: &tree::Snapshot) -> Result<(), Error> {
     Ok(())
 }
 
+fn verify_version_contract(journal: &Journal) -> Result<(), Error> {
+    super::claude_downgrade::validate_windows_npm(
+        journal.downgrade,
+        &journal.old_version,
+        &journal.target_version,
+        &journal.config,
+    )?;
+    if journal.old_version == "2.1.287" {
+        verify_candidate(&journal.original, &journal.old_version)?;
+    }
+    if let Some(prepared) = &journal.prepared {
+        verify_candidate(prepared, &journal.target_version)?;
+    }
+    Ok(())
+}
+
 fn unchanged(journal: &Journal, published: bool) -> Result<(), Error> {
+    verify_version_contract(journal)?;
     if journal
         .config
         .as_ref()
@@ -366,6 +398,7 @@ async fn probe(root: &Path, journal: &mut Journal, mode: &str) -> Result<(), Err
         mode,
         &journal.stage,
         &journal.owner.prefix,
+        &journal.target_version,
     )
     .map_err(|_| Error::SourceChanged)?;
     let digest = probe_digest(&input, journal.id)?;
@@ -412,7 +445,7 @@ async fn probe(root: &Path, journal: &mut Journal, mode: &str) -> Result<(), Err
         std::str::from_utf8(&bytes).map_err(|_| Error::ProbeFailed)?,
     )
     .ok_or(Error::ProbeFailed)?;
-    if version != contract::VERSION {
+    if version != journal.target_version {
         return Err(Error::VersionMismatch);
     }
     journal
@@ -434,7 +467,10 @@ fn verified_exit(root: &Path, journal: &Journal, success: bool) -> Result<(), Er
         }
         managed_process::validate_windows_claude_npm_probe(&probe.input)
             .map_err(|_| Error::RecoveryRequired)?;
-        if probe.input.stage() != journal.stage || probe.input.prefix() != journal.owner.prefix {
+        if probe.input.stage() != journal.stage
+            || probe.input.prefix() != journal.owner.prefix
+            || probe.input.version() != journal.target_version
+        {
             return Err(Error::RecoveryRequired);
         }
         let binding = managed_process::PreparedLaunchBinding::claude_windows_npm_version_probe(
@@ -457,7 +493,7 @@ fn verified_exit(root: &Path, journal: &Journal, success: bool) -> Result<(), Er
         if !receipt.cleanup_confirmed
             || success
                 && (receipt.exit_code != Some(0)
-                    || probe.observed.as_deref() != Some(contract::VERSION))
+                    || probe.observed.as_deref() != Some(journal.target_version.as_str()))
         {
             return Err(Error::RecoveryRequired);
         }
@@ -474,9 +510,12 @@ pub(super) async fn execute(
     if plan.installation.source != Source::Npm {
         return Err(Error::UnsupportedSource);
     }
-    if !matches!(plan.installed_version.as_str(), "2.1.278" | "2.1.280") {
-        return Err(Error::InvalidRelease);
-    }
+    super::claude_downgrade::validate_windows_npm(
+        plan.downgrade,
+        &plan.installed_version,
+        &plan.target_version,
+        &plan.config,
+    )?;
     if journal_path(root)
         .try_exists()
         .map_err(|_| Error::RecoveryRequired)?
@@ -522,6 +561,9 @@ pub(super) async fn execute(
         return Ok(plan.target_version.clone());
     }
     let original = tree::snapshot(&owner.package)?;
+    if plan.installed_version == "2.1.287" {
+        verify_candidate(&original, &plan.installed_version)?;
+    }
     let id = Uuid::new_v4();
     let parent = owner.package.parent().ok_or(Error::SourceChanged)?;
     let stage = parent.join(format!(".infinishell-npm-{id}"));
@@ -548,25 +590,34 @@ pub(super) async fn execute(
         claude_policy,
         phase: Phase::Allocating,
         intent: plan.intent.clone(),
+        downgrade: plan.downgrade,
     };
     unchanged(&journal, false)?;
     let wrapper_metadata = download(
-        "https://registry.npmjs.org/@anthropic-ai/claude-code/2.1.280",
+        &format!(
+            "https://registry.npmjs.org/@anthropic-ai/claude-code/{}",
+            plan.target_version
+        ),
         root,
         1024 * 1024,
     )
     .await?;
     let platform_metadata = download(
-        "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/2.1.280",
+        &format!(
+            "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/{}",
+            plan.target_version
+        ),
         root,
         1024 * 1024,
     )
     .await?;
     let wrapper_bytes = read_limited(wrapper_metadata.path(), 1024 * 1024)?;
     let platform_bytes = read_limited(platform_metadata.path(), 1024 * 1024)?;
+    let (wrapper_integrity, platform_integrity) =
+        contract::integrities_for(&plan.target_version).ok_or(Error::InvalidRelease)?;
     for (bytes, integrity) in [
-        (&wrapper_bytes, contract::WRAPPER_INTEGRITY),
-        (&platform_bytes, contract::PLATFORM_INTEGRITY),
+        (&wrapper_bytes, wrapper_integrity),
+        (&platform_bytes, platform_integrity),
     ] {
         let metadata: serde_json::Value =
             serde_json::from_slice(bytes).map_err(|_| Error::InvalidRelease)?;
@@ -576,7 +627,7 @@ pub(super) async fn execute(
     }
     let release = NpmRelease::from_metadata(
         CLIAgent::Claude,
-        contract::VERSION,
+        &plan.target_version,
         "win32-x64",
         &wrapper_bytes,
         &platform_bytes,
@@ -586,7 +637,7 @@ pub(super) async fn execute(
     let wrapper_archive = release.wrapper.verify_archive(wrapper.as_file_mut())?;
     let platform_archive = release.platform.verify_archive(platform.as_file_mut())?;
     release.verify_entries(&wrapper_archive, &platform_archive)?;
-    verify_archives(&wrapper_archive, &platform_archive)?;
+    verify_archives(&plan.target_version, &wrapper_archive, &platform_archive)?;
     journal.owner.verify()?;
     save(root, &journal)?;
     let result = async {
@@ -685,7 +736,7 @@ pub(super) async fn execute(
             }
         }
         let prepared = tree::snapshot(&journal.stage)?;
-        verify_candidate(&prepared)?;
+        verify_candidate(&prepared, &journal.target_version)?;
         journal.prepared = Some(prepared);
         journal.phase = Phase::Prepared;
         save(root, &journal)?;
@@ -715,19 +766,20 @@ pub(super) async fn execute(
             progress.enter().await;
         }
         finish_publish(root, &mut journal)?;
-        Ok(contract::VERSION.to_owned())
+        Ok(journal.target_version.clone())
     }
     .await;
     if result.is_err()
         && recover(CLIAgent::Claude, &plan.installation.entry, root)?
-            == Some(contract::VERSION.to_owned())
+            == Some(plan.target_version.clone())
     {
-        return Ok(contract::VERSION.to_owned());
+        return Ok(plan.target_version.clone());
     }
     result
 }
 
 fn finish_publish(root: &Path, journal: &mut Journal) -> Result<(), Error> {
+    verify_version_contract(journal)?;
     verified_exit(root, journal, true)?;
     journal.owner.verify()?;
     if tree::snapshot(&journal.owner.package)?
@@ -781,22 +833,18 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         .ok_or(Error::RecoveryRequired)?;
     if journal.schema != 1
         || journal.id.is_nil()
-        || journal.target_version != contract::VERSION
-        || !matches!(journal.old_version.as_str(), "2.1.278" | "2.1.280")
         || journal.owner.entry != entry
         || journal.stage != parent.join(format!(".infinishell-npm-{}", journal.id))
         || journal.backup != parent.join(format!(".infinishell-npm-old-{}", journal.id))
     {
         return Err(Error::RecoveryRequired);
     }
+    verify_version_contract(&journal)?;
     journal.owner.verify()?;
     verified_exit(root, &journal, false)?;
-    if let Some(prepared) = &journal.prepared {
-        verify_candidate(prepared)?;
-    }
     if matches!(journal.phase, Phase::ConfigPublishing | Phase::Committed) {
         finish_publish(root, &mut journal)?;
-        return Ok(Some(contract::VERSION.to_owned()));
+        return Ok(Some(journal.target_version.clone()));
     }
     unchanged(&journal, false)?;
     let target_exists = journal
@@ -840,10 +888,14 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         root,
         CLIAgent::Claude,
         entry,
-        contract::VERSION,
+        &journal.target_version,
         Some(journal.intent),
     )?;
     fs::remove_file(journal_path(root)).map_err(|_| Error::PersistenceFailed)?;
     super::sync_config_directory(root)?;
     Ok(None)
 }
+
+#[cfg(test)]
+#[path = "sources_npm_claude_windows_tests.rs"]
+mod tests;

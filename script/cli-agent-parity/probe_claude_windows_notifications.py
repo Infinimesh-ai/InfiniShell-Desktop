@@ -607,6 +607,41 @@ def validate_acceptance(value):
                 and notification == native.get("notification"), "两侧真实通知没有关联")
 
 
+def archive_raw_pty(root, output, report):
+    # 原件仅来自本轮两项无认证私有场景；外层 Job 清空后才读取并导出。
+    require(report.get("job_empty") is True, "原件导出前私有 Job 必须已空")
+    owned_root(root)
+    require(credential_boundary(root), "原件导出前私有认证边界改变")
+    archived = report.setdefault("raw_pty_files", {})
+    worker = report.get("worker", report.get("recovered_receipts", {}).get("worker.json", {}))
+    rows = worker.get("transport_cases", [])
+    for index in range(len(CASE_NAMES)):
+        name = f"case-{index}.pty.bin"
+        source = root / name
+        expected = rows[index].get("raw_pty") if index < len(rows) else None
+        if not source.exists() and not source.is_symlink():
+            archived[name] = {"present": False}
+            require(expected is None, "已记录的 ConPTY 原件缺失")
+            continue
+        raw = raw_bytes(private_path(root, str(source), exists=True))
+        observed = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        destination = output.with_suffix(f".case-{index}.pty.bin")
+        # 独占创建，绝不覆盖先前原件；任何失败都由调用方保留私有目录。
+        with destination.open("xb") as target:
+            target.write(raw)
+            target.flush()
+            os.fsync(target.fileno())
+        require(regular_file(destination).st_size == observed["bytes"]
+                and digest(destination) == observed["sha256"], "导出的 ConPTY 原件摘要不符")
+        archived[name] = {"present": True, "file": destination.name, **observed,
+                          "worker_snapshot": expected,
+                          "worker_digest_matched": expected == observed if expected is not None else None}
+        # 失败场景可能仍有 reader 尾部字节；保全最终原件与先前摘要差异，不据此改判成功。
+        require(index >= len(rows) or rows[index].get("passed") is not True or expected == observed,
+                "通过场景的 ConPTY 原件与 worker 摘要不符")
+    report["raw_pty_archived"] = all(row.get("present") is True for row in archived.values())
+
+
 def require_native_host():
     require(os.name == "nt" and sys.implementation.name == "cpython" and struct.calcsize("P") == 8,
             "需要原生 Windows x64 CPython")
@@ -622,6 +657,7 @@ def public_run(args):
               "credentials_provided": False, "credential_files_read": False, "model_inputs_sent": 0,
               "fixture_completed_onboarding": True, "default_first_run_verified": False,
               "production_windows_gate_changed": False, "forced_cleanup": False,
+              "raw_pty_archived": False,
               "expected_version": args.claude_version}
     write_json(output, report, exclusive=True)
     root, job, process = None, None, None
@@ -676,6 +712,7 @@ def public_run(args):
                             report.setdefault("recovered_receipts", {})[name] = record
                         except Exception as error:
                             report.setdefault("receipt_errors", {})[name] = failure(error)
+                archive_raw_pty(root, output, report)
                 shutil.rmtree(root)
                 report["private_directory_removed"] = True
             except Exception as error:

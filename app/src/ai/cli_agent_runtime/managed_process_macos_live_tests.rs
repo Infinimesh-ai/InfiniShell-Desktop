@@ -252,6 +252,7 @@ async fn spawn_captured_output(
         arguments: vec![OsString::from("echo")],
         cwd: directory.to_owned(),
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         atomic_cwd: None,
     };
@@ -281,6 +282,7 @@ async fn spawn_captured_output(
         control: Some(control),
         state_dir: directory.to_owned(),
         generation,
+        exit_confirmation_timeout: CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT,
     }
 }
 
@@ -480,6 +482,7 @@ fn supervised_macos_live_domain_zero_timeout_never_writes_success() {
         arguments: Vec::new(),
         cwd: directory.clone(),
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         atomic_cwd: None,
     };
@@ -525,6 +528,7 @@ fn supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper() {
         arguments: Vec::new(),
         cwd: directory.clone(),
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         atomic_cwd: None,
     };
