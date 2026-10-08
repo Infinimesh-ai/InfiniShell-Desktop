@@ -50,14 +50,21 @@ pub(super) async fn prepare(options: &SessionOptions) -> Result<ClaudeFileProfil
     .into_iter()
     .chain(ISOLATED_SETTINGS_ARGUMENTS)
     .chain([FIXED_PERMISSION_MODE_ARGUMENT]);
-    let mut child = Command::new(&options.executable)
+    let mut command = Command::new(&options.executable);
+    #[cfg(windows)]
+    command.inherit_managed_job();
+    let mut child = command
         .args(arguments)
         .current_dir(&options.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true)
-        .spawn()?;
+        .spawn()
+        .map_err(|source| RuntimeError::IoAt {
+            operation: "claude.profile_preflight.spawn",
+            source,
+        })?;
     let mut stdin = child
         .stdin
         .take()

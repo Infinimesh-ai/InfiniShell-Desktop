@@ -289,6 +289,11 @@ pub enum RuntimeError {
     Protocol(String),
     #[error("CLI process I/O failed: {0}")]
     Io(#[from] std::io::Error),
+    #[error("CLI process I/O failed ({operation}): {source}")]
+    IoAt {
+        operation: &'static str,
+        source: std::io::Error,
+    },
     #[error("CLI request timed out; input delivery is uncertain")]
     RequestTimedOut,
     #[error("CLI event consumer is too slow; the connection was stopped without dropping events")]
@@ -305,6 +310,7 @@ impl RuntimeError {
             | Self::InvalidConfiguration(_)
             | Self::Protocol(_)
             | Self::Io(_)
+            | Self::IoAt { .. }
             | Self::RequestTimedOut
             | Self::EventBackpressure => None,
         }

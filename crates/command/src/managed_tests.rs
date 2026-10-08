@@ -91,6 +91,134 @@ fn managed_worker_reaps_descendants_inside_strict_parent_job() {
     assert!(directory.path().join("verified").exists());
 }
 
+// 必须使用生产默认标志；test-util 会关闭普通异步 Command 的 breakaway 请求。
+#[cfg(all(windows, not(feature = "test-util")))]
+mod async_job {
+    use super::*;
+    use crate::r#async::Command as AsyncCommand;
+    use windows::Win32::Foundation::FILETIME;
+    use windows::Win32::System::JobObjects::{
+        IsProcessInJob, JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectExtendedLimitInformation, QueryInformationJobObject,
+    };
+    use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
+    use windows::core::BOOL;
+
+    const ASYNC_DRIVER: &str = "managed::tests::async_job::isolated_async_driver";
+    const ASYNC_CHILD: &str = "managed::tests::async_job::async_child_keeps_strict_job";
+
+    fn assert_strict_job() {
+        let process = unsafe { GetCurrentProcess() };
+        let mut in_job = BOOL::default();
+        unsafe { IsProcessInJob(process, None, &mut in_job) }.unwrap();
+        assert!(in_job.as_bool(), "托管进程必须仍属于 Job");
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        unsafe {
+            QueryInformationJobObject(
+                None,
+                JobObjectExtendedLimitInformation,
+                (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                std::mem::size_of_val(&limits) as u32,
+                None,
+            )
+        }
+        .unwrap();
+        let flags = limits.BasicLimitInformation.LimitFlags;
+        assert_eq!(
+            flags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        );
+        assert_eq!(
+            (flags & (JOB_OBJECT_LIMIT_BREAKAWAY_OK | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK)).0,
+            0
+        );
+        let mut created = FILETIME::default();
+        let mut exited = FILETIME::default();
+        let mut kernel = FILETIME::default();
+        let mut user = FILETIME::default();
+        unsafe { GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user) }
+            .unwrap();
+        let created = (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime);
+        let pid = std::process::id();
+        let image = std::env::current_exe().unwrap();
+        println!(
+            "严格 Job 身份：pid={pid}, creation_filetime={created}, image={image:?}, flags={flags:?}"
+        );
+    }
+
+    #[test]
+    fn async_managed_command_runs_inside_strict_parent_job() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut driver = command(ASYNC_DRIVER, directory.path(), true);
+        driver.stdin(Stdio::piped()).stdout(Stdio::inherit());
+        let driver = driver.spawn().unwrap();
+        let pid = driver.id();
+        let mut tree = ManagedTree::claim(driver).unwrap();
+        // 真实严格 Job 建立后才允许驱动程序调用异步派生 API。
+        tree.child_mut()
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"1")
+            .unwrap();
+        wait_until(|| tree.root_exited().unwrap());
+        let status = tree.terminate_and_confirm(Duration::from_secs(5)).unwrap();
+        assert!(status.success(), "严格 Job 内异步派生失败：{status}");
+        assert!(directory.path().join("async-verified").exists());
+        println!("异步严格 Job 整树退出已确认：driver_pid={pid}, status={status}");
+    }
+
+    #[test]
+    #[ignore = "仅由真实严格 Job 回归在绑定后授权启动"]
+    fn isolated_async_driver() {
+        if std::env::var_os(FIXTURE_ENV).is_none() {
+            return;
+        }
+        let mut authorization = [0];
+        std::io::stdin().read_exact(&mut authorization).unwrap();
+        assert_eq!(authorization, [b'1']);
+        assert_strict_job();
+        let executable = std::env::current_exe().unwrap();
+        let mut ordinary = AsyncCommand::new(&executable);
+        ordinary
+            .args(["--ignored", "--exact", ASYNC_CHILD])
+            .kill_on_drop(true);
+        let error = ordinary
+            .spawn()
+            .expect_err("普通构造器仍须请求 breakaway，严格 Job 必须拒绝");
+        assert_eq!(error.raw_os_error(), Some(5));
+        println!("普通异步构造器负例：os_error=5");
+
+        let mut managed = AsyncCommand::new(&executable);
+        managed.inherit_managed_job();
+        managed
+            .args(["--ignored", "--exact", ASYNC_CHILD, "--nocapture"])
+            .env(FIXTURE_ENV, "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true);
+        let output = futures_lite::future::block_on(managed.output()).unwrap();
+        assert!(output.status.success(), "异步子进程必须验证仍在严格 Job 内");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(stdout.contains("托管异步子进程保留严格 Job"));
+        print!("{stdout}");
+        let directory = std::path::PathBuf::from(std::env::var_os(DIRECTORY_ENV).unwrap());
+        fs::write(directory.join("async-verified"), b"1").unwrap();
+    }
+
+    #[test]
+    #[ignore = "仅由真实异步托管命令回归派生"]
+    fn async_child_keeps_strict_job() {
+        if std::env::var_os(FIXTURE_ENV).is_none() {
+            return;
+        }
+        assert_strict_job();
+        println!("托管异步子进程保留严格 Job");
+    }
+}
+
 #[test]
 #[ignore = "只由受管理进程测试派生，隔离 Linux subreaper 的作用范围"]
 fn isolated_driver() {

@@ -1303,7 +1303,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         use warpui::platform::windows::AppBuilderExt;
-        app_builder.set_app_user_model_id(ChannelState::app_id().to_string());
+        app_builder.set_app_user_model_id(ChannelState::data_domain());
 
         // Only use DXC for DirectX shader compilation if we're not running in a Parallels VM
         // Parallels VMs can have issues with DXC shader compilation

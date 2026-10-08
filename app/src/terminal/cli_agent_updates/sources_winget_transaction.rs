@@ -826,7 +826,8 @@ fn rename_owned(file: &File, destination: &Path) -> Result<(), Error> {
     if name.is_empty() || name.len() > 32767 || name.contains(&0) || !destination.is_absolute() {
         return Err(Error::SourceChanged);
     }
-    let length = std::mem::offset_of!(FILE_RENAME_INFO, FileName) + name.len() * 2;
+    // 显式保留宽字符终止零，不依赖 usize 对齐产生的偶然填充；名称长度仍不含终止零。
+    let length = std::mem::offset_of!(FILE_RENAME_INFO, FileName) + (name.len() + 1) * 2;
     let mut storage = vec![0_usize; length.div_ceil(std::mem::size_of::<usize>())];
     let info = storage.as_mut_ptr().cast::<FILE_RENAME_INFO>();
     unsafe {

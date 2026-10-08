@@ -5,6 +5,11 @@ use warp_errors::report_error;
 use windows_registry::{CURRENT_USER, HSTRING};
 
 pub(super) fn register_uri_handler() {
+    // 独立开发 profile 不覆盖当前用户的系统 URI 关联。
+    if ChannelState::data_profile().is_some() {
+        return;
+    }
+
     // To change the settings for the user, changes must be made under
     // HKEY_CURRENT_USER\Software\Classes instead of under HKEY_CLASSES_ROOT since only an
     // administrator can modify it. It gets merged into HKEY_CLASSES_ROOT later.

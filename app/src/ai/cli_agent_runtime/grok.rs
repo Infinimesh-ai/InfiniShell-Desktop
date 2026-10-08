@@ -116,10 +116,7 @@ fn connect_protocol(mut protocol: GrokProtocol) -> RuntimeConnection {
         update_lease_audit(&protocol.lease_audit_for_live, |audit| {
             audit.protocol_errors += u64::from(result.is_err());
         });
-        let reason = match &result {
-            Ok(()) => "runtime connection closed".to_owned(),
-            Err(error) => error.to_string(),
-        };
+        let reason = protocol.disconnected_reason(&result);
         let _ = sender.try_send(protocol.event(RuntimeEventKind::Disconnected { reason }));
         result
     });
@@ -383,6 +380,8 @@ async fn run_process(
         .as_ref()
         .map_or(executable, |source| source.executable.clone());
     let mut version = Command::new(&executable);
+    #[cfg(windows)]
+    version.inherit_managed_job();
     version
         .arg("--version")
         .stdin(Stdio::null())
@@ -406,7 +405,11 @@ async fn run_process(
         .output()
         .with_timeout(Duration::from_secs(3))
         .await
-        .map_err(|_| RuntimeError::RequestTimedOut)??;
+        .map_err(|_| protocol.timeout_error("version_probe"))?
+        .map_err(|source| RuntimeError::IoAt {
+            operation: "grok.version_probe",
+            source,
+        })?;
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     if !output.status.success() {
         return Err(RuntimeError::UnsupportedVersion(detected));
@@ -549,10 +552,10 @@ async fn run_process(
     };
     let (finished, drained) = futures::join!(finish, drain.with_timeout(drain_timeout));
     // 清理和读取均结束后保留原传输失败；正常成功还必须具有可信回执及预算内 EOF。
-    host_cleanup?;
+    host_cleanup.map_err(|error| protocol.error_at_stage(error, "host_cleanup"))?;
     result?;
     finished?;
-    drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+    drained.map_err(|_| protocol.timeout_error("stdout_drain"))??;
     for kind in protocol.host_commands.take_cancelled_events() {
         events
             .try_send(protocol.event(kind))
@@ -607,7 +610,9 @@ async fn run_transport(
     if let Some(probe) = &protocol.catalog_probe_for_live {
         probe.guard_write(&initialize)?;
     }
-    write_message(stdin, &initialize).await?;
+    write_message(stdin, &initialize)
+        .await
+        .map_err(|error| protocol.error_at_stage(error, "stdin_write_or_flush"))?;
     #[cfg(test)]
     if let Some(probe) = &protocol.sdk_origin_probe {
         probe.observe_outbound_transaction(&initialize, protocol.transaction_context());
@@ -845,7 +850,7 @@ fn runtime_error_diagnostic(error: &RuntimeError) -> Value {
         RuntimeError::InvalidConfiguration(_) => "invalid_configuration",
         RuntimeError::PermissionCeilingRejected { .. } => "permission_ceiling_rejected",
         RuntimeError::Protocol(_) => "protocol",
-        RuntimeError::Io(_) => "io",
+        RuntimeError::Io(_) | RuntimeError::IoAt { .. } => "io",
         RuntimeError::RequestTimedOut => "request_timed_out",
         RuntimeError::EventBackpressure => "event_backpressure",
     };
@@ -865,6 +870,7 @@ fn runtime_error_diagnostic(error: &RuntimeError) -> Value {
         | RuntimeError::InvalidConfiguration(_)
         | RuntimeError::PermissionCeilingRejected { .. }
         | RuntimeError::Io(_)
+        | RuntimeError::IoAt { .. }
         | RuntimeError::RequestTimedOut
         | RuntimeError::EventBackpressure => "not_protocol",
     };
@@ -940,7 +946,9 @@ async fn flush_effects(
         if let Some(probe) = &protocol.catalog_probe_for_live {
             probe.guard_write(&message)?;
         }
-        write_message(stdin, &message).await?;
+        write_message(stdin, &message)
+            .await
+            .map_err(|error| protocol.error_at_stage(error, "stdin_write_or_flush"))?;
         if message["method"] == "session/prompt" {
             // 只证明本进程代次曾完整写入输入；原生 ACK 仍由独立接收事件确认。
             protocol.task_input_written = true;
@@ -996,6 +1004,25 @@ enum PendingKind {
     Prompt,
     FinalOutput,
     CloseSession,
+}
+
+impl PendingKind {
+    fn diagnostic_stage(&self) -> &'static str {
+        match self {
+            Self::Initialize => "initialize",
+            Self::Authenticate => "authenticate",
+            Self::OpenSession { requested_id: None } => "new_session",
+            Self::OpenSession {
+                requested_id: Some(_),
+            } => "load_session",
+            Self::CommandCatalog { .. } => "command_catalog",
+            Self::SkillReload { .. } => "skill_reload",
+            Self::SkillCatalog { .. } => "skill_catalog",
+            Self::Prompt => "prompt",
+            Self::FinalOutput => "final_output",
+            Self::CloseSession => "close_session",
+        }
+    }
 }
 
 struct PendingRequest {
@@ -1276,6 +1303,7 @@ struct GrokProtocol {
     session_id: Option<String>,
     next_id: u64,
     pending: Option<PendingRequest>,
+    timeout_stage: Option<&'static str>,
     prompt: Option<PendingPrompt>,
     queued: VecDeque<QueuedPrompt>,
     controls: HashMap<Uuid, [u8; 32]>,
@@ -1585,20 +1613,10 @@ impl GrokProtocol {
 
     #[cfg(test)]
     fn transaction_context(&self) -> Value {
-        let kind = self.pending.as_ref().map(|pending| match &pending.kind {
-            PendingKind::Initialize => "initialize",
-            PendingKind::Authenticate => "authenticate",
-            PendingKind::OpenSession { requested_id: None } => "new_session",
-            PendingKind::OpenSession {
-                requested_id: Some(_),
-            } => "load_session",
-            PendingKind::CommandCatalog { .. } => "command_catalog",
-            PendingKind::SkillReload { .. } => "skill_reload",
-            PendingKind::SkillCatalog { .. } => "skill_catalog",
-            PendingKind::Prompt => "prompt",
-            PendingKind::FinalOutput => "final_output",
-            PendingKind::CloseSession => "close_session",
-        });
+        let kind = self
+            .pending
+            .as_ref()
+            .map(|pending| pending.kind.diagnostic_stage());
         json!({"generation":self.options.generation,"next_request_id":self.next_id,
             "pending_id":self.pending.as_ref().map(|pending|pending.id),"pending_kind":kind})
     }
@@ -1647,6 +1665,7 @@ impl GrokProtocol {
             session_id: None,
             next_id: 0,
             pending: None,
+            timeout_stage: None,
             prompt: None,
             queued: VecDeque::new(),
             controls: HashMap::new(),
@@ -1794,8 +1813,8 @@ impl GrokProtocol {
         self.host_commands.owns_call(call_id)
     }
 
-    fn sdk_timed_out(&self, now: Instant) -> bool {
-        self.sdk.as_ref().is_some_and(|sdk| {
+    fn sdk_timed_out(&mut self, now: Instant) -> bool {
+        let timed_out = self.sdk.as_ref().is_some_and(|sdk| {
             sdk.retired_at
                 .is_some_and(|at| now.duration_since(at) >= REQUEST_TIMEOUT)
                 || sdk.approved_until.values().any(|until| now >= *until)
@@ -1808,7 +1827,11 @@ impl GrokProtocol {
                         && now.duration_since(call.requested_at) >= REQUEST_TIMEOUT
                         && !self.host_command_owns_call(&call.request.call_id)
                 })
-        })
+        });
+        if timed_out {
+            self.timeout_stage = Some("sdk");
+        }
+        timed_out
     }
 
     fn retire_sdk(&mut self, events: &mut Vec<RuntimeEventKind>) {
@@ -2312,15 +2335,39 @@ impl GrokProtocol {
         Ok(message)
     }
 
-    fn request_timed_out(&self) -> bool {
+    fn timeout_error(&mut self, stage: &'static str) -> RuntimeError {
+        self.timeout_stage = Some(stage);
+        RuntimeError::RequestTimedOut
+    }
+
+    fn error_at_stage(&mut self, error: RuntimeError, stage: &'static str) -> RuntimeError {
+        if matches!(error, RuntimeError::RequestTimedOut) {
+            self.timeout_stage = Some(stage);
+        }
+        error
+    }
+
+    fn disconnected_reason(&self, result: &Result<(), RuntimeError>) -> String {
+        match result {
+            Ok(()) => "runtime connection closed".to_owned(),
+            Err(RuntimeError::RequestTimedOut) if self.timeout_stage.is_some() => {
+                let stage = self.timeout_stage.expect("超时阶段已存在");
+                format!("{} (grok.{stage})", RuntimeError::RequestTimedOut)
+            }
+            Err(error) => error.to_string(),
+        }
+    }
+
+    fn request_timed_out(&mut self) -> bool {
         if self
             .deferred_ready
             .as_ref()
             .is_some_and(|(_, began)| began.elapsed() >= REQUEST_TIMEOUT)
         {
+            self.timeout_stage = Some("deferred_ready");
             return true;
         }
-        self.pending.as_ref().is_some_and(|request| {
+        let timed_out = self.pending.as_ref().is_some_and(|request| {
             if matches!(request.kind, PendingKind::Prompt) {
                 if let Some(prompt) = &self.prompt {
                     if let Some(sent) = prompt.cancel_sent {
@@ -2333,7 +2380,23 @@ impl GrokProtocol {
                 }
             }
             request.sent_at.elapsed() >= REQUEST_TIMEOUT
-        })
+        });
+        if timed_out {
+            let request = self.pending.as_ref().expect("超时请求已存在");
+            self.timeout_stage = Some(
+                if matches!(request.kind, PendingKind::Prompt)
+                    && self
+                        .prompt
+                        .as_ref()
+                        .is_some_and(|prompt| prompt.cancel_sent.is_some())
+                {
+                    "cancel_confirmation"
+                } else {
+                    request.kind.diagnostic_stage()
+                },
+            );
+        }
+        timed_out
     }
 
     fn stop_reviewed_command(&mut self, outcome: TurnOutcome) -> Effects {
@@ -4512,7 +4575,7 @@ impl GrokProtocol {
             RuntimeError::Protocol("Grok setup completed without a deferred ready event".into())
         })?;
         if began.elapsed() >= REQUEST_TIMEOUT {
-            return Err(RuntimeError::RequestTimedOut);
+            return Err(self.timeout_error("deferred_ready"));
         }
         Ok(Effects {
             writes: Vec::new(),
@@ -5133,7 +5196,7 @@ impl GrokProtocol {
                     .as_ref()
                     .is_some_and(|(_, began)| began.elapsed() >= REQUEST_TIMEOUT)
                 {
-                    return Err(RuntimeError::RequestTimedOut);
+                    return Err(self.timeout_error("deferred_ready"));
                 }
                 let session = params["sessionId"]
                     .as_str()
@@ -5314,7 +5377,7 @@ impl GrokProtocol {
                         );
                         if let Some((effective_permissions, began)) = self.deferred_ready.take() {
                             if began.elapsed() >= REQUEST_TIMEOUT {
-                                return Err(RuntimeError::RequestTimedOut);
+                                return Err(self.timeout_error("deferred_ready"));
                             }
                             return Ok(Effects {
                                 writes: Vec::new(),

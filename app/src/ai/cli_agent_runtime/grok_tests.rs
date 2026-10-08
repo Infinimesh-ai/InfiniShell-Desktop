@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use super::{
     Effects, GrokProtocol, PendingKind, REQUEST_TIMEOUT, flush_effects, native_stdio_arguments,
-    run_process, supported_version, validate_current_settings_update, validate_options,
-    verified_version, verify_test_candidate_binary,
+    run_process, run_transport, supported_version, validate_current_settings_update,
+    validate_options, verified_version, verify_test_candidate_binary,
 };
 use crate::ai::cli_agent_runtime::grok_profile::GrokCreationPolicyV1;
 use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
@@ -3658,6 +3658,123 @@ fn handshake_timeout_remains_uncertain_and_does_not_retry() {
     assert!(protocol.session_id.is_none());
 }
 
+#[tokio::test]
+async fn transport_timeout_stage_survives_sdk_cleanup_without_changing_error_kind() {
+    for stage in ["deferred_ready", "sdk"] {
+        let mut launch = options();
+        launch.local_tools = Some(LocalToolPermissions::default());
+        let mut protocol = GrokProtocol::from_fixture(launch);
+        let expired = Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1);
+        if stage == "sdk" {
+            protocol.sdk.as_mut().unwrap().retired_at = Some(expired);
+        } else {
+            protocol.deferred_ready = Some((json!({"secret":"不得带入诊断"}), expired));
+        }
+        let (commands, receiver) = mpsc::channel(1);
+        let (events, _receiver) = mpsc::channel(8);
+        let mut stdin = Cursor::new(Vec::new());
+        let mut stdout = Cursor::new(Vec::new());
+        let result = run_transport(&mut protocol, &mut stdin, &mut stdout, receiver, &events).await;
+        assert!(matches!(result, Err(RuntimeError::RequestTimedOut)));
+        protocol.finish_transport(&result);
+        assert!(protocol.sdk.as_ref().unwrap().retired);
+        assert!(!protocol.task_input_written);
+        assert_eq!(protocol.next_id, 1);
+        assert_eq!(
+            protocol.disconnected_reason(&result),
+            format!("{} (grok.{stage})", RuntimeError::RequestTimedOut)
+        );
+        drop(commands);
+    }
+}
+
+#[test]
+fn pending_timeout_diagnostic_never_includes_session_or_payload_fields() {
+    for (kind, stage) in [
+        (PendingKind::Initialize, "initialize"),
+        (PendingKind::Authenticate, "authenticate"),
+        (
+            PendingKind::OpenSession { requested_id: None },
+            "new_session",
+        ),
+        (
+            PendingKind::OpenSession {
+                requested_id: Some("敏感会话".into()),
+            },
+            "load_session",
+        ),
+        (
+            PendingKind::CommandCatalog {
+                session_id: "敏感会话".into(),
+                version: "敏感版本",
+            },
+            "command_catalog",
+        ),
+        (
+            PendingKind::SkillReload {
+                session_id: "敏感会话".into(),
+            },
+            "skill_reload",
+        ),
+        (
+            PendingKind::SkillCatalog {
+                session_id: "敏感会话".into(),
+            },
+            "skill_catalog",
+        ),
+        (PendingKind::Prompt, "prompt"),
+        (PendingKind::FinalOutput, "final_output"),
+        (PendingKind::CloseSession, "close_session"),
+    ] {
+        let mut protocol = GrokProtocol::from_fixture(options());
+        protocol.request(kind, "敏感方法", json!({"secret":"敏感正文"}));
+        assert!(!protocol.request_timed_out());
+        assert!(protocol.timeout_stage.is_none());
+        protocol.pending.as_mut().unwrap().sent_at =
+            Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1);
+        assert!(protocol.request_timed_out());
+        assert_eq!(
+            protocol.disconnected_reason(&Err(RuntimeError::RequestTimedOut)),
+            format!("{} (grok.{stage})", RuntimeError::RequestTimedOut)
+        );
+        assert_eq!(
+            protocol.disconnected_reason(&Err(RuntimeError::ControllerClosed)),
+            RuntimeError::ControllerClosed.to_string()
+        );
+    }
+}
+
+#[test]
+fn final_output_timeout_stage_survives_pending_request_removal() {
+    let (mut protocol, _) = multistream_before_final_text();
+    protocol.receive(multistream_terminal()).unwrap();
+    protocol.pending.as_mut().unwrap().sent_at =
+        Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1);
+    assert!(protocol.request_timed_out());
+    let result = Err(RuntimeError::RequestTimedOut);
+    protocol.finish_transport(&result);
+    assert!(protocol.pending.is_none());
+    assert_eq!(
+        protocol.disconnected_reason(&result),
+        format!("{} (grok.final_output)", RuntimeError::RequestTimedOut)
+    );
+}
+
+#[test]
+fn timeout_context_preserves_other_errors_and_unknown_timeout_origins() {
+    let mut protocol = GrokProtocol::from_fixture(options());
+    let error = protocol.error_at_stage(RuntimeError::ControllerClosed, "stdin_write_or_flush");
+    assert!(matches!(error, RuntimeError::ControllerClosed));
+    assert!(protocol.timeout_stage.is_none());
+    assert_eq!(
+        protocol.disconnected_reason(&Err(RuntimeError::RequestTimedOut)),
+        RuntimeError::RequestTimedOut.to_string()
+    );
+    let error = protocol.timeout_error("version_probe");
+    assert!(matches!(error, RuntimeError::RequestTimedOut));
+    assert_eq!(protocol.timeout_stage, Some("version_probe"));
+}
+
 fn quota_notifications() -> Vec<Value> {
     authenticated_fixture()
         .into_iter()
@@ -4809,6 +4926,7 @@ fn confirmed_long_turn_waits_for_user_but_cancel_has_a_bounded_confirmation_time
     protocol.pending.as_mut().unwrap().sent_at =
         Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1);
     assert!(!protocol.request_timed_out());
+    assert!(protocol.timeout_stage.is_none());
     internal_action(
         &mut protocol,
         Uuid::new_v4(),
@@ -4819,6 +4937,7 @@ fn confirmed_long_turn_waits_for_user_but_cancel_has_a_bounded_confirmation_time
     protocol.prompt.as_mut().unwrap().cancel_sent =
         Some(Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1));
     assert!(protocol.request_timed_out());
+    assert_eq!(protocol.timeout_stage, Some("cancel_confirmation"));
 }
 
 #[test]

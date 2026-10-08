@@ -89,6 +89,8 @@ async fn run_process(
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
     let mut version = Command::new(&protocol.options.executable);
+    #[cfg(windows)]
+    version.inherit_managed_job();
     version
         .arg("--version")
         .stdin(Stdio::null())
@@ -99,7 +101,11 @@ async fn run_process(
         .output()
         .with_timeout(Duration::from_secs(3))
         .await
-        .map_err(|_| RuntimeError::RequestTimedOut)??;
+        .map_err(|_| RuntimeError::RequestTimedOut)?
+        .map_err(|source| RuntimeError::IoAt {
+            operation: "codex.version_probe",
+            source,
+        })?;
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if !output.status.success() {
         return Err(RuntimeError::UnsupportedVersion(detected));
@@ -853,16 +859,19 @@ impl CodexProtocol {
                     PermissionPolicy::ReadOnly => Some("readOnly"),
                     PermissionPolicy::WorkspaceWrite => Some("workspaceWrite"),
                 };
-                if let Some(expected_sandbox) = expected_sandbox
-                    && (result.pointer("/sandbox/type").and_then(Value::as_str)
-                        != Some(expected_sandbox)
-                        || result.get("approvalPolicy").and_then(Value::as_str)
-                            != Some("untrusted")
-                        || result.get("approvalsReviewer").and_then(Value::as_str) != Some("user"))
-                {
-                    return Err(RuntimeError::Protocol(
-                        "app-server did not apply the requested permission policy".into(),
-                    ));
+                if let Some(expected_sandbox) = expected_sandbox {
+                    let sandbox_matches = result.pointer("/sandbox/type").and_then(Value::as_str)
+                        == Some(expected_sandbox);
+                    let approval_matches =
+                        result.get("approvalPolicy").and_then(Value::as_str) == Some("untrusted");
+                    let reviewer_matches =
+                        result.get("approvalsReviewer").and_then(Value::as_str) == Some("user");
+                    if !sandbox_matches || !approval_matches || !reviewer_matches {
+                        let sandbox_type = sandbox_type_diagnostic(result);
+                        return Err(RuntimeError::Protocol(format!(
+                            "app-server did not apply the requested permission policy: sandbox_matches={sandbox_matches}, approval_matches={approval_matches}, reviewer_matches={reviewer_matches}, sandbox_type={sandbox_type}"
+                        )));
+                    }
                 }
                 let effective_permissions = json!({
                     "approvalPolicy": result.get("approvalPolicy"), "sandbox": result.get("sandbox"), "approvalsReviewer": result.get("approvalsReviewer"),
@@ -1319,6 +1328,31 @@ fn terminal_effects(
             writes: Vec::new(),
             events: vec![terminal],
             terminal_after_cleanup: None,
+        }
+    }
+}
+
+// 只保留固定协议枚举与形状分类；未知回包文本、路径或配置不会进入诊断。
+fn sandbox_type_diagnostic(result: &Value) -> &'static str {
+    match result.get("sandbox") {
+        None => "missing",
+        Some(Value::Null) => "null",
+        Some(Value::Object(sandbox)) => match sandbox.get("type") {
+            None => "missing",
+            Some(Value::Null) => "null",
+            Some(Value::String(value)) => match value.as_str() {
+                "dangerFullAccess" => "dangerFullAccess",
+                "readOnly" => "readOnly",
+                "externalSandbox" => "externalSandbox",
+                "workspaceWrite" => "workspaceWrite",
+                _ => "unknown",
+            },
+            Some(Value::Bool(_) | Value::Number(_) | Value::Array(_) | Value::Object(_)) => {
+                "wrong_type"
+            }
+        },
+        Some(Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Array(_)) => {
+            "wrong_type"
         }
     }
 }
