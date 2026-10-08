@@ -484,7 +484,127 @@ jobs:
     runs-on: [self-hosted, linux, x64, infinishell-ci]
     timeout-minutes: 180
     steps:
+      # 普通源码门禁只写本轮目录，不清理或复用其他任务的 checkout、配置和构建输出。
+      - name: Prepare isolated Linux source gate
+        id: source_isolation
+        if: ${{ inputs.source_gate_only }}
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import shutil
+          import stat
+          import subprocess
+
+          sha = os.environ["GITHUB_SHA"]
+          run = os.environ["GITHUB_RUN_ID"]
+          attempt = os.environ["GITHUB_RUN_ATTEMPT"]
+          if (os.environ["GITHUB_REPOSITORY"] != "Infinimesh-ai/InfiniShell-Desktop"
+                  or not re.fullmatch(r"[0-9a-f]{40}", sha)
+                  or not run.isdigit() or not attempt.isdigit()):
+              raise RuntimeError("源码门禁身份无效")
+          root = Path(os.environ["RUNNER_TEMP"]) / f"source-gate-{run}-{attempt}-linux"
+          for path in (root, *root.parents):
+              if path.exists() or path.is_symlink():
+                  if path.is_symlink() or not path.is_dir():
+                      raise RuntimeError("隔离路径或祖先不是普通目录")
+          if root.exists():
+              raise RuntimeError("本轮隔离目录已存在，禁止复用")
+          for parent in root.parents:
+              if any((parent / ".cargo" / name).exists() for name in ("config", "config.toml")):
+                  raise RuntimeError("隔离目录祖先存在共享 Cargo 配置")
+          root.mkdir(mode=0o700)
+          # Unix socket 有路径长度上限；短临时根仍按本轮身份独占创建。
+          temporary = Path("/tmp") / f"ifs-{run}-{attempt}"
+          if temporary.parent.is_symlink() or not temporary.parent.is_dir():
+              raise RuntimeError("短临时根祖先不是普通目录")
+          temporary.mkdir(mode=0o700)
+          source = root / "source"
+          cargo_home = Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo")))
+          rust = {}
+          for tool in ("cargo", "rustc", "rustdoc"):
+              rust[tool] = subprocess.check_output(
+                  ["rustup", "which", "--toolchain", "1.92.0", tool], text=True).strip()
+          version = subprocess.check_output([rust["rustc"], "--version"], text=True).strip()
+          if not version.startswith("rustc 1.92.0 "):
+              raise RuntimeError("固定 Rust 工具链不匹配")
+          paths = {
+              "CARGO_HOME": root / "cargo-home", "CARGO_TARGET_DIR": root / "target",
+              "CARGO_BUILD_TARGET_DIR": root / "target", "TMPDIR": temporary,
+              "TEMP": temporary, "TMP": temporary,
+              "XDG_CONFIG_HOME": root / "config", "XDG_DATA_HOME": root / "data",
+              "XDG_CACHE_HOME": root / "cache", "XDG_STATE_HOME": root / "state",
+              "XDG_RUNTIME_DIR": temporary / "runtime", "CODEX_HOME": root / "cli/codex",
+              "CLAUDE_CONFIG_DIR": root / "cli/claude", "GROK_HOME": root / "cli/grok",
+          }
+          for path in set(paths.values()) | {source, root / "tmp", root / "empty-hooks"}:
+              path.mkdir(parents=True, mode=0o700, exist_ok=True)
+          # 只复制依赖内容，不复制根配置、凭据或链接；后续 Cargo 只更新私有副本。
+          for name in ("registry/cache", "registry/index", "git/db"):
+              cache = cargo_home / name
+              if not cache.exists() and not cache.is_symlink():
+                  continue
+              for ancestor in (cache, *cache.parents):
+                  if ancestor.is_symlink() or not ancestor.is_dir():
+                      raise RuntimeError("共享依赖缓存祖先不是普通目录")
+              for base, directories, files in os.walk(cache, followlinks=False):
+                  for entry in directories + files:
+                      mode = (Path(base) / entry).lstat().st_mode
+                      if not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+                          raise RuntimeError("共享依赖缓存含链接或特殊文件")
+              destination = paths["CARGO_HOME"] / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copytree(cache, destination)
+          git_config = root / "gitconfig"
+          git_config.touch(exist_ok=False)
+          values = {name: str(path) for name, path in paths.items()}
+          values.update({
+              "RUSTC": rust["rustc"], "RUSTDOC": rust["rustdoc"],
+              "RUSTUP_TOOLCHAIN": "1.92.0", "RUSTUP_AUTO_INSTALL": "0",
+              "WARP_DATA_PROFILE": f"ci-source-{run}-{attempt}-linux",
+              "GIT_CONFIG_GLOBAL": str(git_config), "GIT_CONFIG_NOSYSTEM": "1",
+              "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never",
+              "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "",
+              "CARGO_BUILD_RUSTC_WRAPPER": "", "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER": "",
+              "SCCACHE_DISABLE": "1", "CCACHE_DISABLE": "1",
+          })
+          environment = dict(os.environ, **values)
+          def git(*arguments):
+              subprocess.run(["git", "-C", str(source), *arguments], env=environment, check=True)
+          git("-c", "init.templateDir=", "init")
+          git("config", "--local", "core.hooksPath", str(root / "empty-hooks"))
+          git("remote", "add", "origin", "https://github.com/Infinimesh-ai/InfiniShell-Desktop.git")
+          git("-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never",
+              "fetch", "--no-tags", "--depth", "1", "origin", sha)
+          git("checkout", "--detach", "FETCH_HEAD")
+          actual = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], env=environment, text=True).strip()
+          if actual != sha:
+              raise RuntimeError("隔离 checkout 提交不匹配")
+          if subprocess.check_output(["git", "-C", str(source), "status", "--porcelain"], env=environment):
+              raise RuntimeError("隔离 checkout 不干净")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
+              for name, value in values.items():
+                  if "\n" in value or "\r" in value:
+                      raise RuntimeError("环境值含换行")
+                  stream.write(f"{name}={value}\n")
+          with open(os.environ["GITHUB_PATH"], "a", encoding="utf-8") as stream:
+              stream.write(str(Path(rust["cargo"]).parent) + "\n")
+          receipt = {"source_commit": actual, "run_id": run, "run_attempt": attempt,
+                     "source": str(source), "target": str(paths["CARGO_TARGET_DIR"]),
+                     "cargo_home": str(paths["CARGO_HOME"]), "temp": str(paths["TEMP"]),
+                     "profile": values["WARP_DATA_PROFILE"], "rust_version": version, "source_clean": True}
+          (root / "isolation.safe.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(receipt))
+          PY
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: ${{ !inputs.source_gate_only }}
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -514,22 +634,26 @@ jobs:
         if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         timeout-minutes: 2
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        env:
+          INFINISHELL_PREFLIGHT_TEMP: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}
         run: |
           set -euo pipefail
-          python3 -I -B script/cli-agent-parity/probe_package_source_environment.py > "$RUNNER_TEMP/package-source-environment.safe.json"
+          python3 -I -B script/cli-agent-parity/probe_package_source_environment.py > "$INFINISHELL_PREFLIGHT_TEMP/package-source-environment.safe.json"
 
       - name: Preserve Linux package source environment
         if: ${{ always() && (steps.package_source_environment.outcome == 'success' || steps.package_source_environment.outcome == 'failure') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-linux-package-source-environment-${{ github.sha }}
-          path: ${{ runner.temp }}/package-source-environment.safe.json
+          path: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}/package-source-environment.safe.json
           if-no-files-found: error
           retention-days: 14
 
       - name: Verify provisioned toolchain
         id: linux_toolchain
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           git --version
@@ -551,6 +675,7 @@ jobs:
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           node --version
@@ -565,6 +690,7 @@ jobs:
         timeout-minutes: 3
         env:
           PYTHONUTF8: "1"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           command -v python3
@@ -699,6 +825,7 @@ jobs:
         timeout-minutes: 3
         env:
           PYTHONUTF8: "1"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           command -v bash
@@ -710,12 +837,14 @@ jobs:
       - name: Test Unix PTY notification framing
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: python3 script/cli-agent-parity/tmux_notification_tests.py
 
       - name: Check InfiniShell-Desktop
         if: ${{ !cancelled() && steps.linux_toolchain.outcome == 'success' }}
         id: check_app
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo check -p warp --lib
 
       - name: Build fixed Grok terminal bridge from public source on Linux
@@ -765,6 +894,7 @@ jobs:
       - name: Test IPC frame-limit recovery
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --no-fail-fast -p ipc --lib
           -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
@@ -773,9 +903,12 @@ jobs:
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         id: test_app
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        env:
+          INFINISHELL_PREFLIGHT_TEMP: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}
         run: >-
           python3 -I -B script/cli-agent-parity/run_private_linux_tmp.py
-          --receipt "$RUNNER_TEMP/grok-host-tmp.safe.json" --
+          --receipt "$INFINISHELL_PREFLIGHT_TEMP/grok-host-tmp.safe.json" --
           cargo nextest run --no-fail-fast -p warp --lib
           -E '${{ github.event_name == 'workflow_dispatch' && (inputs.native_acceptance_only || inputs.run_grok_native_bridge_host) && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_sessions::grok_native_bridge) | test(terminal::cli_agent_sessions::grok_owned_launch) | test(terminal::cli_agent_sessions::grok_leader_input) | test(terminal::view::grok_remote_owned::) | test(terminal::cli_agent_sessions::tests::) | (test(terminal::view::tests::) & (test(ctrl_c) | test(escape))) | test(persistence::local_cli_tasks::grok_native_bridge::tests::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
@@ -784,7 +917,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: grok-host-tmp-linux-${{ github.sha }}
-          path: ${{ runner.temp }}/grok-host-tmp.safe.json
+          path: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}/grok-host-tmp.safe.json
           if-no-files-found: error
           retention-days: 14
 
@@ -794,6 +927,7 @@ jobs:
         if: ${{ !cancelled() && steps.test_app.outcome == 'success' && steps.native_node.outcome == 'success' }}
         shell: bash
         timeout-minutes: 5
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           INFINISHELL_LINUX_NODE_ELF_PROBE="$(python3 -c 'import pathlib,shutil; print(pathlib.Path(shutil.which("node")).resolve(strict=True))')"
@@ -803,12 +937,14 @@ jobs:
       - name: Test remote CLI image client contracts
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p remote_server --lib -E 'test(client::image_staging::tests::) | test(client::terminal_binding::tests::) | test(terminal_candidate) | test(manager::)'
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
@@ -816,16 +952,19 @@ jobs:
       - name: Test CLI harness arguments
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed::linux::tests::)'
 
       # 诊断仅在专用 feature 中经专用匿名管道启用；先保存通知 worker，再重建默认 supervisor。
@@ -835,14 +974,16 @@ jobs:
         shell: bash
         timeout-minutes: 30
         env:
+          INFINISHELL_PREFLIGHT_TEMP: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}
           CARGO_BUILD_JOBS: "2"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           cargo nextest run --locked --no-fail-fast -p warp --lib --features cli-agent-notify-trace -E 'test(cli_agent_notify_trace::tests::)'
           cargo build -p warp_tui --bin infinishell-tui --features cli-agent-notify-trace
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
           # 正式身份门禁要求单链接入口；保留独立副本，不修改 Cargo 缓存产物。
-          install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
+          install -m 0755 "$target_dir/debug/infinishell-tui" "$INFINISHELL_PREFLIGHT_TEMP/infinishell-test-notify-worker"
 
       # 默认构建仍用于正式 supervisor；通知诊断 feature 不传入原子更新等后续验收。
       - name: Build CLI process supervisor
@@ -851,12 +992,16 @@ jobs:
         shell: bash
         env:
           CARGO_BUILD_JOBS: "2"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo build -p warp_tui --bin infinishell-tui
 
       - name: Test installed Grok hook through the native notification worker
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' && steps.notify_trace_worker.outcome == 'success' }}
         shell: bash
         timeout-minutes: 8
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        env:
+          INFINISHELL_PREFLIGHT_TEMP: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}
         run: |
           set -euo pipefail
           # 补齐已定义的真实 shell 回归依赖，避免缺少解释器时静默跳过。
@@ -871,7 +1016,7 @@ jobs:
           zsh --version
           fish --version
           tmux -V
-          export INFINISHELL_TEST_NOTIFY_WORKER="$RUNNER_TEMP/infinishell-test-notify-worker"
+          export INFINISHELL_TEST_NOTIFY_WORKER="$INFINISHELL_PREFLIGHT_TEMP/infinishell-test-notify-worker"
           export INFINISHELL_TEST_NOTIFY_TRACE_REQUIRED=1
           python3 -B script/cli-agent-parity/run_installed_grok_hook_tests.py -v
           python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
@@ -1069,6 +1214,7 @@ jobs:
       - name: Test supervisor cleanup after host crash
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           set -euo pipefail
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
@@ -1118,21 +1264,25 @@ jobs:
       - name: Test Bash generator cancellation
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: ./script/test_bash_generator_cancellation
 
       - name: Test MCP, Vim, and POSIX completion
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --locked --no-fail-fast -p mcp -p ai -p vim -p warp_completer
 
       - name: Test completion v2 compatibility
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --locked --no-fail-fast -p warp_completer --features v2
 
       - name: Test desktop and TUI input regressions
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
           -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(i18n::tests)'
@@ -1140,6 +1290,7 @@ jobs:
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
       - name: Compile GUI integration tests
@@ -1281,6 +1432,7 @@ jobs:
         env:
           CHECK_RESULT: ${{ steps.check_app.outcome }}
           TEST_RESULT: ${{ steps.test_app.outcome }}
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           {
             echo '### Linux 普通源码门禁'
@@ -1289,6 +1441,16 @@ jobs:
             echo '未执行固定外部 CLI、真实安装/升级/恢复及 GUI 专项；这些条件仍待验收。'
             echo '6726e735994568e0f2b0995a068d6c5bb32924f1 / run 37045744557 的 Windows 固定 Codex hooks 退出和真实 npm 首 CMD 候选失败仍然保留；本次源码结果不覆盖或修复它们，不关闭 G09，不构成最终合并许可。'
           } >> "$GITHUB_STEP_SUMMARY"
+
+
+      - name: Preserve source gate isolation receipt
+        if: ${{ always() && inputs.source_gate_only }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-source-isolation-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ format('{0}/source-gate-{1}-{2}-linux', runner.temp, github.run_id, github.run_attempt) }}/isolation.safe.json
+          if-no-files-found: warn
+          retention-days: 14
 
   macos_intel_ssh_extension_build:
     name: macOS Intel SSH extension fallback cross-build
@@ -1607,7 +1769,117 @@ jobs:
       SCCACHE_DIR: 'C:\infinishell-ci\sccache'
       SCCACHE_CACHE_SIZE: 80G
     steps:
+      - name: Prepare isolated Windows source gate
+        id: source_isolation
+        if: ${{ inputs.source_gate_only }}
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -ne 'Infinimesh-ai/InfiniShell-Desktop' -or
+              $env:GITHUB_SHA -notmatch '^[0-9a-f]{40}$' -or $env:GITHUB_RUN_ID -notmatch '^\d+$' -or
+              $env:GITHUB_RUN_ATTEMPT -notmatch '^\d+$') { throw '源码门禁身份无效' }
+          $root = Join-Path $env:RUNNER_TEMP "source-gate-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-windows"
+          function Assert-PlainDirectory([string] $Path) {
+            $current = [IO.Path]::GetFullPath($Path)
+            while ($current) {
+              try { $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop }
+              catch [System.Management.Automation.ItemNotFoundException] { $item = $null }
+              if ($null -ne $item) {
+                if (-not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                  throw '隔离路径或祖先不是普通目录'
+                }
+              }
+              $current = [IO.Path]::GetDirectoryName($current)
+            }
+          }
+          Assert-PlainDirectory $root
+          if (Test-Path -LiteralPath $root) { throw '本轮隔离目录已存在，禁止复用' }
+          $ancestor = [IO.Path]::GetDirectoryName($root)
+          while ($ancestor) {
+            foreach ($name in @('config', 'config.toml')) {
+              if (Test-Path -LiteralPath (Join-Path $ancestor ".cargo\$name")) { throw '隔离目录祖先存在共享 Cargo 配置' }
+            }
+            $ancestor = [IO.Path]::GetDirectoryName($ancestor)
+          }
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $source = Join-Path $root 'source'
+          $cacheHome = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
+          $rust = @{}
+          foreach ($tool in @('cargo', 'rustc', 'rustdoc')) {
+            $rust[$tool] = & rustup which --toolchain 1.92.0 $tool
+            if ($LASTEXITCODE -ne 0) { throw '固定 Rust 工具入口不可用' }
+          }
+          $rustVersion = & $rust.rustc --version
+          if ($LASTEXITCODE -ne 0 -or $rustVersion -notmatch '^rustc 1\.92\.0 ') { throw '固定 Rust 工具链不匹配' }
+          $paths = @{
+            CARGO_HOME = "$root\cargo-home"; CARGO_TARGET_DIR = "$root\target"; CARGO_BUILD_TARGET_DIR = "$root\target"
+            TMP = "$root\tmp"; TEMP = "$root\tmp"; TMPDIR = "$root\tmp"
+            APPDATA = "$root\appdata\roaming"; LOCALAPPDATA = "$root\appdata\local"
+            CODEX_HOME = "$root\cli\codex"; CLAUDE_CONFIG_DIR = "$root\cli\claude"; GROK_HOME = "$root\cli\grok"
+          }
+          foreach ($path in (@($paths.Values) + @($source, "$root\empty-hooks") | Select-Object -Unique)) {
+            New-Item -ItemType Directory -Path $path -Force | Out-Null
+          }
+          # 缓存只读复制到本轮目录，不带根配置、凭据，也不追随重解析点。
+          foreach ($name in @('registry\cache', 'registry\index', 'git\db')) {
+            $cache = Join-Path $cacheHome $name
+            if (-not (Test-Path -LiteralPath $cache)) { continue }
+            Assert-PlainDirectory $cache
+            $pending = [Collections.Generic.Stack[string]]::new()
+            $pending.Push($cache)
+            while ($pending.Count) {
+              foreach ($item in Get-ChildItem -LiteralPath ($pending.Pop()) -Force) {
+                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw '共享依赖缓存含重解析点' }
+                if ($item.PSIsContainer) { $pending.Push($item.FullName) }
+              }
+            }
+            $destination = Join-Path $paths.CARGO_HOME $name
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $cache -Destination $destination -Recurse
+          }
+          $gitConfig = Join-Path $root 'gitconfig'
+          New-Item -ItemType File -Path $gitConfig | Out-Null
+          $values = $paths + @{
+            RUSTC = $rust.rustc; RUSTDOC = $rust.rustdoc; RUSTUP_TOOLCHAIN = '1.92.0'; RUSTUP_AUTO_INSTALL = '0'
+            WARP_DATA_PROFILE = "ci-source-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-windows"
+            GIT_CONFIG_GLOBAL = $gitConfig; GIT_CONFIG_NOSYSTEM = '1'; GIT_TERMINAL_PROMPT = '0'; GCM_INTERACTIVE = 'never'
+            RUSTC_WRAPPER = ''; RUSTC_WORKSPACE_WRAPPER = ''; CARGO_BUILD_RUSTC_WRAPPER = ''; CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER = ''
+            SCCACHE_DISABLE = '1'
+          }
+          foreach ($entry in $values.GetEnumerator()) {
+            if ($entry.Value -match '[\r\n]') { throw '环境值含换行' }
+            [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
+            "$($entry.Key)=$($entry.Value)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          (Split-Path -Parent $rust.cargo) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & git -C $source -c 'init.templateDir=' init
+          if ($LASTEXITCODE -ne 0) { throw '隔离 Git 初始化失败' }
+          & git -C $source config --local core.longpaths true
+          if ($LASTEXITCODE -ne 0) { throw '隔离 Git 路径配置失败' }
+          & git -C $source config --local core.hooksPath "$root\empty-hooks"
+          if ($LASTEXITCODE -ne 0) { throw '隔离 Git hook 配置失败' }
+          & git -C $source remote add origin 'https://github.com/Infinimesh-ai/InfiniShell-Desktop.git'
+          if ($LASTEXITCODE -ne 0) { throw '隔离 Git remote 配置失败' }
+          & git -C $source -c protocol.file.allow=never -c protocol.ext.allow=never fetch --no-tags --depth 1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw '完整提交获取失败' }
+          & git -C $source checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw '隔离 checkout 失败' }
+          $actual = & git -C $source rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $actual -ne $env:GITHUB_SHA) { throw '隔离 checkout 提交不匹配' }
+          $status = & git -C $source status --porcelain
+          if ($LASTEXITCODE -ne 0 -or $status) { throw '隔离 checkout 不干净' }
+          $receipt = @{
+            source_commit = $actual; run_id = $env:GITHUB_RUN_ID; run_attempt = $env:GITHUB_RUN_ATTEMPT
+            source = $source; target = $paths.CARGO_TARGET_DIR; cargo_home = $paths.CARGO_HOME
+            temp = $paths.TEMP; profile = $values.WARP_DATA_PROFILE; rust_version = $rustVersion; source_clean = $true
+          }
+          $receipt | ConvertTo-Json | Set-Content -LiteralPath "$root\isolation.safe.json" -Encoding utf8
+          $receipt | ConvertTo-Json
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: ${{ !inputs.source_gate_only }}
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -1620,6 +1892,7 @@ jobs:
 
       # 空间充足时复用 Cargo/sccache；不足时才清理可重建产物，避免每轮从零编译。
       - name: Reclaim Windows build storage
+        if: ${{ !inputs.source_gate_only }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -1657,6 +1930,7 @@ jobs:
         id: native_python
         shell: pwsh
         timeout-minutes: 5
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: ./script/cli-agent-parity/prepare_windows_python.ps1
 
       # 只打开当前用户的登记根和 profile 目录，不运行 WinGet 或改变注册表。
@@ -1665,11 +1939,14 @@ jobs:
         if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 2
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        env:
+          INFINISHELL_PREFLIGHT_TEMP: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}
         run: |
           $ErrorActionPreference = 'Stop'
           $receipt = python -I -B script/cli-agent-parity/probe_package_source_environment.py
           if ($LASTEXITCODE -ne 0) { throw 'Package source environment probe failed' }
-          $path = Join-Path $env:RUNNER_TEMP 'package-source-environment.safe.json'
+          $path = Join-Path $env:INFINISHELL_PREFLIGHT_TEMP 'package-source-environment.safe.json'
           [System.IO.File]::WriteAllText($path, ($receipt -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 
       - name: Preserve Windows package source environment
@@ -1677,14 +1954,19 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-package-source-environment-${{ github.sha }}
-          path: ${{ runner.temp }}/package-source-environment.safe.json
+          path: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/tmp', runner.temp, github.run_id, github.run_attempt) || runner.temp }}/package-source-environment.safe.json
           if-no-files-found: error
           retention-days: 14
 
       - name: Configure Windows build environment
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
-          git config --global core.longpaths true
+          if ('${{ inputs.source_gate_only }}' -eq 'true') {
+            git config --local core.longpaths true
+          } else {
+            git config --global core.longpaths true
+          }
           $strawberryPerl = 'C:\Strawberry\perl\bin\perl.exe'
           if (Test-Path $strawberryPerl) {
             'C:\Strawberry\perl\bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
@@ -1699,6 +1981,7 @@ jobs:
       - name: Verify provisioned toolchain
         id: windows_toolchain
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $commands = @('git', 'bash', 'rustc', 'cargo', 'cmake', 'protoc', 'perl')
           foreach ($command in $commands) {
@@ -1712,8 +1995,10 @@ jobs:
           cargo nextest --version
           cmake --version
           protoc --version
-          & $env:RUSTC_WRAPPER --version
-          & $env:RUSTC_WRAPPER --zero-stats
+          if ('${{ inputs.source_gate_only }}' -ne 'true') {
+            & $env:RUSTC_WRAPPER --version
+            & $env:RUSTC_WRAPPER --zero-stats
+          }
 
       # 与仓库共用构建引导使用同一固定 Node 版本；缺依赖必须失败，不能跳过校验。
       - name: Install Node for CLI plugin verification
@@ -1725,6 +2010,7 @@ jobs:
       - name: Test Grok notification plugin scripts
         shell: pwsh
         timeout-minutes: 3
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $ErrorActionPreference = 'Stop'
           node --version
@@ -1765,6 +2051,7 @@ jobs:
         timeout-minutes: 3
         env:
           PYTHONUTF8: "1"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $ErrorActionPreference = 'Stop'
           if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
@@ -1933,6 +2220,7 @@ jobs:
         timeout-minutes: 3
         env:
           PYTHONUTF8: "1"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $ErrorActionPreference = 'Stop'
           $gitBashCandidates = @(
@@ -2111,6 +2399,7 @@ jobs:
         id: check_app
         if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $arguments = @('check', '-p', 'warp', '--lib')
           if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'cli-agent-native-witness') }
@@ -2157,6 +2446,7 @@ jobs:
       - name: Test IPC frame-limit recovery
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --no-fail-fast -p ipc --lib
           -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
@@ -2165,6 +2455,7 @@ jobs:
         id: ssh_worker
         if: ${{ (inputs.run_grok_native_bridge_source || inputs.run_grok_native_bridge_host) && !cancelled() && steps.check_app.outcome == 'success' || (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $ErrorActionPreference = 'Stop'
           $buildArgs = @('build', '-p', 'warp', '--bin', 'infinishell-ssh', '--features', 'release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker')
@@ -2183,6 +2474,7 @@ jobs:
       - name: Test Windows PowerShell SSH worker arguments
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.ssh_worker.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: powershell
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           .\script\windows\test_pwsh_ssh_worker.ps1
           -WorkerPath "$env:CARGO_TARGET_DIR\debug\infinishell-ssh.exe"
@@ -2191,9 +2483,24 @@ jobs:
         id: test_app
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
           -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && (inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && (inputs.native_acceptance_only || inputs.run_grok_native_bridge_host) && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_sessions::grok_native_bridge) | test(terminal::cli_agent_sessions::grok_owned_launch) | test(terminal::cli_agent_sessions::grok_leader_input) | test(terminal::view::grok_remote_owned::) | test(terminal::cli_agent_sessions::tests::) | (test(terminal::view::tests::) & (test(ctrl_c) | test(escape))) | test(persistence::local_cli_tasks::grok_native_bridge::tests::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(terminal::view::codex_remote_owned::) | test(terminal_binding) | test(terminal_candidate) | test(remote_server::tmux_native::) | test(tmux_owned) | test(tmux_remote_owned) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+
+      - name: Test private PowerShell startup and profile preferences
+        if: ${{ !cancelled() && inputs.source_gate_only && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp --lib -E 'test(terminal::bootstrap::powershell_private_tests::)'
+          $powershellExit = $LASTEXITCODE
+          cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warpui_extras --lib -E 'test(user_preferences::registry_backed::tests::)'
+          $registryExit = $LASTEXITCODE
+          if ($powershellExit -ne 0 -or $registryExit -ne 0) {
+            throw "Private startup regression failed: PowerShell=$powershellExit registry=$registryExit"
+          }
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
@@ -2265,12 +2572,14 @@ jobs:
       - name: Test remote CLI image client contracts
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p remote_server --lib -E 'test(client::image_staging::tests::) | test(client::terminal_binding::tests::) | test(terminal_candidate) | test(manager::)'
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
@@ -2278,16 +2587,19 @@ jobs:
       - name: Test CLI harness arguments
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $arguments = @('nextest', 'run', '--no-fail-fast', '-p', 'command', '--lib', '-E', 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::appcontainer::output::tests::) | test(windows::station_bootstrap::tests::) | test(windows::station_bootstrap::device_map::tests::) | test(windows::station_bootstrap::debugger::tests::) | test(windows::station_bootstrap::debugger::event::tests::)')
           if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'native-probe-witness') }
@@ -2417,6 +2729,7 @@ jobs:
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $arguments = @('build', '-p', 'warp_tui', '--bin', 'infinishell-tui', '-p', 'command', '--bin', 'infinishell-station-bootstrap')
           if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'warp/cli-agent-native-witness,command/native-probe-witness') }
@@ -2560,6 +2873,7 @@ jobs:
       - name: Test supervisor cleanup after host crash
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -2636,16 +2950,19 @@ jobs:
       - name: Test MCP, Vim, and POSIX completion
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --locked --no-fail-fast -p mcp -p ai -p vim -p warp_completer
 
       - name: Test completion v2 compatibility
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo nextest run --locked --no-fail-fast -p warp_completer --features v2
 
       - name: Test desktop and TUI input regressions
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.run_grok_native_bridge_host || inputs.full_workspace_tests) }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
           -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(i18n::tests)'
@@ -2653,6 +2970,7 @@ jobs:
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
       - name: Compile GUI integration tests
@@ -2749,7 +3067,7 @@ jobs:
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
       - name: Report sccache statistics
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (always()) }}
+        if: ${{ !inputs.source_gate_only && (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (always()) }}
         shell: pwsh
         run: '& $env:RUSTC_WRAPPER --show-stats'
 
@@ -2759,6 +3077,7 @@ jobs:
         env:
           CHECK_RESULT: ${{ steps.check_app.outcome }}
           TEST_RESULT: ${{ steps.test_app.outcome }}
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: |
           @(
             '### Windows 普通源码门禁'
@@ -2767,3 +3086,12 @@ jobs:
             '未执行固定外部 CLI、真实安装/升级/恢复及 GUI 专项；这些条件仍待验收。'
             '6726e735994568e0f2b0995a068d6c5bb32924f1 / run 37045744557 的 Windows 固定 Codex hooks 退出和真实 npm 首 CMD 候选失败仍然保留；本次源码结果不覆盖或修复它们，不关闭 G09，不构成最终合并许可。'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Preserve source gate isolation receipt
+        if: ${{ always() && inputs.source_gate_only }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-source-isolation-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ format('{0}/source-gate-{1}-{2}-windows', runner.temp, github.run_id, github.run_attempt) }}/isolation.safe.json
+          if-no-files-found: warn
+          retention-days: 14
