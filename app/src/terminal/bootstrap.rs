@@ -464,3 +464,7 @@ fn load_script(file_path: &str, assets: &dyn AssetProvider) -> String {
 #[cfg(test)]
 #[path = "bootstrap_tests.rs"]
 mod tests;
+
+#[cfg(all(test, windows))]
+#[path = "bootstrap_powershell_private_tests.rs"]
+mod powershell_private_tests;

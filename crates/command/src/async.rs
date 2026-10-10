@@ -44,6 +44,15 @@ impl Command {
         Self::new_internal(inner)
     }
 
+    /// 托管宿主的子进程保留现有 Job，不请求脱离严格清理边界。
+    #[cfg(windows)]
+    pub fn inherit_managed_job(&mut self) -> &mut Self {
+        use async_process::windows::CommandExt;
+        self.inner
+            .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+        self
+    }
+
     /// Same as new, but makes this process the leader of a new session with
     /// the same ID as the process ID.
     ///

@@ -27,9 +27,12 @@ static WARP_REGISTRY_BASE_PATH: &str = "Software\\InfiniShell\\";
 pub const KEY_NOT_FOUND_ERR: HRESULT = HRESULT::from_win32(0x80070002);
 
 impl RegistryBackedPreferences {
-    /// Construct a separate registry path for each channel (stable, dev, local, etc.)
-    pub fn new(app_name: &str) -> Self {
-        let app_key_path = WARP_REGISTRY_BASE_PATH.to_owned() + app_name;
+    /// 按发布通道及可选数据 profile 隔离注册表；未指定 profile 时保留既有路径。
+    pub fn new(app_name: &str, data_profile: Option<&str>) -> Self {
+        let app_key_path = match data_profile {
+            Some(profile) => format!("{WARP_REGISTRY_BASE_PATH}{app_name}-{profile}"),
+            None => WARP_REGISTRY_BASE_PATH.to_owned() + app_name,
+        };
         // 启动时就预热 Key,让第一次 setting 读取也避开同步系统调用。
         // 预热失败不为错:`with_warp_registry` 会在需要时重试。
         let initial_key = CURRENT_USER
@@ -103,3 +106,7 @@ impl UserPreferences for RegistryBackedPreferences {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "registry_backed_tests.rs"]
+mod tests;

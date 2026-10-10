@@ -248,10 +248,7 @@ pub(super) fn connect_with_attachment_store(
         let mut protocol = ClaudeProtocol::new(options);
         protocol.attachment_store = attachment_store;
         let result = run_process(&mut protocol, commands, &sender).await;
-        let reason = match &result {
-            Ok(()) => "runtime connection closed".to_string(),
-            Err(error) => error.to_string(),
-        };
+        let reason = disconnected_reason(&result);
         // 满队列时不能阻塞控制循环；调用方也会通过 task 得到同一个失败。
         let _ = sender.try_send(protocol.event(RuntimeEventKind::Disconnected { reason }));
         result
@@ -261,6 +258,84 @@ pub(super) fn connect_with_attachment_store(
         events,
         task,
     })
+}
+
+fn disconnected_reason(result: &Result<(), RuntimeError>) -> String {
+    let Err(error) = result else {
+        return "runtime connection closed".to_string();
+    };
+    // 只允许受审文件策略的静态诊断值；不回传 details 中的配置、规则或未知文本。
+    const REASONS: &[&str] = &[
+        "claude_files_v2_executable_unverified",
+        "claude_files_v2_identity_invalid",
+        "claude_profile_admin_policy_unverified",
+        "claude_profile_cli_deny_missing",
+        "claude_profile_deny_anchor_unsupported",
+        "claude_profile_deny_pattern_unsupported",
+        "claude_profile_deny_source_mismatch",
+        "claude_profile_directory_unavailable",
+        "claude_profile_executable_unverified",
+        "claude_profile_fixed_settings_changed",
+        "claude_profile_hooks_unsupported",
+        "claude_profile_identity_invalid",
+        "claude_profile_legacy_settings_source",
+        "claude_profile_mcp_identity",
+        "claude_profile_mcp_shape",
+        "claude_profile_mcp_tools",
+        "claude_profile_mcp_unverified",
+        "claude_profile_mode_changed",
+        "claude_profile_native_tools_changed",
+        "claude_profile_permissions_shape",
+        "claude_profile_permissions_unsupported",
+        "claude_profile_platform_unverified",
+        "claude_profile_preflight_busy",
+        "claude_profile_preflight_exit_unconfirmed",
+        "claude_profile_preflight_failed",
+        "claude_profile_preflight_flood",
+        "claude_profile_preflight_identity",
+        "claude_profile_preflight_json",
+        "claude_profile_preflight_response",
+        "claude_profile_preflight_stdin",
+        "claude_profile_preflight_stdout",
+        "claude_profile_preflight_stream",
+        "claude_profile_preflight_timeout",
+        "claude_profile_read_ask_unsupported",
+        "claude_profile_resume_missing",
+        "claude_profile_rule_behavior",
+        "claude_profile_rule_scope",
+        "claude_profile_rule_shape",
+        "claude_profile_rule_source",
+        "claude_profile_rule_source_unverified",
+        "claude_profile_rules_shape",
+        "claude_profile_sandbox_unsupported",
+        "claude_profile_saved_source_unsupported",
+        "claude_profile_settings_errors",
+        "claude_profile_settings_shape",
+        "claude_profile_settings_source",
+        "claude_profile_settings_unsupported",
+        "claude_profile_skills_unsupported",
+        "claude_profile_source_changed",
+        "claude_profile_sources_live_mismatch",
+        "claude_profile_tool_pattern_unsupported",
+        "claude_profile_unexpected_settings_source",
+        "claude_profile_wrong_parent",
+        "claude_profile_wrong_policy",
+        "claude_skills_parent_ceiling",
+        "claude_skills_selection_required",
+    ];
+    let reported = error
+        .permission_ceiling_evidence()
+        .and_then(|details| details.get("reason"))
+        .and_then(Value::as_str);
+    if let Some(reason) = REASONS
+        .iter()
+        .copied()
+        .find(|reason| Some(*reason) == reported)
+    {
+        format!("{error} [reason={reason}]")
+    } else {
+        error.to_string()
+    }
 }
 
 async fn run_process(
@@ -277,6 +352,8 @@ async fn run_process(
         protocol.options.claude_profile = Some(profile);
     }
     let mut version = Command::new(&protocol.options.executable);
+    #[cfg(windows)]
+    version.inherit_managed_job();
     version
         .arg("--version")
         .stdin(Stdio::null())
@@ -287,7 +364,11 @@ async fn run_process(
         .output()
         .with_timeout(Duration::from_secs(3))
         .await
-        .map_err(|_| RuntimeError::RequestTimedOut)??;
+        .map_err(|_| RuntimeError::RequestTimedOut)?
+        .map_err(|source| RuntimeError::IoAt {
+            operation: "claude.version_probe",
+            source,
+        })?;
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_string();
     protocol.bind_probed_version(output.status.success(), &detected)?;
 

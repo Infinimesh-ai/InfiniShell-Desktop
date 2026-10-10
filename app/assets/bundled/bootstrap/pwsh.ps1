@@ -1,6 +1,20 @@
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '', Scope = 'Function', Target = 'Warp-*', Justification = 'Warp-* functions are ours')]
 param()
 
+# 私有启动必须由 init 阶段完成；异常时不得继续加载共享 RC 或回报默认历史路径。
+if (($PSEdition -eq 'Desktop' -or $IsWindows) -and $env:WARP_IS_LOCAL_SHELL_SESSION -eq '1' -and (Test-Path Env:WARP_POWERSHELL_PRIVATE_STARTUP_ROOT)) {
+    try {
+        if ([String]::IsNullOrEmpty($global:_warpPrivateHistoryPath)) { throw 'missing_private_init' }
+        Set-PSReadLineOption -HistorySaveStyle SaveNothing -HistorySavePath $global:_warpPrivateHistoryPath -ErrorAction Stop
+        $privateOptions = Get-PSReadLineOption -ErrorAction Stop
+        if ($privateOptions.HistorySaveStyle -ne 'SaveNothing' -or $privateOptions.HistorySavePath -cne $global:_warpPrivateHistoryPath) { throw 'history_options' }
+    } catch {
+        [Console]::Error.WriteLine('WARP_POWERSHELL_PRIVATE_STARTUP_FAILED')
+        [Environment]::Exit(1)
+    }
+    Remove-Variable privateOptions -ErrorAction Ignore
+}
+
 # Wrap things in a module to avoid cluttering the global scope. We assign it to '$null' to suppress
 # the console output from creating the module.
 # NOTE: If you do need a function to be global and also have access to variables in this scope, add
@@ -1086,13 +1100,15 @@ $script:WarpPwshInitShell = @'
     # Source the user's RC files
     # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.4#profile-types-and-locations
     # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.4#the-profile-variable
-    foreach ($file in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) {
-        if ([System.IO.File]::Exists($file)) {
-            try {
-                . $file
-            } catch {
-                Write-Host -ForegroundColor Red $_.InvocationInfo.PositionMessage
-                Write-Host -ForegroundColor DarkRed $_.Exception
+    if ($null -eq $global:_warpPrivateHistoryPath) {
+        foreach ($file in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) {
+            if ([System.IO.File]::Exists($file)) {
+                try {
+                    . $file
+                } catch {
+                    Write-Host -ForegroundColor Red $_.InvocationInfo.PositionMessage
+                    Write-Host -ForegroundColor DarkRed $_.Exception
+                }
             }
         }
     }

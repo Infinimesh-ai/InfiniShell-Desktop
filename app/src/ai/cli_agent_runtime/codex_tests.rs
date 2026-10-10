@@ -37,6 +37,29 @@ fn options() -> SessionOptions {
     }
 }
 
+#[test]
+fn failed_version_probe_preserves_io_source_and_disconnects_before_native_launch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut settings = options();
+    settings.executable = directory.path().join("missing-codex.exe");
+    settings.state_dir = directory.path().join("native");
+    let mut connection = connect(settings).unwrap();
+
+    let error = warpui::r#async::block_on(connection.task).unwrap_err();
+    let RuntimeError::IoAt { operation, source } = &error else {
+        panic!("版本探测应保留带阶段的 I/O 错误：{error:?}");
+    };
+    assert_eq!(*operation, "codex.version_probe");
+    assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+    assert!(std::error::Error::source(&error).is_some());
+    let event = connection.events.try_recv().unwrap();
+    assert!(
+        matches!(event.kind, RuntimeEventKind::Disconnected { reason }
+        if reason == error.to_string())
+    );
+    assert!(!directory.path().join("native").exists());
+}
+
 fn legacy_probed_protocol(options: SessionOptions) -> CodexProtocol {
     let mut protocol = CodexProtocol::new(options);
     protocol.record_version_probe("codex-cli 0.147.0").unwrap();
@@ -604,6 +627,136 @@ fn inherited_permissions_are_not_replaced_with_bypass_or_sandbox_overrides() {
         .unwrap();
     assert!(open.writes[1]["params"].get("approvalPolicy").is_none());
     assert!(open.writes[1]["params"].get("sandbox").is_none());
+}
+
+fn assert_fixed_permission_mismatch(pointer: &str, value: Value, expected_error: &str) {
+    let mut protocol = CodexProtocol::new(options());
+    protocol.record_version_probe("codex-cli 0.156.1").unwrap();
+    protocol.initialize();
+    // 仅验证协议拒绝行为，不冒充 Windows 原生回包或沙箱验收。
+    protocol
+        .receive(json!({"id":1,"result":{
+            "userAgent":"infinishell/0.156.1 (Windows; x86_64)"
+        }}))
+        .unwrap();
+    let mut response = captured_output(TWO_TURNS, |message| message["id"] == 2);
+    *response.pointer_mut(pointer).unwrap() = value;
+
+    let Err(RuntimeError::Protocol(message)) = protocol.receive(response) else {
+        panic!("权限差异必须在会话就绪前拒绝");
+    };
+    assert_eq!(message, expected_error);
+    assert!(protocol.session_id.is_none());
+    assert!(
+        protocol
+            .command(command(
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text("must not run".into())]
+                },
+                99
+            ))
+            .writes
+            .is_empty()
+    );
+}
+
+#[test]
+fn narrower_sandbox_is_rejected_with_only_sandbox_mismatch() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox/type",
+        json!("readOnly"),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=readOnly",
+    );
+}
+
+#[test]
+fn approval_mismatch_diagnostic_does_not_echo_response_value() {
+    assert_fixed_permission_mismatch(
+        "/result/approvalPolicy",
+        json!("private-config-value-must-not-be-logged"),
+        "app-server did not apply the requested permission policy: sandbox_matches=true, approval_matches=false, reviewer_matches=true, sandbox_type=workspaceWrite",
+    );
+}
+
+#[test]
+fn automated_reviewer_is_rejected_with_only_reviewer_mismatch() {
+    assert_fixed_permission_mismatch(
+        "/result/approvalsReviewer",
+        json!("auto_review"),
+        "app-server did not apply the requested permission policy: sandbox_matches=true, approval_matches=true, reviewer_matches=false, sandbox_type=workspaceWrite",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_rejects_danger_full_access() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox/type",
+        json!("dangerFullAccess"),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=dangerFullAccess",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_rejects_external_sandbox() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox/type",
+        json!("externalSandbox"),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=externalSandbox",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_does_not_echo_unknown_type() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox/type",
+        json!("workspaceWrite\nprivate-token-fixture"),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=unknown",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_distinguishes_missing_type() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox",
+        json!({"private-field":"private-config-fixture"}),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=missing",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_distinguishes_null_type() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox/type",
+        Value::Null,
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=null",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_distinguishes_wrong_type() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox/type",
+        json!(["private-config-fixture"]),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=wrong_type",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_distinguishes_null_container() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox",
+        Value::Null,
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=null",
+    );
+}
+
+#[test]
+fn sandbox_diagnostic_distinguishes_wrong_container() {
+    assert_fixed_permission_mismatch(
+        "/result/sandbox",
+        json!("private-config-fixture"),
+        "app-server did not apply the requested permission policy: sandbox_matches=false, approval_matches=true, reviewer_matches=true, sandbox_type=wrong_type",
+    );
 }
 
 #[test]

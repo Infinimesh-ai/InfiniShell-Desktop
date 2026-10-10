@@ -1859,6 +1859,8 @@ async fn spawn_configured_inner(
     let manifest_path = directory.join("manifest.json");
     let mut command = Command::new(worker);
     #[cfg(windows)]
+    command.inherit_managed_job();
+    #[cfg(windows)]
     command
         .env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_ALLOW")
         .env_remove("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION")

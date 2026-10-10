@@ -207,6 +207,58 @@ fn rollback_file_boundaries_use_actual_file_identity_and_reject_replacement() {
 }
 
 #[test]
+fn rename_owned_preserves_images_at_all_utf16_alignments_with_chinese_and_spaces() {
+    let root = tempfile::tempdir().unwrap();
+    for remainder in 0..4 {
+        let directory = root.path().join(format!("中文 空格 {remainder}"));
+        fs::create_dir(&directory).unwrap();
+        let mut journal = fixture(&directory);
+        let base_length = directory
+            .join("备份 file.exe")
+            .as_os_str()
+            .encode_wide()
+            .count();
+        let padding = (remainder + 4 - base_length % 4) % 4;
+        journal.backup = directory.join(format!("备份 file{}.exe", "a".repeat(padding)));
+        // 按实际绝对路径的 UTF-16 码元数覆盖四种余数，不依赖临时目录的随机长度。
+        assert_eq!(
+            journal.backup.as_os_str().encode_wide().count() % 4,
+            remainder
+        );
+        verify_rollback_images(&journal).unwrap();
+
+        let original = hold_file(&journal.owner.target, &journal.original).unwrap();
+        rename_owned(&original, &journal.backup).unwrap();
+        drop(original);
+        assert_eq!(optional_image(&journal.owner.target).unwrap(), None);
+        assert_eq!(image(&journal.backup).unwrap(), journal.original);
+        assert_eq!(image(&journal.candidate).unwrap(), journal.prepared);
+        verify_rollback_images(&journal).unwrap();
+
+        let candidate = hold_file(&journal.candidate, &journal.prepared).unwrap();
+        rename_owned(&candidate, &journal.owner.target).unwrap();
+        drop(candidate);
+        assert_eq!(optional_image(&journal.candidate).unwrap(), None);
+        assert_eq!(image(&journal.owner.target).unwrap(), journal.prepared);
+        assert_eq!(image(&journal.backup).unwrap(), journal.original);
+        verify_rollback_images(&journal).unwrap();
+
+        replace(
+            &journal.owner.target,
+            &journal.backup,
+            &journal.candidate,
+            &journal.prepared,
+            &journal.original,
+        )
+        .unwrap();
+        assert_eq!(image(&journal.owner.target).unwrap(), journal.original);
+        assert_eq!(optional_image(&journal.backup).unwrap(), None);
+        assert_eq!(image(&journal.candidate).unwrap(), journal.prepared);
+        verify_rollback_images(&journal).unwrap();
+    }
+}
+
+#[test]
 fn arp_partial_write_accepts_only_bound_fields_without_touching_registry() {
     let root = tempfile::tempdir().unwrap();
     let journal = fixture(root.path());

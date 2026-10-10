@@ -920,6 +920,7 @@ impl ServiceImpl for RuntimeHostServiceImpl {
                         | RuntimeError::Protocol(_)
                         | RuntimeError::PermissionCeilingRejected { .. }
                         | RuntimeError::Io(_)
+                        | RuntimeError::IoAt { .. }
                         | RuntimeError::RequestTimedOut
                         | RuntimeError::EventBackpressure,
                     ) => {

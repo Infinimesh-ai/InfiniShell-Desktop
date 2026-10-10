@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-08T04:19:55.1968284+08:00",
+  "scope": "实际 Windows 应用内各一次初始化、消息确认、模型回复及断开；不代表完整 V01/V02/V05 验收",
+  "tested_source_commit": "fc635a3dfe628c0493beb8a20db1adedd39d9779",
+  "application_sha256": "e1a20ed40843fde49b0651aff81a90dd48602ffce4bd2b8739554d795e997bdd",
+  "is_evidence_for_integration_commit": false,
+  "tasks": [
+    {
+      "task_id": "a9789b4f-1301-4d0e-9bdf-c1b48df29c10",
+      "harness": "grok",
+      "cli_version": "1.0.41",
+      "state": "completed",
+      "native_session_id": "01a11802-0158-7420-b411-4aea25628ea4",
+      "generation": 1,
+      "result": "GROK_APP_RECHECK_OK",
+      "permission_policy": "Inherit"
+    },
+    {
+      "task_id": "ff7c9e04-4098-42f6-b695-eddf6bfa5970",
+      "harness": "codex",
+      "cli_version": "0.156.1",
+      "state": "completed",
+      "native_session_id": "01a117fa-bfe5-7a52-9375-0e3e8735f0cb",
+      "generation": 1,
+      "result": "CODEX_APP_RECHECK_OK",
+      "permission_policy": "ReadOnly"
+    }
+  ],
+  "messages": [
+    {
+      "task_id": "ff7c9e04-4098-42f6-b695-eddf6bfa5970",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    },
+    {
+      "task_id": "a9789b4f-1301-4d0e-9bdf-c1b48df29c10",
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    }
+  ],
+  "remaining_private_codex_grok_processes": [],
+  "project_entries": [],
+  "original_summary": {
+    "sha256": "5a921acaded6eef4dc100f49b2107c7058679acb6088f8d2dcb0967c73183b22",
+    "path": "diagnostics/cli-recheck-20261008/app-rerun-summary.safe.json"
+  },
+  "evidence": [
+    {
+      "path": "evidence/app-20.json",
+      "sha256": "d0091ebc53c2f953070c5ef141301881649a9c4c2a6f5264cddc002e02f894cd"
+    },
+    {
+      "path": "evidence/tasks-app20-final.json",
+      "sha256": "87082732029271da85069b0755203cc15b2199c5bb618de39e500d8c9330a34e"
+    },
+    {
+      "path": "gui-12/app20-codex-result-02.png",
+      "sha256": "6caae410b9c796c8869fd0ba06bbf1b596718943811526590df2ab5e2ea73533"
+    },
+    {
+      "path": "gui-12/app20-grok-result-02.png",
+      "sha256": "517f9b78a17df7fa626616b1cfc919c92432d152481d2bd0cee737ec5a54a77d"
+    },
+    {
+      "path": "gui-12/app20-codex-disconnect-02.png",
+      "sha256": "178d3bbd0fd6d2c9d127d748453e096b4dc6b63fddf7cd5fee27e05cae192857"
+    },
+    {
+      "path": "gui-12/app20-grok-disconnect-02.png",
+      "sha256": "66d4c52d027a3b2e3eb94d5a6ef4d569eb771ae07a688ac080d73ca6ce2afd80"
+    }
+  ]
+}

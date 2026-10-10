@@ -239,10 +239,9 @@ fn resume_claims_unstarted_generation_but_rejects_incomplete_process_records() {
                 .unwrap()
                 .unwrap();
         assert_eq!(receipt.containment, "not_started");
-        assert!(
-            verify_previous_process_exit(&writer.sender, &next, Some(2), &options)
-                .await
-                .is_err()
+        assert_eq!(
+            verify_previous_process_exit(&writer.sender, &next, Some(2), &options).await,
+            Err((crate::t!("cli-agent-task-invalid-launch"), None))
         );
         let incomplete = Uuid::new_v4();
         std::fs::create_dir(
@@ -259,10 +258,12 @@ fn resume_claims_unstarted_generation_but_rejects_incomplete_process_records() {
             .await
             .unwrap()
             .unwrap();
-        assert!(
-            verify_previous_process_exit(&writer.sender, &next, Some(1), &options)
-                .await
-                .is_err()
+        assert_eq!(
+            verify_previous_process_exit(&writer.sender, &next, Some(1), &options).await,
+            Err((
+                crate::t!("cli-agent-task-exit-unconfirmed"),
+                Some(prior.clone())
+            ))
         );
         let stored = load_tasks(&writer.sender, false)
             .unwrap()
@@ -273,6 +274,217 @@ fn resume_claims_unstarted_generation_but_rejects_incomplete_process_records() {
     });
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();
+}
+
+#[test]
+fn failed_resume_preflight_restores_durable_task_without_starting_or_persisting_next_generation() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let directory = tempfile::tempdir().unwrap();
+        let writer =
+            crate::persistence::start_test_writer(&directory.path().join("resume.sqlite")).unwrap();
+        let old_runtime = Uuid::new_v4();
+        let mut previous = snapshot().task;
+        previous.config_json = json!({"runtime_generation": old_runtime}).to_string();
+        persist_running_task(&writer.sender, &mut previous).await;
+        let running = previous.clone();
+        previous.state = LocalCliTaskState::Disconnected;
+        previous.result = Some("保留历史结果".into());
+        previous.terminal_evidence = Some("保留旧代证据".into());
+        commit_transition(&writer.sender, &mut previous, &running)
+            .await
+            .unwrap();
+        let generations = load_task_generations(&writer.sender, previous.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        // 仅测试夹具：正式宿主身份匹配，但 NotStarted 不代表前置子进程已清理。
+        super::super::runtime_host::write_cancelled_startup_marker_for_test(
+            previous.task_id.clone(),
+            previous.generation,
+            Harness::Codex,
+            recovery_options(directory.path(), old_runtime),
+        )
+        .unwrap();
+        let host = super::super::runtime_host::load_record(directory.path(), old_runtime)
+            .unwrap()
+            .unwrap();
+        let host_directory = directory
+            .path()
+            .join("cli-agent-hosts")
+            .join(old_runtime.to_string());
+        // 创建器附带的 startup marker 不参与 confirmed_exit；此处另建完整合法空账本。
+        tempfile::NamedTempFile::new_in(&host_directory)
+            .unwrap()
+            .persist(host_directory.join("runtime.journal"))
+            .unwrap();
+        let mut exit = tempfile::NamedTempFile::new_in(&host_directory).unwrap();
+        serde_json::to_writer(
+            &mut exit,
+            &json!({
+                "version": 2,
+                "runtime_generation": old_runtime,
+                "host_instance_id": host.host_instance_id(),
+                "manifest_sha256": host.manifest_sha256(),
+                "journal_sha256": host.manifest_sha256(),
+                "last_event_sequence": 0,
+                "acknowledged_sequence": 0,
+                "native_process": "not_started",
+                "native_cleanup_sha256": null,
+                "adapter_task_terminated": true,
+                "adapter_succeeded": false,
+                "event_journal_completed": true
+            }),
+        )
+        .unwrap();
+        exit.persist(host_directory.join("host-exit.json")).unwrap();
+        assert_eq!(
+            super::super::runtime_host::confirmed_exit(directory.path(), old_runtime)
+                .unwrap_err()
+                .to_string(),
+            "运行时宿主退出回执不完整或不匹配"
+        );
+        let token = Uuid::new_v4();
+        let mut options = recovery_options(directory.path(), token);
+        options.target = SessionTarget::Resume {
+            native_session_id: previous.native_session_id.clone().unwrap(),
+        };
+        let mut pending = snapshot();
+        pending.task = next_task_generation(&previous).unwrap();
+        pending.ready = false;
+        let coordinator = app.add_model(|_| LocalCLITaskCoordinator::new(None));
+        let (commands, receiver) = mpsc::channel(1);
+        let spawner = coordinator.update(&mut app, |coordinator, ctx| {
+            coordinator.entries.insert(
+                pending.task.task_id.clone(),
+                ManagedTaskEntry {
+                    token,
+                    snapshot: pending.clone(),
+                    commands,
+                    pending_tool_calls: HashSet::new(),
+                },
+            );
+            ctx.spawner()
+        });
+        let (controller, mut wire, _events_sender, events) = channels(token);
+        let connection = RuntimeConnection {
+            controller,
+            events,
+            task: async { panic!("退出门禁失败不得启动宿主或 CLI") }.boxed(),
+        };
+        assert_eq!(
+            run_managed_task(
+                pending,
+                Some(previous.generation),
+                false,
+                None,
+                token,
+                writer.sender.clone(),
+                options.clone(),
+                connection,
+                receiver,
+                spawner,
+                Vec::new(),
+                RecoveryProtocolState::default(),
+                ManagedStartMode::Fresh,
+            )
+            .await,
+            Err(crate::t!("cli-agent-task-exit-unconfirmed"))
+        );
+        coordinator.update(&mut app, |coordinator, _| {
+            let restored = coordinator.snapshot(&previous.task_id).unwrap();
+            assert_eq!(restored.task, previous);
+            assert!(!restored.connected);
+            assert!(!restored.ready);
+            assert!(!restored.task.state.is_active());
+            assert_eq!(
+                restored.error,
+                Some(crate::t!("cli-agent-task-exit-unconfirmed"))
+            );
+        });
+        assert_eq!(
+            wire.try_recv(),
+            Err(mpsc::error::TryRecvError::Disconnected)
+        );
+        assert_eq!(
+            load_tasks(&writer.sender, false)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap(),
+            [previous.clone()]
+        );
+        assert_eq!(
+            load_task_generations(&writer.sender, previous.task_id.clone())
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap(),
+            generations
+        );
+        assert!(
+            load_messages(
+                &writer.sender,
+                previous.task_id.clone(),
+                previous.generation
+            )
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap()
+            .is_empty()
+        );
+        // 可再次请求核验不等于放行：未补齐旧代回执时仍以相同错误拒绝。
+        assert_eq!(
+            verify_previous_process_exit(
+                &writer.sender,
+                &next_task_generation(&previous).unwrap(),
+                Some(previous.generation),
+                &options,
+            )
+            .await,
+            Err((crate::t!("cli-agent-task-exit-unconfirmed"), Some(previous)))
+        );
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+    });
+}
+
+#[test]
+fn failed_resume_publication_cannot_replace_a_newer_runtime_entry() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let coordinator = app.add_model(|_| LocalCLITaskCoordinator::new(None));
+        let current_token = Uuid::new_v4();
+        let mut current = snapshot();
+        current.task.generation = 3;
+        current.task.state = LocalCliTaskState::Running;
+        let mut failed = current.clone();
+        failed.task.generation = 1;
+        failed.task.state = LocalCliTaskState::Disconnected;
+        failed.connected = false;
+        failed.ready = false;
+        failed.error = Some(crate::t!("cli-agent-task-exit-unconfirmed"));
+        let (commands, _receiver) = mpsc::channel(1);
+        coordinator.update(&mut app, |coordinator, ctx| {
+            coordinator.entries.insert(
+                current.task.task_id.clone(),
+                ManagedTaskEntry {
+                    token: current_token,
+                    snapshot: current.clone(),
+                    commands,
+                    pending_tool_calls: HashSet::new(),
+                },
+            );
+            coordinator.publish(Uuid::new_v4(), failed, None, ctx);
+            let retained = coordinator.snapshot(&current.task.task_id).unwrap();
+            assert_eq!(retained.task, current.task);
+            assert!(retained.connected);
+            assert!(retained.ready);
+            assert!(retained.error.is_none());
+        });
+    });
 }
 
 fn snapshot() -> ManagedTaskSnapshot {
@@ -1635,6 +1847,109 @@ fn disconnect_cannot_imply_success_and_cannot_overwrite_a_committed_result() {
     apply_runtime_event(&mut state, &disconnected).unwrap();
     assert_eq!(state.task.state, LocalCliTaskState::Completed);
     assert_eq!(state.task.result.as_deref(), Some("真实结果"));
+}
+
+#[test]
+fn failed_current_turn_exposes_native_error_without_replacing_output() {
+    let mut state = snapshot();
+    state.active_turn_id = Some("current".into());
+    state.task.state = LocalCliTaskState::Running;
+    state.error = Some("旧请求错误".into());
+    let finished = event(
+        &state,
+        RuntimeEventKind::TurnFinished {
+            turn_id: "current".into(),
+            outcome: TurnOutcome::Failed {
+                message: "原生额度限制".into(),
+            },
+            output: String::new(),
+        },
+    );
+
+    apply_runtime_event(&mut state, &finished).unwrap();
+
+    assert_eq!(state.task.state, LocalCliTaskState::Failed);
+    assert_eq!(state.error.as_deref(), Some("原生额度限制"));
+    assert_eq!(state.task.result.as_deref(), Some(""));
+    assert!(state.output.is_empty());
+    assert!(state.active_turn_id.is_none());
+    let evidence: Value =
+        serde_json::from_str(state.task.terminal_evidence.as_deref().unwrap()).unwrap();
+    assert_eq!(
+        evidence["event"]["TurnFinished"]["outcome"]["Failed"]["message"],
+        "原生额度限制"
+    );
+}
+
+#[test]
+fn completed_current_turn_clears_previous_error() {
+    let mut state = snapshot();
+    state.active_turn_id = Some("current".into());
+    state.task.state = LocalCliTaskState::Running;
+    state.error = Some("旧请求错误".into());
+    let finished = event(
+        &state,
+        RuntimeEventKind::TurnFinished {
+            turn_id: "current".into(),
+            outcome: TurnOutcome::Completed,
+            output: "原生完成结果".into(),
+        },
+    );
+
+    apply_runtime_event(&mut state, &finished).unwrap();
+
+    assert_eq!(state.task.state, LocalCliTaskState::Completed);
+    assert!(state.error.is_none());
+    assert_eq!(state.task.result.as_deref(), Some("原生完成结果"));
+}
+
+#[test]
+fn cancelled_current_turn_clears_previous_error() {
+    let mut state = snapshot();
+    state.active_turn_id = Some("current".into());
+    state.task.state = LocalCliTaskState::Running;
+    state.error = Some("旧请求错误".into());
+    let finished = event(
+        &state,
+        RuntimeEventKind::TurnFinished {
+            turn_id: "current".into(),
+            outcome: TurnOutcome::Cancelled,
+            output: String::new(),
+        },
+    );
+
+    apply_runtime_event(&mut state, &finished).unwrap();
+
+    assert_eq!(state.task.state, LocalCliTaskState::Cancelled);
+    assert!(state.error.is_none());
+    assert_eq!(state.task.result.as_deref(), Some(""));
+}
+
+#[test]
+fn failed_old_turn_cannot_replace_current_error() {
+    let mut state = snapshot();
+    state.active_turn_id = Some("current".into());
+    state.task.state = LocalCliTaskState::Running;
+    state.error = Some("当前请求错误".into());
+    state.output = "当前输出".into();
+    let previous = state.task.clone();
+    let finished = event(
+        &state,
+        RuntimeEventKind::TurnFinished {
+            turn_id: "old".into(),
+            outcome: TurnOutcome::Failed {
+                message: "旧回合错误".into(),
+            },
+            output: "旧回合输出".into(),
+        },
+    );
+
+    apply_runtime_event(&mut state, &finished).unwrap();
+
+    assert_eq!(state.task, previous);
+    assert_eq!(state.active_turn_id.as_deref(), Some("current"));
+    assert_eq!(state.error.as_deref(), Some("当前请求错误"));
+    assert_eq!(state.output, "当前输出");
 }
 
 #[test]
@@ -8631,7 +8946,10 @@ fn durable_identity_quarantine_blocks_resume_even_when_process_exit_is_confirmed
             // 调用方沿用隔离前的快照；必须以重新读取的数据库记录拒绝恢复。
             assert_eq!(
                 verify_previous_process_exit(&writer.sender, &next, Some(1), &options).await,
-                Err(crate::t!("cli-agent-task-outcome-unconfirmed"))
+                Err((
+                    crate::t!("cli-agent-task-outcome-unconfirmed"),
+                    Some(previous.clone())
+                ))
             );
             assert_eq!(
                 load_tasks(&writer.sender, false)

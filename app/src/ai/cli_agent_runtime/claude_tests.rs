@@ -2868,3 +2868,105 @@ fn paired_init_after_first_input_does_not_replay_that_input() {
     assert_eq!(protocol.turns.len(), 1);
     assert_eq!(protocol.messages.len(), 1);
 }
+
+#[test]
+fn claude_disconnected_known_permission_reason_preserves_message_and_error() {
+    let details = json!({
+        "reason":"claude_profile_preflight_timeout", "actual":"private-config-fixture",
+    });
+    let result = Err(RuntimeError::PermissionCeilingRejected {
+        message: "已有的本地化错误。".into(),
+        details: details.clone(),
+    });
+    assert_eq!(
+        disconnected_reason(&result),
+        "已有的本地化错误。 [reason=claude_profile_preflight_timeout]"
+    );
+    let Err(RuntimeError::PermissionCeilingRejected {
+        message,
+        details: retained_details,
+    }) = &result
+    else {
+        panic!("诊断不能替换原权限错误");
+    };
+    assert_eq!(message, "已有的本地化错误。");
+    assert_eq!(retained_details, &details);
+}
+
+#[test]
+fn claude_disconnected_unknown_permission_reason_never_leaks_details() {
+    let details = json!({
+        "reason":"claude_profile_preflight_timeout\nprivate-token-fixture",
+        "actual":"private-config-fixture", "expected":"private-path-fixture",
+    });
+    let result = Err(RuntimeError::PermissionCeilingRejected {
+        message: "The existing localized error.".into(),
+        details: details.clone(),
+    });
+    assert_eq!(
+        disconnected_reason(&result),
+        "The existing localized error."
+    );
+    assert_eq!(
+        result.as_ref().unwrap_err().permission_ceiling_evidence(),
+        Some(&details)
+    );
+}
+
+#[test]
+fn claude_disconnected_malformed_permission_reason_is_not_a_diagnostic() {
+    let result = Err(RuntimeError::PermissionCeilingRejected {
+        message: "已有的本地化错误。".into(),
+        details: json!({"reason":["claude_profile_preflight_timeout"],"actual":"private-config-fixture"}),
+    });
+    assert_eq!(disconnected_reason(&result), "已有的本地化错误。");
+    let missing = Err(RuntimeError::PermissionCeilingRejected {
+        message: "已有的本地化错误。".into(),
+        details: json!({"actual":"private-config-fixture"}),
+    });
+    assert_eq!(disconnected_reason(&missing), "已有的本地化错误。");
+}
+
+#[test]
+fn claude_disconnected_other_results_keep_existing_semantics() {
+    assert_eq!(disconnected_reason(&Ok(())), "runtime connection closed");
+    let result = Err(RuntimeError::RequestTimedOut);
+    assert_eq!(
+        disconnected_reason(&result),
+        "CLI request timed out; input delivery is uncertain"
+    );
+    assert!(matches!(result, Err(RuntimeError::RequestTimedOut)));
+    let result = Err(RuntimeError::InvalidConfiguration("fixture".into()));
+    assert_eq!(
+        disconnected_reason(&result),
+        "Invalid runtime configuration: fixture"
+    );
+    assert!(matches!(result, Err(RuntimeError::InvalidConfiguration(_))));
+}
+
+#[tokio::test]
+async fn claude_disconnected_preflight_rejection_keeps_task_error_and_event() {
+    let mut settings = options();
+    settings.permission_policy = PermissionPolicy::ClaudeRestrictedFilesV2;
+    settings.target = SessionTarget::Resume {
+        native_session_id: Uuid::from_u128(17).to_string(),
+    };
+    // 缺少恢复策略会在任何预检子进程启动前被拒绝，测试不启动 CLI。
+    let mut connection = connect(settings).unwrap();
+    let result = connection.task.await;
+    let Err(RuntimeError::PermissionCeilingRejected { message, details }) = &result else {
+        panic!("预检必须保留原权限拒绝类型");
+    };
+    assert_eq!(details["reason"], "claude_profile_resume_missing");
+    assert_eq!(details["task_input_sent"], Value::Null);
+    let event = connection.events.try_recv().unwrap();
+    let RuntimeEventKind::Disconnected { reason } = event.kind else {
+        panic!("预检失败必须发布断开事件");
+    };
+    assert_eq!(
+        reason.strip_suffix(" [reason=claude_profile_resume_missing]"),
+        Some(message.as_str())
+    );
+    assert!(event.native_session_id.is_none());
+    assert!(connection.events.try_recv().is_err());
+}

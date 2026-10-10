@@ -2731,8 +2731,22 @@ async fn run_managed_task(
     if start_mode == ManagedStartMode::Fresh
         && matches!(options.target, SessionTarget::Resume { .. })
     {
-        verify_previous_process_exit(&sender, &snapshot.task, expected_generation, &options)
-            .await?;
+        if let Err((error, previous)) =
+            verify_previous_process_exit(&sender, &snapshot.task, expected_generation, &options)
+                .await
+        {
+            if let Some(previous) = previous {
+                // 新代尚未落库；恢复本次核验读取的旧代，不能留下虚假的 Queued 运行。
+                snapshot.task = previous;
+                snapshot.connected = false;
+                snapshot.ready = false;
+                snapshot.error = Some(error.clone());
+                let _ = spawner
+                    .spawn(move |model, ctx| model.publish(token, snapshot, None, ctx))
+                    .await;
+            }
+            return Err(error);
+        }
     }
     if start_mode == ManagedStartMode::Reattached {
         if expected_generation.is_some() || initial_input.is_some() {
@@ -3205,6 +3219,7 @@ async fn run_managed_task(
 fn runtime_error_for_user(error: RuntimeError) -> String {
     match error {
         RuntimeError::Io(_)
+        | RuntimeError::IoAt { .. }
         | RuntimeError::ControllerClosed
         | RuntimeError::Protocol(_)
         | RuntimeError::RequestTimedOut
@@ -3279,47 +3294,55 @@ async fn verify_previous_process_exit(
     task: &LocalCliTask,
     expected_generation: Option<i64>,
     options: &SessionOptions,
-) -> Result<(), String> {
-    let previous = load_tasks(sender, false)?
-        .await
-        .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
-        .into_iter()
-        .find(|previous| {
-            previous.task_id == task.task_id && Some(previous.generation) == expected_generation
-        })
-        .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
-    // 重新读取的持久记录才是恢复授权依据，调用方不能删去隔离字段后绕过检查。
-    verify_recovery_identity(&previous)?;
-    let configuration: serde_json::Value = serde_json::from_str(&previous.config_json)
-        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
-    let generation = configuration
-        .get("runtime_generation")
-        .and_then(serde_json::Value::as_str)
-        .and_then(|value| Uuid::parse_str(value).ok())
-        .ok_or_else(|| crate::t!("cli-agent-task-exit-unconfirmed"))?;
-    let state_dir = options.state_dir.clone();
-    let executable = options.executable.clone();
-    let cwd = options.cwd.clone();
-    blocking::unblock(move || {
-        if super::runtime_host::load_record(&state_dir, generation)?.is_some() {
-            if super::runtime_host::confirmed_exit(&state_dir, generation)?.is_none() {
-                return Err(std::io::Error::other("runtime_host_exit_unconfirmed"));
-            }
-        } else if super::managed_process::confirmed_exit(&state_dir, generation)?.is_none() {
-            // 抢先封存尚未声明的旧代，晚到的 spawn 将失败；已有启动记录不能被覆盖。
-            super::managed_process::record_not_started(
-                &state_dir,
-                generation,
-                &executable,
-                &[],
-                &cwd,
-            )?;
-        }
-        Ok::<(), std::io::Error>(())
-    })
+) -> Result<(), (String, Option<LocalCliTask>)> {
+    let previous = async {
+        load_tasks(sender, false)?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
+            .into_iter()
+            .find(|previous| {
+                previous.task_id == task.task_id && Some(previous.generation) == expected_generation
+            })
+            .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))
+    }
     .await
-    .map_err(|_| crate::t!("cli-agent-task-exit-unconfirmed"))?;
-    Ok(())
+    .map_err(|error| (error, None))?;
+    async {
+        // 重新读取的持久记录才是恢复授权依据，调用方不能删去隔离字段后绕过检查。
+        verify_recovery_identity(&previous)?;
+        let configuration: serde_json::Value = serde_json::from_str(&previous.config_json)
+            .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+        let generation = configuration
+            .get("runtime_generation")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .ok_or_else(|| crate::t!("cli-agent-task-exit-unconfirmed"))?;
+        let state_dir = options.state_dir.clone();
+        let executable = options.executable.clone();
+        let cwd = options.cwd.clone();
+        blocking::unblock(move || {
+            if super::runtime_host::load_record(&state_dir, generation)?.is_some() {
+                if super::runtime_host::confirmed_exit(&state_dir, generation)?.is_none() {
+                    return Err(std::io::Error::other("runtime_host_exit_unconfirmed"));
+                }
+            } else if super::managed_process::confirmed_exit(&state_dir, generation)?.is_none() {
+                // 抢先封存尚未声明的旧代，晚到的 spawn 将失败；已有启动记录不能被覆盖。
+                super::managed_process::record_not_started(
+                    &state_dir,
+                    generation,
+                    &executable,
+                    &[],
+                    &cwd,
+                )?;
+            }
+            Ok::<(), std::io::Error>(())
+        })
+        .await
+        .map_err(|_| crate::t!("cli-agent-task-exit-unconfirmed"))?;
+        Ok(())
+    }
+    .await
+    .map_err(|error| (error, Some(previous)))
 }
 
 async fn send_user_request(
@@ -4853,6 +4876,10 @@ fn apply_runtime_event(
             {
                 return Err(crate::t!("cli-agent-task-invalid-launch"));
             }
+            snapshot.error = match outcome {
+                TurnOutcome::Failed { message } => Some(message.clone()),
+                TurnOutcome::Completed | TurnOutcome::Cancelled => None,
+            };
             snapshot.task.result = Some(output.clone());
             snapshot.task.terminal_evidence = Some(
                 json!({"native_session_id": event.native_session_id, "event": event.kind})
