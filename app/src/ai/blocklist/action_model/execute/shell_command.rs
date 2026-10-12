@@ -29,7 +29,7 @@ use crate::ai::execution_profiles::WriteToPtyPermission;
 use crate::terminal::TerminalModel;
 use crate::terminal::event::BlockMetadataReceivedEvent;
 use crate::terminal::model::block::{
-    Block, BlockId, CURSOR_MARKER, formatted_terminal_contents_for_input,
+    Block, BlockId, BlockState, CURSOR_MARKER, formatted_terminal_contents_for_input,
 };
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
@@ -1068,6 +1068,13 @@ fn action_result_for_block(
         formatted_terminal_contents_for_input(
             model.alt_screen().grid_handler(),
             None,
+            CURSOR_MARKER,
+        )
+    } else if block.state() == BlockState::BeforeExecution {
+        // preexec 前的命令回显和续行提示位于命令网格，Agent 需要看到等待补全的位置。
+        formatted_terminal_contents_for_input(
+            block.prompt_and_command_grid().grid_handler(),
+            Some(1000),
             CURSOR_MARKER,
         )
     } else {

@@ -23,7 +23,7 @@ use crate::pane_group::NewTerminalOptions;
 use crate::root_view::{NewWorkspaceSource, open_new_with_workspace_source};
 use crate::terminal::TerminalView;
 use crate::terminal::model::RespectObfuscatedSecrets;
-use crate::terminal::model::block::{BlockId, SerializedBlock};
+use crate::terminal::model::block::{BlockId, BlockState, SerializedBlock};
 use crate::terminal::model::find::RegexDFAs;
 use crate::terminal::model::grid::RespectDisplayedOutput;
 use crate::terminal::model::index::Point;
@@ -207,20 +207,25 @@ impl TerminalDriver {
             .map(SerializedBlock::from)
     }
 
-    /// Full visible plaintext of `block_id`'s output grid (no ANSI escape
-    /// sequences; secrets obfuscated). Used by the harness output monitor
-    /// to detect whether the block has stalled — two byte-identical
-    /// snapshots taken N seconds apart imply the harness has produced no
-    /// new output and no spinner activity.
+    /// 返回 `block_id` 当前块网格的完整可见纯文本，不含 ANSI 转义序列并保留秘密脱敏。
+    /// harness 输出监视器通过比较相隔 N 秒的快照检测停滞：字节完全一致表示
+    /// 没有新增输出，也没有进度指示器活动。
     ///
-    /// We intentionally pass `None` for `max_rows` so we compare the entire
-    /// visible output; capping the row count could falsely report "stalled"
-    /// when content scrolled below the cap actually changed.
+    /// preexec 尚未触发时，命令回显和未闭合引号的续行提示写入命令网格；
+    /// 此时读取命令网格，执行开始后再读取输出网格，避免漏掉等待补全的提示。
+    ///
+    /// `max_rows` 刻意使用 `None`，以比较全部可见输出；截断行数可能漏掉
+    /// 限制范围外的滚动内容变化，将仍在输出的命令误判为停滞。
     pub fn block_output_plaintext(&self, block_id: &BlockId, ctx: &AppContext) -> Option<String> {
         let terminal = self.terminal_view.as_ref(ctx);
         let model = terminal.model.lock();
         let block = model.block_list().block_with_id(block_id)?;
-        Some(block.output_grid().contents_to_string(
+        let grid = if block.state() == BlockState::BeforeExecution {
+            block.prompt_and_command_grid()
+        } else {
+            block.output_grid()
+        };
+        Some(grid.contents_to_string(
             false, // include_escape_sequences
             None,  // max_rows: full visible output
         ))
@@ -506,3 +511,7 @@ impl TerminalDriver {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "terminal_tests.rs"]
+mod tests;

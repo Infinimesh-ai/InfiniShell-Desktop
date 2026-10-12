@@ -1,12 +1,182 @@
 use std::time::Duration;
 
+use async_channel::unbounded;
+use warpui::App;
+
 use super::*;
+use crate::ai::agent::AIAgentAction;
 use crate::ai::agent::conversation::AIConversationId;
+use crate::ai::agent::task::TaskId;
 use crate::ai::blocklist::block::cli_controller::{
     LongRunningCommandControlState, UserTakeOverReason,
 };
 use crate::terminal::model::ansi::{ExitShellValue, Handler, InitShellValue, SSHValue};
-use crate::terminal::model::session::SessionId;
+use crate::terminal::model::block::BlockState;
+use crate::terminal::model::session::{SessionId, Sessions};
+
+#[test]
+fn polling_snapshot_exposes_continuation_prompt_and_cursor() {
+    App::test((), |mut app| async move {
+        let sessions = app.add_model(|_| Sessions::new_for_test());
+        let (_events_tx, events_rx) = unbounded();
+        let dispatcher =
+            app.add_model(|ctx| ModelEventDispatcher::new(events_rx, sessions.clone(), ctx));
+        let active_session =
+            app.add_model(|ctx| ActiveSession::new(sessions, dispatcher.clone(), ctx));
+        let model = Arc::new(FairMutex::new(TerminalModel::mock(None, None)));
+        let block_id = {
+            let mut model = model.lock();
+            model.block_list_mut().active_block_mut().start();
+            model.process_bytes("echo \"unterminated\r\ndquote> ");
+            assert_eq!(
+                model.block_list().active_block().state(),
+                BlockState::BeforeExecution
+            );
+            model.active_block_id().clone()
+        };
+        let executor = app.add_model(|ctx| {
+            ShellCommandExecutor::new(active_session, model, &dispatcher, EntityId::new(), ctx)
+        });
+        let action = AIAgentAction {
+            id: "read-output".to_owned().into(),
+            task_id: TaskId::new("root".into()),
+            requires_result: true,
+            action: AIAgentActionType::ReadShellCommandOutput {
+                block_id,
+                delay: Some(ShellCommandDelay::Duration(Duration::ZERO)),
+            },
+        };
+
+        let execution = executor.update(&mut app, |executor, ctx| {
+            executor.execute(
+                ExecuteActionInput {
+                    action: &action,
+                    conversation_id: AIConversationId::new(),
+                },
+                ctx,
+            )
+        });
+        let AnyActionExecution::Async {
+            execute_future,
+            on_complete,
+        } = execution
+        else {
+            panic!("未闭合引号应继续等待命令快照");
+        };
+        let snapshot = execute_future.await;
+        let result = app.update(|ctx| on_complete(snapshot, ctx));
+
+        let AIAgentActionResultType::ReadShellCommandOutput(
+            ReadShellCommandOutputResult::LongRunningCommandSnapshot {
+                grid_contents,
+                cursor,
+                ..
+            },
+        ) = result
+        else {
+            panic!("未闭合引号应返回长命令快照");
+        };
+        assert_eq!(grid_contents, "echo \"unterminated\ndquote> <|cursor|>");
+        assert_eq!(cursor, CURSOR_MARKER);
+    });
+}
+
+#[test]
+fn control_handback_snapshot_exposes_continuation_prompt_and_cursor() {
+    App::test((), |mut app| async move {
+        let sessions = app.add_model(|_| Sessions::new_for_test());
+        let (_events_tx, events_rx) = unbounded();
+        let dispatcher =
+            app.add_model(|ctx| ModelEventDispatcher::new(events_rx, sessions.clone(), ctx));
+        let active_session =
+            app.add_model(|ctx| ActiveSession::new(sessions, dispatcher.clone(), ctx));
+        let model = Arc::new(FairMutex::new(TerminalModel::mock(None, None)));
+        let conversation_id = AIConversationId::new();
+        {
+            let mut model = model.lock();
+            model.block_list_mut().active_block_mut().start();
+            model.process_bytes("echo \"unterminated\r\ndquote> ");
+            let block = model.block_list_mut().active_block_mut();
+            block.set_was_long_running(true.into());
+            block.set_agent_interaction_mode_for_requested_command(
+                "running-command".to_owned().into(),
+                None,
+                conversation_id,
+            );
+            assert_eq!(block.state(), BlockState::BeforeExecution);
+        }
+        let executor = app.add_model(|ctx| {
+            ShellCommandExecutor::new(active_session, model, &dispatcher, EntityId::new(), ctx)
+        });
+        let action = AIAgentAction {
+            id: "transfer-control".to_owned().into(),
+            task_id: TaskId::new("root".into()),
+            requires_result: true,
+            action: AIAgentActionType::TransferShellCommandControlToUser {
+                reason: "补齐未闭合引号".to_owned(),
+            },
+        };
+
+        let execution = executor.update(&mut app, |executor, ctx| {
+            executor.execute(
+                ExecuteActionInput {
+                    action: &action,
+                    conversation_id,
+                },
+                ctx,
+            )
+        });
+        let AnyActionExecution::Async {
+            execute_future,
+            on_complete,
+        } = execution
+        else {
+            panic!("控制权转交应等待用户交还");
+        };
+        executor.update(&mut app, |executor, _| {
+            executor.notify_control_handed_back()
+        });
+        let snapshot = execute_future.await;
+        let result = app.update(|ctx| on_complete(snapshot, ctx));
+
+        let AIAgentActionResultType::TransferShellCommandControlToUser(
+            TransferShellCommandControlToUserResult::Snapshot {
+                grid_contents,
+                cursor,
+                ..
+            },
+        ) = result
+        else {
+            panic!("交还未闭合引号命令应返回快照");
+        };
+        assert_eq!(grid_contents, "echo \"unterminated\ndquote> <|cursor|>");
+        assert_eq!(cursor, CURSOR_MARKER);
+    });
+}
+
+#[test]
+fn continuation_prompt_snapshot_preserves_alt_screen_priority() {
+    let mut model = TerminalModel::mock(None, None);
+    model.block_list_mut().active_block_mut().start();
+    model.process_bytes("echo \"unterminated\r\ndquote> ");
+    model.process_bytes("\x1b[?1049h\x1b[Halt output");
+    let block = model.block_list().active_block();
+    assert_eq!(block.state(), BlockState::BeforeExecution);
+
+    let ActionResult::LongRunningCommandSnapshot {
+        grid_contents,
+        cursor,
+        is_alt_screen_active,
+        ..
+    } = action_result_for_block(&model, block, false)
+    else {
+        panic!("备用屏幕应返回运行中快照");
+    };
+    assert!(is_alt_screen_active);
+    assert!(grid_contents.starts_with("alt output<|cursor|>"));
+    assert!(!grid_contents.contains("dquote>"));
+    assert_eq!(cursor, CURSOR_MARKER);
+}
 
 #[test]
 fn treats_bootstrapped_ssh_command_as_running_until_remote_shell_exits() {
