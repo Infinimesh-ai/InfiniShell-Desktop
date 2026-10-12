@@ -12,8 +12,21 @@
 | 三方能力与消费者可用范围 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md)、[RELEASE_SUPPORT.md](RELEASE_SUPPORT.md) |
 | 自动升级、渠道与事务约定 | [CLI_AUTOUPDATE.md](CLI_AUTOUPDATE.md) |
 | 已通过、失败、未验及源码／平台对应 | [VALIDATION_REPORT.md](VALIDATION_REPORT.md) |
+| Linux 桌面验收延期与归档入口 | [本页归档决定](#linux-桌面验收延期与归档2026-10-13) |
 
 `CODEX_PLUGIN_CACHE_REFRESH.md`、`PLUGIN_COMPATIBILITY.md`、`SSH_TMUX_VERIFICATION.md` 是配套插件说明正在引用的简短兼容入口，正文已收敛到上述文档。
+
+## Linux 桌面验收延期与归档（2026-10-13）
+
+按用户决定，归档并删除 `codex/acceptance-linux-v01-v02-v05` 分支。该分支独有的 3 个提交只增加四份验收 JSON，没有独有产品代码；原受测源码为 `28d0922519b02b0690626edc148638c0150cda1c`，记录提交为 `1a5910afec898cc00522c9147ce665c539ab3968`。
+
+- 归档标签 `archive/acceptance-linux-v01-v02-v05-2026-10-13` 保留原提交历史；[四份原始记录与证据索引](https://github.com/Infinimesh-ai/InfiniShell-Desktop/tree/1a5910afec898cc00522c9147ce665c539ab3968/specs/cli-agent-parity/acceptance/linux-28d092251-20261005)按原字节保留，不改写历史状态。
+- 闪迪备份位于 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/linux-acceptance-archived-2026-10-13/`，包含四份 JSON、Git bundle、三提交补丁、恢复说明及 SHA-256 清单。bundle 依赖上述受测源码提交，该提交已包含在主线历史中。
+- 索引内 42 项原始证据仍指向 Linux 私有目录 `/home/chiiz/.local/share/infinishell-acceptance/linux-28d092251-20261005`。本次只归档记录与索引，没有复制或重新核验远端原件，也不清理配置、构建产物或原始日志。
+- Linux V01（真实模型生命周期）、V02（真实中文输入法）、V05（双语界面与真实审批）延期，保持未验、不计通过；Windows 的验收安排不因本决定改变。后续从届时主线固定新的受测源码和二进制，优先评估用户日常桌面，不把切换 Xfce/X11 作为默认前置要求。
+- 保留现有 [Linux 自动检查工作流](../../.github/workflows/cross-platform-preflight.yml)，继续使用 `ci/**` 推送和 `workflow_dispatch` 入口，`run_linux` 默认开启；不修改工作流、测试或验收判据。自动检查通过不替代延期的桌面实机验收。
+
+本次仅归档与更新验收安排，**无需本地化变更**。
 
 ## 维护约定
 
