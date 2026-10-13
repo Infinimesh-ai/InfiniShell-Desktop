@@ -244,7 +244,7 @@ impl AltScreenElement {
     }
 
     fn left_mouse_down(
-        &self,
+        &mut self,
         mouse_state: MouseState,
         local_position: Vector2F,
         click_count: u32,
@@ -274,6 +274,8 @@ impl AltScreenElement {
         };
 
         if should_intercept_mouse(&self.model.lock(), mouse_state.modifiers().shift, app) {
+            // 连续鼠标事件可能先于下一帧到达，不能等重新渲染才更新选择状态。
+            self.is_terminal_selecting = true;
             ctx.dispatch_typed_action(TerminalAction::AltSelect(SelectAction::Begin {
                 point,
                 side,
@@ -281,6 +283,7 @@ impl AltScreenElement {
                 position: local_position,
             }));
         } else {
+            self.is_terminal_selecting = false;
             ctx.dispatch_typed_action(TerminalAction::MaybeClearAltSelect);
             ctx.dispatch_typed_action(TerminalAction::AltMouseAction(mouse_state.set_point(point)));
         }
@@ -374,7 +377,7 @@ impl AltScreenElement {
     }
 
     fn mouse_up(
-        &self,
+        &mut self,
         mouse_state: MouseState,
         local_position: Vector2F,
         ctx: &mut EventContext,
@@ -395,6 +398,7 @@ impl AltScreenElement {
         });
 
         if self.is_terminal_selecting {
+            self.is_terminal_selecting = false;
             ctx.dispatch_typed_action(TerminalAction::AltSelect(SelectAction::End));
         }
 
@@ -642,8 +646,9 @@ impl Element for AltScreenElement {
                 SizeConstraint {
                     min: vec2f(0., 0.),
                     max: vec2f(
-                        constraint.max.x() * 0.3 - CLI_SUBAGENT_HORIZONTAL_MARGIN,
-                        constraint.max.y() - CLI_SUBAGENT_VERTICAL_MARGIN * 3.,
+                        // 父布局允许浮窗按记忆宽度展开，同时保留当前终端两侧的边距。
+                        (constraint.max.x() - CLI_SUBAGENT_HORIZONTAL_MARGIN * 2.).max(0.),
+                        (constraint.max.y() - CLI_SUBAGENT_VERTICAL_MARGIN * 3.).max(0.),
                     ),
                 },
                 ctx,
@@ -1021,3 +1026,7 @@ impl ScrollableElement for AltScreenElement {
         });
     }
 }
+
+#[cfg(test)]
+#[path = "alt_screen_element_tests.rs"]
+mod tests;
