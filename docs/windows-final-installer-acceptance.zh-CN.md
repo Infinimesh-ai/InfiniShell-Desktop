@@ -1,6 +1,6 @@
 # Windows 最终安装器验收
 
-当前状态：**正式发行构建已启动，等待最终安装器；用户尚未执行**。新候选为 `v0.2026.10.13.22.25.oss_00`，源码 `f429fe2c0426846f41f79fef15a791c5f7cbb011`，annotated tag 对象 `20260485d332089610007c6c1df1d84462093ef2`。同 SHA 的[双平台自动门禁 38411587441](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38411587441)首次运行成功后已推送 tag，[正式发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397) attempt 1 已启动；构建完成和包身份仍待核验。
+当前状态：**正式发行构建已启动，等待最终安装器；用户尚未执行**。候选为 `v0.2026.10.14.01.46.oss_00`，源码 `5360f5d6cf7e3b25263431027993a3a26dca9cb5`，annotated tag 对象 `45219f419c628bf3f5dbace5fd10013f6cf2c0c2`。本地门禁及[同 SHA 双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行全部通过，主线和标签已推送；[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 已启动，最终包身份待产生。
 
 新候选的 `InfiniShellSetup.exe` SHA-256／字节数和 CI 原 manifest SHA-256 均保持空值。助手将在正式新包产出后核对来源、SHA-256、字节数、实际 Authenticode 状态及 CI 原始六资源清单，再交付新包和采集材料。当前采集器仍拒绝执行，不应移除该限制或开始最终人工验收；不得预填新 SHA 或复用旧包回执。
 
@@ -20,13 +20,15 @@
 
 以下材料位于新候选的独立归档，旧结果没有复制为本轮结果。此时仅可审阅，不能执行验收：
 
-- [完整用户操作说明](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/README.zh-CN.md)
-- [PowerShell 证据采集器（尚未启用）](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/collect-windows-evidence.ps1)
-- [新候选身份绑定（run／安装器／清单待填）](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/candidate-binding.json)
-- [结果填写模板](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/RESULT.zh-CN.md)
-- [助手证据审查清单](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/EVIDENCE-REVIEW.zh-CN.md)与[只读绑定预检器](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/review-evidence-binding.py)
+- [完整用户操作说明](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/README.zh-CN.md)
+- [PowerShell 证据采集器（尚未启用）](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/collect-windows-evidence.ps1)
+- [新候选身份绑定（安装器／清单待填）](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/candidate-binding.json)
+- [结果填写模板](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/RESULT.zh-CN.md)
+- [助手证据审查清单](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/EVIDENCE-REVIEW.zh-CN.md)与[只读绑定预检器](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/review-evidence-binding.py)
 
 ## 旧候选历史材料
+
+上一候选 `v0.2026.10.13.22.25.oss_00`（源码 `f429fe2c0426846f41f79fef15a791c5f7cbb011`）因后补共享初始化入口回归失败拒收，[发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397)由主控主动取消。Windows 两种架构 SSH 编译成功，但桌面安装器未产出，也未执行本候选 Windows 原生或生命周期验收；这不代表 Windows 编译失败。[Windows 关闭记录](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-desktop/CLOSEOUT.zh-CN.md)和[弃用材料](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/native-validation/windows-manual/README.zh-CN.md)保留，不得用于新候选验收。
 
 旧候选 `v0.2026.10.13.16.19.oss_00`（源码 `36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680`）因两处已确认的 macOS/BYOP GUI 缺陷拒收，[发行构建 38368533631](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368533631)由主控主动取消，Windows 桌面 artifact 未产出；这不代表 Windows 编译失败。[关闭记录与原始日志索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/native-validation/windows-desktop/REPORT.zh-CN.md)和以下旧材料保留，不能作为新候选的执行材料：
 

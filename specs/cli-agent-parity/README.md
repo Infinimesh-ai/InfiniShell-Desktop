@@ -2,13 +2,15 @@
 
 本目录维护当前规格、能力边界、剩余工作和验证结论。**原批准合并范围中的 G01–G10、V03 共 11 项已关闭并合入主线；全平台实机验收尚未全部完成。** 当前结论以本页及 `CURRENT_STATUS.json` 的当前入口为准；历史记录保留原构建、平台、失败和未验边界。
 
-## 当前主线状态（2026-10-13）
+## 当前主线状态（2026-10-14）
 
 此前 `main` 已快进合入并推送 `36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680`，修复 Linux musl socket 长度字段的 ABI 类型差异，并补入双 musl 编译门禁。本机 `cargo check`、两 musl 目标 `command --all-targets` 检查及 i18n **12/12** 通过；[同提交 Linux 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368196945)通过，Rust **1661 项**、Python **109 项通过／2 项 Windows 专属跳过**。其中 socket 身份测试在 glibc 宿主实际 **9/9** 通过，两 musl 目标仅计编译通过。
 
 此前 `1ca59d352` 的[两项缺陷修复和四项 macOS debug GUI 复验](#macos-gui-修复复验2026-10-13)及同提交 Linux／Windows 自动检查通过，原 GUI 失败和首轮网络中断记录保留。正式候选 `v0.2026.10.13.16.19.oss_00` 已完成六份 SSH 资源校验、macOS Developer ID 签名、公证和装订，但实际 GUI 发现 CLI 模型路由与 Responses 工具 schema 两处阻塞，整体拒收；[旧发行构建 38368533631](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368533631)余下打包已主动取消，不记为 Linux／Windows 编译失败。
 
-修复提交 `f429fe2c0426846f41f79fef15a791c5f7cbb011` 已快进合入并推送 `main`；本地 `cargo check`、定向回归 **39/39**（含新增 8 项）、i18n **12/12** 通过；[同提交双平台门禁 38411587441](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38411587441)首次运行全部通过：Linux 应用 **624/624**、Windows **609/609**，新增 8 项及通用 i18n 11 项两端均逐名 PASS。新候选 `v0.2026.10.13.22.25.oss_00` 已推送固定标签，[发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397)进行中，不复用旧资产或通过结论。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，新候选尚未验收通过。
+修复提交 `f429fe2c0426846f41f79fef15a791c5f7cbb011` 已快进合入并推送 `main`；本地 `cargo check`、定向回归 **39/39**（含新增 8 项）、i18n **12/12** 通过；[同提交双平台门禁 38411587441](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38411587441)首次运行全部通过：Linux 应用 **624/624**、Windows **609/609**，新增 8 项及通用 i18n 11 项两端均逐名 PASS。该候选 `v0.2026.10.13.22.25.oss_00` 后续因共享初始化入口的循环模型借用回归拒收，[发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397)已主动取消。真实入口测试与调用栈复现了 singleton lookup panic；当前未找到生产调用者，不据此宣称实际共享 GUI 崩溃。Intel runner 的独立 DNS 失败与其他任务的主动取消分别保留，实际基础设施重试为 0。
+
+修复提交 `5360f5d6cf7e3b25263431027993a3a26dca9cb5` 已合入并推送主线：在历史模型更新前构造请求快照，保持 Base／CLI 选择不变；本地 `cargo check`、**40/40** 定向回归和 **12/12** i18n 通过。[同提交双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行通过：Linux 应用 **625/625**、Windows **610/610**，累计新增 9 项及通用 i18n 11 项两端均逐名 PASS。新候选 `v0.2026.10.14.01.46.oss_00` 标签已推送，[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 进行中；macOS 中间预编译完成，正式包仍待本轮六资源、签名公证及 GUI 复验。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，新候选最终验收未完成。
 
 | 范围 | 当前结论与依据 |
 | --- | --- |
@@ -48,7 +50,7 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。这三项未完成前，不宣称下一发行候选已完成验收。
 
-新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/`。旧轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；入口为 `macos-gui/result.json`、`macos-gui/evidence-index.json` 和 `STATUS.zh-CN.md`。修复源码门禁归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**：修复改变请求路由与协议归一化，没有新增或改变用户文案；既有双语界面仍在新候选复验。Linux 桌面继续延期，自动检查保留。
+新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/`。上一轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/` 保留原自动检查、预编译、DNS 失败和主动取消证据；共享初始化修复及红／绿回归记录位于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-14-shared-init-fix/`。旧轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；入口为 `macos-gui/result.json`、`macos-gui/evidence-index.json` 和 `STATUS.zh-CN.md`。修复源码门禁归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**：修复改变请求路由与协议归一化，没有新增或改变用户文案；既有双语界面仍在新候选复验。Linux 桌面继续延期，自动检查保留。
 
 ### 正式签名候选拒收与修复（2026-10-13）
 
@@ -101,7 +103,7 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 | 目的 | 文档 |
 | --- | --- |
 | 目标、P0–P5、实施与验收要求 | [PLAN.md](PLAN.md) |
-| 当前关闭、延期与发版必验清单 | [本页当前状态](#当前主线状态2026-10-13)、[CURRENT_STATUS.json](CURRENT_STATUS.json) 的 `main_acceptance` |
+| 当前关闭、延期与发版必验清单 | [本页当前状态](#当前主线状态2026-10-14)、[CURRENT_STATUS.json](CURRENT_STATUS.json) 的 `main_acceptance` |
 | 原关闭条件、原生差异与历史缺口 | [KNOWN_GAPS.md](KNOWN_GAPS.md)，按顶部当前入口区分历史快照 |
 | 三方能力与消费者可用范围 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md)、[RELEASE_SUPPORT.md](RELEASE_SUPPORT.md) |
 | 自动升级、渠道与事务约定 | [CLI_AUTOUPDATE.md](CLI_AUTOUPDATE.md) |
