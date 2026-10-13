@@ -1,10 +1,10 @@
 {
   "main_acceptance": {
     "as_of": "2026-10-13",
-    "assessed_main_commit": "b4bfeacc3b29a33886a423002d34f5d0cbf5ee48",
+    "assessed_main_commit": "45a8911075277d127e959510631c3d4b01b44903",
     "reader_entry": "README.md#当前主线状态2026-10-13",
     "all_platform_desktop_acceptance_complete": false,
-    "new_acceptance_performed_in_this_revision": false,
+    "new_acceptance_performed_in_this_revision": true,
     "latest_public_release": "v0.2026.10.07.01.09.oss_00",
     "main_changes_after_public_release_are_published": false,
     "deferred": [
@@ -77,7 +77,8 @@
       ],
       "run_linux_default": true,
       "runs_on_every_main_push": false,
-      "repeat_online_gui_or_remote_gates_for_docs_only": false
+      "repeat_online_gui_or_remote_gates_for_docs_only": false,
+      "latest_change_remote_status": "38352476222在1ca59d352的应用回归阶段因Linux/Windows两个runner失联中断；已完成步骤成功，应用测试结果未知。待节点恢复重试一次，Linux桌面继续延期"
     },
     "next_release_required": [
       {
@@ -95,11 +96,12 @@
       },
       {
         "item": "近期GUI候选包冒烟",
-        "status": "pending_next_release",
+        "status": "source_smoke_passed_final_release_package_pending",
         "when": "下次发版前，优先常用Mac桌面",
         "pass_condition": "浮窗真实拖拽后重启尺寸恢复；Retina图片覆盖区域输入/选择；英中同步错误及Plan tooltip可读性；绑定候选源码/二进制及实际结果",
         "linux_desktop_matrix_required": false,
-        "evidence": "../../docs/upstream-essence/2026-10-07-zap.md"
+        "evidence": "README.md#macos-gui-修复复验2026-10-13",
+        "remaining": "本轮四项macOS源码包实测通过；最终发行候选仍需核对包身份和必要冒烟，不把debug包视为正式发行包"
       }
     ],
     "ongoing_boundaries": {
@@ -126,7 +128,260 @@
       }
     ],
     "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。",
-    "localization": "无需本地化变更；只校正文档入口，没有新的产品验收结论"
+    "localization": "无需本地化变更；修复不新增或改变用户文案，英中同步错误和Plan提示均在同一最终包实测",
+    "macos_gui_smoke": {
+      "date": "2026-10-13",
+      "source_commit": "45a8911075277d127e959510631c3d4b01b44903",
+      "source_state": "修复已提交并推送验证分支codex/macos-gui-smoke-fixes；Linux/Windows同提交定向检查因两节点失联中断，尚未合入main",
+      "source_patch_sha256": "853704f52d86edf57b6f02b2f5bbe81dfe50c04b2c9f047e06427d25075cd400",
+      "binary_sha256": "d60d27ad841f952bed109822f0305efb0c39881ec635cf3129636e45f2c15183",
+      "platform": "Apple M1 Pro / macOS 27.0 (26A428) / Retina 2x",
+      "package_boundary": "Apple Development local debug bundle; not a Developer ID notarized release",
+      "status": "macos_gui_smoke_passed_remote_gates_infrastructure_blocked",
+      "counts": {
+        "passed": 4,
+        "partial": 0,
+        "failed": 0
+      },
+      "checks": [
+        {
+          "id": "MAC-GUI-01",
+          "subject": "浮窗拖拽与重启",
+          "status": "passed",
+          "observed": "alt-screen与普通缓冲区实际宽高拖拽、换行和内部滚动通过；普通缓冲区保存640×140.2999267578125，退出后新建alt-screen浮窗实际恢复相同尺寸",
+          "evidence": [
+            "screenshots/15-floating-width-expanded.png",
+            "screenshots/16-floating-height-reduced.png",
+            "screenshots/17-floating-scroll-top.png",
+            "screenshots/18-floating-scroll-bottom.png",
+            "screenshots/19-floating-height-expanded.png",
+            "screenshots/21-normal-floating-wider.png",
+            "screenshots/25-normal-height-reduced.png",
+            "screenshots/26-normal-scroll-top.png",
+            "screenshots/27-normal-scroll-bottom.png",
+            "screenshots/28-floating-restored-after-restart.png",
+            "receipts/floating-before-restart.json",
+            "receipts/floating-after-restart.json"
+          ]
+        },
+        {
+          "id": "MAC-GUI-02",
+          "subject": "Retina图片输入与拖动选择",
+          "status": "passed",
+          "observed": "连字关/开两条路径均在图片覆盖区域点击、输入ABC123；关闭应用鼠标上报后真实拖动选字，复制再粘贴到raw终端均精确回送SELECT_ME_RETINA_06",
+          "evidence": [
+            "screenshots/08-retina-off-final-selection.png",
+            "screenshots/09-retina-off-final-copy.png",
+            "screenshots/10-ligatures-enabled.png",
+            "screenshots/11-retina-on-final-selection.png",
+            "screenshots/12-retina-on-final-copy.png",
+            "receipts/retina-off-final.json",
+            "receipts/retina-on-final.json"
+          ]
+        },
+        {
+          "id": "MAC-GUI-03",
+          "subject": "英文和简体中文同步错误",
+          "status": "passed",
+          "observed": "合成无效token触发真实GitHub HTTP401；英中前缀、多行响应和按钮完整可读。保存按钮先验证，401未进入凭据持久化分支；未上传下载数据",
+          "evidence": [
+            "screenshots/29-cloud-sync-en-401-final.png",
+            "screenshots/32-cloud-sync-zh-401-final.png"
+          ]
+        },
+        {
+          "id": "MAC-GUI-04",
+          "subject": "英文和简体中文Plan本地保存提示",
+          "status": "passed",
+          "observed": "本地固定回复调用真实create_documents，英文提示完整；GUI切中文、正常退出并重启后同一Plan恢复，中文本地保存提示完整",
+          "evidence": [
+            "screenshots/30-plan-en-save-tooltip-final.png",
+            "screenshots/31-plan-zh-save-restored-final.png",
+            "receipts/plan-restart-boundary.json",
+            "provider-requests.safe.jsonl"
+          ]
+        }
+      ],
+      "closed_defects": [
+        {
+          "id": "MAC-GUI-B01",
+          "fix": "去掉alt-screen父布局旧30%宽度上限，改用当前pane扣两侧边距并钳零"
+        },
+        {
+          "id": "MAC-GUI-B02",
+          "origin": "MAC-GUI-V01补验时确认",
+          "fix": "按下/松开即时更新AltScreenElement选择状态，避免下一帧前的drag/up事件读到旧状态"
+        }
+      ],
+      "local_gates": {
+        "cargo_check": {
+          "run": "r-c2caa7d7",
+          "status": "passed"
+        },
+        "build": {
+          "run": "r-7a68a4df",
+          "status": "passed"
+        },
+        "focused_nextest": {
+          "run": "r-6017a77d",
+          "passed": 50,
+          "new_tests": 7,
+          "includes_i18n": 12
+        },
+        "cargo_test_i18n": {
+          "run": "r-409c52fc",
+          "passed": 12
+        },
+        "static_checks": "receipts/static-checks.json",
+        "independent_review": "receipts/code-review.zh-CN.md"
+      },
+      "localization": "无需本地化变更；修复不新增或改变用户文案，英中同步错误和Plan提示均在同一最终包实测",
+      "remote_gates": {
+        "status": "incomplete_infrastructure_runner_disconnected",
+        "workflow": ".github/workflows/cross-platform-preflight.yml",
+        "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38352476222",
+        "head_sha": "1ca59d352972cac0de0e562a9fcebd8c8066668f",
+        "mode": "upstream_essence",
+        "platforms": [
+          "linux-x64",
+          "windows-x64"
+        ],
+        "full_workspace_tests": false,
+        "user_resume_instruction": "检查节点，继续完成",
+        "linux_desktop": "deferred_not_passed",
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-cross-platform-fix",
+        "run_attempt": 1,
+        "github_conclusion": "failure",
+        "failure_classification": "GitHub明确报告两台自托管runner均与服务器失联；两节点再次offline，未产生应用测试终态或完整日志artifact",
+        "evidence": "infrastructure-interruption.json",
+        "retry_status": "awaiting_runners_recovery_one_infrastructure_retry_available",
+        "node_diagnostics": {
+          "evidence": "node-network-diagnostics.json",
+          "ssh_reachable_both": true,
+          "runner_processes_present_both": true,
+          "github_dns_fails_both": true,
+          "github_tls_reset_with_one_request_dns_override_both": true,
+          "configuration_changed": false,
+          "remaining": "恢复节点DNS及GitHub外网通路后完成同提交重试"
+        }
+      },
+      "linux_desktop": "deferred_not_passed",
+      "linux_automatic_checks_retained": true,
+      "open_macos_product_blockers": [],
+      "cleanup": "GUI、本地provider及后代退出；全部本轮短TMPDIR按身份核验后清理；归档包和隔离profile保留",
+      "archive": "/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-width-fix",
+      "archive_entries": [
+        "REPORT.zh-CN.md",
+        "EVIDENCE_INDEX.md",
+        "result.json",
+        "SHA256SUMS"
+      ],
+      "user_scope_decision": {
+        "recorded_at": "2026-10-13T05:27:50.590833+00:00",
+        "user_instruction": "本轮先完成 macOS，远端检查待节点上线",
+        "current_scope": "macOS修复与四项GUI复验完成",
+        "remote_checks": "Linux/Windows自动检查保留，待节点上线后执行，不计已通过",
+        "linux_desktop": "继续延期，不计已通过",
+        "automatic_monitoring_created": false
+      },
+      "remote_gates_history": [
+        {
+          "status": "incomplete_runner_offline",
+          "workflow": ".github/workflows/cross-platform-preflight.yml",
+          "runner_snapshot": {
+            "at": "2026-10-13T04:59:17.896516+00:00",
+            "runners": [
+              {
+                "busy": false,
+                "id": 21,
+                "labels": [
+                  "self-hosted",
+                  "Linux",
+                  "X64",
+                  "infinishell-ci"
+                ],
+                "name": "infinishell-linux-x64",
+                "os": "Linux",
+                "status": "offline"
+              },
+              {
+                "busy": false,
+                "id": 22,
+                "labels": [
+                  "self-hosted",
+                  "X64",
+                  "infinishell-ci",
+                  "Windows"
+                ],
+                "name": "infinishell-windows-x64",
+                "os": "Windows",
+                "status": "offline"
+              }
+            ]
+          },
+          "dispatch_performed": false,
+          "new_tests_added_to_existing_filters": true,
+          "disposition": "deferred_by_user_until_runners_online"
+        }
+      ],
+      "fix_commit": "1ca59d352972cac0de0e562a9fcebd8c8066668f"
+    },
+    "macos_gui_smoke_history": [
+      {
+        "date": "2026-10-13",
+        "source_commit": "45a8911075277d127e959510631c3d4b01b44903",
+        "platform": "Apple M1 Pro / macOS 27.0 (26A428) / Retina 2x",
+        "build": "cargo build --locked -p warp --bin infinishell --features warpui/test-util,rust-embed/debug-embed",
+        "build_passed": true,
+        "binary_sha256": "0de734e87f38f80edfe6e9b7e775f881278d76a24cb32f96a1157b035a8a4897",
+        "package_boundary": "独立debug profile；Apple Development本机签名；非最终Developer ID公证发行包",
+        "status": "failed_release_gate",
+        "counts": {
+          "passed": 2,
+          "partial": 1,
+          "failed": 1
+        },
+        "checks": [
+          {
+            "id": "MAC-GUI-01",
+            "subject": "浮窗拖拽与重启",
+            "status": "failed",
+            "passed": "真实宽高拖拽写入SQLite；540×218.4重启前后相同，新浮窗恢复高度",
+            "blocker": "MAC-GUI-B01：alt-screen父布局仍限宽约30%，即使已保存983.6逻辑像素也无法实际展开；普通缓冲区能展开",
+            "source": "app/src/terminal/alt_screen/alt_screen_element.rs:645"
+          },
+          {
+            "id": "MAC-GUI-02",
+            "subject": "Retina图片输入与选择",
+            "status": "partial",
+            "passed": "连字关/开两路径点击、ABC123输入、双击选词复制回送",
+            "remaining": "MAC-GUI-V01：拖动选字未明确确认；图片外对照也未稳定确认，不判为已证实图片缺陷"
+          },
+          {
+            "id": "MAC-GUI-03",
+            "subject": "英文和简体中文同步错误",
+            "status": "passed",
+            "boundary": "真实HTTP401；无效合成token；未上传下载数据或保存凭据"
+          },
+          {
+            "id": "MAC-GUI-04",
+            "subject": "英文和简体中文Plan保存tooltip",
+            "status": "passed",
+            "boundary": "本地固定回复触发真实文档工具；实际GUI与退出重启恢复，不证明真实模型能力"
+          }
+        ],
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-main-45a891107",
+        "archive_entries": [
+          "REPORT.zh-CN.md",
+          "EVIDENCE_INDEX.md",
+          "result.json",
+          "SHA256SUMS"
+        ],
+        "cleanup": "测试应用及本地模拟服务退出；四个本轮短TMPDIR归档后按身份清理；保留隔离profile与测试包",
+        "linux_desktop": "deferred_not_passed",
+        "linux_automatic_checks_retained": true
+      }
+    ]
   },
   "current_goal_scope": {
     "authorized_scope": "PR22原批准合并范围；其他平台实机验收单独管理",
@@ -7541,7 +7796,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "原批准合并范围 G01–G10、V03 共11项关闭，G09已正式签收，PR22及Windows修复整合PR25已合并。Linux桌面V01/V02/V05延期；Windows完整生命周期、输入法正式补证与真实审批布局延期，均不计通过。Codex V04保留独立补验；下次发行必验见main_acceptance.next_release_required，当前没有新增实机验收结论。",
+  "status_zh": "原批准合并范围G01–G10、V03共11项关闭。macOS两项GUI缺陷修复，四项实测全部通过。修复提交1ca59d352已推送独立验证分支；双平台运行38352476222因两节点失联中断，自动门禁未完成，尚未合入主线。Linux桌面及其他既定延期保留，未视为已验。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
