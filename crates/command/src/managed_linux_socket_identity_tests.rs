@@ -59,7 +59,7 @@ fn send_identity(stream: &UnixStream, marker: u8, descriptors: &[RawFd]) {
             let header = bytes.cast::<libc::cmsghdr>();
             (*header).cmsg_level = libc::SOL_SOCKET;
             (*header).cmsg_type = libc::SCM_RIGHTS;
-            (*header).cmsg_len = libc::CMSG_LEN(rights_bytes as u32) as usize;
+            (*header).cmsg_len = libc::CMSG_LEN(rights_bytes as u32) as _;
             ptr::copy_nonoverlapping(
                 descriptors.as_ptr().cast::<u8>(),
                 libc::CMSG_DATA(header),
@@ -69,7 +69,7 @@ fn send_identity(stream: &UnixStream, marker: u8, descriptors: &[RawFd]) {
         let header = bytes.add(rights_space).cast::<libc::cmsghdr>();
         (*header).cmsg_level = libc::SOL_SOCKET;
         (*header).cmsg_type = libc::SCM_CREDENTIALS;
-        (*header).cmsg_len = libc::CMSG_LEN(mem::size_of::<libc::ucred>() as u32) as usize;
+        (*header).cmsg_len = libc::CMSG_LEN(mem::size_of::<libc::ucred>() as u32) as _;
         ptr::write_unaligned(libc::CMSG_DATA(header).cast::<libc::ucred>(), credentials);
     }
     let mut vector = libc::iovec {
@@ -80,7 +80,7 @@ fn send_identity(stream: &UnixStream, marker: u8, descriptors: &[RawFd]) {
     message.msg_iov = &mut vector;
     message.msg_iovlen = 1;
     message.msg_control = bytes.cast();
-    message.msg_controllen = length;
+    message.msg_controllen = length as _;
     assert_eq!(
         unsafe { libc::sendmsg(stream.as_raw_fd(), &message, libc::MSG_NOSIGNAL) },
         1,

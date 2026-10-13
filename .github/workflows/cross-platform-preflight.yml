@@ -360,6 +360,20 @@ jobs:
             protoc --version
           } 2>&1 | tee "$log_dir/toolchain.log"
 
+      - name: 检查 Linux musl ABI 与 socket 身份回归
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+            for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+              cargo check --locked -p command --all-targets --target "$target"
+            done
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 \
+              -p command --lib -E 'test(socket_identity)'
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/command-musl.log"
+
       - name: 检查主应用及启动条件编译
         shell: bash
         run: |
@@ -844,6 +858,17 @@ jobs:
         shell: bash
         working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: python3 script/cli-agent-parity/tmux_notification_tests.py
+
+      - name: Check Linux musl command targets
+        if: ${{ !cancelled() && steps.linux_toolchain.outcome == 'success' }}
+        shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        run: |
+          set -euo pipefail
+          rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+          for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+            cargo check --locked -p command --all-targets --target "$target"
+          done
 
       - name: Check InfiniShell-Desktop
         if: ${{ !cancelled() && steps.linux_toolchain.outcome == 'success' }}

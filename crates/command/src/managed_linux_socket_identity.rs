@@ -31,7 +31,7 @@ pub fn linux_receive_peer_handle(
         message.msg_iov = &mut vector;
         message.msg_iovlen = 1;
         message.msg_control = control.as_mut_ptr().cast();
-        message.msg_controllen = mem::size_of_val(&control);
+        message.msg_controllen = mem::size_of_val(&control) as _;
         let count = unsafe {
             libc::recvmsg(
                 stream.as_raw_fd(),
@@ -93,18 +93,21 @@ fn collect_identity(
     let mut rights_messages = 0;
     let mut credential_messages = 0;
     let mut valid = message.msg_flags & (libc::MSG_TRUNC | libc::MSG_CTRUNC) == 0;
-    let available = message.msg_controllen.min(mem::size_of_val(control));
-    valid &= message.msg_controllen <= mem::size_of_val(control);
+    // glibc 的长度字段是 usize，musl 则是 socklen_t；先统一为缓冲区索引类型。
+    let control_length = message.msg_controllen as usize;
+    let available = control_length.min(mem::size_of_val(control));
+    valid &= control_length <= mem::size_of_val(control);
     let bytes = control.as_ptr().cast::<u8>();
     let header_length = unsafe { libc::CMSG_LEN(0) } as usize;
     let mut offset = 0usize;
     while available.saturating_sub(offset) >= mem::size_of::<libc::cmsghdr>() {
         let header = unsafe { ptr::read_unaligned(bytes.add(offset).cast::<libc::cmsghdr>()) };
-        if header.cmsg_len < header_length || header.cmsg_len > available - offset {
+        let message_length = header.cmsg_len as usize;
+        if message_length < header_length || message_length > available - offset {
             valid = false;
             break;
         }
-        let payload_length = header.cmsg_len - header_length;
+        let payload_length = message_length - header_length;
         let payload = unsafe { bytes.add(offset + header_length) };
         match (header.cmsg_level, header.cmsg_type) {
             (libc::SOL_SOCKET, libc::SCM_RIGHTS) => {
