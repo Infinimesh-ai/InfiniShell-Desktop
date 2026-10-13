@@ -1,4 +1,5 @@
 use settings::Setting;
+use warp_multi_agent_api::{ResponseEvent, response_event};
 use warpui::{App, ViewHandle};
 
 use super::*;
@@ -151,6 +152,46 @@ fn routing_provider(id: &str, api_type: AgentProviderApiType) -> AgentProvider {
         extra_headers: vec![],
         responses: Default::default(),
     }
+}
+
+#[test]
+fn 共享会话初始化保留base模型且不循环借用历史模型() {
+    with_routing_app(|fixture, app| {
+        BlocklistAIHistoryModel::handle(app).update(app, |history, _ctx| {
+            history.set_server_conversation_token_for_conversation(
+                fixture.conversation_id,
+                "shared-routing-conversation".to_owned(),
+            );
+        });
+        fixture.terminal.update(app, |terminal, ctx| {
+            terminal.ai_controller().update(ctx, |controller, ctx| {
+                controller.handle_shared_session_response_event(
+                    ResponseEvent {
+                        r#type: Some(response_event::Type::Init(response_event::StreamInit {
+                            request_id: "shared-routing-request".to_owned(),
+                            conversation_id: "shared-routing-conversation".to_owned(),
+                            run_id: String::new(),
+                        })),
+                    },
+                    ctx,
+                );
+                assert_eq!(
+                    controller.get_current_shared_session_conversation_id(ctx),
+                    Some(fixture.conversation_id)
+                );
+            });
+        });
+        BlocklistAIHistoryModel::handle(app).read(app, |history, _ctx| {
+            let conversation = history.conversation(&fixture.conversation_id).unwrap();
+            assert_eq!(conversation.root_task_exchanges().count(), 1);
+            let exchange = conversation.root_task_exchanges().next().unwrap();
+            assert_eq!(exchange.model_id, llm_id::encode("base", "model"));
+            assert_eq!(
+                exchange.cli_agent_model_id,
+                llm_id::encode("cli-selected", "model")
+            );
+        });
+    });
 }
 
 #[test]

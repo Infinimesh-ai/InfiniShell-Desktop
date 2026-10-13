@@ -130,17 +130,18 @@ impl BlocklistAIController {
         });
 
         // Eagerly create an exchange for this request (with empty inputs) and initialize output.
+        let request_input = RequestInput::for_task(
+            vec![],
+            task_id,
+            &self.active_session,
+            self.get_current_response_initiator(),
+            conversation_id,
+            self.terminal_view_id,
+            ctx,
+        );
         history.update(ctx, |history_model, ctx| {
             let _ = history_model.update_conversation_for_new_request_input(
-                RequestInput::for_task(
-                    vec![],
-                    task_id,
-                    &self.active_session,
-                    self.get_current_response_initiator(),
-                    conversation_id,
-                    self.terminal_view_id,
-                    ctx,
-                ),
+                request_input,
                 stream_id.clone(),
                 self.terminal_view_id,
                 ctx,
