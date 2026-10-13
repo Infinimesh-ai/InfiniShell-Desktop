@@ -4,9 +4,11 @@
 
 ## 当前主线状态（2026-10-13）
 
-当前 `main` 已快进合入并推送 `36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680`，修复 Linux musl socket 长度字段的 ABI 类型差异，并补入双 musl 编译门禁。本机 `cargo check`、两 musl 目标 `command --all-targets` 检查及 i18n **12/12** 通过；[同提交 Linux 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368196945)通过，Rust **1661 项**、Python **109 项通过／2 项 Windows 专属跳过**。其中 socket 身份测试在 glibc 宿主实际 **9/9** 通过，两 musl 目标仅计编译通过。
+此前 `main` 已快进合入并推送 `36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680`，修复 Linux musl socket 长度字段的 ABI 类型差异，并补入双 musl 编译门禁。本机 `cargo check`、两 musl 目标 `command --all-targets` 检查及 i18n **12/12** 通过；[同提交 Linux 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368196945)通过，Rust **1661 项**、Python **109 项通过／2 项 Windows 专属跳过**。其中 socket 身份测试在 glibc 宿主实际 **9/9** 通过，两 musl 目标仅计编译通过。
 
-此前 `1ca59d352` 的[两项缺陷修复和四项 macOS debug GUI 复验](#macos-gui-修复复验2026-10-13)及同提交 Linux／Windows 自动检查通过，原 GUI 失败和首轮网络中断记录保留。当前正式候选为 `v0.2026.10.13.16.19.oss_00`，绑定上述 `36abcbb5b`，[发行构建 38368533631](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368533631)仍在运行；macOS 预编译通过，但尚未嵌入最终六份 SSH 资源、未完成公证，也未做本候选 GUI 验收。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，源码与预编译通过不等于正式资产或发版验收通过。
+此前 `1ca59d352` 的[两项缺陷修复和四项 macOS debug GUI 复验](#macos-gui-修复复验2026-10-13)及同提交 Linux／Windows 自动检查通过，原 GUI 失败和首轮网络中断记录保留。正式候选 `v0.2026.10.13.16.19.oss_00` 已完成六份 SSH 资源校验、macOS Developer ID 签名、公证和装订，但实际 GUI 发现 CLI 模型路由与 Responses 工具 schema 两处阻塞，整体拒收；[旧发行构建 38368533631](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368533631)余下打包已主动取消，不记为 Linux／Windows 编译失败。
+
+修复提交 `f429fe2c0426846f41f79fef15a791c5f7cbb011` 已快进合入并推送 `main`；本地 `cargo check`、定向回归 **39/39**（含新增 8 项）、i18n **12/12** 通过；[同提交双平台门禁 38411587441](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38411587441)首次运行全部通过：Linux 应用 **624/624**、Windows **609/609**，新增 8 项及通用 i18n 11 项两端均逐名 PASS。新候选 `v0.2026.10.13.22.25.oss_00` 已推送固定标签，[发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397)进行中，不复用旧资产或通过结论。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，新候选尚未验收通过。
 
 | 范围 | 当前结论与依据 |
 | --- | --- |
@@ -36,17 +38,23 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 相关代码变更继续执行 `cargo check`、必要的 i18n／定向回归，以及受影响的 Linux／Windows 自动检查。现有跨平台工作流入口为 `ci/**` 推送或 `workflow_dispatch`，`run_linux` 默认开启；不是每次推送 `main` 都自动执行。文档更新不触发已通过的模型、GUI 或双平台验收重跑。
 
-以下三项是本轮候选仍待完成的发版门禁；macOS 修复后的 debug 包四项 GUI 冒烟全部通过，原失败历史保留，不替代最终产物验收：
+以下三项是新候选仍待完成的发版门禁。debug 包历史通过及旧签名候选的局部通过保留，两处新发现的问题必须在修复后的最终包复验：
 
 | 必做项 | 执行时机与通过条件 |
 | --- | --- |
 | 最终发行产物校验 | 每次发版绑定同一源码与正式标签；核对既定 12 件资产、内嵌 SSH 资源和下载摘要，完成 macOS Developer ID 签名、公证及装订检查。继续保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
 | Windows 安装生命周期 | 按用户新安排，由用户在自己的 Windows 开发电脑完成最终安装器的安装、可见 GUI 启动、正常退出、官方卸载与残留记录，助手审核回执；先绑定最终包 SHA-256／大小再交付执行。已有分支验收不重开，也不替代本次最终安装器回执；不再索要机器名、账号或要求切换桌面。见[独立操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
-| 最近 GUI 改动的候选包冒烟 | 本机修复包四项通过：浮窗宽高拖动／重启恢复、Retina 图片覆盖区域输入／拖动选字、英中同步错误、Plan 保存 tooltip。最终候选仍需核对包身份及必要冒烟；修复的 Linux／Windows 同提交自动检查已通过，不要求补做已延期的 Linux 桌面矩阵 |
+| 最近 GUI 改动的候选包冒烟 | 新最终包复验四项 GUI，并额外确认 CLI 所选模型用于实际请求、Responses 工具 schema 无不支持的 `uniqueItems`。旧签名包的浮窗项是在 Base／CLI 同选本地夹具后通过，不能关闭路由缺陷；不要求补做已延期的 Linux 桌面矩阵 |
 
 发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。这三项未完成前，不宣称下一发行候选已完成验收。
 
-本轮构建与验收归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/`：`github/musl-preflight/` 保存源码门禁、完整日志与摘要索引，`macos-precompile/result.json` 明确中间包边界，`native-validation/windows-manual/` 保存用户操作说明、采集器和审核清单。当前只更新状态与分工，**无需本地化变更**；Linux 桌面继续延期，自动检查保留。
+新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/`。旧轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；入口为 `macos-gui/result.json`、`macos-gui/evidence-index.json` 和 `STATUS.zh-CN.md`。修复源码门禁归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**：修复改变请求路由与协议归一化，没有新增或改变用户文案；既有双语界面仍在新候选复验。Linux 桌面继续延期，自动检查保留。
+
+### 正式签名候选拒收与修复（2026-10-13）
+
+旧候选 DMG 摘要为 `4ba15c20da518bdc8114994c817b327458fba7c049ce581aa40c7d9bb1a8df3e`；Apple 公证 `47f39a29-c42c-4d84-9fd2-e97ebc53f1fb` Accepted，静态签名／装订／Gatekeeper 校验 **19/19** 通过。实际 GUI 完成 Retina 连字开关下输入和拖选、英中真实 HTTP 401、英中 Plan 保存提示与重启恢复；浮窗宽高及滚动在记录变通后完成，重启实际恢复 765 × 164。
+
+整体拒收原因及修复：CLI 子任务请求原先保留 Base 模型，现按实际单个 CLI 任务选择已解析的 CLI 模型；普通任务与多目标请求继续使用 Base。Responses strict 参数原先保留数组 `uniqueItems`，服务端拒绝 `send_message_to_agent` schema；现移除不支持的约束，运行时收件人去重检查保留。两项源码修复通过本地门禁，最终签名包尚待复验，不将旧失败改写为通过。
 
 ### macOS 近期 GUI 冒烟（2026-10-13）
 
