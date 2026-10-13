@@ -263,6 +263,7 @@ impl RequestInput {
             app,
         );
         me.input_messages.insert(task_id, inputs);
+        me.select_task_model(app);
         me
     }
 
@@ -291,7 +292,24 @@ impl RequestInput {
                     context: context.clone(),
                 });
         }
+        me.select_task_model(app);
         me
+    }
+
+    fn select_task_model(&mut self, ctx: &AppContext) {
+        if self.input_messages.len() != 1 {
+            return;
+        }
+        let target = self.input_messages.keys().next().and_then(|task_id| {
+            BlocklistAIHistoryModel::as_ref(ctx)
+                .conversation(&self.conversation_id)?
+                .get_task(task_id)
+        });
+        if target.is_some_and(|task| task.is_cli_subagent()) {
+            // 按实际目标任务选择，避免当前终端的接管状态影响普通 Base 请求。
+            // 在请求快照形成时固定模型，历史记录、发送和错误重试保持一致。
+            self.model_id = self.cli_agent_model_id.clone();
+        }
     }
 
     pub fn all_inputs(&self) -> impl Iterator<Item = &AIAgentInput> {

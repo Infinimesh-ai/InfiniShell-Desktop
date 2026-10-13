@@ -737,6 +737,39 @@ fn responses工具调用在本地解析前删除可选null() {
         .expect("恢复缺省参数后应能转换为内部工具调用");
 }
 
+#[tokio::test]
+async fn responses实际请求的发送消息工具不含unique_items() {
+    let mut server = mockito::Server::new_async().await;
+    let mut params = responses_continuation_params();
+    params.local_orchestration_enabled = true;
+    let request = server
+        .mock("POST", "/v1/responses")
+        .match_request(|request| {
+            let body: Value = serde_json::from_slice(request.body().unwrap()).unwrap();
+            let tool = body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|tool| tool["name"] == "send_message_to_agent")
+                .expect("实际请求必须包含发送消息工具");
+            tool["strict"] == true
+                && tool["parameters"]["properties"]["addresses"]
+                    == json!({
+                        "type": "array", "minItems": 1, "maxItems": 16,
+                        "items": {"type": "string"}
+                    })
+        })
+        .with_header("content-type", "text/event-stream")
+        .with_body(COMPLETED_RESPONSES_STREAM)
+        .expect(1)
+        .create_async()
+        .await;
+
+    collect_responses_request(params, format!("{}/v1/", server.url()), Default::default()).await;
+
+    request.assert_async().await;
+}
+
 #[test]
 fn responses混合本地与审批工具结果保持就绪() {
     let task_id = "task-1";

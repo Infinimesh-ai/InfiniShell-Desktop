@@ -767,3 +767,7 @@ async fn byop_required_response_stream(
 #[cfg(test)]
 #[path = "response_stream_compaction_tests.rs"]
 mod compaction_tests;
+
+#[cfg(test)]
+#[path = "response_stream_model_routing_tests.rs"]
+mod model_routing_tests;

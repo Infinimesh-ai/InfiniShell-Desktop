@@ -30,7 +30,18 @@ fn normalize_node(schema: &mut Value) {
     object.remove("default");
     replace_one_of(object);
 
-    if object.get("type").is_some_and(is_object_type) {
+    if object
+        .get("type")
+        .is_some_and(|kind| has_type(kind, "array"))
+    {
+        // Responses strict 不支持 uniqueItems，唯一性仍由工具参数校验保证。
+        object.remove("uniqueItems");
+    }
+
+    if object
+        .get("type")
+        .is_some_and(|kind| has_type(kind, "object"))
+    {
         let originally_required = required_names(object);
         let property_names = object
             .get("properties")
@@ -225,10 +236,10 @@ fn required_names(schema: &Map<String, Value>) -> HashSet<String> {
         .collect()
 }
 
-fn is_object_type(schema_type: &Value) -> bool {
+fn has_type(schema_type: &Value, expected: &str) -> bool {
     match schema_type {
-        Value::String(value) => value == "object",
-        Value::Array(values) => values.iter().any(|value| value == "object"),
+        Value::String(value) => value == expected,
+        Value::Array(values) => values.iter().any(|value| value == expected),
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::Object(_) => false,
     }
 }

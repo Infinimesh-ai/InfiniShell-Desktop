@@ -281,6 +281,8 @@ jobs:
         test(settings_view::cloud_sync_page::tests::) |
         test(cli_subagent_sizes) |
         test(terminal::alt_screen::alt_screen_element::tests::) |
+        test(ai::agent_providers::chat_stream::responses_tests::) |
+        test(ai::blocklist::controller::response_stream::model_routing_tests::) |
         test(ai::blocklist::block::cli::) |
         test(persistence::sqlite::tests::) |
         test(terminal::grid_renderer::tests::) |
@@ -1315,7 +1317,7 @@ jobs:
         working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
-          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(terminal::alt_screen::alt_screen_element::tests::) | test(i18n::tests)'
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(terminal::alt_screen::alt_screen_element::tests::) | test(ai::agent_providers::tools::strict_schema_tests::) | test(ai::agent_providers::chat_stream::responses_tests::) | test(ai::blocklist::controller::response_stream::model_routing_tests::) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
@@ -2995,7 +2997,7 @@ jobs:
         working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-windows/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
-          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(terminal::alt_screen::alt_screen_element::tests::) | test(i18n::tests)'
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(terminal::alt_screen::alt_screen_element::tests::) | test(ai::agent_providers::tools::strict_schema_tests::) | test(ai::agent_providers::chat_stream::responses_tests::) | test(ai::blocklist::controller::response_stream::model_routing_tests::) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.windows_toolchain.outcome == 'success') }}

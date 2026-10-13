@@ -47,6 +47,55 @@ fn strict_schema把one_of转换为受支持的any_of() {
 }
 
 #[test]
+fn strict_schema移除数组去重关键字但保留同名业务字段() {
+    let schema = strict_schema::normalize(json!({
+        "type": "object",
+        "properties": {
+            "uniqueItems": {"type": "string"},
+            "recipients": {
+                "type": "array",
+                "uniqueItems": true,
+                "minItems": 1,
+                "maxItems": 16,
+                "items": {"type": "string"}
+            }
+        },
+        "required": ["uniqueItems"]
+    }));
+
+    assert_eq!(
+        schema["properties"]["uniqueItems"],
+        json!({"type": "string"})
+    );
+    assert_eq!(
+        schema["properties"]["recipients"],
+        json!({
+            "type": ["array", "null"],
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {"type": "string"}
+        })
+    );
+}
+
+#[test]
+fn strict发送消息仍拒绝重复收件人() {
+    let tool = lookup("send_message_to_agent").expect("应注册发送消息工具");
+    let schema = strict_schema::normalize((tool.parameters)());
+    assert!(
+        schema["properties"]["addresses"]
+            .get("uniqueItems")
+            .is_none()
+    );
+    assert!(
+        (tool.from_args)(r#"{"addresses":["task-1","task-1"],"subject":"状态","message":"继续"}"#)
+            .is_err()
+    );
+    (tool.from_args)(r#"{"addresses":["task-1","task-2"],"subject":"状态","message":"继续"}"#)
+        .expect("不同收件人仍应有效");
+}
+
+#[test]
 fn strict参数中的可选null会恢复为字段缺省() {
     let tool = lookup("run_shell_command").expect("应注册 run_shell_command");
     let schema = (tool.parameters)();
@@ -74,6 +123,10 @@ fn assert_strict_schema(schema: &Value) {
             assert!(
                 !object.contains_key("oneOf"),
                 "strict schema 不应包含 oneOf"
+            );
+            assert!(
+                !object.contains_key("uniqueItems"),
+                "内置 strict schema 不应包含 uniqueItems"
             );
             if object.get("type").is_some_and(is_object_type) {
                 assert_eq!(
