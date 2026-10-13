@@ -1,12 +1,69 @@
 {
   "main_acceptance": {
     "as_of": "2026-10-13",
-    "assessed_main_commit": "1ca59d352972cac0de0e562a9fcebd8c8066668f",
+    "assessed_main_commit": "36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680",
     "reader_entry": "README.md#当前主线状态2026-10-13",
     "all_platform_desktop_acceptance_complete": false,
     "new_acceptance_performed_in_this_revision": true,
     "latest_public_release": "v0.2026.10.07.01.09.oss_00",
     "main_changes_after_public_release_are_published": false,
+    "musl_release_fix": {
+      "source_commit": "36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680",
+      "integration": "fast_forwarded_and_pushed_to_main",
+      "scope": "修复Linux musl socket长度字段ABI类型差异；保留FD关闭和边界校验，并新增双musl编译门禁",
+      "local_checks": {
+        "cargo_check_warp": "passed",
+        "command_all_targets_musl": [
+          "x86_64-unknown-linux-musl: passed",
+          "aarch64-unknown-linux-musl: passed"
+        ],
+        "macos_i18n_passed": 12,
+        "provenance": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/github/source-gate-provenance.json"
+      },
+      "linux_preflight": {
+        "run_id": 38368196945,
+        "run_attempt": 1,
+        "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368196945",
+        "status": "passed",
+        "rust_tests_passed": 1661,
+        "python_tests_passed": 109,
+        "python_tests_skipped": 2,
+        "python_skip_reason": "Windows原生jq与Windows Job专属用例",
+        "linux_i18n_passed": 11,
+        "native_socket_identity": "9/9 passed on x86_64-unknown-linux-gnu; ignored fixture not counted",
+        "musl_runtime_verified": false,
+        "musl_scope": "两目标command --all-targets编译通过，不计musl原生运行通过",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/github/musl-preflight/result.json"
+      },
+      "gui_boundary": "原1ca59d352的debug GUI四项通过及双平台自动检查按原证据保留；本次未执行最终发行候选GUI验收"
+    },
+    "current_release_candidate": {
+      "tag": "v0.2026.10.13.16.19.oss_00",
+      "source_sha": "36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680",
+      "tag_object": "202304b292c71d09fa84d5a199c1fa11c0bb45ca",
+      "release_run": 38368533631,
+      "release_run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368533631",
+      "status": "building_not_accepted",
+      "publication": "draft_only",
+      "archive": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00",
+      "macos_precompile": {
+        "status": "passed_not_final_artifact",
+        "embedded_final_six_resources": false,
+        "notarization": "not_submitted",
+        "gui_acceptance": "not_executed",
+        "evidence": "macos-precompile/result.json"
+      },
+      "windows_installer": {
+        "status": "awaiting_final_hash_size_and_user_execution",
+        "execution": "user_on_windows_development_desktop",
+        "review": "assistant_reviews_candidate_evidence",
+        "existing_branch_acceptance": "preserved_not_reopened_and_not_substitute_for_final_installer_receipts",
+        "request_machine_name_account_or_desktop_switch": false,
+        "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md",
+        "materials": "native-validation/windows-manual"
+      },
+      "linux_desktop": "deferred_not_passed"
+    },
     "deferred": [
       {
         "platform": "linux-x64",
@@ -78,30 +135,31 @@
       "run_linux_default": true,
       "runs_on_every_main_push": false,
       "repeat_online_gui_or_remote_gates_for_docs_only": false,
-      "latest_change_remote_status": "1ca59d352的Linux/Windows定向门禁已通过（38352476222 attempt2）；新增7项及通用i18n11项在两平台各自逐名PASS；首轮网络中断保留，Linux桌面继续延期"
+      "latest_change_remote_status": "36abcbb5b的Linux源码门禁38368196945通过：Rust1661项、Python109通过/2项Windows专属跳过，含glibc宿主socket身份9项；双musl仅编译通过。1ca59d352原双平台门禁及首轮网络中断按历史保留；Linux桌面继续延期"
     },
     "next_release_required": [
       {
         "item": "发行产物校验",
-        "status": "pending_next_release",
-        "when": "每次发版",
+        "status": "pending_final_assets_build_in_progress",
+        "when": "本轮候选发版前，后续每次发版同样执行",
         "pass_condition": "同一源码和正式标签；12件既定资产、内嵌SSH资源、下载摘要；macOS Developer ID签名、公证及装订检查",
         "scope": "ARM64 macOS桌面、Windows x64桌面、四份Linux桌面包及六份SSH扩展；保留Intel macOS SSH，不恢复Intel桌面DMG"
       },
       {
         "item": "Windows安装生命周期",
-        "status": "pending_next_windows_release",
-        "when": "下次Windows发版前",
-        "pass_condition": "在现有隔离/干净账号用最终安装器完成安装、启动、官方卸载并记录残留检查；构建成功或SSH扩展版本输出不能替代，不预称零残留"
+        "status": "pending_final_installer_identity_and_user_receipts",
+        "when": "最终安装器SHA-256和大小绑定并交付后，本轮Windows发版前",
+        "pass_condition": "用户在自己的Windows开发电脑完成最终包安装、可见GUI启动、正常退出、官方卸载与残留记录，助手审核；已有分支验收不重开且不替代最终安装器回执；不预称零残留",
+        "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md"
       },
       {
         "item": "近期GUI候选包冒烟",
         "status": "source_smoke_passed_final_release_package_pending",
-        "when": "下次发版前，优先常用Mac桌面",
+        "when": "本轮最终候选就绪后，使用常用Mac桌面",
         "pass_condition": "浮窗真实拖拽后重启尺寸恢复；Retina图片覆盖区域输入/选择；英中同步错误及Plan tooltip可读性；绑定候选源码/二进制及实际结果",
         "linux_desktop_matrix_required": false,
         "evidence": "README.md#macos-gui-修复复验2026-10-13",
-        "remaining": "本轮四项macOS源码包实测通过；最终发行候选仍需核对包身份和必要冒烟，不把debug包视为正式发行包"
+        "remaining": "已有debug源码包四项实测通过；新候选macOS仅预编译通过，尚缺最终六资源、公证及候选GUI。仍需核对最终包身份和必要冒烟，不把debug或中间DMG视为正式发行包"
       }
     ],
     "ongoing_boundaries": {
@@ -128,7 +186,7 @@
       }
     ],
     "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。",
-    "localization": "无需本地化变更；修复不新增或改变用户文案，英中同步错误和Plan提示均在同一最终包实测",
+    "localization": "无需本地化变更；本轮仅校正状态文档与验收分工，musl修复不涉及界面文案；原debug GUI双语证据按原包范围保留",
     "macos_gui_smoke": {
       "date": "2026-10-13",
       "source_commit": "45a8911075277d127e959510631c3d4b01b44903",

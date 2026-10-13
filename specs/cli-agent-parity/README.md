@@ -4,7 +4,9 @@
 
 ## 当前主线状态（2026-10-13）
 
-状态校正基于 `main` 提交 `b4bfeacc3b29a33886a423002d34f5d0cbf5ee48`；随后在 `45a8911075277d127e959510631c3d4b01b44903` 执行[初轮 macOS GUI 冒烟](#macos-近期-gui-冒烟2026-10-13)，保留原失败结论。同日完成[两项缺陷修复和四项 GUI 复验](#macos-gui-修复复验2026-10-13)，macOS 实测全部通过。修复提交 `1ca59d352972cac0de0e562a9fcebd8c8066668f` 已快进合入 `main`；Linux／Windows 同提交自动检查在网络恢复后的第二次尝试全部通过，首轮网络中断记录保留。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`；源码修复通过不等于变更已随安装包发布。
+当前 `main` 已快进合入并推送 `36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680`，修复 Linux musl socket 长度字段的 ABI 类型差异，并补入双 musl 编译门禁。本机 `cargo check`、两 musl 目标 `command --all-targets` 检查及 i18n **12/12** 通过；[同提交 Linux 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368196945)通过，Rust **1661 项**、Python **109 项通过／2 项 Windows 专属跳过**。其中 socket 身份测试在 glibc 宿主实际 **9/9** 通过，两 musl 目标仅计编译通过。
+
+此前 `1ca59d352` 的[两项缺陷修复和四项 macOS debug GUI 复验](#macos-gui-修复复验2026-10-13)及同提交 Linux／Windows 自动检查通过，原 GUI 失败和首轮网络中断记录保留。当前正式候选为 `v0.2026.10.13.16.19.oss_00`，绑定上述 `36abcbb5b`，[发行构建 38368533631](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368533631)仍在运行；macOS 预编译通过，但尚未嵌入最终六份 SSH 资源、未完成公证，也未做本候选 GUI 验收。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，源码与预编译通过不等于正式资产或发版验收通过。
 
 | 范围 | 当前结论与依据 |
 | --- | --- |
@@ -34,15 +36,17 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 相关代码变更继续执行 `cargo check`、必要的 i18n／定向回归，以及受影响的 Linux／Windows 自动检查。现有跨平台工作流入口为 `ci/**` 推送或 `workflow_dispatch`，`run_linux` 默认开启；不是每次推送 `main` 都自动执行。文档更新不触发已通过的模型、GUI 或双平台验收重跑。
 
-以下三项属于下一发行候选门禁；macOS 修复后的 debug 包四项 GUI 冒烟全部通过，原失败历史保留，其余仍待对应最终产物验收：
+以下三项是本轮候选仍待完成的发版门禁；macOS 修复后的 debug 包四项 GUI 冒烟全部通过，原失败历史保留，不替代最终产物验收：
 
 | 必做项 | 执行时机与通过条件 |
 | --- | --- |
 | 最终发行产物校验 | 每次发版绑定同一源码与正式标签；核对既定 12 件资产、内嵌 SSH 资源和下载摘要，完成 macOS Developer ID 签名、公证及装订检查。继续保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
-| Windows 安装生命周期 | 下次 Windows 发版前，在现有隔离／干净账号使用最终正式安装器完成安装、启动、官方卸载并记录残留检查。只有安装器构建或 SSH 扩展 `--version` 成功不算通过；以实际原件说明卸载结果，不预称零残留 |
+| Windows 安装生命周期 | 按用户新安排，由用户在自己的 Windows 开发电脑完成最终安装器的安装、可见 GUI 启动、正常退出、官方卸载与残留记录，助手审核回执；先绑定最终包 SHA-256／大小再交付执行。已有分支验收不重开，也不替代本次最终安装器回执；不再索要机器名、账号或要求切换桌面。见[独立操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
 | 最近 GUI 改动的候选包冒烟 | 本机修复包四项通过：浮窗宽高拖动／重启恢复、Retina 图片覆盖区域输入／拖动选字、英中同步错误、Plan 保存 tooltip。最终候选仍需核对包身份及必要冒烟；修复的 Linux／Windows 同提交自动检查已通过，不要求补做已延期的 Linux 桌面矩阵 |
 
 发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。这三项未完成前，不宣称下一发行候选已完成验收。
+
+本轮构建与验收归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/`：`github/musl-preflight/` 保存源码门禁、完整日志与摘要索引，`macos-precompile/result.json` 明确中间包边界，`native-validation/windows-manual/` 保存用户操作说明、采集器和审核清单。当前只更新状态与分工，**无需本地化变更**；Linux 桌面继续延期，自动检查保留。
 
 ### macOS 近期 GUI 冒烟（2026-10-13）
 
@@ -95,6 +99,7 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 | 自动升级、渠道与事务约定 | [CLI_AUTOUPDATE.md](CLI_AUTOUPDATE.md) |
 | 已通过、失败、未验及源码／平台对应 | [VALIDATION_REPORT.md](VALIDATION_REPORT.md) |
 | Linux 桌面验收延期与归档入口 | [本页归档决定](#linux-桌面验收延期与归档2026-10-13) |
+| Windows 最终安装器用户操作与助手审核 | [独立验收入口](../../docs/windows-final-installer-acceptance.zh-CN.md)，等待最终包身份绑定后交付执行 |
 
 `CODEX_PLUGIN_CACHE_REFRESH.md`、`PLUGIN_COMPATIBILITY.md`、`SSH_TMUX_VERIFICATION.md` 是配套插件说明正在引用的简短兼容入口，正文已收敛到上述文档。
 
