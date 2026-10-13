@@ -4,7 +4,7 @@
 
 ## 当前主线状态（2026-10-13）
 
-状态校正基于 `main` 提交 `b4bfeacc3b29a33886a423002d34f5d0cbf5ee48`；随后在 `45a8911075277d127e959510631c3d4b01b44903` 执行[初轮 macOS GUI 冒烟](#macos-近期-gui-冒烟2026-10-13)，保留原失败结论。同日完成[两项缺陷修复和四项 GUI 复验](#macos-gui-修复复验2026-10-13)，macOS 实测全部通过。修复已提交并推送 `codex/macos-gui-smoke-fixes`，提交为 `1ca59d352972cac0de0e562a9fcebd8c8066668f`；节点上线后启动了同提交 Linux／Windows 自动检查，但两节点在应用测试阶段同时失联，检查未完成；恢复并通过后再完成主线收尾。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`；源码修复通过不等于变更已随安装包发布。
+状态校正基于 `main` 提交 `b4bfeacc3b29a33886a423002d34f5d0cbf5ee48`；随后在 `45a8911075277d127e959510631c3d4b01b44903` 执行[初轮 macOS GUI 冒烟](#macos-近期-gui-冒烟2026-10-13)，保留原失败结论。同日完成[两项缺陷修复和四项 GUI 复验](#macos-gui-修复复验2026-10-13)，macOS 实测全部通过。修复提交 `1ca59d352972cac0de0e562a9fcebd8c8066668f` 已快进合入 `main`；Linux／Windows 同提交自动检查在网络恢复后的第二次尝试全部通过，首轮网络中断记录保留。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`；源码修复通过不等于变更已随安装包发布。
 
 | 范围 | 当前结论与依据 |
 | --- | --- |
@@ -40,7 +40,7 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 | --- | --- |
 | 最终发行产物校验 | 每次发版绑定同一源码与正式标签；核对既定 12 件资产、内嵌 SSH 资源和下载摘要，完成 macOS Developer ID 签名、公证及装订检查。继续保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
 | Windows 安装生命周期 | 下次 Windows 发版前，在现有隔离／干净账号使用最终正式安装器完成安装、启动、官方卸载并记录残留检查。只有安装器构建或 SSH 扩展 `--version` 成功不算通过；以实际原件说明卸载结果，不预称零残留 |
-| 最近 GUI 改动的候选包冒烟 | 本机修复包四项通过：浮窗宽高拖动／重启恢复、Retina 图片覆盖区域输入／拖动选字、英中同步错误、Plan 保存 tooltip。最终候选仍需核对包身份及必要冒烟；修复的 Linux／Windows 自动检查因 runner 失联中断，待恢复后重试，不要求补做已延期的 Linux 桌面矩阵 |
+| 最近 GUI 改动的候选包冒烟 | 本机修复包四项通过：浮窗宽高拖动／重启恢复、Retina 图片覆盖区域输入／拖动选字、英中同步错误、Plan 保存 tooltip。最终候选仍需核对包身份及必要冒烟；修复的 Linux／Windows 同提交自动检查已通过，不要求补做已延期的 Linux 桌面矩阵 |
 
 发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。这三项未完成前，不宣称下一发行候选已完成验收。
 
@@ -74,13 +74,15 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 `cargo check --locked -p warp`、debug 构建通过；定向 nextest **50/50**（含新增 7 项和 i18n 12 项）通过，另行 `cargo test ... i18n::tests` **12/12** 通过。格式、diff、actionlint（声明实际自托管标签）及独立差异审查通过。无需本地化变更：修复未新增或改变用户文案，双语布局已复验。
 
-修复已提交／推送为 `1ca59d352972cac0de0e562a9fcebd8c8066668f`，当前在独立验证分支；生产源码及回归测试与 macOS 归档一致，同时以基线 SHA 和归档 `source-final-code.diff` 绑定，补丁 SHA-256 为 `853704f52d86edf57b6f02b2f5bbe81dfe50c04b2c9f047e06427d25075cd400`；最终签名后二进制 SHA-256 为 `d60d27ad841f952bed109822f0305efb0c39881ec635cf3129636e45f2c15183`。使用 `warpui/test-util,rust-embed/debug-embed` 和 Apple Development 本机签名，仍非正式公证发行包。本地固定模型只用于触发真实 GUI／文档工具，不证明模型能力。
+修复提交 `1ca59d352972cac0de0e562a9fcebd8c8066668f` 已快进合入 `main`；生产源码及回归测试与 macOS 归档一致，同时以基线 SHA 和归档 `source-final-code.diff` 绑定，补丁 SHA-256 为 `853704f52d86edf57b6f02b2f5bbe81dfe50c04b2c9f047e06427d25075cd400`；最终签名后二进制 SHA-256 为 `d60d27ad841f952bed109822f0305efb0c39881ec635cf3129636e45f2c15183`。使用 `warpui/test-util,rust-embed/debug-embed` 和 Apple Development 本机签名，仍非正式公证发行包。本地固定模型只用于触发真实 GUI／文档工具，不证明模型能力。
 
 完整报告、索引、结果和 SHA-256 清单位于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-width-fix/`；原失败、仅宽度修复的中间包、操作定位过程均保留。GUI／provider 及后代退出，全部本轮短 TMPDIR 已按身份清理，归档包和隔离 profile 保留。
 
-**收尾安排历史**：用户先确认本轮完成 macOS、远端自动检查待节点上线；随后要求检查节点并继续。两个节点曾恢复在线且空闲；[同提交定向运行 38352476222](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38352476222)已完成编译和基础回归，但两 runner 在应用回归阶段失联，GitHub 标记失败，应用测试结论未知且尚未上传日志产物。这是基础设施中断，不能记为产品通过或产品断言失败。两节点恢复后同提交重试一次；原中断记录归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-cross-platform-fix/`。macOS 已完成的实测结果保留。 后续只读诊断确认两台 SSH 仍可达、runner 进程仍在，但使用同组网关 DNS 的两台均无法解析 GitHub；单次指定解析 IP 仍连接重置。待恢复 DNS／外网通路，未修改节点网络或服务配置。
+**收尾安排历史**：用户先确认本轮完成 macOS、远端自动检查待节点上线；随后要求检查节点并继续。两个节点曾恢复在线且空闲；[同提交定向运行 38352476222 首次尝试](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38352476222/attempts/1)已完成编译和基础回归，但两 runner 在应用回归阶段失联，GitHub 标记失败，应用测试结论未知且尚未上传日志产物。这是基础设施中断，不能记为产品通过或产品断言失败。后续重试保持同一受测提交；原中断记录归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-cross-platform-fix/`。macOS 已完成的实测结果保留。 后续只读诊断确认两台 SSH 仍可达、runner 进程仍在，但使用同组网关 DNS 的两台均无法解析 GitHub；单次指定解析 IP 仍连接重置。未修改节点网络或服务配置。用户恢复网络后，两台默认 DNS 访问 GitHub 均返回 HTTP 200；同一提交的[第二次尝试](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38352476222/attempts/2)全部通过，独立证据目录为原归档下的 `retry-1/`，包含报告、证据索引、完整 Actions 日志和 SHA-256 清单。
 
-**尚未完成的门禁**：本修复的 Linux／Windows 定向自动检查（运行 38352476222 因两节点失联中断，待恢复后重试）；最终候选身份及必要冒烟、12 件正式资产与 macOS 签名公证装订、Windows 最终安装器生命周期。新回归已接入现有自动检查过滤器。Linux 桌面继续延期，不计通过，不要求切换桌面。
+**双平台最终核验**：两平台 `cargo check` 均通过；基础 crate／窗口与同步 crate／v2 补全／应用回归分别为 Linux **503／525／22／602** 项全通过、Windows **492／528／11／587** 项全通过。新增 7 项回归与通用 i18n 11 项在两平台各逐名 PASS；第 12 项 i18n 是 macOS 专用布局测试，只在本机计证。Python 通知测试 Linux 111 项（跳过 2）、Windows 108 项（跳过 5），均成功，跳过不计通过。逐项日志审计和独立复核通过，未启用全工作区套件。
+
+**尚未完成的发版门禁**：最终候选身份及必要冒烟、12 件正式资产与 macOS 签名公证装订、Windows 最终安装器生命周期。新回归已接入现有自动检查过滤器。Linux 桌面继续延期，不计通过，不要求切换桌面。
 
 ## 当前入口
 
@@ -128,4 +130,4 @@ git show e3ef39689cd8b686dfe040b90217ed1067b4d268:specs/cli-agent-parity/<原相
 
 整理前已在维护机器的仓库外保留完整压缩备份及逐文件 SHA-256 清单；备份位于 `~/Documents/InfiniShell-Archives/cli-agent-parity/`，以完整提交号命名。跨机器追溯以固定 Git 提交为准，不依赖该本机目录。
 
-当前机器可读结论位于 `CURRENT_STATUS.json` 的根级状态、`current_goal_scope`、`required_goal_merge_gate` 与 `main_acceptance`。原入口值保存在 `historical_entry_before_20261013`，原 Goal 大对象及合并门禁分别原样保留为 `historical_goal_scope_before_merge` 和 `historical_required_goal_merge_gate`；其余逐轮快照继续按各自来源阅读。原始证据链接仅用于追溯，不能取代当前状态；后续更新结论仍需绑定实际实现和验证。
+当前机器可读结论位于 `CURRENT_STATUS.json` 的根级状态、`current_goal_scope`、`required_goal_merge_gate` 与 `main_acceptance`。原入口值保存在 `historical_entry_before_20261013`，原 Goal 大对象及合并门禁分别原样保留为 `historical_goal_scope_before_merge` 和 `historical_required_goal_merge_gate`；其余逐轮快照继续按各自来源阅读。本轮替换的旧当前摘要完整保存在 `historical_current_summaries_before_gui_closeout_20261013`。原始证据链接仅用于追溯，不能取代当前状态；后续更新结论仍需绑定实际实现和验证。
