@@ -1,5 +1,9 @@
 # CLI 能力缺项与验收缺口
 
+> **当前主线状态（2026-10-13）**：G01–G10、V03 共 11 项已在原批准范围关闭，PR #22 已合并，G09 已正式签收。延期项和下次发版必验清单以 [README 当前入口](README.md#当前主线状态2026-10-13)及 [CURRENT_STATUS.json](CURRENT_STATUS.json) 的 `main_acceptance` 为准。
+>
+> **历史阅读约定**：下文按日期、提交和构建保留原状态与原验收条件；旧“G09 开放／PR 草稿／门禁未完成”描述不代表当前主线。保留历史失败，不将全平台实机或延期项改记为通过。
+
 ## 当前接续状态：S4双平台拒收，明确Node就绪前置条件
 
 冻结 `5b4ad5538825918d0492916781278c8a37a8cd1d` 的正常Windows [37692547122](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37692547122)已独审通过：witness=false、五场景、三次独立冷恢复、8次worker/8代候选/8自动站，严格输出、四角色自然退出0及清理通过。签收SHA `0a0aed5b6a9731f3d6760d4b4b909f62bc191b291ddebad2858447c8b1e3888d`；该结果只归属S4。
