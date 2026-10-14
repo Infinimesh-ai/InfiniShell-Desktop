@@ -1,10 +1,27 @@
 # Windows 最终安装器验收
 
-当前结论：**旧 `01.46` 候选的用户证据已复核，安装、GUI 启动、正常退出和官方卸载分项通过，但 URI 登记仍指向旧失效目标，阻塞发版。** 详见[审核报告](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)。本轮修复安装登记、启动时恢复及按所有权卸载清理；新包和复验指令待验证完成后替换入口。保留用户数据，Linux 桌面继续延期。
+当前结论：**Windows URI 修复已通过源码和原生门禁；新 `13.00` 候选正在构建，最终安装器和用户六阶段复验仍待完成。** 产品源码为 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b`，已整合至主线 `cf75bdfddfd213215ded6ca27d484cfa628b7f2c`。[Windows 门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)成功：80 项 Inno 断言、6 项隔离注册表回归、616 项应用测试（含该 6 项）、492 项 crate、528 项 Zap、11 项 completer；本地 cargo check 与同 Rust／本地化源码 i18n 12/12 已通过。
+
+候选为 `v0.2026.10.14.13.00.oss_00`，annotated tag 对象 `9b5afd31aafa5bbda210356cf329d63ec696bc07`，固定上述产品源码；[正式 run 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)正在构建。当前 Setup SHA-256、大小、实际 Authenticode、最终静态报告和便携 ZIP 均待实际产出后绑定，不能借用旧包摘要或 `NotSigned` 结果。新归档入口为 [candidate.json](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.13.00.oss_00/candidate.json)。尚未交付新包或启用其用户执行材料。
+
+旧 `01.46` 的[用户证据审核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、GUI 启动、正常退出和官方卸载分项通过，但 URI 登记仍指向旧失效目标，故整体拒收。源码修复通过不等于新最终安装器已验收；旧 macOS 和 12 资产通过仅属于旧标签。保留用户数据，Linux 桌面继续延期，自动检查保留。
+
+## 新候选六阶段安排（待最终包交付）
+
+正式 run 全部成功、最终 Setup 静态核验及身份绑定通过后，交付含同字节安装器和采集材料的便携 ZIP；用户使用现有 PowerShell 5.1 或 7，无需 Git 或 Python。执行和审查顺序为：
+
+1. `baseline`：记录本轮基线，先核对既有安装与 URI/AUMID，不覆盖或清理归属未知的环境。
+2. `installed`：完成当前用户安装，核对安装器首次登记及本实例路径。
+3. `launched`：从本轮快捷方式启动可见 GUI，采集本候选进程和窗口证据。
+4. `uri_activated`：通过交付的激活脚本实际打开 `infinishell://action/new_window?path=...`；记录唯一请求、对应 launched 摘要、返回时间、新窗口和目录标记，不能只读注册表替代真实唤起。
+5. `closed`：正常关闭本轮所有产品窗口和进程，采集退出证据。
+6. `uninstalled`：使用官方卸载器，核对本实例 URI/AUMID、PATH、快捷方式和卸载项，保留用户数据与被其他实例接管的关联；助手审核全部原始回执后判定。
+
+新材料的准备记录见[修复归档](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/handoff-preparation/README.zh-CN.md)，仍是待绑定模板，不能直接执行。用户无需另报机器名或账号，不要求切换桌面；已有分支验收不重开，也不替代最终安装器六阶段回执。
 
 ## 旧 01.46 候选交付时快照（保留历史）
 
-当前状态：**最终安装器静态核验已通过，便携验收包可交付；用户五阶段尚未执行**。候选为 `v0.2026.10.14.01.46.oss_00`，源码 `5360f5d6cf7e3b25263431027993a3a26dca9cb5`，annotated tag 对象 `45219f419c628bf3f5dbace5fd10013f6cf2c0c2`。本地门禁及[同 SHA 双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行全部通过，主线和标签已推送；[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 已成功完成，Windows desktop producer 为 `115576837239`，artifact 为 `11860520494`。
+交付时状态：**最终安装器静态核验已通过，便携验收包可交付；当时用户五阶段尚未执行**。以下包身份和操作材料仅供追溯，不用于新候选执行。候选为 `v0.2026.10.14.01.46.oss_00`，源码 `5360f5d6cf7e3b25263431027993a3a26dca9cb5`，annotated tag 对象 `45219f419c628bf3f5dbace5fd10013f6cf2c0c2`。本地门禁及[同 SHA 双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行全部通过，主线和标签已推送；[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 已成功完成，Windows desktop producer 为 `115576837239`，artifact 为 `11860520494`。
 
 正式原件已完成来源、provider 摘要、ZIP 完整性与唯一安装器核对；既有 Windows 节点实际读取 Authenticode 为 **`NotSigned`**，读取错误、签名证书与时间戳证书均为空。这是明确的 OSS 未签名状态，不代表有效数字签名。只读解包确认主程序为 AMD64，内嵌 CI 原 manifest 字节及六件资源摘要／大小全部匹配本 run 原件；没有安装或启动 GUI。
 
@@ -17,7 +34,7 @@ CI 原 manifest SHA-256 为 `2abbe09e3a4b1557702fcd8003b19e06c45d4ac7ee9094ca019
 
 按用户安排，用户在自己的 Windows 开发电脑完成安装、真实 GUI 启动、正常退出和官方卸载，助手审核回执。无需另报机器名或账号，也不要求切换桌面。已有分支验收继续按原范围保留，不重开；它不能替代本次最终安装器的回执。
 
-## 用户五阶段操作顺序
+### 旧包用户五阶段操作顺序
 
 1. 收到最终包和发行方 SHA-256 后，在同一交互登录会话、同一普通 PowerShell 中采集 `baseline`。若已有会被覆盖的安装或集成，或旧 `warp\InfiniShell` 数据目录存在，先发回基线核对，不直接覆盖或卸载既有环境。
 2. 按完整说明进行当前用户安装，记录安装目录、PATH 和快捷方式选项；完成后采集 `installed` 与安装完成截图。
@@ -27,7 +44,7 @@ CI 原 manifest SHA-256 为 `2abbe09e3a4b1557702fcd8003b19e06c45d4ac7ee9094ca019
 
 保留用户配置、历史和凭据，不提交其内容。URI/AUMID 登记若残留，应单独据实记录，不能归为用户数据或预称“零残留”。完整命令、既有数据边界和异常处理见下列本轮交付材料；收到完整 ZIP 并核对身份后执行。
 
-## 本轮交付材料
+### 旧包交付材料
 
 以下材料位于本候选的独立归档，旧结果没有复制为本轮结果。用户执行五阶段后，助手再审核实际回执：
 

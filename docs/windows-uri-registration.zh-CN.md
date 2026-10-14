@@ -1,5 +1,9 @@
 # Windows URI 登记与卸载约定
 
+当前实现源码 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` 已整合至主线 `cf75bdfddfd213215ded6ca27d484cfa628b7f2c`，本地 cargo check 与同 Rust／本地化源码 i18n 12/12 通过。[Windows 原生门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)全部成功：80 项 Inno 断言、6 项真实隔离注册表回归，以及应用 616、crate 492、Zap 528、completer 11 项测试；应用计数已包含该 6 项。原始依据为[原生审核](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/remote/38512735757/review.json)及[源码门禁记录](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/source-gates-5acb349c7.json)。早期 Inno 声明编译失败 `38512138949` 的原件保留，不重写为成功。
+
+新候选 `v0.2026.10.14.13.00.oss_00` 的 tag 对象为 `9b5afd31aafa5bbda210356cf329d63ec696bc07`，固定上述产品源码，[正式 run 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)正在构建。**源码缺陷已修复验证，最终 Windows 安装器和用户六阶段复验仍待完成**，不能据源码回归直接关闭发行验收阻塞。
+
 `v0.2026.10.14.01.46.oss_00` 的用户回执确认：安装、GUI 启动、正常退出和官方卸载分项通过，但 `infinishell://` 命令始终指向旧失效目标。原件及审核保存在 [Windows 证据审核目录](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)。该候选不能发版，也不以修改旧包、重用旧标签来修复。
 
 ## 登记和恢复
@@ -21,7 +25,7 @@
 
 运行时回归使用随机 HKCU 私有子树，覆盖缺失登记、旧命令恢复、实例接管、中文和空格路径、原始字符串终止符及错误传播。安装器回归编译并执行生产共用的 Inno Pascal 函数，在独占子树验证清理和外来接管保护；不以文本搜索代替执行。
 
-自动检查通过后，以新源码冻结新的候选，交付包含安装器、身份绑定和采集器的便携 ZIP。用户按[最终安装器验收入口](windows-final-installer-acceptance.zh-CN.md)补实际 URI 唤起、退出和官方卸载，助手审核回执后再判关闭。Linux 桌面继续延期，自动检查保留；旧候选的 macOS 和 12 资产通过记录仅属于原字节。
+自动检查已通过，新候选已冻结并开始构建；实际安装器、同来源静态校验和身份绑定就绪后，再交付包含安装器、激活脚本和采集器的便携 ZIP。用户按[最终安装器验收入口](windows-final-installer-acceptance.zh-CN.md)完成 `baseline → installed → launched → uri_activated → closed → uninstalled` 六阶段，助手审核实际 URI 唤起、正常退出和官方卸载回执后再判关闭。Linux 桌面继续延期，自动检查保留；旧候选的 macOS 和 12 资产通过记录仅属于原字节。
 
 无需本地化变更：没有新增或改变用户可见文案，变更限于 Windows 系统登记与卸载行为。
 
