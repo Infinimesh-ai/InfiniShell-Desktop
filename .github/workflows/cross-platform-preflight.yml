@@ -372,6 +372,13 @@ jobs:
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File script/windows/test_windows_registration.ps1 -OutputDirectory $outputDirectory
           if ($LASTEXITCODE -ne 0) { throw "Windows 安装登记原生回归失败：$LASTEXITCODE" }
 
+      - name: 验证 Linux DEB 安装和归属卸载
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B script/linux/test_bundle_deb.py -v 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/deb-maintainers.log"
+
       - name: 检查 Linux musl ABI 与 socket 身份回归
         if: ${{ matrix.platform == 'linux' }}
         shell: bash
@@ -873,6 +880,12 @@ jobs:
         shell: bash
         working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
         run: python3 script/cli-agent-parity/tmux_notification_tests.py
+
+      - name: Test Linux DEB installation and owned-link cleanup
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
+        shell: bash
+        working-directory: ${{ inputs.source_gate_only && format('{0}/source-gate-{1}-{2}-linux/source', runner.temp, github.run_id, github.run_attempt) || github.workspace }}
+        run: python3 -B script/linux/test_bundle_deb.py -v
 
       - name: Check Linux musl command targets
         if: ${{ !cancelled() && steps.linux_toolchain.outcome == 'success' }}

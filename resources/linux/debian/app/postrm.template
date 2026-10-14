@@ -4,7 +4,15 @@
 # postrm script.
 action="$1"
 
-rm -f /usr/bin/@@PACKAGE_NAME@@
+# 升级及失败回滚仍可能使用此入口；卸载时也保留管理员替换的文件或链接。
+case "$action" in
+  remove|purge)
+    if [ -L "/usr/bin/@@PACKAGE_NAME@@" ] && \
+       [ "$(readlink "/usr/bin/@@PACKAGE_NAME@@")" = "@@OPTDIR@@/@@BINARY_NAME@@" ]; then
+      rm -f "/usr/bin/@@PACKAGE_NAME@@"
+    fi
+    ;;
+esac
 
 # Make sure the system forgets the newly-uninstalled desktop file.
 if hash update-desktop-database 2>/dev/null; then
