@@ -288,7 +288,8 @@ jobs:
         test(terminal::grid_renderer::tests::) |
         test(terminal::local_tty::unix::tests::) |
         test(i18n::tests) | test(app_services::linux::startup_tests::) |
-        test(app_services::windows::startup_tests::)
+        test(app_services::windows::startup_tests::) |
+        test(app_services::windows::registry::)
     steps:
       # 全量模式在 job 条件中优先；其余专项冲突直接失败，避免悄悄漏验。
       - name: 校验精简模式输入
@@ -361,6 +362,15 @@ jobs:
             cmake --version
             protoc --version
           } 2>&1 | tee "$log_dir/toolchain.log"
+
+      - name: 验证 Windows 安装登记与归属卸载
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $outputDirectory = Join-Path $env:RUNNER_TEMP 'upstream-essence/windows-registration'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File script/windows/test_windows_registration.ps1 -OutputDirectory $outputDirectory
+          if ($LASTEXITCODE -ne 0) { throw "Windows 安装登记原生回归失败：$LASTEXITCODE" }
 
       - name: 检查 Linux musl ABI 与 socket 身份回归
         if: ${{ matrix.platform == 'linux' }}
@@ -491,6 +501,9 @@ jobs:
           path: |
             ${{ runner.temp }}/upstream-essence/*.log
             ${{ runner.temp }}/upstream-essence/*.json
+            ${{ runner.temp }}/upstream-essence/windows-registration/*.log
+            ${{ runner.temp }}/upstream-essence/windows-registration/*.json
+            ${{ runner.temp }}/upstream-essence/windows-registration/completed.txt
           if-no-files-found: error
           retention-days: 14
 

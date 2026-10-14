@@ -42,7 +42,7 @@
       "source_sha": "5360f5d6cf7e3b25263431027993a3a26dca9cb5",
       "tag_object": "45219f419c628bf3f5dbace5fd10013f6cf2c0c2",
       "release_run": 38444122158,
-      "status": "assets_and_macos_passed_waiting_windows_user_receipts",
+      "status": "windows_uri_registration_blocked_replacement_candidate_required",
       "publication": "draft_only",
       "archive": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00",
       "source_preflight_run": 38441190656,
@@ -90,7 +90,7 @@
         }
       },
       "windows_installer": {
-        "state": "waiting_user_execution_and_assistant_evidence_review",
+        "state": "user_evidence_reviewed_core_lifecycle_passed_uri_registration_blocked",
         "execution_owner": "user_on_existing_windows_development_desktop",
         "review_owner": "assistant_reviews_candidate_evidence",
         "existing_branch_acceptance": "preserved_not_reopened_and_not_substitute_for_final_installer_receipts",
@@ -103,7 +103,7 @@
         "installer_size_bytes": 580408345,
         "actual_authenticode_status": "NotSigned",
         "signature_read_error": null,
-        "lifecycle": "not_executed",
+        "lifecycle": "install_launch_close_uninstall_passed_uri_registration_failed",
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-desktop/result.json",
         "evidence_sha256": "da097c15bc8ac80be355ecdfce47dba70482339a964ac93a8f2fe67bb82ab0a7",
         "portable_kit": {
@@ -118,6 +118,13 @@
           "handoff_manifest_sha256": "eac14d5ffeb1ccf15d761b98fd52685214b032263796dd3d467ca1e0fb010f8a",
           "windows_lifecycle": "not_executed",
           "github_release_asset": false
+        },
+        "user_evidence_review": {
+          "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/result.json",
+          "evidence_sha256": "bcd491752dca676e9b63c53fa5c3bc162c058615c26ba29dd6d053b18eaa579d",
+          "input_zip_sha256": "d9208ed88e330dae3fd101d35e1d633c1f61a6fd83fe48b7abb36c9c44dc17fe",
+          "blocker": "WIN-RELEASE-URI-01",
+          "observed": "五阶段旧URI命令摘要不变，目标不存在且非候选；实际URI唤起未执行；基线已有URI/AUMID不记为本轮新增卸载残留"
         }
       },
       "linux_desktop": "deferred_not_passed",
@@ -190,7 +197,8 @@
         "evidence_sha256": "3273fed00c67daf918e322880cebd14146077add2e0a7907601af8307ecd7126",
         "release_ready": false,
         "remaining": [
-          "Windows最终安装器五阶段用户回执及助手审核"
+          "修复WIN-RELEASE-URI-01并构建新候选；新Windows包安装、URI激活与官方卸载回执及助手审核",
+          "新候选同源码12资产与macOS最终包验证；旧01.46通过记录仅属于旧字节"
         ]
       }
     },
@@ -270,7 +278,7 @@
     "next_release_required": [
       {
         "item": "发行产物校验",
-        "status": "passed_final_twelve_assets_and_authenticated_roundtrip",
+        "status": "passed_old_candidate_new_candidate_required_after_windows_fix",
         "when": "本轮候选发版前，后续每次发版同样执行",
         "pass_condition": "同一源码和正式标签；12件既定资产、内嵌SSH资源、下载摘要；macOS Developer ID签名、公证及装订检查",
         "scope": "ARM64 macOS桌面、Windows x64桌面、四份Linux桌面包及六份SSH扩展；保留Intel macOS SSH，不恢复Intel桌面DMG",
@@ -279,15 +287,15 @@
       },
       {
         "item": "Windows安装生命周期",
-        "status": "pending_user_execution_and_assistant_evidence_review",
+        "status": "blocked_uri_registration_new_candidate_retest_required",
         "when": "最终安装器SHA-256和大小绑定并交付后，本轮Windows发版前",
         "pass_condition": "用户在自己的Windows开发电脑完成最终包安装、可见GUI启动、正常退出、官方卸载与残留记录，助手审核；已有分支验收不重开且不替代最终安装器回执；不预称零残留",
         "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md",
-        "completed": "最终Setup来源、大小、摘要、实际NotSigned、内嵌六资源已核；便携验收ZIP已交付，采集器启用；五阶段未执行"
+        "completed": "旧01.46包安装、GUI启动、正常退出、官方卸载分项通过；URI仍指旧失效目标阻塞。新包需补实际URI激活和本实例登记清理"
       },
       {
         "item": "近期GUI候选包冒烟",
-        "status": "passed_final_signed_candidate_independently_reviewed",
+        "status": "passed_old_candidate_new_final_candidate_not_yet_built",
         "when": "本轮最终候选就绪后，使用常用Mac桌面",
         "pass_condition": "浮窗真实拖拽后重启尺寸恢复；Retina图片覆盖区域输入/选择；英中同步错误及Plan tooltip可读性；绑定候选源码/二进制及实际结果",
         "linux_desktop_matrix_required": false,
@@ -870,7 +878,14 @@
           "new_candidate_acceptance_inherited": false
         }
       }
-    ]
+    ],
+    "windows_uri_fix": {
+      "status": "source_fix_in_progress_gates_and_new_candidate_pending",
+      "scope": "安装时注册、启动同步修复旧失效URI并读回，统一URI/AUMID归属，卸载按当前所有权清理",
+      "archive": "/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14",
+      "root_cause_boundary": "现场首因未确定；修正已确认的REG_SZ终止符缺失与安装/卸载登记缺口，不将KEY_READ误写为已复现根因",
+      "localization": "无需本地化变更；仅Windows系统登记和卸载行为，无用户可见文案变化"
+    }
   },
   "current_goal_scope": {
     "authorized_scope": "PR22原批准合并范围；其他平台实机验收单独管理",
@@ -8323,7 +8338,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "原批准合并范围G01–G10、V03共11项关闭，旧两轮候选拒收保留。本候选源码门禁、macOS签名公证装订19项与GUI六项、Linux四包原生检查、Windows安装器静态检查及12资产Draft全量下载回验通过；仅Windows用户五阶段回执及助手审核待完成。Linux桌面继续延期，未公开发布。",
+  "status_zh": "原批准范围11项关闭及Linux桌面延期不变。01.46候选12资产和macOS通过记录保留；Windows用户证据审核确认安装、启动、退出和官方卸载分项通过，但URI仍指旧失效目标，阻塞发版。正在修复并准备新Windows候选复验，未公开发布。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,

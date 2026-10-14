@@ -1,6 +1,8 @@
+use anyhow::Context;
 use registry::register_uri_handler;
 #[cfg(feature = "release_bundle")]
 use warp_errors::report_error;
+use warp_errors::report_if_error;
 use warpui::AppContext;
 #[cfg(feature = "release_bundle")]
 use {
@@ -78,14 +80,8 @@ pub(super) fn init(_ctx: &mut AppContext) {
     #[cfg(feature = "release_bundle")]
     _ctx.add_singleton_model(SingleInstanceManager::new);
 
-    // 注册表 URI handler 注册(warp:// 协议)是纯同步多次写 HKCU,
-    // 与主线程任何 UI 初始化都没依赖。冷启动耗时 ~30–60 ms,
-    // 丢到后台线程跳出关键路径。失败逻辑原本就是 log::error,
-    // 后台跳不会错过任何信息。
-    std::thread::Builder::new()
-        .name("warp-uri-handler-register".into())
-        .spawn(register_uri_handler)
-        .ok();
+    // GUI 初始化返回前完成关联恢复；失败保留阶段与 Win32 错误，不静默丢弃。
+    report_if_error!(register_uri_handler().context("Could not register Windows URI handler"));
 }
 
 #[cfg(all(test, feature = "release_bundle"))]

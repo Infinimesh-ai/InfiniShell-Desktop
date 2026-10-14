@@ -1,5 +1,9 @@
 # Windows 最终安装器验收
 
+当前结论：**旧 `01.46` 候选的用户证据已复核，安装、GUI 启动、正常退出和官方卸载分项通过，但 URI 登记仍指向旧失效目标，阻塞发版。** 详见[审核报告](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)。本轮修复安装登记、启动时恢复及按所有权卸载清理；新包和复验指令待验证完成后替换入口。保留用户数据，Linux 桌面继续延期。
+
+## 旧 01.46 候选交付时快照（保留历史）
+
 当前状态：**最终安装器静态核验已通过，便携验收包可交付；用户五阶段尚未执行**。候选为 `v0.2026.10.14.01.46.oss_00`，源码 `5360f5d6cf7e3b25263431027993a3a26dca9cb5`，annotated tag 对象 `45219f419c628bf3f5dbace5fd10013f6cf2c0c2`。本地门禁及[同 SHA 双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行全部通过，主线和标签已推送；[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 已成功完成，Windows desktop producer 为 `115576837239`，artifact 为 `11860520494`。
 
 正式原件已完成来源、provider 摘要、ZIP 完整性与唯一安装器核对；既有 Windows 节点实际读取 Authenticode 为 **`NotSigned`**，读取错误、签名证书与时间戳证书均为空。这是明确的 OSS 未签名状态，不代表有效数字签名。只读解包确认主程序为 AMD64，内嵌 CI 原 manifest 字节及六件资源摘要／大小全部匹配本 run 原件；没有安装或启动 GUI。

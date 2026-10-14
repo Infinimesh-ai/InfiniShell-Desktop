@@ -22,6 +22,12 @@
 
 `KNOWN_GAPS.md`、`VALIDATION_REPORT.md`、能力矩阵和支持说明的早期“G09 开放／PR 草稿／14 项未闭合”按原快照阅读。最终 G09 签收以 PR #22 及其收据为准，延期不计通过。
 
+### Windows URI 发版阻塞与修复（2026-10-14）
+
+用户已交回 `01.46` 候选的完整 Windows 证据，助手[复核报告](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、可见 GUI、正常退出和官方卸载分项通过。**URI 命令五阶段仍指向旧失效目标，`WIN-RELEASE-URI-01` 阻塞发版**；旧 URI/AUMID 基线已有，不能算作新安装遗留。上文“等待五阶段”是交付时状态，已由本结论替代。
+
+本轮修复安装时登记、启动同步恢复及读回、URI/AUMID 归属标记与按所有权卸载清理。待源码门禁通过后冻结新候选、生成新的 Windows 复验包；用户补真实 URI 激活和卸载清理，助手再审核。旧候选 12 资产和 macOS GUI 通过记录保留在原标签，不移用为新字节的通过证明。Linux 桌面延期，自动检查保留。无需本地化变更。
+
 ### 延期项与独立补验
 
 | 项目 | 当前证据与后续安排 |

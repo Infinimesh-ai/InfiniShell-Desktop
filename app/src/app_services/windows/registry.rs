@@ -1,90 +1,126 @@
-use std::ffi::OsString;
+use std::{ffi::OsString, path::Path};
 
+use anyhow::{ensure, Context, Result};
 use warp_core::channel::ChannelState;
-use warp_errors::report_error;
-use windows_registry::{CURRENT_USER, HSTRING};
+use windows_registry::{Key, CURRENT_USER, HSTRING};
 
-pub(super) fn register_uri_handler() {
+const OWNER_PATH: &str = "InfiniShellOwnerPath";
+
+pub(super) fn register_uri_handler() -> Result<()> {
     // 独立开发 profile 不覆盖当前用户的系统 URI 关联。
     if ChannelState::data_profile().is_some() {
-        return;
+        return Ok(());
     }
 
-    // To change the settings for the user, changes must be made under
-    // HKEY_CURRENT_USER\Software\Classes instead of under HKEY_CLASSES_ROOT since only an
-    // administrator can modify it. It gets merged into HKEY_CLASSES_ROOT later.
-    let Ok(classes_key) = CURRENT_USER.open("Software\\Classes") else {
-        report_error!("Failed to get current_user\\software\\classes");
-        return;
-    };
-
-    // The Windows Registry entry for Zap (assuming the channel is WarpLocal):
-    // warplocal
-    //   (Default) = "WarpLocal"
-    //   URL Protocol = ""
-    //   DefaultIcon
-    //      (Default) = "{path_to_channel_icon},0" TODO(CORE-2860): Add icon file path here.
-    //   shell
-    //      open
-    //         command
-    //            (Default) = "{path_to_executable}" "%0"
-    let uri_scheme = ChannelState::url_scheme();
-    match classes_key.create(uri_scheme) {
-        Ok(parent_key) => {
-            // The empty string represents the "(Default)" value for a registry key.
-            if let Err(err) = parent_key.set_string("", ChannelState::app_id().application_name()) {
-                report_error!(
-                    anyhow::Error::new(err).context("Could not set URI Scheme display name")
-                );
-                return;
-            }
-            if let Err(err) = parent_key.set_string("URL Protocol", "") {
-                report_error!(
-                    anyhow::Error::new(err).context("Could not set URI Scheme URL Protocol Key")
-                );
-                return;
-            };
-
-            // TODO(CORE-2861): Add the `DefaultIcon` Default value here with the file path to
-            // Zap's icon once we figure out distribution on Windows.
-
-            let command_key = match parent_key.create("shell\\open\\command") {
-                Ok(command_key) => command_key,
-                Err(err) => {
-                    report_error!(
-                        anyhow::Error::new(err)
-                            .context("Could not create shell\\open\\command key")
-                    );
-                    return;
-                }
-            };
-            let command = match std::env::current_exe() {
-                Ok(path) => {
-                    let mut command = OsString::new();
-                    command.push("\"");
-                    command.push(path.as_os_str());
-                    command.push("\" \"%0\"");
-                    HSTRING::from(command.as_os_str())
-                }
-                Err(err) => {
-                    report_error!(anyhow::Error::new(err).context(
-                        "Could not get path to current executable for registering URI scheme"
-                    ));
-                    return;
-                }
-            };
-            // The empty string represents the "(Default)" value for a registry key.
-            if let Err(err) = command_key.set_hstring("", &command) {
-                report_error!(
-                    anyhow::Error::new(err)
-                        .context("Could not set shell command path for URI Scheme")
-                );
-            }
-        }
-        Err(err) => {
-            report_error!(
-                anyhow::Error::new(err).context("Failed to create URI Scheme registry entry")
-            );
-        }
-    }
+    let executable =
+        std::env::current_exe().context("Could not get current executable for URI registration")?;
+    let app_id = ChannelState::app_id();
+    register_uri_handler_at(
+        CURRENT_USER,
+        "Software\\Classes",
+        ChannelState::url_scheme(),
+        app_id.application_name(),
+        &app_id.to_string(),
+        &executable,
+    )
 }
+
+// 根键和 Classes 路径由调用方提供，让原生回归仅访问隔离的 HKCU 子树。
+fn register_uri_handler_at(
+    root: &Key,
+    classes_path: &str,
+    uri_scheme: &str,
+    application_name: &str,
+    app_id: &str,
+    executable: &Path,
+) -> Result<()> {
+    // 缺失的 Classes、协议和命令键都要恢复，旧失效命令同样由本实例接管。
+    let classes_key = root
+        .create(classes_path)
+        .context("Could not create or open URI classes key")?;
+    let parent_key = classes_key
+        .create(uri_scheme)
+        .context("Could not create or open URI scheme key")?;
+    parent_key
+        .set_string("", application_name)
+        .context("Could not set URI scheme display name")?;
+    parent_key
+        .set_string("URL Protocol", "")
+        .context("Could not set URI protocol marker")?;
+    let command_key = parent_key
+        .create("shell\\open\\command")
+        .context("Could not create or open URI command key")?;
+
+    let mut command = OsString::from("\"");
+    command.push(executable.as_os_str());
+    command.push("\" \"%1\"");
+    let expected_command = HSTRING::from(command.as_os_str());
+    // windows-registry 0.2 的 set_hstring 不把终止 NUL 计入写入长度。
+    // REG_SZ 的原始字节必须包含它，不能只依赖回读 API 自动补齐。
+    command.push("\0");
+    command_key
+        .set_hstring("", &HSTRING::from(command.as_os_str()))
+        .context("Could not set URI command")?;
+    ensure!(
+        command_key
+            .get_hstring("")
+            .context("Could not read back URI command")?
+            == expected_command
+            && parent_key
+                .get_string("")
+                .context("Could not read back URI scheme display name")?
+                == application_name
+            && parent_key
+                .get_string("URL Protocol")
+                .context("Could not read back URI protocol marker")?
+                .is_empty(),
+        "URI registration did not match after writing"
+    );
+
+    // 与安装器共用归属字段；命令成功后才登记所有者。
+    let expected_owner = HSTRING::from(executable.as_os_str());
+    let mut owner = executable.as_os_str().to_os_string();
+    owner.push("\0");
+    let owner = HSTRING::from(owner.as_os_str());
+    parent_key
+        .set_hstring(OWNER_PATH, &owner)
+        .context("Could not set URI registration owner")?;
+    ensure!(
+        parent_key
+            .get_hstring(OWNER_PATH)
+            .context("Could not read back URI registration owner")?
+            == expected_owner,
+        "URI registration owner did not match after writing"
+    );
+
+    // 与 WarpUI 的显示名算法一致，并向安装器标明本实例的 AUMID 归属。
+    let aumid_key = classes_key
+        .create(format!("AppUserModelId\\{app_id}"))
+        .context("Could not create or open AUMID key")?;
+    let display_name = app_id.rsplit('.').next().unwrap_or(app_id);
+    aumid_key
+        .set_string("DisplayName", display_name)
+        .context("Could not set AUMID display name")?;
+    ensure!(
+        aumid_key
+            .get_string("DisplayName")
+            .context("Could not read back AUMID display name")?
+            == display_name,
+        "AUMID display name did not match after writing"
+    );
+    aumid_key
+        .set_hstring(OWNER_PATH, &owner)
+        .context("Could not set AUMID registration owner")?;
+    ensure!(
+        aumid_key
+            .get_hstring(OWNER_PATH)
+            .context("Could not read back AUMID registration owner")?
+            == expected_owner,
+        "AUMID registration owner did not match after writing"
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "registry_tests.rs"]
+mod tests;
