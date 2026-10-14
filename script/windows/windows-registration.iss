@@ -2,18 +2,20 @@
 const
   RegistrationOwnerValue = 'InfiniShellOwnerPath';
 
-function RegistrationOpenKey(RootKey: HKEY; Subkey: String; Options, Access: LongWord;
-  var OpenedKey: HKEY): Longint;
+{ Inno 6.7 的注册表根类型为 Integer，Win32 句柄为 THandle；
+  不使用较新版帮助页面中的 HKEY/NativeUInt。 }
+function RegistrationOpenKey(RootKey: Integer; Subkey: String; Options, Access: LongWord;
+  var OpenedKey: THandle): Longint;
   external 'RegOpenKeyExW@advapi32.dll stdcall';
-function RegistrationQueryType(Key: HKEY; Name: String; Reserved: NativeUInt;
-  var ValueType: LongWord; Data: NativeUInt; var DataSize: LongWord): Longint;
+function RegistrationQueryType(Key: THandle; Name: String; Reserved: DWORD_PTR;
+  var ValueType: LongWord; Data: DWORD_PTR; var DataSize: LongWord): Longint;
   external 'RegQueryValueExW@advapi32.dll stdcall';
-function RegistrationCloseKey(Key: HKEY): Longint;
+function RegistrationCloseKey(Key: THandle): Longint;
   external 'RegCloseKey@advapi32.dll stdcall';
 
-function IsRegistrationString(RootKey: HKEY; const Key, Name: String): Boolean;
+function IsRegistrationString(RootKey: Integer; const Key, Name: String): Boolean;
 var
-  OpenedKey: HKEY;
+  OpenedKey: THandle;
   Access, ValueType, DataSize: LongWord;
 begin
   { Inno 的字符串读取还接受 REG_EXPAND_SZ；归属协议只接受实际 REG_SZ。 }
@@ -33,7 +35,7 @@ begin
   end;
 end;
 
-function RegistrationStringMatches(RootKey: HKEY; const Key, Name, Expected: String): Boolean;
+function RegistrationStringMatches(RootKey: Integer; const Key, Name, Expected: String): Boolean;
 var
   Value: String;
 begin
@@ -47,7 +49,7 @@ begin
     Log('注册表值未确认匹配，保留已有登记：' + Key + '\' + Name);
 end;
 
-function WriteRegistrationString(RootKey: HKEY; const Key, Name, Value: String): Boolean;
+function WriteRegistrationString(RootKey: Integer; const Key, Name, Value: String): Boolean;
 begin
   Result := RegWriteStringValue(RootKey, Key, Name, Value);
   if Result then
@@ -56,7 +58,7 @@ begin
     Log('注册表写入或读回失败：' + Key + '\' + Name);
 end;
 
-function RegistrationPathMatches(RootKey: HKEY; const Key, Name, Expected: String): Boolean;
+function RegistrationPathMatches(RootKey: Integer; const Key, Name, Expected: String): Boolean;
 var
   Value: String;
 begin
@@ -70,7 +72,7 @@ begin
     Log('注册表路径未确认归属，保留已有登记：' + Key + '\' + Name);
 end;
 
-function RegisterWindowsIntegration(RootKey: HKEY;
+function RegisterWindowsIntegration(RootKey: Integer;
   const ClassesKey, Scheme, AppName, AppId, ExePath: String): Boolean;
 var
   UriKey, AumidKey, DisplayName: String;
@@ -90,14 +92,14 @@ begin
   Result := True;
 end;
 
-function DeleteRegistrationValue(RootKey: HKEY; const Key, Name: String): Boolean;
+function DeleteRegistrationValue(RootKey: Integer; const Key, Name: String): Boolean;
 begin
   Result := RegDeleteValue(RootKey, Key, Name);
   if not Result then
     Log('删除已确认归属的注册表值失败：' + Key + '\' + Name);
 end;
 
-function PruneRegistrationKey(RootKey: HKEY; const Key: String): Boolean;
+function PruneRegistrationKey(RootKey: Integer; const Key: String): Boolean;
 var
   Values, Subkeys: TArrayOfString;
 begin
@@ -121,7 +123,7 @@ begin
     Log('检查或删除空注册表键失败：' + Key);
 end;
 
-function RemoveOwnedWindowsIntegration(RootKey: HKEY;
+function RemoveOwnedWindowsIntegration(RootKey: Integer;
   const ClassesKey, Scheme, AppName, AppId, ExePath: String): Boolean;
 var
   UriKey, CommandKey, AumidKey, DisplayName: String;

@@ -41,8 +41,54 @@ $deniedKeys = @()
 $result = [ordered]@{
     schema_version = 1; test_id = $testId; status = 'incomplete'
     registry_root = "HKCU\$keyPath"; started_at = [DateTime]::UtcNow.ToString('o')
-    compiler = $compiler.Source; harness_exit_code = $null; assertions = 0
+    compiler = $compiler.Source; compiler_runs = @(); harness_exit_code = $null; assertions = 0
     cleanup_passed = $false; error = $null; finished_at = $null
+}
+
+function Invoke-Compiler {
+    param([string[]] $Arguments, [string] $LogName)
+    $quoted = foreach ($argument in $Arguments) {
+        if ($argument -match '["\r\n]') { throw '编译器参数含不允许的引号或换行' }
+        '"' + ($argument -replace '(\\+)$', '$1$1') + '"'
+    }
+    $info = [Diagnostics.ProcessStartInfo]::new()
+    $info.FileName = $compiler.Source
+    $info.Arguments = $quoted -join ' '
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $stdoutPath = Join-Path $OutputDirectory "$LogName.log"
+    $stderrPath = Join-Path $OutputDirectory "$LogName.stderr.log"
+    $stdout = [IO.File]::Open($stdoutPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    $stderr = [IO.File]::Open($stderrPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    $process = [Diagnostics.Process]::new()
+    try {
+        $process.StartInfo = $info
+        if (-not $process.Start()) { throw '编译器未启动' }
+        # 不经 PS5.1 的 native stderr 管道，避免第一条 NativeCommandError 截断后续错误。
+        $stdoutTask = $process.StandardOutput.BaseStream.CopyToAsync($stdout)
+        $stderrTask = $process.StandardError.BaseStream.CopyToAsync($stderr)
+        $process.WaitForExit()
+        $null = $stdoutTask.GetAwaiter().GetResult()
+        $null = $stderrTask.GetAwaiter().GetResult()
+        $stdout.Flush($true)
+        $stderr.Flush($true)
+        $exitCode = $process.ExitCode
+        $receipt = [ordered]@{
+            command = @($compiler.Source) + $Arguments; exit_code = $exitCode
+            stdout = $stdoutPath; stderr = $stderrPath
+        }
+        $result.compiler_runs += $receipt
+        $receipt | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory "$LogName.json") -Encoding UTF8
+    } finally {
+        $stdout.Dispose()
+        $stderr.Dispose()
+        $process.Dispose()
+    }
+    Write-Host ([IO.File]::ReadAllText($stdoutPath))
+    Write-Host ([IO.File]::ReadAllText($stderrPath))
+    if ($exitCode -ne 0) { throw "ISCC 编译失败：$exitCode；完整输出见 $stdoutPath 和 $stderrPath" }
 }
 
 function Set-Fixture {
@@ -88,8 +134,7 @@ try {
         (Join-Path $PSScriptRoot 'windows-registration-tests.iss'),
         "/DTestId=$testId", "/DEvidenceDir=$OutputDirectory"
     )
-    & $compiler.Source @compilerArgs 2>&1 | Tee-Object -FilePath (Join-Path $OutputDirectory 'compile.log') | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "ISCC 编译失败：$LASTEXITCODE" }
+    Invoke-Compiler $compilerArgs 'compile'
 
     # 同时编译实际安装器，覆盖预处理宏、include 和事件接线；此包仅编译，绝不执行。
     $fixture = Join-Path $OutputDirectory 'compile-only-input'
@@ -99,12 +144,12 @@ try {
     }
     [IO.File]::WriteAllText((Join-Path $fixture 'pwsh.ps1'), '# 仅供安装器编译的测试夹具')
     [IO.File]::WriteAllText((Join-Path $fixture 'resources\fixture.txt'), 'compile-only fixture')
-    & $compiler.Source (Join-Path $PSScriptRoot 'windows-installer.iss') `
-        /DArch=x64 /DReleaseChannel=oss /DMyAppName=InfiniShell /DMyAppExeName=infinishell.exe `
-        /DAppUserModelId=dev.infinishell.InfiniShell /DInnoAppId=infinishell `
-        "/DTargetProfileDir=$fixture" /DOutputName=compile-only-installer "/O$OutputDirectory" `
-        2>&1 | Tee-Object -FilePath (Join-Path $OutputDirectory 'production-compile.log') | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "实际安装器编译失败：$LASTEXITCODE" }
+    Invoke-Compiler @(
+        (Join-Path $PSScriptRoot 'windows-installer.iss'),
+        '/DArch=x64', '/DReleaseChannel=oss', '/DMyAppName=InfiniShell', '/DMyAppExeName=infinishell.exe',
+        '/DAppUserModelId=dev.infinishell.InfiniShell', '/DInnoAppId=infinishell',
+        "/DTargetProfileDir=$fixture", '/DOutputName=compile-only-installer', "/O$OutputDirectory"
+    ) 'production-compile'
 
     $logPath = Join-Path $OutputDirectory 'inno.log'
     $process = Start-Process -FilePath (Join-Path $OutputDirectory 'registration-test.exe') -ArgumentList @(
