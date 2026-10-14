@@ -120,23 +120,10 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: 专项范围；upstream_essence 仅验上游精华，g09_clr_fixture 验固定 CLR，g09_npm_powershell 选择首 PS 快照
+        description: 专项范围（默认all）；upstream_essence验源码，release-installer:<runid>只读验正式Windows安装器
         required: true
         default: all
-        type: choice
-        options:
-          - all
-          - upstream_essence
-          - stdio
-          - nul_token
-          - g09_tokens
-          - g09_netcredentials
-          - g09_stdio_lifetime
-          - codex_hooks
-          - g09_image_contract
-          - g09_powershell_contract
-          - g09_clr_fixture
-          - g09_npm_powershell
+        type: string
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -185,9 +172,22 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import re
           import sys
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          scope = inputs.get("windows_atomic_debug_scope", "all")
+          known_scopes = {"all", "upstream_essence", "stdio", "nul_token", "g09_tokens", "g09_netcredentials", "g09_stdio_lifetime", "codex_hooks", "g09_image_contract", "g09_powershell_contract", "g09_clr_fixture", "g09_npm_powershell"}
+          release_mode = isinstance(scope, str) and re.fullmatch(r"release-installer:[1-9][0-9]*", scope)
+          if scope not in known_scopes and not release_mode:
+              sys.exit("未知专项范围；仅允许既有白名单或 release-installer:<正整数runid>")
+          if release_mode:
+              allowed = {"run_linux", "run_windows", "windows_atomic_debug_scope"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in allowed and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if inputs.get("run_windows") is not True or inputs.get("run_linux") is not False or conflicts:
+                  sys.exit("正式安装器只读验证仅允许 Windows，其他输入必须保持默认：" + ", ".join(sorted(conflicts)))
+              sys.exit(0)
           if inputs.get("windows_atomic_debug_scope") == "upstream_essence" and not inputs.get("full_workspace_tests", False):
               allowed = {"run_linux", "run_windows", "windows_atomic_debug_scope"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -247,6 +247,49 @@ jobs:
           if not (inputs.get("run_linux", False) or inputs.get("run_windows", False)):
               sys.exit("源码门禁至少选择 Linux 或 Windows 一个平台")
           PY
+
+  windows_release_installer:
+    name: Windows 正式安装器只读验证
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && !inputs.run_linux && startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+      - name: 准备已固定的作业内 Python
+        shell: pwsh
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
+      - name: 核验正式工件来源、签名和内嵌资源
+        id: verify_installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_MODE: ${{ inputs.windows_atomic_debug_scope }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:ARTIFACT_MODE -cnotmatch '^release-installer:([1-9][0-9]*)$') { throw '正式构建 run ID 无效。' }
+          $releaseRun = $Matches[1]
+          ./script/windows/verify_release_installer.ps1 -ReleaseRun $releaseRun -OutputDirectory (Join-Path $env:RUNNER_TEMP 'verify-release-installer')
+          if ($LASTEXITCODE -ne 0) { throw "正式安装器只读验证失败：$LASTEXITCODE" }
+      - name: 保存正式安装器只读证据
+        if: ${{ always() && steps.verify_installer.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-release-installer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/verify-release-installer/*.json
+            ${{ runner.temp }}/verify-release-installer/*.log
+            ${{ runner.temp }}/verify-release-installer/*.py
+          if-no-files-found: error
+          retention-days: 14
 
   upstream_essence:
     name: 上游精华 / ${{ matrix.platform }} x64
@@ -1803,7 +1846,7 @@ jobs:
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows &&
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && !startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') &&
        inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime' &&
        (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, windows, x64, infinishell-ci]
