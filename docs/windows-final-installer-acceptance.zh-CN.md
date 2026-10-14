@@ -1,10 +1,14 @@
 # Windows 最终安装器验收
 
-当前结论：**Windows URI 修复已通过源码和原生门禁；新 `13.00` 候选正在构建，最终安装器和用户六阶段复验仍待完成。** 产品源码为 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b`，已整合至主线 `cf75bdfddfd213215ded6ca27d484cfa628b7f2c`。[Windows 门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)成功：80 项 Inno 断言、6 项隔离注册表回归、616 项应用测试（含该 6 项）、492 项 crate、528 项 Zap、11 项 completer；本地 cargo check 与同 Rust／本地化源码 i18n 12/12 已通过。
+当前结论：**Windows URI 与 Linux DEB 卸载源码修复已验证；统一 `16.45` 候选正在构建，最终安装器和用户六阶段复验仍待完成。** 产品源码为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及只读核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`；独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 不属于本候选。
 
-候选为 `v0.2026.10.14.13.00.oss_00`，annotated tag 对象 `9b5afd31aafa5bbda210356cf329d63ec696bc07`，固定上述产品源码；[正式 run 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)正在构建。当前 Setup SHA-256、大小、实际 Authenticode、最终静态报告和便携 ZIP 均待实际产出后绑定，不能借用旧包摘要或 `NotSigned` 结果。新归档入口为 [candidate.json](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.13.00.oss_00/candidate.json)。尚未交付新包或启用其用户执行材料。
+Windows 实现字节与已验证的 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` 一致，见[Git 对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-source-equivalence.json)。[Windows 门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)的 80 项 Inno 断言、6 项隔离注册表回归、616 项应用测试（含该 6 项）、492 项 crate、528 项 Zap、11 项 completer 保留原 5ac 范围，不称为 5068 新运行。5068 的[Linux 原生门禁 38534655990](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38534655990)和本机 cargo check／i18n 12/12 已通过；源码通过不代替最终安装器。
 
-旧 `01.46` 的[用户证据审核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、GUI 启动、正常退出和官方卸载分项通过，但 URI 登记仍指向旧失效目标，故整体拒收。源码修复通过不等于新最终安装器已验收；旧 macOS 和 12 资产通过仅属于旧标签。保留用户数据，Linux 桌面继续延期，自动检查保留。
+候选为 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式 run 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605)正在构建。Setup SHA-256、大小、实际 Authenticode、静态报告和便携 ZIP 均待实际产出后绑定，不能借用旧包摘要或 `NotSigned`。新归档入口为 [candidate.json](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/candidate.json)，尚未交付或启用新包执行材料。
+
+`13.00` 因 DEB 卸载遗漏包名替换被统一修复候选替代，[run 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)已主动取消，原件保留，不记为 Windows 编译失败。旧 `01.46` 的[用户证据审核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、GUI 启动、正常退出和官方卸载分项通过，但 URI 仍指旧失效目标而整体拒收。旧 macOS 和 12 资产结果仅属于原字节。
+
+用户确认等待统一修复候选，在 Windows 开发电脑和 [Ubuntu 24.04 x86_64](ubuntu-final-installer-acceptance.zh-CN.md) 各验一次；新 Ubuntu DEB 生命周期不再延期，旧 CLI 认证矩阵继续延期。两份新包与回执、macOS 最终包及 12 资产核验未完成前不宣称发版验收完成。
 
 ## 新候选六阶段安排（待最终包交付）
 
@@ -68,4 +72,4 @@ CI 原 manifest SHA-256 为 `2abbe09e3a4b1557702fcd8003b19e06c45d4ac7ee9094ca019
 - [结果填写模板](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/native-validation/windows-manual/RESULT.zh-CN.md)
 - [助手证据审查清单](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/native-validation/windows-manual/EVIDENCE-REVIEW.zh-CN.md)与[只读绑定预检器](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/native-validation/windows-manual/review-evidence-binding.py)
 
-脚本准备和静态自检不等于 Windows 实测通过；若最终包散列变化，另建验收轮次并保留旧记录。本入口只覆盖当前用户安装生命周期，不自动关闭 CLI Agent 延期项或 Linux 桌面验收。Linux 桌面继续延期，Linux 自动检查保留。本次仅校正文档状态，**无需本地化变更**。
+脚本准备和静态自检不等于 Windows 实测通过；若最终包散列变化，另建验收轮次并保留旧记录。本入口只覆盖当前用户 Windows 安装生命周期；Ubuntu DEB 生命周期由独立文档管理，两者都不自动关闭旧 CLI Agent 延期矩阵。Linux 自动检查保留。本次仅校正文档状态，**无需本地化变更**。
