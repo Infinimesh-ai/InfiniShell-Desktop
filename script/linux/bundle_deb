@@ -102,7 +102,7 @@ sed \
     < "$WORKSPACE_ROOT_DIR/resources/linux/debian/common/postinst.repo.template" \
     >> "$DEBIAN_DIR/postinst"
 sed \
-    "s#@@CHANNEL_SUFFIX@@#$CHANNEL_SUFFIX#g; s#@@OPTDIR@@#$OPT_DIR#g; s#@@REPO_NAME@@#$REPO_NAME#g" \
+    "s#@@CHANNEL_SUFFIX@@#$CHANNEL_SUFFIX#g; s#@@PACKAGE_NAME@@#$PACKAGE_NAME#g; s#@@BINARY_NAME@@#$BINARY_NAME#g; s#@@OPTDIR@@#$OPT_DIR#g; s#@@REPO_NAME@@#$REPO_NAME#g" \
     < "$TEMPLATE_DIR/postrm.template" \
     > "$DEBIAN_DIR/postrm"
 sed \

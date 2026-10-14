@@ -4,4 +4,12 @@
 # postrm script.
 action="$1"
 
-rm -f /usr/bin/@@PACKAGE_NAME@@
+# 链接名必须与 postinst 一致，只清理仍指向本包的入口。
+case "$action" in
+  remove|purge)
+    if [ -L "/usr/bin/@@BINARY_NAME@@" ] && \
+       [ "$(readlink "/usr/bin/@@BINARY_NAME@@")" = "@@OPTDIR@@/@@BINARY_NAME@@" ]; then
+      rm -f "/usr/bin/@@BINARY_NAME@@"
+    fi
+    ;;
+esac
