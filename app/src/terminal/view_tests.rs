@@ -71,7 +71,7 @@ use crate::terminal::model::block::{
 use crate::terminal::model::blocks::{TotalIndex, insert_block};
 use crate::terminal::model::grid::Dimensions as _;
 use crate::terminal::model::terminal_model::WithinBlock;
-use crate::terminal::session_settings::AgentToolbarChipSelection;
+use crate::terminal::session_settings::{AgentToolbarChipSelection, CLIAgentToolbarChipSelection};
 use crate::terminal::shared_session::{SharedSessionSource, SharedSessionStatus};
 use crate::terminal::view::ambient_agent::AmbientAgentViewModelEvent;
 use crate::terminal::view::load_ai_conversation::{
@@ -2462,6 +2462,125 @@ fn specific_cli_launch_waits_for_bootstrap_and_duplicate_callbacks_keep_one_draf
             assert!(!view.awaiting_pending_command_completion);
         });
     });
+}
+
+fn assert_specific_cli_launch_opens_rich_input_once(agent: CLIAgent, notification: &'static str) {
+    App::test((), move |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _cli_rich = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _codex_plugin = FeatureFlag::CodexPlugin.override_enabled(true);
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings
+                .should_render_cli_agent_footer
+                .set_value(false, ctx);
+            let _ = settings
+                .auto_open_rich_input_on_cli_agent_start
+                .set_value(false, ctx);
+        });
+        SessionSettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings.cli_agent_footer_chip_selection.set_value(
+                CLIAgentToolbarChipSelection::Custom {
+                    left: vec![],
+                    right: vec![],
+                },
+                ctx,
+            );
+        });
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, _ctx| {
+            bootstrap_with_long_running_block(view);
+            view.model.lock().finish_block();
+        });
+        assert_eventually!(
+            terminal.read(&app, |view, ctx| {
+                view.active_block_session_id()
+                    .is_some_and(|id| History::as_ref(ctx).is_appendable(&id))
+            }),
+            "测试 shell 必须完成引导并可执行命令"
+        );
+
+        terminal.update(&mut app, |view, ctx| {
+            view.queue_specific_cli_agent(agent, None, false, ctx);
+            assert!(
+                !view.input.as_ref(ctx).has_pending_command(),
+                "启动命令必须真实消费，不能仅测试排队标记"
+            );
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(agent.command_prefix(), "");
+            view.handle_cli_agent_notification(
+                Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+                notification,
+                ctx,
+            );
+        });
+        terminal.read(&app, |view, ctx| {
+            assert!(
+                view.has_active_cli_agent_input_session(ctx),
+                "{agent:?} 快捷启动必须忽略原生输入偏好与工具栏布局"
+            );
+        });
+
+        // 会话结束后手动再次运行相同命令，不能继承上次快捷启动的输入选择。
+        terminal.update(&mut app, |view, _ctx| {
+            view.model.lock().finish_block();
+        });
+        assert_eventually!(
+            terminal.read(&app, |view, ctx| {
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .is_none()
+            }),
+            "上一条 CLI 会话必须结束"
+        );
+        terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(agent.command_prefix(), "");
+            view.handle_cli_agent_notification(
+                Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+                notification,
+                ctx,
+            );
+        });
+        terminal.read(&app, |view, ctx| {
+            assert!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .is_some()
+            );
+            assert!(
+                !view.has_active_cli_agent_input_session(ctx),
+                "后续手动命令应恢复原生输入偏好"
+            );
+        });
+    });
+}
+
+#[test]
+fn specific_claude_launch_opens_rich_input_once_without_toolbar() {
+    assert_specific_cli_launch_opens_rich_input_once(
+        CLIAgent::Claude,
+        r#"{"v":1,"agent":"claude","event":"session_start"}"#,
+    );
+}
+
+#[test]
+fn specific_codex_launch_opens_rich_input_once_without_toolbar() {
+    assert_specific_cli_launch_opens_rich_input_once(
+        CLIAgent::Codex,
+        r#"{"v":1,"agent":"codex","event":"session_start"}"#,
+    );
+}
+
+#[test]
+fn specific_grok_launch_opens_rich_input_once_without_toolbar() {
+    assert_specific_cli_launch_opens_rich_input_once(
+        CLIAgent::Grok,
+        r#"{"v":1,"agent":"grok","event":"session_start"}"#,
+    );
 }
 
 #[test]
@@ -8423,10 +8542,9 @@ fn ctrl_g_closes_cli_agent_rich_input_from_terminal_context() {
     })
 }
 
-/// Verifies that Ctrl-G is a true toggle: opens then closes rich input from
-/// the terminal context. Regression test for #9916.
+/// 隐藏工具栏、移除输入框按钮后，真实 Ctrl+G 分派仍可切换输入并保留草稿。
 #[test]
-fn ctrl_g_toggles_cli_agent_rich_input_from_terminal_context() {
+fn ctrl_g_toggles_cli_agent_rich_input_without_toolbar_or_chip() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         app.add_singleton_model(ImportedConfigModel::new);
@@ -8436,46 +8554,165 @@ fn ctrl_g_toggles_cli_agent_rich_input_from_terminal_context() {
         });
         let _agent_view = FeatureFlag::AgentView.override_enabled(true);
         let _cli_rich = FeatureFlag::CLIAgentRichInput.override_enabled(true);
-
-        // Start with rich input open, then close via Ctrl-G, then re-open via
-        // direct call (Ctrl-G open path requires LongRunningCommand which is
-        // tricky to simulate in a unit test), then close via Ctrl-G again.
         let (window_id, terminal) =
-            open_cli_agent_rich_input_for_agent_with_window_id(&mut app, CLIAgent::OpenCode);
+            open_cli_agent_rich_input_for_agent_with_window_id(&mut app, CLIAgent::Claude);
+        terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("claude", "");
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("保留中文草稿 ABC123\n第二行", ctx);
+            });
+        });
 
-        let keystroke = warpui::keymap::Keystroke::parse("ctrl-g").expect("valid keystroke");
-
-        // First close: rich input is open → Ctrl-G should close.
-        let handled = app
-            .dispatch_keystroke(window_id, &[terminal.id()], &keystroke, false)
-            .expect("dispatch should succeed");
-        assert!(handled, "first ctrl-g should be handled (close)");
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings
+                .should_render_cli_agent_footer
+                .set_value(false, ctx);
+        });
+        SessionSettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings.cli_agent_footer_chip_selection.set_value(
+                CLIAgentToolbarChipSelection::Custom {
+                    left: vec![],
+                    right: vec![],
+                },
+                ctx,
+            );
+        });
         terminal.read(&app, |view, ctx| {
             assert!(
-                !view.has_active_cli_agent_input_session(ctx),
-                "rich input should be closed after first Ctrl-G"
+                view.has_active_cli_agent_input_session(ctx),
+                "调整工具栏显示不能关闭正在编辑的输入框"
             );
         });
 
-        // Re-open programmatically (mirrors the user re-triggering open via
-        // Ctrl-G in a long-running context).
-        terminal.update(&mut app, |view, ctx| {
-            view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::CtrlG, ctx);
-            assert!(view.has_active_cli_agent_input_session(ctx));
+        let (input_id, editor_id) = terminal.read(&app, |view, ctx| {
+            let input = view.input.as_ref(ctx);
+            (view.input.id(), input.editor().id())
+        });
+        let keystroke = Keystroke::parse("ctrl-g").expect("valid keystroke");
+        let handled = app
+            .dispatch_keystroke(
+                window_id,
+                &[terminal.id(), input_id, editor_id],
+                &keystroke,
+                false,
+            )
+            .expect("dispatch should succeed");
+        assert!(handled, "编辑器中的 Ctrl+G 必须切换到原生输入");
+        terminal.read(&app, |view, ctx| {
+            assert!(!view.has_active_cli_agent_input_session(ctx));
         });
 
-        // Second close: rich input is open again → Ctrl-G should close again.
+        // 开框也必须通过生产按键绑定，不能直接调用 open_cli_agent_rich_input。
         let handled = app
             .dispatch_keystroke(window_id, &[terminal.id()], &keystroke, false)
             .expect("dispatch should succeed");
-        assert!(handled, "second ctrl-g should be handled (close again)");
+        assert!(handled, "原生输入中的 Ctrl+G 必须重新打开输入框");
         terminal.read(&app, |view, ctx| {
-            assert!(
-                !view.has_active_cli_agent_input_session(ctx),
-                "rich input should be closed after second Ctrl-G"
+            assert!(view.has_active_cli_agent_input_session(ctx));
+            assert_eq!(
+                view.input.as_ref(ctx).buffer_text(ctx),
+                "保留中文草稿 ABC123\n第二行"
             );
         });
     })
+}
+
+#[test]
+fn cli_agent_command_auto_open_respects_preference_without_toolbar() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _cli_rich = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings
+                .should_render_cli_agent_footer
+                .set_value(false, ctx);
+            let _ = settings
+                .auto_open_rich_input_on_cli_agent_start
+                .set_value(false, ctx);
+        });
+        SessionSettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings.cli_agent_footer_chip_selection.set_value(
+                CLIAgentToolbarChipSelection::Custom {
+                    left: vec![],
+                    right: vec![],
+                },
+                ctx,
+            );
+        });
+        let native_terminal = add_window_with_terminal(&mut app, None);
+        native_terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("claude", "");
+            view.handle_cli_agent_notification(
+                Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+                r#"{"v":1,"agent":"claude","event":"session_start"}"#,
+                ctx,
+            );
+        });
+        native_terminal.read(&app, |view, ctx| {
+            assert!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .is_some()
+            );
+            assert!(
+                !view.has_active_cli_agent_input_session(ctx),
+                "手动运行命令时应保留用户选择的原生输入偏好"
+            );
+        });
+
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings
+                .auto_open_rich_input_on_cli_agent_start
+                .set_value(true, ctx);
+        });
+        let rich_terminal = add_window_with_terminal(&mut app, None);
+        rich_terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("claude", "");
+            view.handle_cli_agent_notification(
+                Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+                r#"{"v":1,"agent":"claude","event":"session_start"}"#,
+                ctx,
+            );
+        });
+        rich_terminal.read(&app, |view, ctx| {
+            assert!(
+                view.has_active_cli_agent_input_session(ctx),
+                "开启命令自动输入框后，不得再受工具栏或按钮显示状态限制"
+            );
+        });
+    });
+}
+
+#[test]
+fn late_cli_agent_listener_preserves_manual_native_input_choice() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _cli_rich = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings
+                .auto_open_rich_input_on_cli_agent_start
+                .set_value(true, ctx);
+        });
+        let terminal = open_cli_agent_rich_input_for_agent(&mut app, CLIAgent::Claude);
+        terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("claude", "");
+            view.close_cli_agent_rich_input_and_disable_auto_toggle(ctx);
+            assert!(!view.has_active_cli_agent_input_session(ctx));
+            view.handle_cli_agent_notification(
+                Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+                r#"{"v":1,"agent":"claude","event":"session_start"}"#,
+                ctx,
+            );
+        });
+        terminal.read(&app, |view, ctx| {
+            let session = CLIAgentSessionsModel::as_ref(ctx)
+                .session(view.view_id)
+                .expect("监听器应关联现有会话");
+            assert!(session.listener.is_some());
+            assert!(!view.has_active_cli_agent_input_session(ctx));
+            assert!(!session.should_auto_toggle_input);
+        });
+    });
 }
 
 #[test]
@@ -9199,11 +9436,26 @@ fn status_blocked_auto_closes_rich_input() {
 }
 
 #[test]
-fn status_in_progress_auto_opens_rich_input_after_blocked() {
+fn status_in_progress_auto_opens_rich_input_after_blocked_without_toolbar() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let _agent_view = FeatureFlag::AgentView.override_enabled(true);
         let _cli_rich = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings
+                .should_render_cli_agent_footer
+                .set_value(false, ctx);
+        });
+        SessionSettings::handle(&app).update(&mut app, |settings, ctx| {
+            let _ = settings.cli_agent_footer_chip_selection.set_value(
+                CLIAgentToolbarChipSelection::Custom {
+                    left: vec![],
+                    right: vec![],
+                },
+                ctx,
+            );
+        });
 
         let terminal = add_window_with_terminal(&mut app, None);
 

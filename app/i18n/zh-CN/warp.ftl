@@ -371,8 +371,8 @@ ai-footer-choose-environment-tooltip = 选择环境
 ai-footer-reasoning-depth-tooltip = 推理深度
 ai-footer-file-explorer = 文件浏览器
 ai-footer-open-file-explorer = 打开文件浏览器
-ai-footer-rich-input = 富输入
-ai-footer-open-rich-input = 打开富输入
+ai-footer-rich-input = InfiniShell 输入框
+ai-footer-open-rich-input = 使用 InfiniShell 输入框
 ai-footer-open-coding-agent-settings = 打开编码智能体设置
 ai-footer-turn-off-full-access = 完全访问已开启。点击恢复审批提示。
 
@@ -1118,20 +1118,30 @@ settings-ai-conversation-layout-splitpane = 拆分窗格
 settings-ai-toolbar-layout = 工具栏布局
 
 # 第三方 CLI 智能体
-settings-ai-show-coding-agent-toolbar = 显示编码智能体工具栏
-settings-ai-auto-show-rich-input = 根据智能体状态自动显示/隐藏富输入
-settings-ai-auto-show-rich-input-tooltip = 需要为编码智能体安装 Warp 插件
-settings-ai-auto-open-rich-input = 编码智能体会话启动时自动打开富输入
-settings-ai-auto-dismiss-rich-input = 提交提示后自动关闭富输入
-settings-ai-toolbar-commands-label = 启用工具栏的命令
-settings-ai-toolbar-commands-description = 添加正则表达式，匹配的命令将显示编码智能体工具栏。
-settings-ai-per-agent-section = 已安装的智能体
+settings-ai-cli-input-section = 输入方式
+settings-ai-cli-input-section-description = 右上角的 Codex、Claude 和 Grok 按钮会打开 InfiniShell 输入框。按 Ctrl+G 可切换原生输入并随时切回，草稿会保留。
+settings-ai-cli-input-mode-description = 适用于在终端中键入智能体命令启动的会话。通过右上角按钮启动时，始终打开 InfiniShell 输入框。
+settings-ai-cli-input-mode-infinishell = InfiniShell 输入框
+settings-ai-cli-input-mode-native = 原生终端
+settings-ai-auto-dismiss-rich-input-description = 自动避让原生交互关闭或不可用时生效。自动避让生效时，由智能体状态决定何时切换。
+settings-ai-cli-appearance-section = 启动入口与外观
+settings-ai-cli-toolbar-description = 仅控制 CLI 会话底部工具栏的显示。隐藏工具栏不会关闭 InfiniShell 输入框，也不影响 Ctrl+G 切换。
+settings-ai-cli-toolbar-layout-description = 自定义会话工具栏中的快捷按钮。输入框内始终保留原生输入切换，也可使用 Ctrl+G 切换。
+settings-ai-cli-install-section = 安装与更新
+settings-ai-show-coding-agent-toolbar = 显示会话底部工具栏
+settings-ai-auto-show-rich-input = 自动避让 CLI 原生交互
+settings-ai-auto-show-rich-input-tooltip = 需要 CLI 插件已启用会话通知。智能体等待用户响应时切换到原生输入，处理完成后恢复 InfiniShell 输入框。
+settings-ai-auto-open-rich-input = 通过终端命令启动时的输入方式
+settings-ai-auto-dismiss-rich-input = 发送后切换到原生输入
+settings-ai-toolbar-commands-label = 自定义智能体命令
+settings-ai-toolbar-commands-description = 使用正则表达式识别自定义智能体命令。选择对应智能体可启用其输入功能；选择“其他”仅显示工具栏。
+settings-ai-per-agent-section = 自定义已安装智能体的入口和工具栏
 settings-ai-per-agent-scanning = 正在查找已安装的智能体…
 settings-ai-per-agent-empty = 未找到已安装的 CLI 智能体。
 settings-ai-per-agent-agent-col = 智能体
-settings-ai-per-agent-toolbar-col = 工具栏
-settings-ai-per-agent-tab-menu-col = 新标签页
-settings-ai-per-agent-titlebar-col = 标题栏
+settings-ai-per-agent-toolbar-col = 会话底栏
+settings-ai-per-agent-tab-menu-col = 标签菜单
+settings-ai-per-agent-titlebar-col = 右上入口
 settings-ai-coding-agent-other = 其他
 settings-ai-coding-agent-select-header = 选择编码智能体
 
@@ -2020,7 +2030,7 @@ keybinding-desc-input-clear-and-reset-ai-context-menu-query = 清空并重置 AI
 
 # 终端视图相关 binding
 keybinding-desc-terminal-alternate-paste = 终端备用粘贴
-keybinding-desc-terminal-toggle-cli-agent-rich-input = 切换 CLI 智能体富文本输入
+keybinding-desc-terminal-toggle-cli-agent-rich-input = 切换 InfiniShell 输入框与 CLI 原生输入
 keybinding-desc-terminal-warpify-subshell = Warpify 子 Shell
 keybinding-desc-terminal-warpify-ssh-session = Warpify SSH 会话
 keybinding-desc-terminal-accept-prompt-suggestion = 接受提示词建议
@@ -3578,7 +3588,7 @@ terminal-banner-update-latest-suffix = {" "}更新到最新版本。
 terminal-banner-pure-unsupported = InfiniShell 尚不支持 Pure。你可以考虑改用受支持的提示符。{"  "}
 terminal-loading-session = 正在加载会话…
 
-ai-footer-hide-rich-input = 隐藏富输入
+ai-footer-hide-rich-input = 切换到原生输入
 ai-footer-choose-environment = 选择环境
 ai-footer-agent-environment = 智能体环境
 ai-footer-enable-terminal-command-autodetection = 启用终端命令自动检测
@@ -3611,7 +3621,7 @@ ai-toolbar-voice-input = 语音输入
 ai-toolbar-attach-file = 附加文件
 ai-toolbar-context-usage = 上下文用量
 ai-toolbar-file-explorer = 文件浏览器
-ai-toolbar-rich-input = 富输入
+ai-toolbar-rich-input = InfiniShell 输入框
 ai-toolbar-approval-mode = 授权模式
 ai-tool-output-grep-for = Grep{" "}
 ai-tool-output-grepping-for = 正在 grep{" "}
@@ -5447,7 +5457,7 @@ settings-ai-default-prompt-submission-mode = 默认提示词提交方式
 settings-ai-default-prompt-submission-description = 智能体仍在响应时提交新提示词的处理方式。你可以在每个对话中使用自动排队开关覆盖此设置。
 settings-ai-default-long-running-submission-mode = 长时间运行命令期间的默认提交方式
 settings-ai-default-long-running-submission-description = 智能体正在操作其发起的长时间运行命令时，提交提示词的处理方式。排队的提示词会在命令完成后发送给智能体。
-settings-ai-submit-rich-input = 使用 Ctrl+Enter 提交富输入
+settings-ai-submit-rich-input = 使用 Ctrl+Enter 发送，Enter 换行
 settings-ai-gemini-enterprise-section = Gemini Enterprise
 settings-ai-gemini-enterprise-toggle = 使用 Gemini Enterprise 凭证
 settings-ai-gemini-enterprise-description = InfiniShell 会通过工作区的 Gemini Enterprise Google Cloud 项目路由符合条件的请求。
@@ -5477,9 +5487,9 @@ toggle-suffix-conversation-history = 工具面板中的会话历史
 toggle-suffix-model-picker = 提示词中的模型选择器
 toggle-suffix-coding-agent-toolbar = 编码智能体工具栏
 toggle-suffix-warp-credit-fallback = InfiniShell 额度回退
-toggle-suffix-auto-toggle-rich-input = 根据智能体状态自动显示或隐藏富输入
-toggle-suffix-auto-open-rich-input = 编码智能体会话启动时自动打开富输入
-toggle-suffix-auto-dismiss-rich-input = 提交提示词后自动关闭富输入
+toggle-suffix-auto-toggle-rich-input = 自动避让 CLI 原生交互
+toggle-suffix-auto-open-rich-input = 通过终端命令启动时使用 InfiniShell 输入框
+toggle-suffix-auto-dismiss-rich-input = 发送后切换到 CLI 原生输入
 toggle-suffix-window-custom-size = 以自定义尺寸打开新窗口
 toggle-suffix-window-blur-texture = 亚克力窗口模糊纹理
 toggle-suffix-tools-panel-consistency = 在标签页间保持工具面板可见性一致
@@ -5567,7 +5577,7 @@ cli-agent-plugin-refresh-marketplace-step = 刷新插件市场并保留已安装
 cli-agent-plugin-disabled = 此插件已禁用。请手动启用以恢复通知。
 cli-agent-plugin-enable-step = 启用已安装插件：
 cli-agent-plugin-enable-codex-config-step = 在 Codex 的 config.toml 中启用此插件：
-cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法粘贴图片。请使用受支持的 Grok 版本，将图片粘贴或拖入富输入框后提交。
+cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法粘贴图片。请使用受支持的 Grok 版本，将图片粘贴或拖入 InfiniShell 输入框后提交。
 cli-agent-image-too-large = { $filename } 过大，无法发送给智能体（上限 { $limit_mb } MB）。
 
 cli-agent-task-already-bound = 此终端已关联一个本地任务。
@@ -5839,8 +5849,8 @@ cli-agent-grok-skill-policy-required = Grok 技能需要继承策略或已选技
 cli-agent-grok-skill-unavailable = 所选 Grok 技能已变更，或当前会话中无法唯一匹配其原始路径。请刷新技能并重新选择。
 
 cli-agent-input-waiting-for-native-response = CLI 正在等待回应，已停止提交。请先在原生终端处理提示，草稿和附件已保留。
-cli-agent-grok-input-manual-copy-required = 未发送，草稿已保留。关闭富输入后可在 Grok 中键入。
-cli-agent-grok-pasted-to-draft = 已粘贴到富输入，尚未发送给 Grok。
+cli-agent-grok-input-manual-copy-required = 未发送，草稿已保留。切换到原生输入后可在 Grok 中键入。
+cli-agent-grok-pasted-to-draft = 已粘贴到 InfiniShell 输入框，尚未发送给 Grok。
 cli-agent-input-copy-unsent-text = 复制未发送文本
 terminal-input-grok-draft-delivery-hint = 受支持的 Grok 会话可从此提交；否则请在 Grok 中直接键入
 
@@ -5936,16 +5946,16 @@ cli-task-manager-permission-grok-skills-v1-help = Grok 1.0.41 每次工具调用
 cli-agent-grok-fixed-skills-unavailable = 此 Grok 任务仅接受创建时选定的技能。请使用技能卡片，并保持技能来源不变。此策略禁用斜杠技能命令。
 cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 可读取、编辑和创建项目文件，列举目录，以及搜索指定单个文件的内容。每次工具调用均需审批。终端命令、钩子和技能均禁用。子任务保持此策略，旧任务不会自动增加权限。这不是操作系统沙箱。
 
-workspace-new-grok-rich-input = Grok 富输入（grok-4.7）
-workspace-start-remote-grok-rich-input = 当前窗格 Grok 富输入
-workspace-start-remote-codex-rich-input = 当前窗格 Codex 富输入
+workspace-new-grok-rich-input = Grok 与 InfiniShell 输入框（grok-4.7）
+workspace-start-remote-grok-rich-input = 在当前窗格使用 Grok 与 InfiniShell 输入框
+workspace-start-remote-codex-rich-input = 在当前窗格使用 Codex 与 InfiniShell 输入框
 workspace-start-remote-codex-rich-input-help = 启动 Codex 0.156.1，为当前 SSH/tmux 窗格绑定独立 app server。需要 Bash 或 Zsh 及远程图片支持。
 cli-agent-codex-remote-launch-unavailable = 远程 Codex 会话未能启动。需要 Codex 0.156.1、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 cli-agent-codex-owned-launch-claimed = 此 Codex 启动已被认领或状态尚未确认，请先检查当前远程终端，再启动其他会话。
 workspace-start-remote-grok-rich-input-help = 在当前 SSH/tmux 终端中，以 grok-4.7 启动支持 InfiniShell 会话通知的 Grok 1.0.41 构建版本。需要 Bash 或 Zsh 及远程图片支持。此操作不会更新远端 CLI 安装包。
 cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需要支持 InfiniShell 会话通知的 Grok 1.0.41 构建版本、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 
-cli-agent-grok-owned-launch-unavailable = Grok 富输入需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
+cli-agent-grok-owned-launch-unavailable = Grok 的 InfiniShell 输入框需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
 
 cli-agent-grok-owned-input-unavailable = Grok 输入尚未就绪或会话身份已变化，已保留草稿。
 cli-agent-grok-native-images-unavailable = 此 Grok 连接不支持图片输入，已保留草稿与图片。
@@ -5989,10 +5999,10 @@ workspace-start-tmux-claude = 在 tmux 新窗格启动 Claude
 workspace-start-tmux-codex = 在 tmux 新窗格启动 Codex
 workspace-start-tmux-grok = 在 tmux 新窗格启动 Grok
 workspace-start-tmux-agent-help = 在当前 tmux 会话的新窗格中启动已验证的远端 CLI。需要有效的 SSH 连接和远程图片支持。
-workspace-restore-tmux-agent = 恢复 tmux 富输入
+workspace-restore-tmux-agent = 恢复 tmux 的 InfiniShell 输入框
 workspace-restore-tmux-agent-help = 重新连接所选 tmux 窗格中此前启动的 CLI。此操作只查询已有启动。
 cli-agent-tmux-owned-unavailable = 无法验证远端 tmux 窗格或 CLI。请检查连接和所需 CLI 版本。
-cli-agent-tmux-owned-unknown = tmux 启动状态尚未确认。请使用“恢复 tmux 富输入”查询已有启动，不会另建窗格。
+cli-agent-tmux-owned-unknown = tmux 启动状态尚未确认。请使用“恢复 tmux 的 InfiniShell 输入框”查询已有启动，不会另建窗格。
 
 cli-agent-tmux-owned-exited = 此 tmux CLI 会话已结束。如需继续，请启动新的 tmux 窗格。
 

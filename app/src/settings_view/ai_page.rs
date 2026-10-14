@@ -39,9 +39,9 @@ use super::remove_custom_endpoint_confirmation_dialog::{
 };
 use super::set_default_model_modal::{SetDefaultModelModalBody, SetDefaultModelModalBodyEvent};
 use super::settings_page::{
-    HEADER_PADDING, InputListItem, LocalOnlyIconState, MatchData, PageType, SettingsPageMeta,
-    SettingsPageViewHandle, SettingsWidget, TOGGLE_BUTTON_RIGHT_PADDING, ToggleState,
-    build_sub_header, build_toggle_element, render_body_item_label,
+    Category, HEADER_PADDING, InputListItem, LocalOnlyIconState, MatchData, PageType,
+    SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, TOGGLE_BUTTON_RIGHT_PADDING,
+    ToggleState, build_sub_header, build_toggle_element, render_body_item_label,
     render_body_item_label_with_icon, render_custom_size_header, render_dropdown_item,
     render_dropdown_item_label, render_filterable_dropdown_item, render_full_pane_width_ai_button,
     render_input_list, render_separator, render_settings_info_banner,
@@ -605,7 +605,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoToggleRichInput,
                 )),
-                &(context.clone() & id!(flags::CLI_AGENT_FOOTER_ENABLED)),
+                &context,
                 flags::AUTO_TOGGLE_RICH_INPUT_FLAG,
             )
             .with_group(bindings::BindingGroup::WarpAi)
@@ -615,7 +615,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoOpenRichInputOnCLIAgentStart,
                 )),
-                &(context.clone() & id!(flags::CLI_AGENT_FOOTER_ENABLED)),
+                &context,
                 flags::AUTO_OPEN_RICH_INPUT_ON_CLI_AGENT_START_FLAG,
             )
             .with_group(bindings::BindingGroup::WarpAi)
@@ -625,7 +625,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 builder(SettingsAction::AI(
                     AISettingsPageAction::ToggleAutoDismissRichInputAfterSubmit,
                 )),
-                &(context.clone() & id!(flags::CLI_AGENT_FOOTER_ENABLED)),
+                &context,
                 flags::AUTO_DISMISS_RICH_INPUT_AFTER_SUBMIT_FLAG,
             )
             .with_group(bindings::BindingGroup::WarpAi)
@@ -661,6 +661,7 @@ pub struct AISettingsPageView {
     cli_agent_footer_command_editor: ViewHandle<SubmittableTextInput>,
     cli_agent_footer_command_mouse_state_handles: Vec<MouseStateHandle>,
     cli_agent_footer_command_agent_dropdowns: Vec<ViewHandle<Dropdown<AISettingsPageAction>>>,
+    cli_agent_input_mode_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
     #[cfg(not(target_family = "wasm"))]
     cli_agent_update_channel_dropdowns: Vec<(CLIAgent, ViewHandle<Dropdown<AISettingsPageAction>>)>,
     agent_toolbar_inline_editor: ViewHandle<AgentToolbarInlineEditor>,
@@ -1375,6 +1376,16 @@ impl AISettingsPageView {
                         .map(|_| Default::default())
                         .collect();
                 }
+                AISettingsChangedEvent::AutoOpenRichInputOnCLIAgentStart { .. } => {
+                    let selected = *AISettings::as_ref(ctx).auto_open_rich_input_on_cli_agent_start;
+                    me.cli_agent_input_mode_dropdown
+                        .update(ctx, |dropdown, ctx| {
+                            dropdown.set_selected_by_action(
+                                AISettingsPageAction::SetCLIAgentInputMode(selected),
+                                ctx,
+                            );
+                        });
+                }
                 AISettingsChangedEvent::CLIAgentToolbarEnabledCommands { .. } => {
                     me.cli_agent_footer_command_mouse_state_handles = AISettings::as_ref(ctx)
                         .cli_agent_footer_enabled_commands
@@ -1965,6 +1976,31 @@ impl AISettingsPageView {
         let cli_agent_toolbar_inline_editor = ctx.add_typed_action_view(|ctx| {
             AgentToolbarInlineEditor::new(AgentToolbarEditorMode::CLIAgent, ctx)
         });
+        let cli_agent_input_mode_dropdown = ctx.add_typed_action_view(|ctx| {
+            let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(AI_SETTINGS_DROPDOWN_WIDTH);
+            dropdown.set_menu_width(AI_SETTINGS_DROPDOWN_WIDTH, ctx);
+            dropdown.set_items(
+                vec![
+                    DropdownItem::new(
+                        crate::t!("settings-ai-cli-input-mode-infinishell"),
+                        AISettingsPageAction::SetCLIAgentInputMode(true),
+                    ),
+                    DropdownItem::new(
+                        crate::t!("settings-ai-cli-input-mode-native"),
+                        AISettingsPageAction::SetCLIAgentInputMode(false),
+                    ),
+                ],
+                ctx,
+            );
+            dropdown.set_selected_by_action(
+                AISettingsPageAction::SetCLIAgentInputMode(
+                    *AISettings::as_ref(ctx).auto_open_rich_input_on_cli_agent_start,
+                ),
+                ctx,
+            );
+            dropdown
+        });
 
         #[cfg(feature = "local_fs")]
         let conversation_layout_dropdown = ctx.add_typed_action_view(|ctx| {
@@ -2056,6 +2092,7 @@ impl AISettingsPageView {
             cli_agent_footer_command_editor,
             cli_agent_footer_command_mouse_state_handles,
             cli_agent_footer_command_agent_dropdowns: Self::create_cli_agent_dropdowns(ctx),
+            cli_agent_input_mode_dropdown,
             agent_toolbar_inline_editor,
             cli_agent_toolbar_inline_editor,
             base_model_dropdown,
@@ -3019,7 +3056,10 @@ impl AISettingsPageView {
                 }
             }
             Some(AISubpage::ThirdPartyCLIAgents) => {
-                widgets.extend(cli_agent_widgets());
+                return PageType::new_categorized(
+                    cli_agent_categories(),
+                    Some(crate::t_static!("settings-ai-third-party-cli-section")),
+                );
             }
         }
 
@@ -4007,6 +4047,7 @@ pub enum AISettingsPageAction {
     ToggleShowConversationHistory,
     ToggleAutoToggleRichInput,
     ToggleAutoOpenRichInputOnCLIAgentStart,
+    SetCLIAgentInputMode(bool),
     ToggleAutoDismissRichInputAfterSubmit,
     ToggleSubmitRichInputOnCtrlEnter,
     SetCLIAgentForCommand {
@@ -4952,6 +4993,16 @@ impl TypedActionView for AISettingsPageView {
                         settings
                             .auto_open_rich_input_on_cli_agent_start
                             .toggle_and_save_value(ctx)
+                    );
+                });
+                ctx.notify();
+            }
+            AISettingsPageAction::SetCLIAgentInputMode(use_infinishell_input) => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    report_if_error!(
+                        settings
+                            .auto_open_rich_input_on_cli_agent_start
+                            .set_value(*use_infinishell_input, ctx)
                     );
                 });
                 ctx.notify();
@@ -8868,23 +8919,67 @@ impl SettingsWidget for OtherAIWidget {
 
 #[cfg(not(target_family = "wasm"))]
 pub(crate) fn cli_agent_settings_widget_id() -> &'static str {
-    CLIAgentWidget::static_widget_id()
+    if FeatureFlag::CLIAgentRichInput.is_enabled() {
+        CLIAgentAutoOpenRichInputWidget::static_widget_id()
+    } else {
+        CLIAgentWidget::static_widget_id()
+    }
 }
 fn cli_agent_widgets() -> Vec<Box<dyn SettingsWidget<View = AISettingsPageView>>> {
+    let mut widgets = cli_agent_input_widgets();
+    widgets.extend(cli_agent_appearance_widgets());
+    widgets.extend(cli_agent_update_widgets());
+    widgets
+}
+
+fn cli_agent_categories() -> Vec<Category<AISettingsPageView>> {
+    vec![
+        Category::new(
+            crate::t_static!("settings-ai-cli-input-section"),
+            cli_agent_input_widgets(),
+        )
+        .with_subtitle(crate::t_static!(
+            "settings-ai-cli-input-section-description"
+        )),
+        Category::new(
+            crate::t_static!("settings-ai-cli-appearance-section"),
+            cli_agent_appearance_widgets(),
+        ),
+        Category::new(
+            crate::t_static!("settings-ai-cli-install-section"),
+            cli_agent_update_widgets(),
+        ),
+    ]
+}
+
+fn cli_agent_input_widgets() -> Vec<Box<dyn SettingsWidget<View = AISettingsPageView>>> {
+    if !FeatureFlag::CLIAgentRichInput.is_enabled() {
+        return Vec::new();
+    }
+    vec![
+        Box::new(CLIAgentAutoOpenRichInputWidget),
+        Box::new(CLIAgentSubmitRichInputWidget::default()),
+        Box::new(CLIAgentAutoToggleRichInputWidget::default()),
+        Box::new(CLIAgentAutoDismissRichInputWidget::default()),
+    ]
+}
+
+fn cli_agent_appearance_widgets() -> Vec<Box<dyn SettingsWidget<View = AISettingsPageView>>> {
     vec![
         Box::new(CLIAgentWidget::default()),
+        Box::new(CLIAgentToolbarLayoutWidget),
+        Box::new(CLIAgentCommandsWidget),
+    ]
+}
+
+fn cli_agent_update_widgets() -> Vec<Box<dyn SettingsWidget<View = AISettingsPageView>>> {
+    vec![
         #[cfg(not(target_family = "wasm"))]
         Box::new(CLIAgentUpdateWidget::new(CLIAgent::Codex)),
         #[cfg(not(target_family = "wasm"))]
         Box::new(CLIAgentUpdateWidget::new(CLIAgent::Claude)),
         #[cfg(not(target_family = "wasm"))]
         Box::new(CLIAgentUpdateWidget::new(CLIAgent::Grok)),
-        Box::new(CLIAgentAutoToggleRichInputWidget::default()),
-        Box::new(CLIAgentAutoOpenRichInputWidget::default()),
-        Box::new(CLIAgentAutoDismissRichInputWidget::default()),
-        Box::new(CLIAgentSubmitRichInputWidget::default()),
-        Box::new(CLIAgentCommandsWidget),
-        Box::new(CLIAgentToolbarLayoutWidget),
     ]
 }
 
@@ -8927,13 +9022,13 @@ impl SettingsWidget for CLIAgentUpdateWidget {
     fn search_terms(&self) -> &str {
         match self.agent {
             CLIAgent::Codex => {
-                "third party cli agent codex automatic update version upgrade channel latest alpha plugin integrity 自动 升级 更新 版本 渠道 插件 完整性"
+                "third party cli agent codex installation install automatic update version upgrade channel latest alpha plugin integrity 安装 自动 升级 更新 版本 渠道 插件 完整性"
             }
             CLIAgent::Claude => {
-                "third party cli agent claude automatic update version upgrade channel latest stable plugin integrity 自动 升级 更新 版本 渠道 插件 完整性"
+                "third party cli agent claude installation install automatic update version upgrade channel latest stable plugin integrity 安装 自动 升级 更新 版本 渠道 插件 完整性"
             }
             CLIAgent::Grok => {
-                "third party cli agent grok automatic update version upgrade channel stable alpha plugin integrity 自动 升级 更新 版本 渠道 插件 完整性"
+                "third party cli agent grok installation install automatic update version upgrade channel stable alpha plugin integrity 安装 自动 升级 更新 版本 渠道 插件 完整性"
             }
             _ => "third party cli update",
         }
@@ -9217,7 +9312,7 @@ impl SettingsWidget for CLIAgentWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent claude codex gemini toolbar footer quick actions show"
+        "third party cli coding agent claude codex grok gemini toolbar footer launchers appearance quick actions show 工具栏 启动入口 右上入口 外观 标题栏 标签页"
     }
 
     fn render(
@@ -9241,45 +9336,15 @@ impl SettingsWidget for CLIAgentWidget {
             app,
         );
 
-        let description_fragments = vec![
-            FormattedTextFragment::plain_text(crate::t!(
-                "settings-ai-cli-toolbar-description-prefix"
-            )),
-            FormattedTextFragment::inline_code("claude"),
-            FormattedTextFragment::plain_text(crate::t!(
-                "settings-ai-cli-toolbar-description-separator"
-            )),
-            FormattedTextFragment::inline_code("codex"),
-            FormattedTextFragment::plain_text(crate::t!(
-                "settings-ai-cli-toolbar-description-last-separator"
-            )),
-            FormattedTextFragment::inline_code("gemini"),
-            FormattedTextFragment::plain_text(crate::t!(
-                "settings-ai-cli-toolbar-description-suffix"
-            )),
-        ];
-
-        let description = FormattedTextElement::new(
-            FormattedText::new([FormattedTextLine::Line(description_fragments)]),
-            appearance.ui_font_size(),
-            appearance.ui_font_family(),
-            appearance.monospace_font_family(),
-            styles::description_font_color(true, app).into(),
-            HighlightedHyperlink::default(),
-        )
-        .with_heading_to_font_size_multipliers(appearance.heading_font_size_multipliers().clone());
-
         let is_footer_enabled = *ai_settings.should_render_cli_agent_footer;
 
         Flex::column()
             .with_child(cli_agent_footer_toggle)
-            .with_child(
-                Container::new(description.finish())
-                    .with_margin_top(styles::DESCRIPTION_NEGATIVE_MARGIN_OFFSET)
-                    .with_margin_bottom(styles::DESCRIPTION_MARGIN_BOTTOM)
-                    .with_margin_right(styles::TOGGLE_WIDTH_MARGIN)
-                    .finish(),
-            )
+            .with_child(render_ai_setting_description(
+                crate::t!("settings-ai-cli-toolbar-description"),
+                true,
+                app,
+            ))
             .with_child(self.render_per_agent_settings_section(
                 ai_settings,
                 is_footer_enabled,
@@ -9294,10 +9359,6 @@ fn should_render_cli_agent_detail(app: &AppContext) -> bool {
     *AISettings::as_ref(app).should_render_cli_agent_footer
 }
 
-fn should_render_cli_agent_rich_input(app: &AppContext) -> bool {
-    should_render_cli_agent_detail(app) && FeatureFlag::CLIAgentRichInput.is_enabled()
-}
-
 #[derive(Default)]
 struct CLIAgentAutoToggleRichInputWidget {
     toggle: SwitchStateHandle,
@@ -9308,11 +9369,7 @@ impl SettingsWidget for CLIAgentAutoToggleRichInputWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent rich input auto show hide status plugin"
-    }
-
-    fn should_render(&self, app: &AppContext) -> bool {
-        should_render_cli_agent_rich_input(app)
+        "third party cli coding agent infinishell rich input auto show hide status plugin native interaction 自动避让 自动 避让 状态 插件 原生交互 输入框"
     }
 
     fn render(
@@ -9323,10 +9380,6 @@ impl SettingsWidget for CLIAgentAutoToggleRichInputWidget {
     ) -> Box<dyn Element> {
         use super::settings_page::AdditionalInfo;
         use crate::settings::AutoToggleRichInput;
-
-        if !self.should_render(app) {
-            return Empty::new().finish();
-        }
 
         let label = render_body_item_label::<AISettingsPageAction>(
             crate::t!("settings-ai-auto-show-rich-input"),
@@ -9362,42 +9415,36 @@ impl SettingsWidget for CLIAgentAutoToggleRichInputWidget {
     }
 }
 
-#[derive(Default)]
-struct CLIAgentAutoOpenRichInputWidget {
-    toggle: SwitchStateHandle,
-}
+struct CLIAgentAutoOpenRichInputWidget;
 
 impl SettingsWidget for CLIAgentAutoOpenRichInputWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent rich input auto open session start"
-    }
-
-    fn should_render(&self, app: &AppContext) -> bool {
-        should_render_cli_agent_rich_input(app)
+        "third party cli coding agent infinishell rich input default mode native terminal command launch start 输入方式 默认 原生终端 终端命令 启动 输入框"
     }
 
     fn render(
         &self,
         view: &Self::View,
-        _appearance: &Appearance,
+        appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
         use crate::settings::AutoOpenRichInputOnCLIAgentStart;
 
-        if !self.should_render(app) {
-            return Empty::new().finish();
-        }
-
-        render_ai_setting_toggle::<AutoOpenRichInputOnCLIAgentStart>(
-            crate::t!("settings-ai-auto-open-rich-input"),
-            AISettingsPageAction::ToggleAutoOpenRichInputOnCLIAgentStart,
-            *AISettings::as_ref(app).auto_open_rich_input_on_cli_agent_start,
-            true,
-            self.toggle.clone(),
-            &view.local_only_icon_tooltip_states,
-            app,
+        render_dropdown_item(
+            appearance,
+            &crate::t!("settings-ai-auto-open-rich-input"),
+            Some(&crate::t!("settings-ai-cli-input-mode-description")),
+            None,
+            LocalOnlyIconState::for_setting(
+                AutoOpenRichInputOnCLIAgentStart::storage_key(),
+                AutoOpenRichInputOnCLIAgentStart::sync_to_cloud(),
+                &mut view.local_only_icon_tooltip_states.borrow_mut(),
+                app,
+            ),
+            None,
+            &view.cli_agent_input_mode_dropdown,
         )
     }
 }
@@ -9411,11 +9458,7 @@ impl SettingsWidget for CLIAgentAutoDismissRichInputWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent rich input auto dismiss prompt submission"
-    }
-
-    fn should_render(&self, app: &AppContext) -> bool {
-        should_render_cli_agent_rich_input(app)
+        "third party cli coding agent infinishell rich input auto dismiss prompt submission send sending 发送后 提交后 关闭 输入框"
     }
 
     fn render(
@@ -9426,19 +9469,22 @@ impl SettingsWidget for CLIAgentAutoDismissRichInputWidget {
     ) -> Box<dyn Element> {
         use crate::settings::AutoDismissRichInputAfterSubmit;
 
-        if !self.should_render(app) {
-            return Empty::new().finish();
-        }
-
-        render_ai_setting_toggle::<AutoDismissRichInputAfterSubmit>(
-            crate::t!("settings-ai-auto-dismiss-rich-input"),
-            AISettingsPageAction::ToggleAutoDismissRichInputAfterSubmit,
-            *AISettings::as_ref(app).auto_dismiss_rich_input_after_submit,
-            true,
-            self.toggle.clone(),
-            &view.local_only_icon_tooltip_states,
-            app,
-        )
+        Flex::column()
+            .with_child(render_ai_setting_toggle::<AutoDismissRichInputAfterSubmit>(
+                crate::t!("settings-ai-auto-dismiss-rich-input"),
+                AISettingsPageAction::ToggleAutoDismissRichInputAfterSubmit,
+                *AISettings::as_ref(app).auto_dismiss_rich_input_after_submit,
+                true,
+                self.toggle.clone(),
+                &view.local_only_icon_tooltip_states,
+                app,
+            ))
+            .with_child(render_ai_setting_description(
+                crate::t!("settings-ai-auto-dismiss-rich-input-description"),
+                true,
+                app,
+            ))
+            .finish()
     }
 }
 
@@ -9451,11 +9497,7 @@ impl SettingsWidget for CLIAgentSubmitRichInputWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent rich input submit ctrl enter newline"
-    }
-
-    fn should_render(&self, app: &AppContext) -> bool {
-        should_render_cli_agent_rich_input(app)
+        "third party cli coding agent infinishell rich input submit ctrl enter newline 提交键 换行 输入框"
     }
 
     fn render(
@@ -9465,10 +9507,6 @@ impl SettingsWidget for CLIAgentSubmitRichInputWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         use crate::settings::SubmitRichInputOnCtrlEnter;
-
-        if !self.should_render(app) {
-            return Empty::new().finish();
-        }
 
         render_ai_setting_toggle::<SubmitRichInputOnCtrlEnter>(
             crate::t!("settings-ai-submit-rich-input"),
@@ -9488,11 +9526,7 @@ impl SettingsWidget for CLIAgentCommandsWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent claude codex gemini toolbar commands regex patterns"
-    }
-
-    fn should_render(&self, app: &AppContext) -> bool {
-        should_render_cli_agent_detail(app)
+        "third party cli coding agent claude codex grok gemini toolbar commands regex patterns 命令 匹配 正则表达式"
     }
 
     fn render(
@@ -9501,15 +9535,11 @@ impl SettingsWidget for CLIAgentCommandsWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        if !self.should_render(app) {
-            return Empty::new().finish();
-        }
-
         let mut list_column = Flex::column();
         list_column.add_child(
             appearance
                 .ui_builder()
-                .paragraph(crate::t!("settings-ai-toolbar-commands-description"))
+                .paragraph(crate::t!("settings-ai-toolbar-commands-label"))
                 .with_style(UiComponentStyles {
                     font_size: Some(CONTENT_FONT_SIZE),
                     ..Default::default()
@@ -9620,7 +9650,7 @@ impl SettingsWidget for CLIAgentToolbarLayoutWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "third party cli coding agent toolbar layout chip chips rearrange re-arrange"
+        "third party cli coding agent toolbar layout chip chips rearrange re-arrange 工具栏 布局 排序"
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
@@ -9637,7 +9667,17 @@ impl SettingsWidget for CLIAgentToolbarLayoutWidget {
             return Empty::new().finish();
         }
 
-        render_toolbar_layout_editor(&view.cli_agent_toolbar_inline_editor, appearance)
+        Flex::column()
+            .with_child(render_toolbar_layout_editor(
+                &view.cli_agent_toolbar_inline_editor,
+                appearance,
+            ))
+            .with_child(render_ai_setting_description(
+                crate::t!("settings-ai-cli-toolbar-layout-description"),
+                true,
+                app,
+            ))
+            .finish()
     }
 }
 

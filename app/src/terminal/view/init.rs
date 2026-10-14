@@ -297,12 +297,7 @@ pub fn init(app: &mut AppContext) {
     ]);
 
     app.register_editable_bindings([
-        // Ctrl-G: toggle CLI agent rich input.
-        // Three contexts match this binding:
-        // 1. Terminal context when CLI agent footer is visible (opens rich input)
-        // 2. EditorView context when rich input is already open (closes rich input, fix for #9286)
-        // 3. Terminal context when rich input is open (closes rich input regardless
-        //    of focus location or active-block state; fix for #9916)
+        // Ctrl-G 在支持的 CLI 会话中切换输入方式，不依赖工具栏或其中的按钮。
         EditableBinding::new(
             OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING,
             crate::t!("keybinding-desc-terminal-toggle-cli-agent-rich-input"),
@@ -310,12 +305,11 @@ pub fn init(app: &mut AppContext) {
         )
         .with_key_binding("ctrl-g")
         .with_context_predicate(
-            // Case 1: Open from terminal during CLI agent session
+            // 从活动 CLI 终端打开输入框，保留输入法正在组词时的按键。
             (id!("Terminal")
                 & !id!("IMEOpen")
                 & (id!("LongRunningCommand") | id!("AltScreen"))
-                & id!(flags::CLI_AGENT_FOOTER_ENABLED)
-                & id!(flags::CLI_AGENT_RICH_INPUT_CHIP_ENABLED))
+                & id!(flags::CLI_AGENT_RICH_INPUT_AVAILABLE))
             // Case 2: Close from focused editor when rich input is open
             | (id!("EditorView") & !id!("IMEOpen") & id!(flags::CLI_AGENT_RICH_INPUT_OPEN))
             // Case 3: Close from terminal context when rich input is open (covers
