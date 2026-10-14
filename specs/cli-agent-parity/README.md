@@ -10,7 +10,7 @@
 
 修复提交 `f429fe2c0426846f41f79fef15a791c5f7cbb011` 已快进合入并推送 `main`；本地 `cargo check`、定向回归 **39/39**（含新增 8 项）、i18n **12/12** 通过；[同提交双平台门禁 38411587441](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38411587441)首次运行全部通过：Linux 应用 **624/624**、Windows **609/609**，新增 8 项及通用 i18n 11 项两端均逐名 PASS。该候选 `v0.2026.10.13.22.25.oss_00` 后续因共享初始化入口的循环模型借用回归拒收，[发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397)已主动取消。真实入口测试与调用栈复现了 singleton lookup panic；当前未找到生产调用者，不据此宣称实际共享 GUI 崩溃。Intel runner 的独立 DNS 失败与其他任务的主动取消分别保留，实际基础设施重试为 0。
 
-修复提交 `5360f5d6cf7e3b25263431027993a3a26dca9cb5` 已合入并推送主线：在历史模型更新前构造请求快照，保持 Base／CLI 选择不变；本地 `cargo check`、**40/40** 定向回归和 **12/12** i18n 通过。[同提交双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行通过：Linux 应用 **625/625**、Windows **610/610**，累计新增 9 项及通用 i18n 11 项两端均逐名 PASS。新候选 `v0.2026.10.14.01.46.oss_00` 标签已推送，[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 进行中；本轮六份 SSH 资源已通过静态及限定原生验证，最终 macOS DMG 已通过签名、公证装订及 19 项检查，六项 GUI 实际操作全部通过，独立证据复核通过。Linux／Windows 桌面包和 12 件资产下载回验仍待完成。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，新候选最终验收未完成。
+修复提交 `5360f5d6cf7e3b25263431027993a3a26dca9cb5` 已合入并推送主线：在历史模型更新前构造请求快照，保持 Base／CLI 选择不变；本地 `cargo check`、**40/40** 定向回归和 **12/12** i18n 通过。[同提交双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行通过：Linux 应用 **625/625**、Windows **610/610**，累计新增 9 项及通用 i18n 11 项两端均逐名 PASS。新候选 `v0.2026.10.14.01.46.oss_00` 标签已推送，[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 全部成功；本轮六份 SSH 资源已通过静态及限定原生验证，最终 macOS DMG 已通过签名、公证装订及 19 项检查，六项 GUI 实际操作全部通过，独立证据复核通过。Linux 四包原生检查、Windows 最终安装器静态核验及 12 件资产 Draft 全量下载回验已通过；Windows 便携验收包已就绪，用户五阶段回执仍待完成。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，新候选最终验收未完成。
 
 | 范围 | 当前结论与依据 |
 | --- | --- |
@@ -40,15 +40,15 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 相关代码变更继续执行 `cargo check`、必要的 i18n／定向回归，以及受影响的 Linux／Windows 自动检查。现有跨平台工作流入口为 `ci/**` 推送或 `workflow_dispatch`，`run_linux` 默认开启；不是每次推送 `main` 都自动执行。文档更新不触发已通过的模型、GUI 或双平台验收重跑。
 
-以下三项按各自状态管理：本轮最终 macOS GUI 已完成，发行资产和 Windows 最终安装器回执仍需关闭。debug 包和旧签名候选的历史通过与失败均保留：
+以下三项按各自状态管理：本轮最终 macOS GUI 和发行资产已完成，仅 Windows 最终安装器用户回执及助手审核仍待关闭。debug 包和旧签名候选的历史通过与失败均保留：
 
 | 必做项 | 执行时机与通过条件 |
 | --- | --- |
-| 最终发行产物校验 | 每次发版绑定同一源码与正式标签；核对既定 12 件资产、内嵌 SSH 资源和下载摘要，完成 macOS Developer ID 签名、公证及装订检查。继续保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
-| Windows 安装生命周期 | 按用户新安排，由用户在自己的 Windows 开发电脑完成最终安装器的安装、可见 GUI 启动、正常退出、官方卸载与残留记录，助手审核回执；先绑定最终包 SHA-256／大小再交付执行。已有分支验收不重开，也不替代本次最终安装器回执；不再索要机器名、账号或要求切换桌面。见[独立操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
+| 最终发行产物校验 | **本候选 12 件资产及全量 Draft 下载回验通过**。每次发版绑定同一源码与正式标签；核对既定 12 件资产、内嵌 SSH 资源和下载摘要，完成 macOS Developer ID 签名、公证及装订检查。继续保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
+| Windows 安装生命周期 | 按用户新安排，由用户在自己的 Windows 开发电脑完成最终安装器的安装、可见 GUI 启动、正常退出、官方卸载与残留记录，助手审核回执；本候选实际 SHA-256／大小已绑定，含安装器的便携 ZIP 和采集器已交付，五阶段尚未执行。已有分支验收不重开，也不替代本次最终安装器回执；不再索要机器名、账号或要求切换桌面。见[独立操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
 | 最近 GUI 改动的候选包冒烟 | **本候选六项实测通过，独立证据审核通过**：四项 GUI、A→B→B→A 实际路由、Responses strict schema 均通过；同包正常重启，配置恢复。见[最终包记录](#正式候选-macos-验收2026-10-14)；不要求补做 Linux 桌面矩阵 |
 
-发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。发行资产与 Windows 用户回执关闭前，不宣称下一发行候选已完成验收。
+发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。Windows 用户回执及助手审核关闭前，不宣称下一发行候选已完成验收；当前保持 Draft，尚未公开发布。
 
 新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/`。上一轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/` 保留原自动检查、预编译、DNS 失败和主动取消证据；共享初始化修复及红／绿回归记录位于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-14-shared-init-fix/`。旧轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；入口为 `macos-gui/result.json`、`macos-gui/evidence-index.json` 和 `STATUS.zh-CN.md`。修复源码门禁归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**：修复改变请求路由与协议归一化，没有新增或改变用户文案；指定双语界面已在新候选复验。Linux 桌面继续延期，自动检查保留。
 
@@ -64,6 +64,16 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 证据入口为本候选归档的 `macos-gui/result.json`、`macos-gui/evidence-index.json`、`macos-gui/r-own9vyp9/` 与 `macos-final/validation/result.json`；独立审查 `macos-gui/independent-audit/final-audit.json`（SHA-256 `0ba18d2b7add5a40c241ac6253d2cb937d5289d82acb4b3d30f6472c4815a1e8`）复核 90/90 原件摘要及 30 张截图通过。本轮使用本机固定模型触发真实 UI／HTTP／工具路径，不外推真实模型能力或成功云同步。临时 provider、模型、语言、连字和尺寸已恢复；settings.toml 完整摘要与私有基线相同，未全量覆盖数据库。GUI、后代和 provider 已退出，DMG 正常卸载；临时目录严格保留，不放宽清理规则。
 
 另记录非阻塞改进：中文“连字”设置搜索没有结果，英文 `ligature` 可找到；此项单列后续本地化搜索优化。本轮未新增产品代码，**无需本地化变更**。
+
+### 最终发行资产与 Windows 交付（2026-10-14）
+
+正式 run `38444122158` attempt 1 全部成功，候选仍固定在源码 `5360f5d6c`。Draft `412209685` 精确包含 **12 件资产**：ARM64 macOS DMG、Windows x64 安装器、四份 Linux 包及六份 SSH 扩展。仅 DMG 和两份签名后的 Mac SSH 资源经本机补入；其余九件保持 CI 原字节。全量认证下载后，本地原件、GitHub 摘要和下载件逐项一致，标签、资产身份及公开 Latest 均未改变；没有公开发布。
+
+Linux AppImage／DEB／RPM／Arch 均完成只读解包、元数据与 ELF 检查、内嵌六资源核对，以及本包二进制实际版本检查；没有安装系统包或执行 Linux GUI。Windows 安装器来源、大小、摘要、AMD64 主程序和内嵌原始六资源均通过，实际 Authenticode 为 **`NotSigned`**，按 OSS 未签名边界记录，不称为有效签名。
+
+[Windows 独立操作文档](../../docs/windows-final-installer-acceptance.zh-CN.md)已绑定最终包，便携 ZIP 包含安装器和全部采集材料；用户在现有 Windows 开发电脑完成五阶段，助手审核回执。**这仍是本候选剩余的发版门禁**，不重开已关闭的 Windows 分支验收，也不将静态结果充当安装卸载通过。
+
+归档入口：[`final-acceptance/result.json`](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/final-acceptance/result.json)和[证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/final-acceptance/evidence-index.json)；12 件回验为 `github/draft-roundtrip/result.json`（SHA-256 `428a26eddb0748d9cdbe98e76b1a597a5737b2450134acca4783c2565b02f2fd`），Linux 四包及 Windows 安装器原件分别在 `native-validation/linux-packages/` 和 `native-validation/windows-desktop/`。源头 `candidate.json` 保留构建启动时快照，当前结论以 `STATUS.zh-CN.md` 和上述汇总为准；旧候选和失败原件保留。Linux 桌面继续延期，自动检查保留；本次仅文档归档，**无需本地化变更**。
 
 ### 正式签名候选拒收与修复（2026-10-13）
 

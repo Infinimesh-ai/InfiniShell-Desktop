@@ -42,7 +42,7 @@
       "source_sha": "5360f5d6cf7e3b25263431027993a3a26dca9cb5",
       "tag_object": "45219f419c628bf3f5dbace5fd10013f6cf2c0c2",
       "release_run": 38444122158,
-      "status": "macos_final_passed_remaining_desktop_assets_in_progress",
+      "status": "assets_and_macos_passed_waiting_windows_user_receipts",
       "publication": "draft_only",
       "archive": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00",
       "source_preflight_run": 38441190656,
@@ -90,14 +90,35 @@
         }
       },
       "windows_installer": {
-        "state": "waiting_final_installer_identity",
+        "state": "waiting_user_execution_and_assistant_evidence_review",
         "execution_owner": "user_on_existing_windows_development_desktop",
         "review_owner": "assistant_reviews_candidate_evidence",
         "existing_branch_acceptance": "preserved_not_reopened_and_not_substitute_for_final_installer_receipts",
         "request_machine_name_account_or_desktop_switch": false,
         "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md",
         "materials": "native-validation/windows-manual",
-        "collector_enabled": false
+        "collector_enabled": true,
+        "static_status": "passed",
+        "installer_sha256": "56276e369cf3bb85cec82165619a73e544cbf9f48932861e705f57a3f8feb5f6",
+        "installer_size_bytes": 580408345,
+        "actual_authenticode_status": "NotSigned",
+        "signature_read_error": null,
+        "lifecycle": "not_executed",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-desktop/result.json",
+        "evidence_sha256": "da097c15bc8ac80be355ecdfce47dba70482339a964ac93a8f2fe67bb82ab0a7",
+        "portable_kit": {
+          "status": "portable_handoff_zip_assembled_and_roundtrip_verified",
+          "candidate_version": "v0.2026.10.14.01.46.oss_00",
+          "source_sha": "5360f5d6cf7e3b25263431027993a3a26dca9cb5",
+          "release_run": 38444122158,
+          "zip_path": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-manual/handoff/InfiniShell-Windows-Acceptance-v0.2026.10.14.01.46.oss_00.zip",
+          "zip_sha256": "cef94e3ee7140f6d62af0f953bb5d827cba214f5dc11573f1d2f57e514b52073",
+          "zip_size_bytes": 580483206,
+          "member_count": 10,
+          "handoff_manifest_sha256": "eac14d5ffeb1ccf15d761b98fd52685214b032263796dd3d467ca1e0fb010f8a",
+          "windows_lifecycle": "not_executed",
+          "github_release_asset": false
+        }
       },
       "linux_desktop": "deferred_not_passed",
       "original_byop_fix_source": "f429fe2c0426846f41f79fef15a791c5f7cbb011",
@@ -136,6 +157,41 @@
         ],
         "arm_linux_windows_scope": "编译及静态检查，未计原生运行",
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/logs/linux-and-six-effective-execution/six-handoff.json"
+      },
+      "release_workflow_final": {
+        "status": "success",
+        "run": 38444122158,
+        "attempt": 1,
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/logs/linux-and-six-effective-execution/release-terminal-result.json",
+        "evidence_sha256": "8b9c017b488f5e046f9a2be265d56d6de43ac2764411ae8868901809ef4115c3"
+      },
+      "draft_assets": {
+        "status": "passed_exact_twelve_three_way_roundtrip",
+        "release_id": 412209685,
+        "draft": true,
+        "prerelease": true,
+        "count": 12,
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/github/draft-roundtrip/result.json",
+        "evidence_sha256": "428a26eddb0748d9cdbe98e76b1a597a5737b2450134acca4783c2565b02f2fd",
+        "public_latest_unchanged": "v0.2026.10.07.01.09.oss_00",
+        "portable_windows_kit_is_release_asset": false
+      },
+      "linux_packages": {
+        "status": "passed",
+        "count": 4,
+        "checks": "解包、包元数据、ELF架构与同构建正文、内嵌六资源及四包原生版本",
+        "installed_system_packages": false,
+        "gui_execution": false,
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/linux-packages/result.json",
+        "evidence_sha256": "700fcce6fe848ec72a57a17c135d3d80fb80d08be81bd4eb51859f6226dfc0fb"
+      },
+      "final_acceptance_summary": {
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/final-acceptance/result.json",
+        "evidence_sha256": "3273fed00c67daf918e322880cebd14146077add2e0a7907601af8307ecd7126",
+        "release_ready": false,
+        "remaining": [
+          "Windows最终安装器五阶段用户回执及助手审核"
+        ]
       }
     },
     "deferred": [
@@ -214,18 +270,20 @@
     "next_release_required": [
       {
         "item": "发行产物校验",
-        "status": "pending_rebuilt_candidate_all_twelve_assets",
+        "status": "passed_final_twelve_assets_and_authenticated_roundtrip",
         "when": "本轮候选发版前，后续每次发版同样执行",
         "pass_condition": "同一源码和正式标签；12件既定资产、内嵌SSH资源、下载摘要；macOS Developer ID签名、公证及装订检查",
         "scope": "ARM64 macOS桌面、Windows x64桌面、四份Linux桌面包及六份SSH扩展；保留Intel macOS SSH，不恢复Intel桌面DMG",
-        "completed": "本候选六份SSH原始/签名/静态与四种原生版本检查、macOS最终包19项及GUI六项已完成；Linux/Windows桌面原件及12资产下载回验仍待完成"
+        "completed": "同一正式源码与标签的12件资产、桌面内嵌SSH资源、macOS签名公证装订、三方摘要与全量Draft下载回验通过；保持Draft，公开Latest未改变",
+        "evidence": "README.md#最终发行资产与-windows-交付2026-10-14"
       },
       {
         "item": "Windows安装生命周期",
-        "status": "pending_rebuilt_final_installer_identity_and_user_receipts",
+        "status": "pending_user_execution_and_assistant_evidence_review",
         "when": "最终安装器SHA-256和大小绑定并交付后，本轮Windows发版前",
         "pass_condition": "用户在自己的Windows开发电脑完成最终包安装、可见GUI启动、正常退出、官方卸载与残留记录，助手审核；已有分支验收不重开且不替代最终安装器回执；不预称零残留",
-        "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md"
+        "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md",
+        "completed": "最终Setup来源、大小、摘要、实际NotSigned、内嵌六资源已核；便携验收ZIP已交付，采集器启用；五阶段未执行"
       },
       {
         "item": "近期GUI候选包冒烟",
@@ -261,7 +319,7 @@
       }
     ],
     "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。",
-    "localization": "无需本地化变更；本轮仅修正请求构造与历史模型更新的顺序，无用户可见文案或布局变化。最终候选英中GUI复验仍待完成。",
+    "localization": "无需本地化变更；本轮仅归档验收证据和校正状态文档，产品源码未变。最终候选指定英中GUI布局已实测通过。",
     "macos_gui_smoke": {
       "date": "2026-10-13",
       "source_commit": "45a8911075277d127e959510631c3d4b01b44903",
@@ -8265,7 +8323,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "原批准合并范围G01–G10、V03共11项关闭；历史两轮候选拒收保留。源码5360f5d6c门禁通过，最终macOS包19项签名公证装订校验和六项GUI实测通过，独立GUI审核通过。Linux/Windows桌面产物、12资产下载回验及Windows用户回执待完成；Linux桌面继续延期。",
+  "status_zh": "原批准合并范围G01–G10、V03共11项关闭，旧两轮候选拒收保留。本候选源码门禁、macOS签名公证装订19项与GUI六项、Linux四包原生检查、Windows安装器静态检查及12资产Draft全量下载回验通过；仅Windows用户五阶段回执及助手审核待完成。Linux桌面继续延期，未公开发布。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -10725,8 +10783,8 @@
   "latest_resume": {
     "authority_ref": "main_acceptance.current_release_candidate",
     "source_commit": "5360f5d6cf7e3b25263431027993a3a26dca9cb5",
-    "status": "最终macOS签名公证装订与六项GUI操作通过，独立审核通过",
-    "next_step": "完成Linux/Windows桌面包、12资产Draft下载回验及Windows便携人工验收材料；等待用户执行后审核五阶段回执；Linux桌面延期"
+    "status": "最终资产及macOS验收通过；Windows便携包已就绪，等待用户执行和助手审核回执",
+    "next_step": "用户按独立Windows文档执行baseline/installed/launched/closed/uninstalled五阶段并交回证据；助手审核后再判断发版门禁；Linux桌面延期，自动检查保留"
   },
   "g01_g07_guard_followup": {
     "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",
@@ -12842,7 +12900,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "5360f5d6cf7e3b25263431027993a3a26dca9cb5",
-  "latest_increment": "final_signed_macos_gui_acceptance_20261014",
+  "latest_increment": "final_assets_roundtrip_and_windows_handoff_20261014",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
