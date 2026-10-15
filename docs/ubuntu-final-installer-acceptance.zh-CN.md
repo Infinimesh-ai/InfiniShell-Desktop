@@ -1,6 +1,6 @@
 # Ubuntu 最终 DEB 桌面验收
 
-当前结论：**用户已确认在 Ubuntu 24.04 x86_64 原生桌面执行验收，并等待统一修复后的新候选，再各做一次 Windows 和 Ubuntu 复验。** 统一候选 `v0.2026.10.14.16.45.oss_00` 已冻结并启动正式构建；实际 DEB、验收 ZIP 和任务指令尚未交付；本页是稳定状态入口，不是可以直接执行的安装材料。
+当前结论：**用户已确认在 Ubuntu 24.04 x86_64 原生桌面执行验收，并等待统一修复后的新候选，再各做一次 Windows 和 Ubuntu 复验。** 统一候选 `v0.2026.10.14.16.45.oss_00` 正式构建已成功并产出 Linux artifact；归档下载正在恢复，实际 DEB 静态审核、验收 ZIP 和任务指令尚未交付；本页是稳定状态入口，不是可以直接执行的安装材料。
 
 Linux 桌面已从本轮延期调整为“用户在现有 Ubuntu 桌面执行、助手审核证据”。Linux 自动检查继续保留。旧 Linux 分支的归档、关闭和延期记录仍作为历史保存；本次不恢复旧开发分支，不重开已关闭的 G09，也不把在线模型、认证 CLI Agent 的跨平台矩阵重新纳入这次包生命周期验收。
 
@@ -8,18 +8,20 @@ Linux 桌面已从本轮延期调整为“用户在现有 Ubuntu 桌面执行、
 
 旧候选 `v0.2026.10.14.13.00.oss_00` 固定源码 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b`，其 Linux DEB 打包路径遗漏了 postrm 的 `@@PACKAGE_NAME@@` 替换，卸载可能保留 `/usr/bin/infinishell` 失效链接。该候选不作为本轮 Windows/Ubuntu 统一用户复验的交付版本；[原正式构建 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)及[候选归档](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.13.00.oss_00/candidate.json)只用于追溯，不能通过手动删链接或改旧包掩盖缺陷。
 
-新产品候选以 `5acb349c7` 已验证的 Windows URI 修复为基础，仅加入本轮必要的 Linux 打包/卸载修复，固定源码为 `5068dae9c75b79628865a0872684113647c204d8`；annotated tag 为 `v0.2026.10.14.16.45.oss_00`，tag 对象为 `27d40029759b541dc8903a0deb9ec0948e9670fa`。[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605)已启动；身份以[新候选归档](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/candidate.json)为准。Linux 源码门禁通过，依据见[源码验证记录](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/linux-deb-cleanup-fix/source-gates.json)；最终包的静态核验和真实桌面六阶段仍待完成。
+新产品候选以 `5acb349c7` 已验证的 Windows URI 修复为基础，仅加入本轮必要的 Linux 打包/卸载修复，固定源码为 `5068dae9c75b79628865a0872684113647c204d8`；annotated tag 为 `v0.2026.10.14.16.45.oss_00`，tag 对象为 `27d40029759b541dc8903a0deb9ec0948e9670fa`。[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 全部成功；身份以[新候选归档](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/candidate.json)为准。Linux 源码门禁通过，依据见[源码验证记录](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/linux-deb-cleanup-fix/source-gates.json)；最终包的静态核验和真实桌面六阶段仍待完成。
 
-修复已整合至主线及验收控制器 `203d08e5053413d5d6a14971208de4e125eb2f1c`，这不是候选产品 SHA。主线后续 `b4e59a8cd`（CLI 启动器打开富输入等 GUI 改动）不进入这轮产品候选。新包大小、摘要和生产工件身份仍须从实际产物核验，不能借用旧资产。Windows 原生门禁结果属于 `5acb349c7`，新候选保持相同 Windows 实现字节，仍需核验本轮最终安装器；旧 macOS/12 资产通过记录也只属于旧候选。
+修复已整合至主线及验收控制器 `203d08e5053413d5d6a14971208de4e125eb2f1c`，这不是候选产品 SHA。主线后续 `b4e59a8cd`（CLI 启动器打开富输入等 GUI 改动）不进入这轮产品候选。新包大小、摘要和生产工件身份仍须从实际产物核验，不能借用旧资产。Windows 原生门禁结果属于 `5acb349c7`，新候选保持相同 Windows 实现字节，本轮最终安装器已另经原生静态审核，但 Windows 用户六阶段仍待验；旧 macOS/12 资产通过记录也只属于旧候选。
 
 | 交付项 | 当前状态与关闭条件 |
 |---|---|
-| 新候选产品 SHA、tag、tag 对象、正式 run | 已按上述身份冻结，正式构建进行中；保留旧 tag 和旧证据 |
-| 官方 Ubuntu amd64 DEB | 待新正式构建产出，并确认包元数据、程序、desktop、六份 SSH 资源、安装/卸载脚本 |
+| 新候选产品 SHA、tag、tag 对象、正式 run | 已按上述身份冻结，正式构建成功；保留旧 tag 和旧证据 |
+| 官方 Ubuntu amd64 DEB | artifact `11903140677` 已产出；下载恢复中，尚待确认包元数据、程序、desktop、六份 SSH 资源、安装/卸载脚本 |
 | 用户验收 ZIP 与 SHA-256 | 待正式 DEB 静态审核通过；与 Windows 使用同一候选源码/tag |
 | 用户任务指令 | 模板已准备；待填真实附件名、版本和 ZIP 摘要后交付 |
 | Ubuntu 现场验收 | 尚未执行；六阶段证据和必要截图待用户回传、助手复核 |
 | 发版结论 | 保持未放行；静态包核验或采集脚本通过不代替真实桌面验收 |
+
+首次下载在 900 秒达到传输超时，约 1.13 GB 部分原件及错误日志已保留；正在执行唯一一次 Linux 专用 7200 秒恢复，来源、provider 摘要、ZIP 及内容核验未放宽。见[下载恢复记录](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/linux-download-recovery/state.json)。未完成下载不算正式 DEB 静态审核通过，也不是产品构建失败。
 
 ## 六阶段与操作边界
 
