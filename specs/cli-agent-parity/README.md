@@ -4,9 +4,11 @@
 
 ## 当前主线状态（2026-10-15）
 
-**统一候选正式构建成功，六份 SSH 静态核验和 Windows 最终安装器原生静态审核通过，Windows 验收 ZIP 已组装；Ubuntu 包审核、两端用户桌面及 Mac／12 资产门禁仍待完成。** 当前产品源码固定为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及工件核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`。独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 未包含在本候选，不把控制器或当前主线代码当作候选产品源码。
+**统一候选正式构建、Windows Setup 和 Ubuntu DEB 静态核验通过，两套验收 ZIP 及任务已就绪，安装包与 Draft 回下载逐字节一致。两端用户桌面、Mac 最终包 GUI 和完整 12 资产仍是发版门禁。** 当前产品源码固定为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及工件核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`。独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 未包含在本候选，不把控制器或当前主线代码当作候选产品源码。
 
-当前候选是 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 已成功完成，当前 Draft 有 11 件 CI 资产。用户已确认等待同一修复候选，在 Windows 开发电脑与 **Ubuntu 24.04 x86_64** 各验一次，助手审核回执。新 Setup 经 [38703172103 原生只读核验](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38703172103)确认 AMD64、内嵌六资源一致，实际 Authenticode 为 `NotSigned`；[Windows 便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已生成。Ubuntu 归档首次下载超时后正进行一次有记录的恢复，包审核尚未完成；Mac 最终包链接遇到参数列表过长，正在修复本机调用，尚无最终 DMG。Setup／DEB 的 Draft 回下载对照、两端实际桌面及全量 12 资产仍待完成；旧 CLI 认证矩阵仍延期，G09 不重开。新产物仅允许写入 Draft，公开版本仍为 `v0.2026.10.07.01.09.oss_00`。
+当前候选是 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 已成功完成，当前 Draft 有 11 件 CI 资产。用户已确认等待同一修复候选，在 Windows 开发电脑与 **Ubuntu 24.04 x86_64** 各验一次，助手审核回执。新 Setup 经 [38703172103 原生只读核验](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38703172103)确认 AMD64、内嵌六资源一致，实际 Authenticode 为 `NotSigned`；[Windows 便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已生成。Ubuntu 下载恢复成功，真实 DEB 的元数据、ELF、desktop、六资源和卸载脚本静态审核通过；两平台安装包的[Draft 回下载对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json)通过，仅覆盖这两件资产。Mac 首次链接失败保留，本机 response-file 调用修正后签名 DMG 已生成，Apple 公证 Accepted、装订及[最终 DMG 静态核验](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-final/dmg-verification/result.json)通过，ARM64 版本执行通过但未启动 GUI；两端实际桌面及 Mac GUI、完整 12 资产仍待完成；旧 CLI 认证矩阵仍延期，G09 不重开。新产物仅允许写入 Draft，公开版本仍为 `v0.2026.10.07.01.09.oss_00`。
+
+两套交付使用同一源码和标签： [Windows ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Acceptance-v0.2026.10.14.16.45.oss_00.zip)／[Windows 任务](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)；[Ubuntu 24.04 x86_64 ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/ubuntu-manual/InfiniShell-Ubuntu24-Acceptance-v0.2026.10.14.16.45.oss_00.zip)／[Ubuntu 任务](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/ubuntu-manual/InfiniShell-Ubuntu24-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)。各自 ZIP 内已包含安装器、采集器和完整说明，用户按任务六阶段执行后回传证据，助手再审核。见[交付复核与证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/handoff-delivery-20261015/review.json)。
 
 [5068 Linux 原生门禁 38534655990](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38534655990) attempt 1 全部通过：真实 `dpkg-deb` 构建与提取的 **252 个维护脚本场景**、双 musl 编译检查、socket **9**、crate **503**、迁移／同步 **525**、补全 **22**、应用 **625**，其中 Linux i18n **11/11** 逐名通过；通知测试 **109 通过／2 项 Windows 专属跳过**。本机 `cargo check`、`cargo check -p warp` 和 i18n **12/12** 通过。原件及 ZIP 摘要复核见[Linux 审核记录](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/linux-deb-cleanup-fix/remote/38534655990/review.json)，不计为 Ubuntu 桌面或正式候选包通过。
 
@@ -38,7 +40,7 @@ Windows 实现沿用已验证的 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` 字�
 
 本轮已修复安装时登记、启动同步恢复及读回、URI/AUMID 归属标记与按所有权卸载清理，并通过上述原生门禁；[源码与门禁收据](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/source-gates-5acb349c7.json)和[Windows 原生审核](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/remote/38512735757/review.json)均绑定 `5acb349c7`。早期 `4c02c6755` 的 Inno 声明编译失败按原 run `38512138949` 保留，不作为新源码结果。现场旧命令摘要不变的首因仍未确定，不将 `KEY_READ` 或独立确认的终止 NUL 缺陷冒称为现场唯一根因。
 
-新候选 Setup 已完成同来源原生静态校验及便携 ZIP 绑定；待 Ubuntu 包审核与两资产 Draft 回下载对照完成后一起交付，再由用户执行 `baseline → installed → launched → uri_activated → closed → uninstalled` 六阶段，助手审核实际 URI 唤起和本实例登记清理。源码修复通过尚不能关闭发行验收阻塞。Ubuntu 24.04 x86_64 将按[独立 DEB 验收入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)执行同候选六阶段；旧 CLI 认证矩阵继续延期，自动检查保留。无需本地化变更。
+新候选 Setup 和 Ubuntu DEB 已完成静态校验、便携 ZIP 绑定及两资产 Draft 回下载对照，现在由用户按各自交付任务执行 `baseline → installed → launched → uri_activated → closed → uninstalled` 六阶段，助手审核实际 URI 唤起和本实例登记清理。源码修复通过尚不能关闭发行验收阻塞。Ubuntu 24.04 x86_64 将按[独立 DEB 验收入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)执行同候选六阶段；旧 CLI 认证矩阵继续延期，自动检查保留。无需本地化变更。
 
 ### 延期项与独立补验
 
@@ -62,10 +64,10 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 | 必做项 | 执行时机与通过条件 |
 | --- | --- |
-| 最终发行产物校验 | **正式 run 成功、六资源静态通过，12 资产门禁仍待完成**。绑定同一源码与标签，核对既定 12 件资产、内嵌 SSH 资源及全量 Draft 下载摘要，完成 macOS Developer ID 签名、公证及装订。保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
-| Windows 安装生命周期 | **新 Setup 静态审核及便携包组装完成，用户六阶段待验**。用户在现有 Windows 开发电脑执行安装、可见 GUI、实际 URI 唤起、正常退出、官方卸载与残留记录，助手审核。等待与 Ubuntu 联合交付及两资产 Draft 回下载对照；不重开分支验收，不另索要机器名、账号或要求切换桌面。见[操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
-| Ubuntu DEB 安装生命周期 | **正式 Linux artifact 已产出；归档下载恢复、DEB 静态审核和用户六阶段待完成**。用户在 Ubuntu 24.04 x86_64 执行安装、可见 GUI、真实 URI 新窗口与目录标记、正常退出及官方卸载；助手核对本包程序链接清理、用户数据保留及全部回执。见[操作入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)。旧 V01／V02／V05 不因此关闭 |
-| 最近 GUI 改动的候选包冒烟 | **新最终包链接调用待修复，签名公证及 GUI 待验证**。旧包四项 GUI、A→B→B→A 路由、Responses strict schema 的六项通过见[历史最终包记录](#正式候选-macos-验收2026-10-14)；新包须绑定实际二进制、必要冒烟与重启恢复证据，不重开旧 Linux CLI 认证矩阵 |
+| 最终发行产物校验 | **正式 run、六资源静态及两件安装包回下载通过，完整 12 资产门禁仍待完成**。绑定同一源码与标签，核对既定 12 件资产、内嵌 SSH 资源及全量 Draft 下载摘要，完成 macOS Developer ID 签名、公证及装订。保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
+| Windows 安装生命周期 | **新 Setup 静态审核及便携包组装完成，用户六阶段待验**。用户在现有 Windows 开发电脑执行安装、可见 GUI、实际 URI 唤起、正常退出、官方卸载与残留记录，助手审核。两套包已就绪，任务已绑定实际安装器及 ZIP 摘要；不重开分支验收，不另索要机器名、账号或要求切换桌面。见[操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
+| Ubuntu DEB 安装生命周期 | **实际 DEB 静态审核、便携包和 Draft 回下载通过；用户六阶段待完成**。用户在 Ubuntu 24.04 x86_64 执行安装、可见 GUI、真实 URI 新窗口与目录标记、正常退出及官方卸载；助手核对本包程序链接清理、用户数据保留及全部回执。见[操作入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)。旧 V01／V02／V05 不因此关闭 |
+| 最近 GUI 改动的候选包冒烟 | **新签名 DMG 公证装订及静态核验通过，GUI 待验证**。旧包四项 GUI、A→B→B→A 路由、Responses strict schema 的六项通过见[历史最终包记录](#正式候选-macos-验收2026-10-14)；新包须绑定实际二进制、必要冒烟与重启恢复证据，不重开旧 Linux CLI 认证矩阵 |
 
 发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。Windows／Ubuntu 用户回执及助手审核关闭前，不宣称下一发行候选已完成验收；新产物仅允许写入 Draft，尚未公开发布。
 

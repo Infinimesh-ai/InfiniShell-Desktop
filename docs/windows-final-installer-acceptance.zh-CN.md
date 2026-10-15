@@ -1,20 +1,20 @@
 # Windows 最终安装器验收
 
-当前结论：**统一 `16.45` 正式构建成功，新 Windows 安装器原生静态审核通过，便携验收 ZIP 已组装；联合交付和用户六阶段复验仍待完成。** 产品源码为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及只读核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`；独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 不属于本候选。
+当前结论：**统一 `16.45` 正式构建成功，新 Windows 安装器原生静态审核通过，便携验收 ZIP 和 Draft 回下载对照通过，可交付；用户六阶段复验仍待完成。** 产品源码为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及只读核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`；独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 不属于本候选。
 
 Windows 实现字节与已验证的 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` 一致，见[Git 对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-source-equivalence.json)。[Windows 门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)的 80 项 Inno 断言、6 项隔离注册表回归、616 项应用测试（含该 6 项）、492 项 crate、528 项 Zap、11 项 completer 保留原 5ac 范围，不称为 5068 新运行。5068 的[Linux 原生门禁 38534655990](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38534655990)和本机 cargo check／i18n 12/12 已通过；源码通过不代替最终安装器。
 
 候选为 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式 run 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 全部成功。最终 Setup 为 **580320096 字节**，SHA-256 **`1ad878fb098c8cc7e49c7dc29aa6afec7ceb34d80fcb9fc8220643f35ec3086a`**。本轮 [Windows 原生核验 38703172103](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38703172103)只读解包确认 AMD64 及内嵌六资源与 CI 原件一致，实际 Authenticode 为 **`NotSigned`**，未安装或启动产品。见[实际核验报告](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/windows-final-installer/review/native-evidence-review.json)。
 
-[便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已绑定本候选和 12 个实际 ZIP 成员；ZIP 为 **580382770 字节**，SHA-256 **`9c8bcd78411ccfb3059c44a523f981f5ccc0fea5bd8e0ad73e78e5b0a45cabb4`**。采集器已绑定并启用；等待 Ubuntu 实际包审核及 Setup／DEB 的 Draft 回下载对照后一起交付。当前未执行新 Windows 用户六阶段，不提前关闭 URI 发版阻塞。
+[便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已绑定本候选和 12 个实际 ZIP 成员；ZIP 为 **580382770 字节**，SHA-256 **`9c8bcd78411ccfb3059c44a523f981f5ccc0fea5bd8e0ad73e78e5b0a45cabb4`**。采集器已绑定并启用；Ubuntu 实际包审核及[Setup／DEB 的 Draft 回下载对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json)均通过，可与 Ubuntu 包一起交付。当前未执行新 Windows 用户六阶段，不提前关闭 URI 发版阻塞。
 
 `13.00` 因 DEB 卸载遗漏包名替换被统一修复候选替代，[run 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)已主动取消，原件保留，不记为 Windows 编译失败。旧 `01.46` 的[用户证据审核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、GUI 启动、正常退出和官方卸载分项通过，但 URI 仍指旧失效目标而整体拒收。旧 macOS 和 12 资产结果仅属于原字节。
 
-用户确认等待统一修复候选，在 Windows 开发电脑和 [Ubuntu 24.04 x86_64](ubuntu-final-installer-acceptance.zh-CN.md) 各验一次；新 Ubuntu DEB 生命周期不再延期，旧 CLI 认证矩阵继续延期。两份新包与回执、macOS 最终包及 12 资产核验未完成前不宣称发版验收完成。
+用户确认等待统一修复候选，在 Windows 开发电脑和 [Ubuntu 24.04 x86_64](ubuntu-final-installer-acceptance.zh-CN.md) 各验一次；新 Ubuntu DEB 生命周期不再延期，旧 CLI 认证矩阵继续延期。两份新包已就绪；用户回执及审核、macOS 最终包 GUI、完整 12 资产未完成前不宣称发版验收完成。
 
-## 新候选六阶段安排（待最终包交付）
+## 新候选六阶段安排（验收包已就绪）
 
-正式 run、最终 Setup 静态核验、身份绑定及便携 ZIP 组装已完成；联合交付前仍须完成两资产 Draft 回下载对照。交付包含同字节安装器和采集材料；用户使用现有 PowerShell 5.1 或 7，无需 Git 或 Python。执行和审查顺序为：
+正式 run、最终 Setup 静态核验、身份绑定、便携 ZIP 组装及两资产 Draft 回下载对照已完成。交付包含同字节安装器和采集材料；用户使用现有 PowerShell 5.1 或 7，无需 Git 或 Python。执行和审查顺序为：
 
 1. `baseline`：记录本轮基线，先核对既有安装与 URI/AUMID，不覆盖或清理归属未知的环境。
 2. `installed`：完成当前用户安装，核对安装器首次登记及本实例路径。
@@ -23,7 +23,7 @@ Windows 实现字节与已验证的 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` �
 5. `closed`：正常关闭本轮所有产品窗口和进程，采集退出证据。
 6. `uninstalled`：使用官方卸载器，核对本实例 URI/AUMID、PATH、快捷方式和卸载项，保留用户数据与被其他实例接管的关联；助手审核全部原始回执后判定。
 
-新材料已经实际绑定；完整[任务说明](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)与组装收据归档在本候选的 `windows-manual/`。用户应等两套统一交付后执行，早期[准备模板](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/handoff-preparation/README.zh-CN.md)仅保留追溯。用户无需另报机器名或账号，不要求切换桌面；已有分支验收不重开，也不替代最终安装器六阶段回执。
+[下载本候选 Windows 验收 ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Acceptance-v0.2026.10.14.16.45.oss_00.zip)。新材料已经实际绑定；完整[任务说明](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)与组装收据归档在本候选的 `windows-manual/`。先核对 ZIP 摘要，完整解压后按独立任务执行；早期[准备模板](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/handoff-preparation/README.zh-CN.md)仅保留追溯。用户无需另报机器名或账号，不要求切换桌面；已有分支验收不重开，也不替代最终安装器六阶段回执。
 
 ## 旧 01.46 候选交付时快照（保留历史）
 
