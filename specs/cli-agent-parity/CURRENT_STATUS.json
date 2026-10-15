@@ -1,10 +1,10 @@
 {
   "main_acceptance": {
     "as_of": "2026-10-15",
-    "assessed_main_commit": "6d8036d37a7e2be18bef915a1e0bce5fb037b1de",
+    "assessed_main_commit": "9b24ad858e0c2c349ff1b5a8a88f8db76c5fbc06",
     "reader_entry": "README.md#当前主线状态2026-10-15",
     "all_platform_desktop_acceptance_complete": false,
-    "new_acceptance_performed_in_this_revision": false,
+    "new_acceptance_performed_in_this_revision": true,
     "latest_public_release": "v0.2026.10.07.01.09.oss_00",
     "main_changes_after_public_release_are_published": false,
     "musl_release_fix": {
@@ -47,7 +47,7 @@
       "repository": "Infinimesh-ai/InfiniShell-Desktop",
       "created_at": "2026-10-14T08:45:46.940848+00:00",
       "release_run": 38537451605,
-      "status": "windows_and_ubuntu_handoffs_ready_user_acceptance_pending",
+      "status": "macos_gui_and_full_twelve_assets_passed_user_desktop_acceptance_pending",
       "publication": "draft_only",
       "linux_desktop": "user_assisted_ubuntu_24_04_x86_64_deb_acceptance_pending",
       "source_preflight_run": 38534655990,
@@ -162,9 +162,29 @@
         "notarization_status": "Accepted"
       },
       "macos_final_gui": {
-        "status": "pending_new_candidate_evidence",
-        "checks_passed": null,
-        "inherits_previous_candidate_pass": false
+        "status": "passed_six_final_candidate_smoke_checks",
+        "checks_passed": 6,
+        "inherits_previous_candidate_pass": false,
+        "run_id": "r-5cmojj28",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json",
+        "evidence_sha256": "b41366b74dff50b348e9561315c12ddb8a5e4131276fd181ed90440b58a857e1",
+        "index": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/evidence-index.json",
+        "scope": "最终签名DMG实际GUI、重启、双语；固定本机模型，不外推商业模型或成功同步",
+        "requests": 14,
+        "completed_requests": 13,
+        "client_disconnected_requests": 1,
+        "strict_tool_requests": 8,
+        "completed_strict_tool_requests": 7,
+        "first_cli_request_boundary": "首个B被续轮替代并断开，不计完整完成；A→B→B→A均有实际路由证据",
+        "configuration_restored": true,
+        "exact_mount_detached": true,
+        "temporary_directory_retained": true,
+        "independent_audit": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/independent-audit/result.json",
+        "independent_audit_sha256": "359dc0c74c7f9171864e1ad222442eb4de98e8e97e17a9b561507f04823f8530",
+        "screenshot_format_note": "25张原图实际为JPEG，保留原.png文件名与字节；格式误判失败独立归档，不影响实际图像和摘要核验。",
+        "nonblocking_findings": [
+          "MAC-SETTINGS-SEARCH-ZH-01：中文连字搜索无结果，英文ligature可找到并操作，后续改进"
+        ]
       },
       "ssh_six": {
         "status": "ci_originals_passed_static_macos_signed_runtime_verified",
@@ -172,36 +192,43 @@
         "final_signed_manifest_sha256": "bc037a41be31ff33d569224051d2659612a4a1af745e1b5885f45b8d18201c69",
         "static_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/six-ci-remote-server/result.json",
         "macos_signing_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-server-signing/result.json",
-        "scope": "CI六份原件仅静态通过；Mac两架构重签及版本运行通过，不外推其他平台原生执行或12资产回下载通过"
+        "scope": "CI六份原件静态通过；Mac两架构重签及版本运行通过；最终六份SSH已纳入完整12资产三方回下载，不外推其他平台原生执行"
       },
       "linux_packages": {
-        "status": "four_artifacts_downloaded_ubuntu_deb_static_passed_other_package_validation_pending",
+        "status": "all_four_static_package_identity_passed_user_ubuntu_lifecycle_pending",
         "expected_count": 4,
         "gui_execution": false,
         "ubuntu_deb_lifecycle": "user_assisted_acceptance_pending_not_deferred",
         "artifact_id": 11903140677,
         "download_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/linux-download-recovery/recovery-result.json",
-        "ubuntu_static_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/ubuntu-deb/result.json"
+        "ubuntu_static_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/ubuntu-deb/result.json",
+        "other_package_static_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/linux-package-static/evidence/result.json",
+        "binary_comparison_boundary": "Arch与DEB主程序全字节一致；RPM非装载编译注释剥离、AppImage动态链接变换分别有有限差异证明，不声称整文件一致或Linux原生运行通过"
       },
       "draft_assets": {
-        "status": "eleven_ci_assets_present_final_macos_and_twelve_asset_roundtrip_pending",
+        "status": "passed_complete_12_asset_identity_and_roundtrip",
         "expected_count": 12,
-        "verified_count": null,
+        "verified_count": 12,
         "release_id": 412823983,
         "portable_windows_kit_is_release_asset": false,
         "portable_ubuntu_kit_is_release_asset": false,
-        "observed_count": 11,
-        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/draft-release.json",
+        "observed_count": 12,
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/result.json",
         "windows_ubuntu_selected_roundtrip": "passed_selected_two_assets_only",
-        "selected_roundtrip_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json"
+        "selected_roundtrip_evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json",
+        "evidence_sha256": "b81fe8fd360a9c4d198cbc6b2d97292fc4b8fde41de141491373e725f207a787",
+        "index": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/evidence-index.json",
+        "index_sha256": "01429ea6fa1333e5ff94a83a4c4ddd2510d6efb1cc99af150439b8dbcdd4fd3a",
+        "total_bytes": 3374447497,
+        "publication": "draft_only",
+        "local_provider_download_sha256_equal": true,
+        "previous_windows_ubuntu_asset_bytes_unchanged": true
       },
       "final_acceptance_summary": {
         "release_ready": false,
         "remaining": [
           "Windows用户六阶段及助手审核",
-          "Ubuntu24.04 x86_64用户六阶段及助手审核",
-          "Mac最终签名包GUI冒烟",
-          "12件最终资产的全量集合与回下载核验"
+          "Ubuntu24.04 x86_64用户六阶段及助手审核"
         ],
         "historical_results_not_inherited": true
       },
@@ -335,6 +362,13 @@
         "priority": "next_focused_acceptance",
         "requirement": "补一条可判定的应用内图片理解链，核对请求字节、实际模型和回答；保留旧失败。独立原生正例不替代产品链，不认定为已确认投递缺陷，不扩成全平台全格式矩阵",
         "evidence": "KNOWN_GAPS.md#v04--图片投递与模型理解分别验收"
+      },
+      {
+        "item": "MAC-SETTINGS-SEARCH-ZH-01",
+        "status": "deferred_nonblocking",
+        "priority": "low",
+        "requirement": "补中文连字关键词的设置搜索可发现性；现有英文ligature入口及开关可用",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/r-5cmojj28/25-chinese-ligature-search-empty.png"
       }
     ],
     "continuous_gates": {
@@ -354,17 +388,17 @@
       "run_linux_default": true,
       "runs_on_every_main_push": false,
       "repeat_online_gui_or_remote_gates_for_docs_only": false,
-      "latest_change_remote_status": "5068的38534655990 attempt1 Linux定向门禁通过：真实dpkg-deb维护脚本252场景、socket9、crate503、迁移同步525、补全22、app625、i18n11；通知109通过/2项Windows专属跳过。Windows沿用5ac的38512735757原始范围且实现字节未变，未称同SHA双平台复验；两端最终包和用户桌面回执待验。 本轮正式构建38537451605成功；新Setup经38703172103原生静态核验通过，仅按安装器静态范围计证。"
+      "latest_change_remote_status": "5068的38534655990 attempt1 Linux定向门禁通过：真实dpkg-deb维护脚本252场景、socket9、crate503、迁移同步525、补全22、app625、i18n11；通知109通过/2项Windows专属跳过。Windows沿用5ac的38512735757原始范围且实现字节未变，未称同SHA双平台复验；两端最终安装包静态和完整12资产回下载通过，用户桌面回执及助手审核待验。 本轮正式构建38537451605成功；新Setup经38703172103原生静态核验通过，仅按安装器静态范围计证。"
     },
     "next_release_required": [
       {
         "item": "发行产物校验",
-        "status": "selected_two_assets_roundtrip_passed_final_twelve_gate_pending",
-        "when": "正式run、六资源静态、两安装包回下载及Mac签名公证装订/静态已通过；其余包检查及完整12资产回下载仍须发版前完成",
+        "status": "passed_for_fixed_candidate",
+        "when": "本候选完整12资产集合、包内资源、签名公证装订及全量Draft三方摘要核验已完成",
         "pass_condition": "同一源码和正式标签；12件既定资产、内嵌SSH资源、全量下载摘要；macOS Developer ID签名、公证及装订检查",
         "scope": "ARM64 macOS桌面、Windows x64桌面、四份Linux桌面包及六份SSH扩展；保留Intel macOS SSH，不恢复Intel桌面DMG",
         "historical_completed": "旧01.46的12资产与三方摘要回验通过，仅属于旧字节；完整原对象保存在release_candidate_history",
-        "evidence": "README.md#持续门禁与下次发版必须完成的验收"
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/evidence-index.json"
       },
       {
         "item": "Windows安装生命周期",
@@ -376,12 +410,12 @@
       },
       {
         "item": "近期GUI候选包冒烟",
-        "status": "final_signed_notarized_candidate_ready_gui_smoke_pending",
-        "when": "新16.45最终签名候选就绪后，使用常用Mac桌面",
+        "status": "passed_six_checks_for_fixed_signed_candidate",
+        "when": "16.45最终签名DMG已完成实际六项GUI及同包重启恢复",
         "pass_condition": "绑定新候选源码和最终签名二进制；必要冒烟及重启恢复，保留模型路由/strict schema、浮窗、Retina输入选择、英中错误及Plan提示判据",
         "linux_desktop_matrix_required": false,
-        "evidence": "README.md#正式候选-macos-验收2026-10-14",
-        "historical_completed": "旧01.46六项GUI及独立复核通过，仅按旧包计证；新包未验不继承通过"
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json",
+        "historical_completed": "旧01.46结果仅按旧包保留；本轮使用16.45真实包独立执行，不继承旧结论"
       },
       {
         "item": "Ubuntu DEB安装生命周期",
@@ -416,8 +450,8 @@
         "boundary": "续行快照与TUI补全门禁完成；本轮文档不改变受测产品源码"
       }
     ],
-    "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。 01.46完整current_release_candidate对象追加至既有release_candidate_history；新13.00不继承旧包通过。替换前根级当前摘要保存在historical_current_summary_before_windows_uri_candidate_20261014。 13.00完整current对象原样追加至release_candidate_history，主动取消与替代结论另存superseded_candidate_closeouts；替换前当前摘要保存在historical_current_summary_before_unified_candidate_20261014。",
-    "localization": "无需本地化变更；Windows登记及Linux卸载修复没有用户可见文案或布局变化，本次仅更新状态入口。",
+    "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。 01.46完整current_release_candidate对象追加至既有release_candidate_history；新13.00不继承旧包通过。替换前根级当前摘要保存在historical_current_summary_before_windows_uri_candidate_20261014。 13.00完整current对象原样追加至release_candidate_history，主动取消与替代结论另存superseded_candidate_closeouts；替换前当前摘要保存在historical_current_summary_before_unified_candidate_20261014。 16.45 GUI与完整12资产收尾前入口全量保存在github/macos-full12-closeout-20261015/before-index.json，原失败和未验边界不删除。",
+    "localization": "无需本地化变更；本次只更新验收状态与证据索引，候选英文/简体中文401和Plan提示实际验证通过。",
     "macos_gui_smoke": {
       "date": "2026-10-13",
       "source_commit": "45a8911075277d127e959510631c3d4b01b44903",
@@ -8816,7 +8850,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "原批准范围11项关闭不变。统一16.45正式构建、Windows最终安装器和Ubuntu DEB静态核验通过，两套验收ZIP已组装并完成Setup/DEB的Draft回下载对照，可交付用户各验一次。两端六阶段回执及助手审核、Mac最终包GUI、12资产全量核验仍待完成；Mac签名公证装订及静态核验已通过；旧CLI认证矩阵延期，G09不重开，仅Draft。",
+  "status_zh": "原批准范围11项关闭不变。统一16.45最终签名Mac包六项GUI、同包重启、完整12资产静态/签名公证装订和三方全量回下载均通过。Windows及Ubuntu24.04 x86_64用户六阶段与助手审核仍是发版门禁；两套已交付包字节未变，旧CLI认证矩阵延期，G09不重开，仅Draft。中文连字搜索缺失记录为非阻塞改进。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -11257,7 +11291,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "原批准范围11项保持关闭。新候选Windows与Ubuntu24.04 x86_64 DEB安装生命周期由用户操作、助手审核；旧Linux/Windows CLI认证V01/V02/V05矩阵继续按原决定延期，自动检查与本轮包冒烟不代替真实模型、完整输入法或审批矩阵验收。",
   "documentation_updated_at": "2026-10-15",
-  "documentation_source_commit": "6d8036d37a7e2be18bef915a1e0bce5fb037b1de",
+  "documentation_source_commit": "9b24ad858e0c2c349ff1b5a8a88f8db76c5fbc06",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -11276,8 +11310,8 @@
   "latest_resume": {
     "authority_ref": "main_acceptance.current_release_candidate",
     "source_commit": "5068dae9c75b79628865a0872684113647c204d8",
-    "status": "两套最终验收包及任务已就绪，Setup和DEB与Draft回下载一致",
-    "next_step": "交付Windows和Ubuntu24.04 x86_64 ZIP与各自任务，用户执行六阶段后回传证据，由助手审核。Mac最终包签名公证装订及静态核验已通过；Mac GUI及12资产全量核验仍待完成。"
+    "status": "最终Mac GUI六项及完整12资产核验通过，等待两端用户回执",
+    "next_step": "用户在Windows及Ubuntu24.04 x86_64执行已交付同候选六阶段后回传证据，助手审核URI/退出/卸载归属清理。Windows实际NotSigned；旧CLI矩阵延期、G09关闭；未经后续授权不公开发布。"
   },
   "g01_g07_guard_followup": {
     "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",

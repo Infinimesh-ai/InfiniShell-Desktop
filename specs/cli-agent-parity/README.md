@@ -4,9 +4,15 @@
 
 ## 当前主线状态（2026-10-15）
 
-**统一候选正式构建、Windows Setup 和 Ubuntu DEB 静态核验通过，两套验收 ZIP 及任务已就绪，安装包与 Draft 回下载逐字节一致。两端用户桌面、Mac 最终包 GUI 和完整 12 资产仍是发版门禁。** 当前产品源码固定为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及工件核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`。独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 未包含在本候选，不把控制器或当前主线代码当作候选产品源码。
+**统一候选最终 Mac 签名包六项 GUI 冒烟、同包重启恢复，以及完整 12 件资产核验均通过。Windows 与 Ubuntu 24.04 x86_64 用户六阶段回执及助手审核仍是发版门禁，保持 Draft。** 当前产品源码固定为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及工件核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`。独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 未包含在本候选，不把控制器或当前主线代码当作候选产品源码。
 
-当前候选是 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 已成功完成，当前 Draft 有 11 件 CI 资产。用户已确认等待同一修复候选，在 Windows 开发电脑与 **Ubuntu 24.04 x86_64** 各验一次，助手审核回执。新 Setup 经 [38703172103 原生只读核验](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38703172103)确认 AMD64、内嵌六资源一致，实际 Authenticode 为 `NotSigned`；[Windows 便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已生成。Ubuntu 下载恢复成功，真实 DEB 的元数据、ELF、desktop、六资源和卸载脚本静态审核通过；两平台安装包的[Draft 回下载对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json)通过，仅覆盖这两件资产。Mac 首次链接失败保留，本机 response-file 调用修正后签名 DMG 已生成，Apple 公证 Accepted、装订及[最终 DMG 静态核验](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-final/dmg-verification/result.json)通过，ARM64 版本执行通过但未启动 GUI；两端实际桌面及 Mac GUI、完整 12 资产仍待完成；旧 CLI 认证矩阵仍延期，G09 不重开。新产物仅允许写入 Draft，公开版本仍为 `v0.2026.10.07.01.09.oss_00`。
+当前候选是 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 已成功完成，当前 Draft 有完整 12 件最终资产。用户已确认等待同一修复候选，在 Windows 开发电脑与 **Ubuntu 24.04 x86_64** 各验一次，助手审核回执。新 Setup 经 [38703172103 原生只读核验](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38703172103)确认 AMD64、内嵌六资源一致，实际 Authenticode 为 `NotSigned`；[Windows 便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已生成。Ubuntu 下载恢复成功，真实 DEB 的元数据、ELF、desktop、六资源和卸载脚本静态审核通过；两平台安装包的[Draft 回下载对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json)通过；本轮又完成全部 12 件最终资产回下载。Mac 首次链接失败保留，本机 response-file 调用修正后签名 DMG 已生成，Apple 公证 Accepted、装订及[最终 DMG 静态核验](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-final/dmg-verification/result.json)通过，ARM64 版本执行及本轮六项实际 GUI 冒烟通过，完整 12 资产已核验；两端用户实际桌面回执及助手审核仍待完成；旧 CLI 认证矩阵仍延期，G09 不重开。新产物仅允许写入 Draft，公开版本仍为 `v0.2026.10.07.01.09.oss_00`。
+
+本轮 [Mac GUI 结果](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json)覆盖 A→B→B→A 实际请求路由、Responses strict schema、普通/备用浮窗拖动滚动及重启恢复、Retina 2x 连字开/关输入拖选、英文/中文真实 HTTP 401 和同一 Plan 的重启/双语保存提示。14 个请求中 13 个完成，首个 CLI B 被续轮替代而断开；8 个带工具请求 schema 全部满足判据，其中 7 个完成，未将断开请求算作完整完成。浮窗重启恢复 **481 × 271.5999755859375** 逻辑像素。DMG 与执行文件摘要绑定同包，退出后严格签名复核通过；临时设置增量已恢复，精确挂载已非强制卸载。[25 张原始截图及摘要索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/evidence-index.json)保留误点等原始尝试。模型是本机固定夹具，不外推商业模型能力或成功云同步。 [独立复核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/independent-audit/result.json)确认六项证据成立，25 张图逐张审阅、81 件原件摘要匹配；截图实际为 JPEG，保留接口原字节和原 `.png` 文件名，格式差异不影响验收。
+
+[完整 12 件资产清单及索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/evidence-index.json)已封存：共 **3,374,447,497 字节**，本地、GitHub provider、完整回下载 SHA-256 和长度一致。只向 Draft 新增最终 DMG、替换两份签名后的 Mac SSH，其余九件 ID 和摘要不变，已交付 Windows/Ubuntu 包无需重取。Linux 四格式均完成静态核验；Arch 主程序与 DEB 全字节一致，RPM 注释剥离及 AppImage 动态链接变换有有限差异证明，不宣称 Linux 原生运行通过。
+
+非阻塞改进 `MAC-SETTINGS-SEARCH-ZH-01`：中文“连字”搜索无结果，英文 `ligature` 可找到并操作该设置；保留[截图](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/r-5cmojj28/25-chinese-ligature-search-empty.png)，后续完善中文搜索。
 
 两套交付使用同一源码和标签： [Windows ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Acceptance-v0.2026.10.14.16.45.oss_00.zip)／[Windows 任务](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)；[Ubuntu 24.04 x86_64 ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/ubuntu-manual/InfiniShell-Ubuntu24-Acceptance-v0.2026.10.14.16.45.oss_00.zip)／[Ubuntu 任务](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/ubuntu-manual/InfiniShell-Ubuntu24-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)。各自 ZIP 内已包含安装器、采集器和完整说明，用户按任务六阶段执行后回传证据，助手再审核。见[交付复核与证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/handoff-delivery-20261015/review.json)。
 
@@ -64,20 +70,20 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 | 必做项 | 执行时机与通过条件 |
 | --- | --- |
-| 最终发行产物校验 | **正式 run、六资源静态及两件安装包回下载通过，完整 12 资产门禁仍待完成**。绑定同一源码与标签，核对既定 12 件资产、内嵌 SSH 资源及全量 Draft 下载摘要，完成 macOS Developer ID 签名、公证及装订。保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
+| 最终发行产物校验 | **本候选完整 12 资产门禁通过**。绑定同一源码与标签，核对既定 12 件资产、内嵌 SSH 资源及全量 Draft 下载摘要，完成 macOS Developer ID 签名、公证及装订。保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
 | Windows 安装生命周期 | **新 Setup 静态审核及便携包组装完成，用户六阶段待验**。用户在现有 Windows 开发电脑执行安装、可见 GUI、实际 URI 唤起、正常退出、官方卸载与残留记录，助手审核。两套包已就绪，任务已绑定实际安装器及 ZIP 摘要；不重开分支验收，不另索要机器名、账号或要求切换桌面。见[操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
 | Ubuntu DEB 安装生命周期 | **实际 DEB 静态审核、便携包和 Draft 回下载通过；用户六阶段待完成**。用户在 Ubuntu 24.04 x86_64 执行安装、可见 GUI、真实 URI 新窗口与目录标记、正常退出及官方卸载；助手核对本包程序链接清理、用户数据保留及全部回执。见[操作入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)。旧 V01／V02／V05 不因此关闭 |
-| 最近 GUI 改动的候选包冒烟 | **新签名 DMG 公证装订及静态核验通过，GUI 待验证**。旧包四项 GUI、A→B→B→A 路由、Responses strict schema 的六项通过见[历史最终包记录](#正式候选-macos-验收2026-10-14)；新包须绑定实际二进制、必要冒烟与重启恢复证据，不重开旧 Linux CLI 认证矩阵 |
+| 最近 GUI 改动的候选包冒烟 | **本候选签名 DMG 六项实际 GUI 和同包重启恢复通过**，见[新包结果](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json)。旧包结果仅按[历史记录](#正式候选-macos-验收2026-10-14)保留，不重开旧 Linux CLI 认证矩阵 |
 
 发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。Windows／Ubuntu 用户回执及助手审核关闭前，不宣称下一发行候选已完成验收；新产物仅允许写入 Draft，尚未公开发布。
 
-本次状态更新前的完整入口保存在[进度历史快照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/status-progress-20261015/before-index.json)；文档提交前 `cargo check --locked` 已通过（`r-iwgef988`）。
+本次状态更新前的完整入口保存在[收尾前历史快照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/macos-full12-closeout-20261015/before-index.json)；本轮主线 `cargo check --locked` 已通过（`r-w61eogvo`，保留 5 条既有警告），结果见[验证收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/macos-full12-closeout-20261015/validation.json)。
 
 新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/`，Windows 修复证据为 `/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/`。旧 `01.46` 全部证据仍在原目录；`22.25` 保留自动检查、预编译、DNS 失败和主动取消证据，共享初始化红／绿回归保存在 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-14-shared-init-fix/`。`16.19` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；原 BYOP 修复门禁仍在 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**；旧候选的双语实测只按原包计证。本轮 Ubuntu DEB 生命周期待用户验收，旧 CLI 认证矩阵延期，自动检查保留。
 
 ### 正式候选 macOS 验收（2026-10-14）
 
-以下是旧 `01.46` 候选的通过记录，保留原证据范围；`13.00` 已被替代，当前 `16.45` 候选尚未完成最终包验证。
+以下是旧 `01.46` 候选的通过记录，保留原证据范围；`13.00` 已被替代，`16.45` 的最新结论见本页顶部。
 
 `v0.2026.10.14.01.46.oss_00` 的最终 DMG **19/19 签名、公证装订和静态检查通过；GUI 六项实际操作全部通过，独立审核通过**。DMG SHA-256 为 `c45d7b4eea75a2fc068ad818b816cd1ae1d59a43480bed3c5ec21e4f33440cad`，执行文件 SHA-256 为 `eb2ac5cc44736b4375a87b612a34112dca4bf8ee02afacd9d136576ed9e0bfc1`；Apple 公证 `7c979869-41d0-4f15-a6c5-636aa7981cc5` Accepted。
 
