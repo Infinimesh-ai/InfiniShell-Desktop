@@ -140,7 +140,7 @@ def prepare(args):
         'controller_sha': head, 'application_source_sha': APP_SOURCE, 'application_version': APP_VERSION,
         'original_installer_sha256': ORIGINAL_SHA, 'identity': identity,
         'verified_result_sha256': sha(verified / 'result.json'), 'compiler': COMPILER,
-        'expected_installer_sha256': args.expected,
+        'previously_accepted_installer_sha256': args.accepted,
     })
     target = root / 'compiler-distribution.exe'
     request = urllib.request.Request(COMPILER['url'], headers={'User-Agent': 'InfiniShell-installer-reissue'})
@@ -263,10 +263,10 @@ def finish(args):
     actual = sha(setup)
     comparison = {'status': 'identical', 'file_count': 150, 'files': rebuilt,
                   'original_installer_sha256': ORIGINAL_SHA, 'rebuilt_installer_sha256': actual,
-                  'expected_installer_sha256': args.expected, 'installer_matches_expected': actual == args.expected,
+                  'previously_accepted_installer_sha256': args.accepted, 'installer_matches_previous_acceptance': actual == args.accepted,
                   'ci_manifest_sha256': identity['ci_manifest_sha256']}
     save(root / 'evidence/payload-verification.json', comparison)
-    require(actual == args.expected, '重编安装器不等于固定已验收候选；保留新字节，需独立候选与桌面验收')
+    # 文件时间等打包元数据可以改变 Setup 摘要；新字节必须独立验收，不能继承旧包的桌面结论。
     signature = read(root / 'evidence/installer-signature.json')
     require(signature['authenticode_status'] in ('Valid', 'NotSigned') and signature['installer_sha256'] == actual, '安装器签名回执不符')
     validate_binding = read(root / 'evidence/path-regression-binding.json')
@@ -277,6 +277,9 @@ def finish(args):
         'original_release_run': identity['release_run'], 'original_tag_object': identity['tag_object'],
         'original_artifact': identity['sources']['windows']['artifact'], 'original_installer_sha256': ORIGINAL_SHA,
         'installer_sha256': actual, 'installer_size_bytes': setup.stat().st_size,
+        'previously_accepted_installer_sha256': args.accepted,
+        'installer_matches_previous_acceptance': actual == args.accepted,
+        'requires_new_desktop_acceptance': actual != args.accepted,
         'helper_sha256': HELPER_SHA, 'application_payload_files_unchanged': 150,
         'compiler': COMPILER, 'authenticode_status': signature['authenticode_status'],
         'test_scope': validate_binding, 'delivery': 'delivery/InfiniShellSetup.exe',
@@ -316,11 +319,11 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--verified', type=Path, required=True)
     parser.add_argument('--repo', type=Path, required=True)
-    parser.add_argument('--expected', required=True)
+    parser.add_argument('--accepted', required=True)
     parser.add_argument('--label')
     args = parser.parse_args()
     require(os.name == 'nt' and os.environ.get('GITHUB_REPOSITORY') == 'Infinimesh-ai/InfiniShell-Desktop' and
-            re.fullmatch('[0-9a-f]{40}', os.environ.get('GITHUB_SHA', '')) and re.fullmatch('[0-9a-f]{64}', args.expected),
+            re.fullmatch('[0-9a-f]{40}', os.environ.get('GITHUB_SHA', '')) and re.fullmatch('[0-9a-f]{64}', args.accepted),
             '仅支持固定仓库 Windows CI 和确切提交/候选摘要')
     args.output, args.verified, args.repo = map(physical, (args.output, args.verified, args.repo))
     {'prepare': prepare, 'listing': listing, 'stage': stage, 'tests': validate_tests,

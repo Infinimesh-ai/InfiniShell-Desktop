@@ -4,7 +4,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$VerifiedDirectory,
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidatePattern('^[0-9a-f]{64}$')][string]$ExpectedInstallerSha256 = '52c987801e27310ffb08351d13c255ca114f05a40d8e0ccb815b638b042a0cc7'
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$AcceptedInstallerSha256 = '52c987801e27310ffb08351d13c255ca114f05a40d8e0ccb815b638b042a0cc7'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -56,7 +56,7 @@ function Invoke-Native([string]$Label, [string]$Executable, [string[]]$Arguments
 }
 function Invoke-Gate([string]$Action, [string]$Label = '', [string[]]$Extra = @()) {
     if (-not $Label) { $Label = $Action }
-    Invoke-Native $Label $python (@('-I', $controller, $Action, '--output', $root, '--verified', $verified, '--repo', $repo, '--expected', $ExpectedInstallerSha256) + $Extra)
+    Invoke-Native $Label $python (@('-I', $controller, $Action, '--output', $root, '--verified', $verified, '--repo', $repo, '--accepted', $AcceptedInstallerSha256) + $Extra)
 }
 function Capture-Signature([string]$Path, [string]$Name, [bool]$RequireValid) {
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
