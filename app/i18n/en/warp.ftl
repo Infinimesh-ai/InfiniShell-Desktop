@@ -377,8 +377,8 @@ ai-footer-choose-environment-tooltip = Choose an environment
 ai-footer-reasoning-depth-tooltip = Reasoning depth
 ai-footer-file-explorer = File explorer
 ai-footer-open-file-explorer = Open file explorer
-ai-footer-rich-input = Rich Input
-ai-footer-open-rich-input = Open Rich Input
+ai-footer-rich-input = InfiniShell input
+ai-footer-open-rich-input = Use InfiniShell input
 ai-footer-open-coding-agent-settings = Open coding agent settings
 ai-footer-turn-off-full-access = Full Access is on. Click to return to approval prompts.
 
@@ -1136,20 +1136,30 @@ settings-ai-conversation-layout-splitpane = Split Pane
 settings-ai-toolbar-layout = Toolbar layout
 
 # Third-party CLI agents
-settings-ai-show-coding-agent-toolbar = Show coding agent toolbar
-settings-ai-auto-show-rich-input = Auto show/hide Rich Input based on agent status
-settings-ai-auto-show-rich-input-tooltip = Requires the Warp plugin for your coding agent
-settings-ai-auto-open-rich-input = Auto open Rich Input when a coding agent session starts
-settings-ai-auto-dismiss-rich-input = Auto dismiss Rich Input after prompt submission
-settings-ai-toolbar-commands-label = Commands that enable the toolbar
-settings-ai-toolbar-commands-description = Add regex patterns to show the coding agent toolbar for matching commands.
-settings-ai-per-agent-section = Installed agents
+settings-ai-cli-input-section = Input
+settings-ai-cli-input-section-description = The top-right Codex, Claude and Grok buttons open InfiniShell input. Use Ctrl+G to switch to native input and back; your draft is kept.
+settings-ai-cli-input-mode-description = Applies when you type an agent command in the terminal. Launching from the top-right buttons always opens InfiniShell input.
+settings-ai-cli-input-mode-infinishell = InfiniShell input
+settings-ai-cli-input-mode-native = Native terminal
+settings-ai-auto-dismiss-rich-input-description = Applies when automatic switching for native CLI prompts is off or unavailable. Otherwise, the agent’s state determines when to switch.
+settings-ai-cli-appearance-section = Launchers and appearance
+settings-ai-cli-toolbar-description = Controls only the toolbar at the bottom of a CLI session. Hiding it does not disable InfiniShell input or Ctrl+G.
+settings-ai-cli-toolbar-layout-description = Choose the session toolbar shortcuts. The input box always keeps its native-input switch, and Ctrl+G remains available.
+settings-ai-cli-install-section = Installation and updates
+settings-ai-show-coding-agent-toolbar = Show session toolbar
+settings-ai-auto-show-rich-input = Automatically switch for native CLI prompts
+settings-ai-auto-show-rich-input-tooltip = Requires active session notifications from the CLI plugin. Switches to native input when the agent needs a response, then restores InfiniShell input when the prompt is resolved.
+settings-ai-auto-open-rich-input = Input mode for terminal commands
+settings-ai-auto-dismiss-rich-input = Switch to native input after sending
+settings-ai-toolbar-commands-label = Custom agent commands
+settings-ai-toolbar-commands-description = Use regular expressions to recognize custom agent commands. Select an agent to enable its input features; “Other” provides the toolbar only.
+settings-ai-per-agent-section = Show entry points and toolbar for each installed agent
 settings-ai-per-agent-scanning = Looking for installed agents…
 settings-ai-per-agent-empty = No installed CLI agents found.
 settings-ai-per-agent-agent-col = Agent
 settings-ai-per-agent-toolbar-col = Toolbar
 settings-ai-per-agent-tab-menu-col = Tab menu
-settings-ai-per-agent-titlebar-col = Title bar
+settings-ai-per-agent-titlebar-col = Top bar
 settings-ai-coding-agent-other = Other
 settings-ai-coding-agent-select-header = Select coding agent
 
@@ -2060,7 +2070,7 @@ keybinding-desc-input-clear-and-reset-ai-context-menu-query = Clear and reset AI
 
 # Terminal view bindings
 keybinding-desc-terminal-alternate-paste = Alternate terminal paste
-keybinding-desc-terminal-toggle-cli-agent-rich-input = Toggle CLI Agent Rich Input
+keybinding-desc-terminal-toggle-cli-agent-rich-input = Switch between InfiniShell and native CLI input
 keybinding-desc-terminal-warpify-subshell = Warpify subshell
 keybinding-desc-terminal-warpify-ssh-session = Warpify SSH session
 keybinding-desc-terminal-accept-prompt-suggestion = Accept Prompt Suggestion
@@ -3653,7 +3663,7 @@ terminal-banner-update-latest-suffix = {" "}to update to the latest version.
 terminal-banner-pure-unsupported = Pure is not yet supported in InfiniShell. You might consider one of the supported prompts as an alternative.{"  "}
 terminal-loading-session = Loading session…
 
-ai-footer-hide-rich-input = Hide Rich Input
+ai-footer-hide-rich-input = Use native input
 ai-footer-choose-environment = Choose an environment
 ai-footer-agent-environment = Agent environment
 ai-footer-enable-terminal-command-autodetection = Enable terminal command autodetection
@@ -3686,7 +3696,7 @@ ai-toolbar-voice-input = Voice Input
 ai-toolbar-attach-file = Attach File
 ai-toolbar-context-usage = Context Usage
 ai-toolbar-file-explorer = File Explorer
-ai-toolbar-rich-input = Rich Input
+ai-toolbar-rich-input = InfiniShell input
 ai-toolbar-approval-mode = Approval Mode
 ai-tool-output-grep-for = Grep for{" "}
 ai-tool-output-grepping-for = Grepping for{" "}
@@ -5632,7 +5642,7 @@ settings-ai-default-prompt-submission-mode = Default prompt submission mode
 settings-ai-default-prompt-submission-description = What happens when you submit a new prompt while the agent is still responding. You can override this per conversation using the auto-queue toggle.
 settings-ai-default-long-running-submission-mode = Default long-running command submission mode
 settings-ai-default-long-running-submission-description = What happens when you submit a prompt while an agent is driving an agent-requested long-running command. Queued prompts are sent to the agent when the command finishes.
-settings-ai-submit-rich-input = Submit Rich Input with Ctrl+Enter
+settings-ai-submit-rich-input = Send with Ctrl+Enter; use Enter for a new line
 settings-ai-gemini-enterprise-section = Gemini Enterprise
 settings-ai-gemini-enterprise-toggle = Use Gemini Enterprise credentials
 settings-ai-gemini-enterprise-description = InfiniShell routes eligible requests through your workspace's Gemini Enterprise Google Cloud project.
@@ -5665,9 +5675,9 @@ toggle-suffix-conversation-history = conversation history in the tools panel
 toggle-suffix-model-picker = model picker in the prompt
 toggle-suffix-coding-agent-toolbar = coding agent toolbar
 toggle-suffix-warp-credit-fallback = InfiniShell credit fallback
-toggle-suffix-auto-toggle-rich-input = automatic Rich Input visibility based on agent status
-toggle-suffix-auto-open-rich-input = automatically opening Rich Input when a coding agent session starts
-toggle-suffix-auto-dismiss-rich-input = automatically dismissing Rich Input after prompt submission
+toggle-suffix-auto-toggle-rich-input = automatic switching for native CLI prompts
+toggle-suffix-auto-open-rich-input = InfiniShell input for agents started with terminal commands
+toggle-suffix-auto-dismiss-rich-input = switching to native CLI input after sending
 toggle-suffix-window-custom-size = opening new windows with a custom size
 toggle-suffix-window-blur-texture = acrylic window blur texture
 toggle-suffix-tools-panel-consistency = consistent tools panel visibility across tabs
@@ -5755,7 +5765,7 @@ cli-agent-plugin-refresh-marketplace-step = Refresh the marketplace while keepin
 cli-agent-plugin-disabled = This plugin is disabled. Enable it explicitly to restore notifications.
 cli-agent-plugin-enable-step = Enable the installed plugin:
 cli-agent-plugin-enable-codex-config-step = Enable the plugin in your Codex config.toml:
-cli-agent-grok-image-paste-unavailable = Image paste is unavailable in this Grok session. Use a supported Grok version, then paste or drop images into the rich input box and submit them there.
+cli-agent-grok-image-paste-unavailable = Image paste is unavailable in this Grok session. Use a supported Grok version, then paste or drop images into InfiniShell input and submit them there.
 cli-agent-image-too-large = { $filename } is too large to send to the agent (limit { $limit_mb } MB).
 
 cli-agent-task-already-bound = This terminal already has an active local task.
@@ -6027,8 +6037,8 @@ cli-agent-grok-skill-policy-required = Grok skills require the inherit policy or
 cli-agent-grok-skill-unavailable = The selected Grok skill changed or is not uniquely available at its original path in this session. Refresh skills and select it again.
 
 cli-agent-input-waiting-for-native-response = Submission stopped because the CLI is waiting for a response. Handle the prompt in the terminal first. Your draft and attachments are kept.
-cli-agent-grok-input-manual-copy-required = Not sent. Your draft is kept. You can close rich input and type directly in Grok.
-cli-agent-grok-pasted-to-draft = Pasted into rich input. Nothing has been sent to Grok.
+cli-agent-grok-input-manual-copy-required = Not sent. Your draft is kept. Switch to native input to type directly in Grok.
+cli-agent-grok-pasted-to-draft = Pasted into InfiniShell input. Nothing has been sent to Grok.
 cli-agent-input-copy-unsent-text = Copy unsent text
 terminal-input-grok-draft-delivery-hint = Supported Grok sessions can submit here; otherwise type directly in Grok
 
@@ -6124,16 +6134,16 @@ cli-task-manager-permission-grok-skills-v1-help = Grok 1.0.41 asks before each t
 cli-agent-grok-fixed-skills-unavailable = This Grok task accepts only the skills selected at creation. Use skill cards and keep their sources unchanged. Slash skill commands are unavailable in this policy.
 cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 can read, edit, and create project files, list directories, and search the contents of a specified file. Each tool call requires approval. Shell commands, hooks, and skills are disabled. Subtasks keep this policy; earlier tasks do not gain permissions. This is not an operating system sandbox.
 
-workspace-new-grok-rich-input = Grok rich input (grok-4.7)
-workspace-start-remote-grok-rich-input = Grok rich input in this pane
-workspace-start-remote-codex-rich-input = Codex rich input in this pane
+workspace-new-grok-rich-input = Grok with InfiniShell input (grok-4.7)
+workspace-start-remote-grok-rich-input = Grok with InfiniShell input in this pane
+workspace-start-remote-codex-rich-input = Codex with InfiniShell input in this pane
 workspace-start-remote-codex-rich-input-help = Start Codex 0.156.1 with a separate app server bound to this SSH/tmux pane. Requires Bash or Zsh and remote image support.
 cli-agent-codex-remote-launch-unavailable = The remote Codex session could not be started. It requires Codex 0.156.1, Bash or Zsh, and a current SSH connection with remote image support.
 cli-agent-codex-owned-launch-claimed = This Codex launch has already been claimed or its status is unconfirmed. Check the current remote terminal before starting another session.
 workspace-start-remote-grok-rich-input-help = Start the InfiniShell build of Grok 1.0.41 with session notifications and grok-4.7 in the current SSH/tmux terminal. Requires Bash or Zsh and remote image support. Remote CLI packages are not updated by this action.
 cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be started. It requires the InfiniShell build of Grok 1.0.41 with session notifications, Bash or Zsh, and a current SSH connection with remote image support.
 
-cli-agent-grok-owned-launch-unavailable = Grok rich input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
+cli-agent-grok-owned-launch-unavailable = Grok with InfiniShell input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
 
 cli-agent-grok-owned-input-unavailable = Grok input is not ready or its session identity has changed. Your draft has been kept.
 cli-agent-grok-native-images-unavailable = This Grok connection does not support image input. Your draft and images have been kept.
@@ -6177,10 +6187,10 @@ workspace-start-tmux-claude = Claude in a new tmux pane
 workspace-start-tmux-codex = Codex in a new tmux pane
 workspace-start-tmux-grok = Grok in a new tmux pane
 workspace-start-tmux-agent-help = Start the verified remote CLI in a new pane of the current tmux session. Requires an active SSH connection and remote image support.
-workspace-restore-tmux-agent = Restore tmux rich input
+workspace-restore-tmux-agent = Restore tmux InfiniShell input
 workspace-restore-tmux-agent-help = Reconnect to the previously launched CLI in the selected tmux pane. This only checks the existing launch.
 cli-agent-tmux-owned-unavailable = Could not verify the remote tmux pane or CLI. Check the connection and the required CLI version.
-cli-agent-tmux-owned-unknown = The tmux launch status is unknown. Use Restore tmux rich input to check the existing launch without starting another pane.
+cli-agent-tmux-owned-unknown = The tmux launch status is unknown. Use Restore tmux InfiniShell input to check the existing launch without starting another pane.
 
 cli-agent-tmux-owned-exited = This tmux CLI session has ended. Start a new tmux pane to continue.
 

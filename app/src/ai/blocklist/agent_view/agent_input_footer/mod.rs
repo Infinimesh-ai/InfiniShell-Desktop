@@ -1285,13 +1285,24 @@ impl AgentInputFooter {
             (background_color, shared_status)
         };
 
+        let ai_settings = AISettings::as_ref(app);
+        let show_toolbar = *ai_settings.should_render_cli_agent_footer
+            && self
+                .cli_agent(app)
+                .is_some_and(|agent| ai_settings.is_cli_agent_toolbar_enabled(agent));
         let session_settings = SessionSettings::as_ref(app);
-        let left_items = session_settings
-            .cli_agent_footer_chip_selection
-            .left_items();
-        let right_items = session_settings
-            .cli_agent_footer_chip_selection
-            .right_items();
+        let (left_items, right_items) = if show_toolbar {
+            (
+                session_settings
+                    .cli_agent_footer_chip_selection
+                    .left_items(),
+                session_settings
+                    .cli_agent_footer_chip_selection
+                    .right_items(),
+            )
+        } else {
+            (Vec::new(), Vec::new())
+        };
 
         let mut left_buttons = Wrap::row()
             .with_main_axis_size(MainAxisSize::Min)
@@ -1300,8 +1311,8 @@ impl AgentInputFooter {
             .with_run_spacing(4.)
             .with_spacing(4.);
 
-        // CLI agent brand icon is always rendered (not configurable).
-        if let Some(agent) = self.cli_agent(app) {
+        // 工具栏隐藏时只保留输入方式切换，不显示品牌和快捷工具。
+        if let Some(agent) = self.cli_agent(app).filter(|_| show_toolbar) {
             let icon_color = agent
                 .brand_color()
                 .map(|c| c.on_background(background_color, MinimumAllowedContrast::NonText))
@@ -1322,7 +1333,7 @@ impl AgentInputFooter {
             );
         }
 
-        if let Some(chip_kind) = self.plugin_chip_kind(app) {
+        if let Some(chip_kind) = self.plugin_chip_kind(app).filter(|_| show_toolbar) {
             let manual = self.should_use_manual_mode(app);
             let chip = match (chip_kind, manual) {
                 (PluginChipKind::Install, false) => {
@@ -1368,6 +1379,15 @@ impl AgentInputFooter {
             if let Some(element) = self.render_cli_toolbar_item(item, &shared_status, app) {
                 right_buttons.add_child(element);
             }
+        }
+
+        // 输入方式切换始终可见，不受工具栏显示或按钮配置影响。
+        if !left_items.contains(&AgentToolbarItemKind::RichInput)
+            && !right_items.contains(&AgentToolbarItemKind::RichInput)
+            && let Some(button) =
+                self.render_cli_toolbar_item(&AgentToolbarItemKind::RichInput, &shared_status, app)
+        {
+            right_buttons.add_child(button);
         }
 
         let content = Wrap::row()

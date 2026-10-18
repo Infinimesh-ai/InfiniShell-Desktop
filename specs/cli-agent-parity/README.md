@@ -2,7 +2,25 @@
 
 本目录维护当前规格、能力边界、剩余工作和验证结论。**原批准合并范围中的 G01–G10、V03 共 11 项已关闭并合入主线；全平台实机验收尚未全部完成。** 当前结论以本页及 `CURRENT_STATUS.json` 的当前入口为准；历史记录保留原构建、平台、失败和未验边界。
 
-## 当前主线状态（2026-10-14）
+## 当前主线状态（2026-10-15）
+
+**统一候选最终 Mac 签名包六项 GUI 冒烟、同包重启恢复，以及完整 12 件资产核验均通过。Windows 与 Ubuntu 24.04 x86_64 用户六阶段回执及助手审核仍是发版门禁，保持 Draft。** 当前产品源码固定为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及工件核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`。独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 未包含在本候选，不把控制器或当前主线代码当作候选产品源码。
+
+当前候选是 `v0.2026.10.14.16.45.oss_00`，annotated tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa`；[正式构建 38537451605](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38537451605) attempt 1 已成功完成，当前 Draft 有完整 12 件最终资产。用户已确认等待同一修复候选，在 Windows 开发电脑与 **Ubuntu 24.04 x86_64** 各验一次，助手审核回执。新 Setup 经 [38703172103 原生只读核验](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38703172103)确认 AMD64、内嵌六资源一致，实际 Authenticode 为 `NotSigned`；[Windows 便携包收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Handoff-v0.2026.10.14.16.45.oss_00.json)已生成。Ubuntu 下载恢复成功，真实 DEB 的元数据、ELF、desktop、六资源和卸载脚本静态审核通过；两平台安装包的[Draft 回下载对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-ubuntu-draft-roundtrip/result.json)通过；本轮又完成全部 12 件最终资产回下载。Mac 首次链接失败保留，本机 response-file 调用修正后签名 DMG 已生成，Apple 公证 Accepted、装订及[最终 DMG 静态核验](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-final/dmg-verification/result.json)通过，ARM64 版本执行及本轮六项实际 GUI 冒烟通过，完整 12 资产已核验；两端用户实际桌面回执及助手审核仍待完成；旧 CLI 认证矩阵仍延期，G09 不重开。新产物仅允许写入 Draft，公开版本仍为 `v0.2026.10.07.01.09.oss_00`。
+
+本轮 [Mac GUI 结果](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json)覆盖 A→B→B→A 实际请求路由、Responses strict schema、普通/备用浮窗拖动滚动及重启恢复、Retina 2x 连字开/关输入拖选、英文/中文真实 HTTP 401 和同一 Plan 的重启/双语保存提示。14 个请求中 13 个完成，首个 CLI B 被续轮替代而断开；8 个带工具请求 schema 全部满足判据，其中 7 个完成，未将断开请求算作完整完成。浮窗重启恢复 **481 × 271.5999755859375** 逻辑像素。DMG 与执行文件摘要绑定同包，退出后严格签名复核通过；临时设置增量已恢复，精确挂载已非强制卸载。[25 张原始截图及摘要索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/evidence-index.json)保留误点等原始尝试。模型是本机固定夹具，不外推商业模型能力或成功云同步。 [独立复核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/independent-audit/result.json)确认六项证据成立，25 张图逐张审阅、81 件原件摘要匹配；截图实际为 JPEG，保留接口原字节和原 `.png` 文件名，格式差异不影响验收。
+
+[完整 12 件资产清单及索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/evidence-index.json)已封存：共 **3,374,447,497 字节**，本地、GitHub provider、完整回下载 SHA-256 和长度一致。只向 Draft 新增最终 DMG、替换两份签名后的 Mac SSH，其余九件 ID 和摘要不变，已交付 Windows/Ubuntu 包无需重取。Linux 四格式均完成静态核验；Arch 主程序与 DEB 全字节一致，RPM 注释剥离及 AppImage 动态链接变换有有限差异证明，不宣称 Linux 原生运行通过。
+
+非阻塞改进 `MAC-SETTINGS-SEARCH-ZH-01`：中文“连字”搜索无结果，英文 `ligature` 可找到并操作该设置；保留[截图](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/r-5cmojj28/25-chinese-ligature-search-empty.png)，后续完善中文搜索。
+
+两套交付使用同一源码和标签： [Windows ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Acceptance-v0.2026.10.14.16.45.oss_00.zip)／[Windows 任务](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/windows-manual/InfiniShell-Windows-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)；[Ubuntu 24.04 x86_64 ZIP](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/ubuntu-manual/InfiniShell-Ubuntu24-Acceptance-v0.2026.10.14.16.45.oss_00.zip)／[Ubuntu 任务](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/ubuntu-manual/InfiniShell-Ubuntu24-Task-v0.2026.10.14.16.45.oss_00.zh-CN.md)。各自 ZIP 内已包含安装器、采集器和完整说明，用户按任务六阶段执行后回传证据，助手再审核。见[交付复核与证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/handoff-delivery-20261015/review.json)。
+
+[5068 Linux 原生门禁 38534655990](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38534655990) attempt 1 全部通过：真实 `dpkg-deb` 构建与提取的 **252 个维护脚本场景**、双 musl 编译检查、socket **9**、crate **503**、迁移／同步 **525**、补全 **22**、应用 **625**，其中 Linux i18n **11/11** 逐名通过；通知测试 **109 通过／2 项 Windows 专属跳过**。本机 `cargo check`、`cargo check -p warp` 和 i18n **12/12** 通过。原件及 ZIP 摘要复核见[Linux 审核记录](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/linux-deb-cleanup-fix/remote/38534655990/review.json)，不计为 Ubuntu 桌面或正式候选包通过。
+
+Windows 实现沿用已验证的 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` 字节：[Windows 原生门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)的 Inno **80 项断言**、隔离注册表 **6 项回归**、应用 **616 项**（含该 6 项）、crate **492 项**、Zap **528 项**、completer **11 项**按原源码保留。[Git 同源对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-source-equivalence.json)确认 5ac 到 5068 的 Windows 实现未变；这不是 5068 的新 Windows 原生运行，也不替代新 Setup 核验。
+
+`13.00` 候选因 DEB 卸载脚本遗漏包名替换、可能遗留程序链接而被统一修复候选替代；[正式 run 38514368665](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38514368665)已主动取消，原件见[取消记录](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.13.00.oss_00/github/superseded-cancellation/run-final.json)，不记作 Windows 编译失败。其完整旧 current 对象与此前 `01.46` URI 拒收均保存在 `CURRENT_STATUS.json` 的历史入口；旧包通过分项不移用于新标签。
 
 此前 `main` 已快进合入并推送 `36abcbb5b027c17a29fc4fb4a5f91b6ebbc2d680`，修复 Linux musl socket 长度字段的 ABI 类型差异，并补入双 musl 编译门禁。本机 `cargo check`、两 musl 目标 `command --all-targets` 检查及 i18n **12/12** 通过；[同提交 Linux 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38368196945)通过，Rust **1661 项**、Python **109 项通过／2 项 Windows 专属跳过**。其中 socket 身份测试在 glibc 宿主实际 **9/9** 通过，两 musl 目标仅计编译通过。
 
@@ -10,7 +28,7 @@
 
 修复提交 `f429fe2c0426846f41f79fef15a791c5f7cbb011` 已快进合入并推送 `main`；本地 `cargo check`、定向回归 **39/39**（含新增 8 项）、i18n **12/12** 通过；[同提交双平台门禁 38411587441](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38411587441)首次运行全部通过：Linux 应用 **624/624**、Windows **609/609**，新增 8 项及通用 i18n 11 项两端均逐名 PASS。该候选 `v0.2026.10.13.22.25.oss_00` 后续因共享初始化入口的循环模型借用回归拒收，[发行构建 38414535397](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38414535397)已主动取消。真实入口测试与调用栈复现了 singleton lookup panic；当前未找到生产调用者，不据此宣称实际共享 GUI 崩溃。Intel runner 的独立 DNS 失败与其他任务的主动取消分别保留，实际基础设施重试为 0。
 
-修复提交 `5360f5d6cf7e3b25263431027993a3a26dca9cb5` 已合入并推送主线：在历史模型更新前构造请求快照，保持 Base／CLI 选择不变；本地 `cargo check`、**40/40** 定向回归和 **12/12** i18n 通过。[同提交双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行通过：Linux 应用 **625/625**、Windows **610/610**，累计新增 9 项及通用 i18n 11 项两端均逐名 PASS。新候选 `v0.2026.10.14.01.46.oss_00` 标签已推送，[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 全部成功；本轮六份 SSH 资源已通过静态及限定原生验证，最终 macOS DMG 已通过签名、公证装订及 19 项检查，六项 GUI 实际操作全部通过，独立证据复核通过。Linux 四包原生检查、Windows 最终安装器静态核验及 12 件资产 Draft 全量下载回验已通过；Windows 便携验收包已就绪，用户五阶段回执仍待完成。公开安装包仍是 `v0.2026.10.07.01.09.oss_00`，新候选最终验收未完成。
+此前修复提交 `5360f5d6cf7e3b25263431027993a3a26dca9cb5` 已合入并推送主线：在历史模型更新前构造请求快照，保持 Base／CLI 选择不变；本地 `cargo check`、**40/40** 定向回归和 **12/12** i18n 通过。[同提交双平台门禁 38441190656](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38441190656)首次运行通过：Linux 应用 **625/625**、Windows **610/610**，累计新增 9 项及通用 i18n 11 项两端均逐名 PASS。旧候选 `v0.2026.10.14.01.46.oss_00` 的[正式发行构建 38444122158](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38444122158) attempt 1 全部成功；该轮六份 SSH 资源通过静态及限定原生验证，最终 macOS DMG 通过签名、公证装订及 19 项检查，六项 GUI 实际操作和独立复核通过。Linux 四包原生检查、Windows 安装器静态核验及 12 件资产 Draft 全量下载回验均通过。后来收到的 Windows 用户回执确认 URI 登记失败，因此该候选整体拒收；这些通过分项不移用于新候选。
 
 | 范围 | 当前结论与依据 |
 | --- | --- |
@@ -24,15 +42,17 @@
 
 ### Windows URI 发版阻塞与修复（2026-10-14）
 
-用户已交回 `01.46` 候选的完整 Windows 证据，助手[复核报告](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、可见 GUI、正常退出和官方卸载分项通过。**URI 命令五阶段仍指向旧失效目标，`WIN-RELEASE-URI-01` 阻塞发版**；旧 URI/AUMID 基线已有，不能算作新安装遗留。上文“等待五阶段”是交付时状态，已由本结论替代。
+用户已交回 `01.46` 候选的完整 Windows 证据，助手[复核报告](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/native-validation/windows-user-review-20261014/README.zh-CN.md)确认安装、可见 GUI、正常退出和官方卸载分项通过。**URI 命令五阶段仍指向旧失效目标，`WIN-RELEASE-URI-01` 使旧候选拒收**；旧 URI/AUMID 基线已有，不能算作新安装遗留。
 
-本轮修复安装时登记、启动同步恢复及读回、URI/AUMID 归属标记与按所有权卸载清理。待源码门禁通过后冻结新候选、生成新的 Windows 复验包；用户补真实 URI 激活和卸载清理，助手再审核。旧候选 12 资产和 macOS GUI 通过记录保留在原标签，不移用为新字节的通过证明。Linux 桌面延期，自动检查保留。无需本地化变更。
+本轮已修复安装时登记、启动同步恢复及读回、URI/AUMID 归属标记与按所有权卸载清理，并通过上述原生门禁；[源码与门禁收据](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/source-gates-5acb349c7.json)和[Windows 原生审核](/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/remote/38512735757/review.json)均绑定 `5acb349c7`。早期 `4c02c6755` 的 Inno 声明编译失败按原 run `38512138949` 保留，不作为新源码结果。现场旧命令摘要不变的首因仍未确定，不将 `KEY_READ` 或独立确认的终止 NUL 缺陷冒称为现场唯一根因。
+
+新候选 Setup 和 Ubuntu DEB 已完成静态校验、便携 ZIP 绑定及两资产 Draft 回下载对照，现在由用户按各自交付任务执行 `baseline → installed → launched → uri_activated → closed → uninstalled` 六阶段，助手审核实际 URI 唤起和本实例登记清理。源码修复通过尚不能关闭发行验收阻塞。Ubuntu 24.04 x86_64 将按[独立 DEB 验收入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)执行同候选六阶段；旧 CLI 认证矩阵继续延期，自动检查保留。无需本地化变更。
 
 ### 延期项与独立补验
 
 | 项目 | 当前证据与后续安排 |
 | --- | --- |
-| Linux V01／V02／V05 | 完整模型生命周期、物理中文输入法和真实审批双语布局延期，不计通过。旧分支已归档，沿用[下方安排](#linux-桌面验收延期与归档2026-10-13)，保留 Linux 自动检查，不要求现在切换桌面 |
+| Linux V01／V02／V05 | 旧 CLI 认证矩阵的完整模型生命周期、物理输入法及真实审批双语布局继续延期，不计通过。归档决定保留；本轮新增 Ubuntu DEB 安装生命周期验收，不自动关闭这些旧矩阵项 |
 | Windows V01 | Claude R04 完整记录仍绑定原 Build09；Codex 0.156.1、Grok 1.0.41 的 Build11 已有应用内启动、单轮回复及断开正例。遵守用户 10 月 8 日缩减并结束验收的安排，完整生命周期延期；宣称完整 Windows 生命周期已验前再补 |
 | Windows V02 | 用户已人工确认输入法无问题，原合同要求的连续物理输入录像未补。正式证据不计完整通过，补证低优先，不单为录像重做人工操作 |
 | Windows V05 | 静态双语视口与模拟审批已有证据；真实 Grok 审批待决、允许、拒绝的完整布局延期，下次集中验审批或相关界面改动时补齐 |
@@ -46,19 +66,24 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 相关代码变更继续执行 `cargo check`、必要的 i18n／定向回归，以及受影响的 Linux／Windows 自动检查。现有跨平台工作流入口为 `ci/**` 推送或 `workflow_dispatch`，`run_linux` 默认开启；不是每次推送 `main` 都自动执行。文档更新不触发已通过的模型、GUI 或双平台验收重跑。
 
-以下三项按各自状态管理：本轮最终 macOS GUI 和发行资产已完成，仅 Windows 最终安装器用户回执及助手审核仍待关闭。debug 包和旧签名候选的历史通过与失败均保留：
+以下四项均按新 `16.45` 候选绑定实际产物和证据；旧 `01.46` 的通过分项、URI 拒收及 `13.00` 的替代／取消结果保留：
 
 | 必做项 | 执行时机与通过条件 |
 | --- | --- |
-| 最终发行产物校验 | **本候选 12 件资产及全量 Draft 下载回验通过**。每次发版绑定同一源码与正式标签；核对既定 12 件资产、内嵌 SSH 资源和下载摘要，完成 macOS Developer ID 签名、公证及装订检查。继续保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
-| Windows 安装生命周期 | 按用户新安排，由用户在自己的 Windows 开发电脑完成最终安装器的安装、可见 GUI 启动、正常退出、官方卸载与残留记录，助手审核回执；本候选实际 SHA-256／大小已绑定，含安装器的便携 ZIP 和采集器已交付，五阶段尚未执行。已有分支验收不重开，也不替代本次最终安装器回执；不再索要机器名、账号或要求切换桌面。见[独立操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
-| 最近 GUI 改动的候选包冒烟 | **本候选六项实测通过，独立证据审核通过**：四项 GUI、A→B→B→A 实际路由、Responses strict schema 均通过；同包正常重启，配置恢复。见[最终包记录](#正式候选-macos-验收2026-10-14)；不要求补做 Linux 桌面矩阵 |
+| 最终发行产物校验 | **本候选完整 12 资产门禁通过**。绑定同一源码与标签，核对既定 12 件资产、内嵌 SSH 资源及全量 Draft 下载摘要，完成 macOS Developer ID 签名、公证及装订。保留 Intel macOS SSH 扩展，不恢复 Intel 桌面 DMG |
+| Windows 安装生命周期 | **新 Setup 静态审核及便携包组装完成，用户六阶段待验**。用户在现有 Windows 开发电脑执行安装、可见 GUI、实际 URI 唤起、正常退出、官方卸载与残留记录，助手审核。两套包已就绪，任务已绑定实际安装器及 ZIP 摘要；不重开分支验收，不另索要机器名、账号或要求切换桌面。见[操作入口](../../docs/windows-final-installer-acceptance.zh-CN.md) |
+| Ubuntu DEB 安装生命周期 | **实际 DEB 静态审核、便携包和 Draft 回下载通过；用户六阶段待完成**。用户在 Ubuntu 24.04 x86_64 执行安装、可见 GUI、真实 URI 新窗口与目录标记、正常退出及官方卸载；助手核对本包程序链接清理、用户数据保留及全部回执。见[操作入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)。旧 V01／V02／V05 不因此关闭 |
+| 最近 GUI 改动的候选包冒烟 | **本候选签名 DMG 六项实际 GUI 和同包重启恢复通过**，见[新包结果](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json)。旧包结果仅按[历史记录](#正式候选-macos-验收2026-10-14)保留，不重开旧 Linux CLI 认证矩阵 |
 
-发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。Windows 用户回执及助手审核关闭前，不宣称下一发行候选已完成验收；当前保持 Draft，尚未公开发布。
+发行边界见[当前公开版的验证说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.07.01.09.oss_00)及[发布工作流](../../.github/workflows/infinishell_release.yml)；最近 GUI 改动的自动覆盖与人工未验范围见 [Zap 吸收报告](../../docs/upstream-essence/2026-10-07-zap.md)。Windows／Ubuntu 用户回执及助手审核关闭前，不宣称下一发行候选已完成验收；新产物仅允许写入 Draft，尚未公开发布。
 
-新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/`。上一轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.22.25.oss_00/` 保留原自动检查、预编译、DNS 失败和主动取消证据；共享初始化修复及红／绿回归记录位于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-14-shared-init-fix/`。旧轮 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.13.16.19.oss_00/` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；入口为 `macos-gui/result.json`、`macos-gui/evidence-index.json` 和 `STATUS.zh-CN.md`。修复源码门禁归档于 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**：修复改变请求路由与协议归一化，没有新增或改变用户文案；指定双语界面已在新候选复验。Linux 桌面继续延期，自动检查保留。
+本次状态更新前的完整入口保存在[收尾前历史快照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/macos-full12-closeout-20261015/before-index.json)；本轮主线 `cargo check --locked` 已通过（`r-w61eogvo`，保留 5 条既有警告），结果见[验证收据](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/macos-full12-closeout-20261015/validation.json)。
+
+新轮归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/`，Windows 修复证据为 `/Volumes/SanDisk/InfiniShell-Archives/windows-uri-fix/2026-10-14/`。旧 `01.46` 全部证据仍在原目录；`22.25` 保留自动检查、预编译、DNS 失败和主动取消证据，共享初始化红／绿回归保存在 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-14-shared-init-fix/`。`16.19` 保留签名公证、六份 SSH 校验、22 张 GUI 原始截图及拒收结果；原 BYOP 修复门禁仍在 `/Volumes/SanDisk/InfiniShell-Archives/macos-gui-smoke/2026-10-13-byop-routing-fix/`。**无需本地化变更**；旧候选的双语实测只按原包计证。本轮 Ubuntu DEB 生命周期待用户验收，旧 CLI 认证矩阵延期，自动检查保留。
 
 ### 正式候选 macOS 验收（2026-10-14）
+
+以下是旧 `01.46` 候选的通过记录，保留原证据范围；`13.00` 已被替代，`16.45` 的最新结论见本页顶部。
 
 `v0.2026.10.14.01.46.oss_00` 的最终 DMG **19/19 签名、公证装订和静态检查通过；GUI 六项实际操作全部通过，独立审核通过**。DMG SHA-256 为 `c45d7b4eea75a2fc068ad818b816cd1ae1d59a43480bed3c5ec21e4f33440cad`，执行文件 SHA-256 为 `eb2ac5cc44736b4375a87b612a34112dca4bf8ee02afacd9d136576ed9e0bfc1`；Apple 公证 `7c979869-41d0-4f15-a6c5-636aa7981cc5` Accepted。
 
@@ -73,11 +98,13 @@ G11 的追加语义差异、G12 的普通 Codex Escape 不保证工具退出，�
 
 ### 最终发行资产与 Windows 交付（2026-10-14）
 
+以下保留旧 `01.46` 的交付时快照；后续 Windows URI 用户回执已使该候选拒收，不作为后续 `13.00` 或当前 `16.45` 的资产或生命周期结论。
+
 正式 run `38444122158` attempt 1 全部成功，候选仍固定在源码 `5360f5d6c`。Draft `412209685` 精确包含 **12 件资产**：ARM64 macOS DMG、Windows x64 安装器、四份 Linux 包及六份 SSH 扩展。仅 DMG 和两份签名后的 Mac SSH 资源经本机补入；其余九件保持 CI 原字节。全量认证下载后，本地原件、GitHub 摘要和下载件逐项一致，标签、资产身份及公开 Latest 均未改变；没有公开发布。
 
 Linux AppImage／DEB／RPM／Arch 均完成只读解包、元数据与 ELF 检查、内嵌六资源核对，以及本包二进制实际版本检查；没有安装系统包或执行 Linux GUI。Windows 安装器来源、大小、摘要、AMD64 主程序和内嵌原始六资源均通过，实际 Authenticode 为 **`NotSigned`**，按 OSS 未签名边界记录，不称为有效签名。
 
-[Windows 独立操作文档](../../docs/windows-final-installer-acceptance.zh-CN.md)已绑定最终包，便携 ZIP 包含安装器和全部采集材料；用户在现有 Windows 开发电脑完成五阶段，助手审核回执。**这仍是本候选剩余的发版门禁**，不重开已关闭的 Windows 分支验收，也不将静态结果充当安装卸载通过。
+[Windows 独立操作文档](../../docs/windows-final-installer-acceptance.zh-CN.md)保留当时的包身份和材料；后续五阶段回执的安装、启动、退出、官方卸载分项通过，但 URI 仍指向旧失效目标。当前入口已切换到新候选的六阶段安排，不重开已关闭的 Windows 分支验收，也不将旧包静态结果充当新包安装卸载通过。
 
 归档入口：[`final-acceptance/result.json`](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/final-acceptance/result.json)和[证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.01.46.oss_00/final-acceptance/evidence-index.json)；12 件回验为 `github/draft-roundtrip/result.json`（SHA-256 `428a26eddb0748d9cdbe98e76b1a597a5737b2450134acca4783c2565b02f2fd`），Linux 四包及 Windows 安装器原件分别在 `native-validation/linux-packages/` 和 `native-validation/windows-desktop/`。源头 `candidate.json` 保留构建启动时快照，当前结论以 `STATUS.zh-CN.md` 和上述汇总为准；旧候选和失败原件保留。Linux 桌面继续延期，自动检查保留；本次仅文档归档，**无需本地化变更**。
 
@@ -137,12 +164,15 @@ Linux AppImage／DEB／RPM／Arch 均完成只读解包、元数据与 ELF 检�
 | 三方能力与消费者可用范围 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md)、[RELEASE_SUPPORT.md](RELEASE_SUPPORT.md) |
 | 自动升级、渠道与事务约定 | [CLI_AUTOUPDATE.md](CLI_AUTOUPDATE.md) |
 | 已通过、失败、未验及源码／平台对应 | [VALIDATION_REPORT.md](VALIDATION_REPORT.md) |
-| Linux 桌面验收延期与归档入口 | [本页归档决定](#linux-桌面验收延期与归档2026-10-13) |
+| Linux 旧 CLI 认证矩阵延期与归档 | [本页历史归档决定](#linux-桌面验收延期与归档2026-10-13)，不包含本轮新增 DEB 生命周期验收 |
+| Ubuntu 24.04 x86_64 最终 DEB 用户操作与助手审核 | [独立验收入口](../../docs/ubuntu-final-installer-acceptance.zh-CN.md)，等待最终包身份绑定后交付执行 |
 | Windows 最终安装器用户操作与助手审核 | [独立验收入口](../../docs/windows-final-installer-acceptance.zh-CN.md)，等待最终包身份绑定后交付执行 |
 
 `CODEX_PLUGIN_CACHE_REFRESH.md`、`PLUGIN_COMPATIBILITY.md`、`SSH_TMUX_VERIFICATION.md` 是配套插件说明正在引用的简短兼容入口，正文已收敛到上述文档。
 
 ## Linux 桌面验收延期与归档（2026-10-13）
+
+以下保留 10 月 13 日的旧矩阵归档决定。10 月 14 日用户另行确认新候选 Ubuntu 24.04 x86_64 DEB 生命周期验收；该新增范围不再延期，旧 V01／V02／V05 认证矩阵继续按原决定保留。
 
 按用户决定，归档并删除 `codex/acceptance-linux-v01-v02-v05` 分支。该分支独有的 3 个提交只增加四份验收 JSON，没有独有产品代码；原受测源码为 `28d0922519b02b0690626edc148638c0150cda1c`，记录提交为 `1a5910afec898cc00522c9147ce665c539ab3968`。
 

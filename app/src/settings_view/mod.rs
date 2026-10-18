@@ -592,7 +592,7 @@ pub mod flags {
     pub const EMPTY_INPUT_BUFFER: &str = "EmptyInputBuffer";
     pub const CLI_AGENT_RICH_INPUT_OPEN: &str = "CLIAgentRichInputOpen";
     pub const CLI_AGENT_FOOTER_ENABLED: &str = "CLIAgentFooterEnabled";
-    pub const CLI_AGENT_RICH_INPUT_CHIP_ENABLED: &str = "CLIAgentRichInputChipEnabled";
+    pub const CLI_AGENT_RICH_INPUT_AVAILABLE: &str = "CLIAgentRichInputAvailable";
     pub const AUTO_TOGGLE_RICH_INPUT_FLAG: &str = "AutoToggleRichInput";
     pub const AUTO_OPEN_RICH_INPUT_ON_CLI_AGENT_START_FLAG: &str =
         "AutoOpenRichInputOnCLIAgentStart";

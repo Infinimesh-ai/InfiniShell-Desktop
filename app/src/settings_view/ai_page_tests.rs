@@ -507,3 +507,104 @@ fn cli_agent_update_search_keeps_the_page_title_and_only_the_matching_cli() {
         });
     });
 }
+
+#[cfg(not(target_family = "wasm"))]
+#[test]
+fn cli_agent_input_settings_remain_searchable_when_the_toolbar_is_hidden() {
+    use settings::Setting;
+    use warp_core::features::FeatureFlag;
+
+    use super::{
+        CLIAgentAutoDismissRichInputWidget, CLIAgentAutoOpenRichInputWidget,
+        CLIAgentAutoToggleRichInputWidget, CLIAgentCommandsWidget, CLIAgentSubmitRichInputWidget,
+        CLIAgentWidget, cli_agent_categories,
+    };
+    use crate::settings::{AISettings, ShouldRenderCLIAgentToolbar};
+
+    App::test((), |mut app| async move {
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _toolbar_editor = FeatureFlag::AgentToolbarEditor.override_enabled(true);
+        app.add_singleton_model(|ctx| {
+            let mut settings = AISettings::new_with_defaults(ctx);
+            settings.should_render_cli_agent_footer = ShouldRenderCLIAgentToolbar::new(Some(false));
+            settings
+        });
+        app.update(|ctx| {
+            let title = crate::t_static!("settings-ai-third-party-cli-section");
+            let mut page = PageType::new_categorized(cli_agent_categories(), Some(title));
+            for (query, expected) in [
+                (
+                    "cli native terminal",
+                    CLIAgentAutoOpenRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "输入方式",
+                    CLIAgentAutoOpenRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "cli native interaction",
+                    CLIAgentAutoToggleRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "cli ctrl enter",
+                    CLIAgentSubmitRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "提交后",
+                    CLIAgentAutoDismissRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "原生终端",
+                    CLIAgentAutoOpenRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "自动避让",
+                    CLIAgentAutoToggleRichInputWidget::static_widget_id(),
+                ),
+                (
+                    "发送后",
+                    CLIAgentAutoDismissRichInputWidget::static_widget_id(),
+                ),
+                ("右上入口", CLIAgentWidget::static_widget_id()),
+                ("Codex 安装", "cli-codex-auto-update"),
+                ("Claude install", "cli-claude-auto-update"),
+                ("cli regex", CLIAgentCommandsWidget::static_widget_id()),
+                ("codex channel", "cli-codex-auto-update"),
+            ] {
+                page.update_filter(query, ctx);
+                let FilteredPageType::Categorized {
+                    categories,
+                    title: filtered_title,
+                    ..
+                } = page.get_filtered()
+                else {
+                    panic!("第三方 CLI 设置应按用途分组");
+                };
+                assert_eq!(filtered_title, Some(title));
+                assert_eq!(categories.len(), 1, "{query}");
+                assert_eq!(categories[0].widgets.len(), 1, "{query}");
+                assert_eq!(categories[0].widgets[0].widget_id(), expected, "{query}");
+            }
+            page.update_filter("", ctx);
+            let FilteredPageType::Categorized { categories, .. } = page.get_filtered() else {
+                panic!("清除搜索后应恢复全部分组");
+            };
+            assert_eq!(categories.len(), 3);
+            assert_eq!(
+                categories[0].title,
+                crate::t_static!("settings-ai-cli-input-section")
+            );
+            assert_eq!(categories[0].widgets.len(), 4, "隐藏工具栏不得隐藏输入设置");
+            assert_eq!(
+                categories[1].title,
+                crate::t_static!("settings-ai-cli-appearance-section")
+            );
+            assert_eq!(categories[1].widgets.len(), 2, "仅隐藏工具栏布局编辑器");
+            assert_eq!(
+                categories[2].title,
+                crate::t_static!("settings-ai-cli-install-section")
+            );
+            assert_eq!(categories[2].widgets.len(), 3);
+        });
+    });
+}

@@ -2595,8 +2595,7 @@ define_settings_group!(AISettings, settings: [
         description: "Whether to show the \"Use Agent\" footer for terminal commands.",
     }
 
-    // Whether to render the CLI agent footer for commands like Claude, Codex, Gemini, etc.
-    // This is independent of the "Use Agent" footer setting.
+    // 仅控制 CLI 会话工具栏的显示，不影响输入框、快捷键和启动入口。
     should_render_cli_agent_footer: ShouldRenderCLIAgentToolbar {
         type: bool,
         default: true,
@@ -2605,7 +2604,7 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "agents.third_party.should_render_cli_agent_toolbar",
-        description: "Whether to show the CLI agent footer for coding agent commands.",
+        description: "Whether to show the CLI session toolbar. Does not disable InfiniShell input, keyboard shortcuts, or launchers.",
     }
     // When enabled and a CLI agent session has a plugin listener, rich input
     // auto-closes when the session enters a Blocked state (the agent requires
@@ -2621,8 +2620,7 @@ define_settings_group!(AISettings, settings: [
         description: "Whether CLI agent Rich Input automatically closes and reopens based on the agent's blocked state.",
     }
 
-    // When enabled and a CLI agent session has a plugin listener, rich input
-    // auto-opens once when the session starts or when the listener is registered.
+    // 手工输入命令启动智能体时的输入偏好；快捷入口始终打开 InfiniShell 输入框。
     auto_open_rich_input_on_cli_agent_start: AutoOpenRichInputOnCLIAgentStart {
         type: bool,
         default: false,
@@ -2631,13 +2629,10 @@ define_settings_group!(AISettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "agents.third_party.auto_open_composer_on_cli_agent_start",
-        description: "Whether CLI agent Rich Input automatically opens when a CLI agent session starts.",
+        description: "Whether InfiniShell input opens for agents started with terminal commands. Quick launch buttons always open it.",
     }
 
-    // When enabled and a CLI agent session does NOT have a plugin listener,
-    // rich input auto-closes after the user submits a prompt.
-    // When the plugin IS present, this setting has no effect (auto-show/hide
-    // from auto_toggle_rich_input handles rich input lifecycle).
+    // 自动避让原生交互关闭或没有可用监听器时，发送后切换到原生输入。
     auto_dismiss_rich_input_after_submit: AutoDismissRichInputAfterSubmit {
         type: bool,
         default: false,

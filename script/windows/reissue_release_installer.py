@@ -35,7 +35,7 @@ INPUTS = [
 TESTS = ['script/windows/' + name for name in (
     'environment-tests.iss', 'environment-action-tests.iss', 'environment-legacy-r4.iss',
     'test_windows_environment.ps1', 'test_windows_environment_reissue.ps1',
-    'reissue_release_installer.ps1', 'reissue_release_installer.py',
+    'reissue_release_installer.ps1', 'reissue_release_installer.py', 'reissue_release_installer_tests.py',
     'verify_release_installer.ps1')]
 
 
@@ -155,16 +155,30 @@ def prepare(args):
     require(target.stat().st_size == COMPILER['distribution_size'] and sha(target) == COMPILER['distribution_sha256'], '编译器发行原件不符')
 
 
-def listing(args):
-    # innounp -s -h 只输出成员名；逐项拒绝逃逸、重名及非 {app} 成员后再解包。
-    text = (args.output / 'evidence' / (args.label + '.stdout.log')).read_text(encoding='utf-8-sig')
-    members = [line.strip() for line in text.splitlines() if line.strip()]
-    require(members and len(members) == len({name.casefold() for name in members}), '成员列表为空或重名')
-    for name in members:
+def application_members(text):
+    # -h 只隐藏程序横幅；-s 仍列出归档说明和未被提取掩码选择的成员。
+    members, all_names = [], set()
+    for line in text.splitlines():
+        name = line.strip()
+        if not name or re.fullmatch(r'Inno Setup archive:\s+(?:compiler-distribution|InfiniShellSetup)\.exe', name) or re.fullmatch(r'Inno Setup version detected:\s+[0-9.]+ \(Unicode\)', name):
+            continue
+        require(name.casefold() not in all_names, '成员列表重名')
+        all_names.add(name.casefold())
+        if name == 'install_script.iss':
+            continue
         parts = name.replace('\\', '/').split('/')
-        require(parts[0] == '{app}' and len(parts) > 1 and
+        require(parts[0] in ('{app}', '{tmp}') and len(parts) > 1 and
                 all(part not in ('', '.', '..') and ':' not in part and not part.endswith((' ', '.')) for part in parts),
-                '拒绝非应用或不安全成员：' + name)
+                '拒绝未知或不安全成员：' + name)
+        if parts[0] == '{app}':
+            members.append(name)
+    require(members, '应用成员列表为空')
+    return members
+
+
+def listing(args):
+    text = (args.output / 'evidence' / (args.label + '.stdout.log')).read_text(encoding='utf-8-sig')
+    members = application_members(text)
     if args.label != 'compiler-members':
         require(len(members) == 150, '应用载荷必须精确为 150 件')
     save(args.output / 'evidence' / (args.label + '.json'), {'members': members, 'count': len(members)})

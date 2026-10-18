@@ -267,6 +267,12 @@ jobs:
       - name: 准备已固定的作业内 Python
         shell: pwsh
         run: ./script/cli-agent-parity/prepare_windows_python.ps1
+      - name: 验证重发控制器目录解析
+        if: ${{ startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:') }}
+        shell: pwsh
+        run: |
+          python -I -B script/windows/reissue_release_installer_tests.py
+          if ($LASTEXITCODE -ne 0) { throw '重发控制器回归失败。' }
       - name: 核验正式工件来源、签名和内嵌资源
         id: verify_installer
         shell: pwsh
@@ -302,6 +308,14 @@ jobs:
           name: infinishell-windows-x64-reissued-${{ github.sha }}
           path: ${{ runner.temp }}/reissue-installer-${{ github.run_id }}-${{ github.run_attempt }}/delivery/
           if-no-files-found: error
+          retention-days: 90
+      - name: 保留未通过最终绑定的重建候选
+        if: ${{ failure() && steps.reissue_installer.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-installer-reissue-failed-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reissue-installer-${{ github.run_id }}-${{ github.run_attempt }}/candidate/InfiniShellSetup.exe
+          if-no-files-found: warn
           retention-days: 90
       - name: 保存正式安装器只读证据
         if: ${{ always() && steps.verify_installer.outcome != 'skipped' }}

@@ -247,7 +247,6 @@ use crate::ai::agent::{
 use crate::ai::agent::{CurrentHead, DiffBase};
 use crate::ai::agent_conversations_model::{AgentConversationsModel, AgentConversationsModelEvent};
 use crate::ai::ambient_agents::{AmbientAgentTaskId, conversation_output_status_from_conversation};
-use crate::ai::blocklist::agent_view::agent_input_footer::toolbar_item::AgentToolbarItemKind;
 use crate::ai::blocklist::agent_view::orchestration_conversation_links::pane_group_id_containing_terminal_view;
 use crate::ai::blocklist::agent_view::{
     AgentViewController, AgentViewControllerEvent, AgentViewConversationSelection,
@@ -2633,6 +2632,8 @@ pub struct TerminalView {
     /// command finishes successfully.
     pending_command_queue: VecDeque<String>,
     pending_specific_cli_agent_launch: Option<PendingSpecificCLIAgentLaunch>,
+    /// 绑定到实际执行命令的启动意图，不影响后续手工启动的会话。
+    cli_agent_rich_input_launch: Option<(CLIAgent, BlockId)>,
     /// 只由同一命令块结束或真实 PTY 退出释放，旧回调不能释放后续启动。
     #[cfg(all(
         feature = "local_fs",
@@ -4414,6 +4415,7 @@ impl TerminalView {
             awaiting_pending_command_completion: false,
             pending_command_queue: Default::default(),
             pending_specific_cli_agent_launch: None,
+            cli_agent_rich_input_launch: None,
             #[cfg(all(
                 feature = "local_fs",
                 feature = "local_tty",
@@ -9088,6 +9090,7 @@ impl TerminalView {
 
     pub(crate) fn prepare_for_pty_shutdown(&mut self, ctx: &mut ViewContext<Self>) {
         self.pending_specific_cli_agent_launch = None;
+        self.cli_agent_rich_input_launch = None;
         self.manual_pty_shutdown_requested = true;
 
         #[cfg(not(target_family = "wasm"))]
@@ -9788,6 +9791,7 @@ impl TerminalView {
         let bytes = data.into();
         if bytes.as_ref() == [0x03] {
             self.pending_specific_cli_agent_launch = None;
+            self.cli_agent_rich_input_launch = None;
             #[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
             { self.grok_owned_history_request = None; }
 
@@ -12439,10 +12443,10 @@ impl TerminalView {
                                             {
                                                 let remote_host =
                                                     me.active_session_remote_host(ctx);
-                                                let should_auto_toggle_input = agent
-                                                    .supports_cli_agent_footer()
-                                                    && *AISettings::as_ref(ctx)
-                                                        .auto_open_rich_input_on_cli_agent_start;
+                                                let should_auto_toggle_input = me
+                                                    .should_auto_open_cli_agent_for_launch(
+                                                        agent, ctx,
+                                                    );
                                                 sessions_model.set_session(
                                                     view_id,
                                                     CLIAgentSession {
@@ -13711,8 +13715,10 @@ impl TerminalView {
             CLIAgentSessionListener::new(view_id, agent, &model_events_handle, ctx)
         });
         let remote_host = self.active_session_remote_host(ctx);
-        let should_auto_toggle_input = agent.supports_cli_agent_footer()
-            && *AISettings::as_ref(ctx).auto_open_rich_input_on_cli_agent_start;
+        let should_auto_toggle_input = CLIAgentSessionsModel::as_ref(ctx)
+            .session(view_id)
+            .map(|session| session.should_auto_toggle_input)
+            .unwrap_or_else(|| self.should_auto_open_cli_agent_for_launch(agent, ctx));
         // Seed context from the event that caused registration before the
         // listener subscribes to future events.
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
@@ -13795,23 +13801,28 @@ impl TerminalView {
             .then_some(child_conversation_id)
     }
 
-    /// If the startup auto-open setting is enabled, auto-opens rich input for a
-    /// CLI agent session. Called after creating a command-detected session or
-    /// registering a listener so rich input is shown immediately.
+    /// 快捷启动只为对应命令打开输入框；手工启动继续使用已有输入偏好。
+    fn should_auto_open_cli_agent_for_launch(&self, agent: CLIAgent, ctx: &AppContext) -> bool {
+        agent.supports_cli_agent_footer()
+            && (*AISettings::as_ref(ctx).auto_open_rich_input_on_cli_agent_start
+                || self.cli_agent_rich_input_launch.as_ref().is_some_and(
+                    |(launched_agent, block_id)| {
+                        *launched_agent == agent
+                            && *block_id == *self.model.lock().block_list().active_block_id()
+                    },
+                ))
+    }
+
+    /// 创建会话或注册监听器后应用本次会话的输入选择，与工具栏布局无关。
     fn maybe_auto_open_cli_agent_rich_input(&mut self, ctx: &mut ViewContext<Self>) {
-        let ai_settings = AISettings::as_ref(ctx);
-        if !*ai_settings.auto_open_rich_input_on_cli_agent_start
-            || !ai_settings.is_any_ai_enabled(ctx)
-            || !*ai_settings.should_render_cli_agent_footer
-            || !is_rich_input_chip_in_cli_toolbar(ctx)
-        {
-            return;
-        }
         let should_open = CLIAgentSessionsModel::as_ref(ctx)
             .session(self.view_id)
             .is_some_and(|s| s.agent.supports_cli_agent_footer() && s.should_auto_toggle_input);
         if should_open && !self.has_active_cli_agent_input_session(ctx) {
             self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+        }
+        if self.has_active_cli_agent_input_session(ctx) {
+            self.cli_agent_rich_input_launch = None;
         }
     }
 
@@ -13952,11 +13963,7 @@ impl TerminalView {
         // Auto-show/hide rich input based on the setting.
         // Only applies when the session has a plugin listener (rich status info).
         let ai_settings = AISettings::as_ref(ctx);
-        if *ai_settings.auto_toggle_rich_input
-            && ai_settings.is_any_ai_enabled(ctx)
-            && *ai_settings.should_render_cli_agent_footer
-            && is_rich_input_chip_in_cli_toolbar(ctx)
-        {
+        if *ai_settings.auto_toggle_rich_input {
             let should_auto_toggle_input = CLIAgentSessionsModel::as_ref(ctx)
                 .session(self.view_id)
                 .is_some_and(|s| {
@@ -15981,12 +15988,22 @@ impl TerminalView {
             return;
         }
         let had_pending = self.input.read(ctx, |input, _| input.has_pending_command());
+        let rich_input_launch = self
+            .pending_specific_cli_agent_launch
+            .as_ref()
+            .map(|intent| {
+                (
+                    intent.agent,
+                    self.model.lock().block_list().active_block_id().clone(),
+                )
+            });
         self.input.update(ctx, |input, ctx| {
             input.execute_pending_command(ctx);
         });
         // If the pending command was just consumed, track that we're waiting
         // for the resulting block to complete.
         if had_pending && !self.input.read(ctx, |input, _| input.has_pending_command()) {
+            self.cli_agent_rich_input_launch = rich_input_launch;
             self.pending_specific_cli_agent_launch = None;
             self.awaiting_pending_command_completion = true;
         }
@@ -24327,11 +24344,6 @@ impl TerminalView {
                 self.update_git_status_subscription(ctx);
             }
             SessionSettingsChangedEvent::CLIAgentToolbarChipSelectionSetting { .. } => {
-                // Force-close rich input when the Rich Input chip is removed so
-                // it doesn't linger open with no toolbar button to manage it.
-                if !is_rich_input_chip_in_cli_toolbar(ctx) {
-                    self.close_cli_agent_rich_input(CLIAgentRichInputCloseReason::Other, ctx);
-                }
                 self.update_git_status_subscription(ctx);
             }
             SessionSettingsChangedEvent::AgentToolbarChipSelectionSetting { .. }
@@ -29283,13 +29295,9 @@ impl View for TerminalView {
         if let Some(session) = CLIAgentSessionsModel::as_ref(app).session(self.view_id) {
             context.set.insert(init::CLI_AGENT_SESSION_ACTIVE_KEY);
             if session.agent.supports_cli_agent_footer()
-                && *AISettings::as_ref(app).should_render_cli_agent_footer
+                && FeatureFlag::CLIAgentRichInput.is_enabled()
             {
-                context.set.insert(flags::CLI_AGENT_FOOTER_ENABLED);
-
-                if is_rich_input_chip_in_cli_toolbar(app) {
-                    context.set.insert(flags::CLI_AGENT_RICH_INPUT_CHIP_ENABLED);
-                }
+                context.set.insert(flags::CLI_AGENT_RICH_INPUT_AVAILABLE);
             }
 
             // Mirror the rich-input-open flag onto the terminal context so the
@@ -29844,16 +29852,6 @@ fn maybe_wrap_terminal_element_in_scrollable(
         }
         (false, false) => element.finish(),
     }
-}
-
-/// Returns `true` when the Rich Input chip is present in the user's CLI agent
-/// footer toolbar configuration.
-fn is_rich_input_chip_in_cli_toolbar(app: &AppContext) -> bool {
-    let sel = &SessionSettings::as_ref(app).cli_agent_footer_chip_selection;
-    sel.left_items()
-        .iter()
-        .chain(sel.right_items().iter())
-        .any(|item| matches!(item, AgentToolbarItemKind::RichInput))
 }
 
 /// Maximum pixel width of the back-button label before it ellipsizes
