@@ -20,6 +20,9 @@ app/assets/bundled/cli-agent-plugins/codex/scripts/*.ps1 text eol=lf
 app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/*.ps1 text eol=lf
 # G09 准备脚本纳入验收来源绑定，各平台检出须保持相同字节。
 script/ci/g09-clr-fixture/*.ps1 text eol=lf
+# 安装器回归源码按字节绑定，Windows 检出保留 PowerShell 5.1 BOM 与 LF。
+script/windows/test_windows_environment*.ps1 text eol=lf
+script/windows/reissue_release_installer.ps1 text eol=lf
 app/assets/bundled/cli-agent-plugins/codex/source/plugins/orchestration/skills/factory-files/references/scorers.md whitespace=-blank-at-eol
 
 # 原始验收输出保留终端空白与文件摘要，不对记录做格式整理。

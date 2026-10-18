@@ -24,3 +24,16 @@
 自动检查通过后，以新源码冻结新的候选，交付包含安装器、身份绑定和采集器的便携 ZIP。用户按[最终安装器验收入口](windows-final-installer-acceptance.zh-CN.md)补实际 URI 唤起、退出和官方卸载，助手审核回执后再判关闭。Linux 桌面继续延期，自动检查保留；旧候选的 macOS 和 12 资产通过记录仅属于原字节。
 
 无需本地化变更：没有新增或改变用户可见文案，变更限于 Windows 系统登记与卸载行为。
+
+## 正式安装器只读工件验证
+
+发行方在新的完整 release run 成功后，使用同一个 `cross-platform-preflight.yml` 控制面验证最终 Setup，不通过 SSH 另跑验证器，也不重复源码门禁。在 Actions 的 Run workflow 中选择包含验证工具的控制器分支，设置：
+
+- `run_windows=true`、`run_linux=false`；其他开关保持默认。
+- `windows_atomic_debug_scope=release-installer:<正式 release run 的正整数 ID>`，例如把冒号后的占位说明替换成实际 run ID。旧的 `all`、`upstream_essence` 等范围值仍按白名单接受，拼写错误会前置拒绝。
+
+这里沿用范围字段，是因为既有 workflow 已达到 GitHub 的 25 个 dispatch 输入上限。该模式只有一个独立 Windows 只读 job，权限为 `contents:read` 与 `actions:read`；工具和临时文件只落在独占作业目录。
+
+验证器分别记录 `artifact_source_sha` 和 `controller_sha`：前者由正式 run、注解 tag、生产作业、工件提供方摘要及六资源清单严格绑定，且必须是控制器提交的祖先或同一提交；后者是实际执行验证工具的提交。发行方还须将输出身份与已冻结 `candidate.json` 对照，不能把控制器后继提交说成候选产品源码。
+
+验证包括 Windows 与 bundle 原始 ZIP 的提供方摘要、CRC、精确成员、上传/下载来源链，Setup 实际 Authenticode 状态，以及固定 innounp 对主 EXE、manifest 和六资源的八件只读解包。`NotSigned` 明确记为未签名；内层主 EXE 要求 AMD64，Setup 引擎可以是 PE32。只读验证不安装或启动产品、不改注册表，成功也不替代用户安装、真实 URI 唤起和官方卸载回执。失败保存原始证据，不自动重跑或放宽门禁。
