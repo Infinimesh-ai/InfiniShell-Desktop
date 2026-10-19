@@ -342,6 +342,11 @@ fn restore_prepares_private_permissions_and_leaves_no_file_after_invalid_snapsho
 #[test]
 #[cfg(windows)]
 fn restore_preserves_readonly_and_cleans_its_temporary_file_after_collision() {
+    use std::os::windows::fs::MetadataExt;
+
+    // WinNT.h 的公开属性位；测试只读取元数据，不引入额外 Windows 依赖。
+    const FILE_ATTRIBUTE_TEMPORARY: u32 = 0x100;
+
     let dir = tempfile::tempdir().unwrap();
     let target = dir.path().join("readonly.txt");
     let permissions = FilePermissions {
@@ -350,7 +355,12 @@ fn restore_preserves_readonly_and_cleans_its_temporary_file_after_collision() {
     };
     restore_local_file(&target, "original", permissions).unwrap();
     assert!(std::fs::metadata(&target).unwrap().permissions().readonly());
+    assert_eq!(
+        std::fs::metadata(&target).unwrap().file_attributes() & FILE_ATTRIBUTE_TEMPORARY,
+        0
+    );
     assert!(restore_local_file(&target, "replacement", permissions).is_err());
+    assert!(std::fs::metadata(&target).unwrap().permissions().readonly());
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "original");
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     let mut writable = std::fs::metadata(&target).unwrap().permissions();

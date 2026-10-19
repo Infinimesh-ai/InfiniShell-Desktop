@@ -1570,15 +1570,27 @@ impl RepositorySubscriber for FileRepositorySubscriber {
 #[path = "lib_tests.rs"]
 mod tests;
 
-/// 临时文件默认以 0600 创建；任何写入失败都发生在目标目录项发布之前。
+/// 在目标目录预先准备内容和权限；Unix 临时文件默认以 0600 创建。
 fn restore_local_file(path: &Path, content: &str, permissions: FilePermissions) -> io::Result<()> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
+    #[cfg(not(windows))]
     let mut temporary = tempfile::Builder::new()
         .prefix(".infinishell-restore-")
         .tempfile_in(parent)?;
+    #[cfg(windows)]
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".infinishell-restore-")
+        .make_in(parent, |temporary_path| {
+            // 普通文件不带 TEMPORARY 属性，发布时无需清除已准备的只读属性。
+            std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(temporary_path)
+        })?;
     temporary.write_all(content.as_bytes())?;
     #[cfg(unix)]
     {
@@ -1595,29 +1607,37 @@ fn restore_local_file(path: &Path, content: &str, permissions: FilePermissions) 
     }
     #[cfg(windows)]
     {
-        let mut restored = temporary.as_file().metadata()?.permissions();
-        restored.set_readonly(permissions.readonly);
-        temporary.as_file().set_permissions(restored)?;
+        let result = (|| {
+            let mut restored = temporary.as_file().metadata()?.permissions();
+            restored.set_readonly(permissions.readonly);
+            temporary.as_file().set_permissions(restored)?;
+            rename_file_noreplace(temporary.path(), path)
+        })();
+        return match result {
+            Ok(()) => {
+                // 已移动的旧临时名字可能被复用，成功后不再按该路径清理。
+                temporary.disable_cleanup(true);
+                Ok(())
+            }
+            Err(error) => {
+                // 权限准备或移动失败时只修改自持句柄，避免只读属性阻止清理。
+                if let Ok(metadata) = temporary.as_file().metadata() {
+                    let mut writable = metadata.permissions();
+                    writable.set_readonly(false);
+                    let _ = temporary.as_file().set_permissions(writable);
+                }
+                Err(error)
+            }
+        };
     }
     #[cfg(not(any(unix, windows)))]
     return Err(io::Error::new(
         io::ErrorKind::Unsupported,
         "Permission restoration is unavailable",
     ));
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     match temporary.persist_noclobber(path) {
         Ok(_) => Ok(()),
-        Err(error) => {
-            #[cfg(windows)]
-            {
-                // 只修改自持的临时文件，避免只读属性阻止失败后的清理。
-                if let Ok(metadata) = error.file.as_file().metadata() {
-                    let mut writable = metadata.permissions();
-                    writable.set_readonly(false);
-                    let _ = error.file.as_file().set_permissions(writable);
-                }
-            }
-            Err(error.error)
-        }
+        Err(error) => Err(error.error),
     }
 }
