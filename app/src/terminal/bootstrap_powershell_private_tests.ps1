@@ -20,6 +20,8 @@ Remove-Item Env:WARP_IS_SSH -ErrorAction Ignore
 Remove-Item Env:WARP_POWERSHELL_PRIVATE_STARTUP_ROOT -ErrorAction Ignore
 $root = Join-Path $fixture 'private root 中文[1]'
 $null = New-Item -ItemType Directory -Path $root
+# 输入保留原始路径；预期根独立规范化，避免 8.3 别名与长路径比较产生误判。
+$expectedPrivateRoot = (Get-Item -LiteralPath $root -Force -ErrorAction Stop).FullName
 if ($Case -ne 'default') { $env:WARP_POWERSHELL_PRIVATE_STARTUP_ROOT = $root }
 if ($Case -eq 'relative') { $env:WARP_POWERSHELL_PRIVATE_STARTUP_ROOT = 'relative-root' }
 if ($Case -eq 'missing') { $env:WARP_POWERSHELL_PRIVATE_STARTUP_ROOT = Join-Path $fixture 'missing' }
@@ -69,13 +71,18 @@ try {
         if ($message.hook -eq 'Bootstrapped') { $hook = $message }
     }
     $result = @{
+        powershell_edition = $PSEdition
         powershell_version = $PSVersionTable.PSVersion.ToString()
         psreadline_version = (Get-Module PSReadLine).Version.ToString()
         rc_executed = [IO.File]::Exists($env:WARP_TEST_RC_MARKER)
         rc_sequence = $(if ([IO.File]::Exists($env:WARP_TEST_RC_MARKER)) { [IO.File]::ReadAllText($env:WARP_TEST_RC_MARKER) } else { '' })
         unloaded_after_init = $unloaded
         style = [string]$options.HistorySaveStyle
-        history_private = $options.HistorySavePath.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+        history_private_raw = $options.HistorySavePath.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+        expected_root_changed = -not [String]::Equals($root, $expectedPrivateRoot, [StringComparison]::OrdinalIgnoreCase)
+        history_private = $options.HistorySavePath.StartsWith($expectedPrivateRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+        private_path_matches_options = ($null -ne $global:_warpPrivateHistoryPath -and $global:_warpPrivateHistoryPath -ceq $options.HistorySavePath)
+        private_path_matches_bootstrapped = ($null -ne $global:_warpPrivateHistoryPath -and $null -ne $hook -and $global:_warpPrivateHistoryPath -ceq $hook.value.histfile)
         history_empty = $(if ($null -ne $global:_warpPrivateHistoryPath) { (Get-Item -LiteralPath $global:_warpPrivateHistoryPath).Length -eq 0 } else { $false })
         real_bootstrapped_path_matches = ($null -ne $hook -and $hook.value.histfile -ceq $options.HistorySavePath)
         init_shell_emitted = (($initOutput -join '') -match '496E69745368656C6C')

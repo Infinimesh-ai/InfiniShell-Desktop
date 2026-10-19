@@ -89,6 +89,22 @@ fn run_case(case: &str) -> (i32, Value) {
             String::from_utf8_lossy(&output.stderr)
         );
     }
+    if receipt.is_object() {
+        // 只记录布尔、版本及策略值，不输出历史内容、完整路径或 Bootstrap 环境快照。
+        let diagnostics = json!({
+            "powershell_edition": receipt["powershell_edition"],
+            "powershell_version": receipt["powershell_version"],
+            "psreadline_version": receipt["psreadline_version"],
+            "style": receipt["style"],
+            "history_private_raw": receipt["history_private_raw"],
+            "expected_root_changed": receipt["expected_root_changed"],
+            "history_private": receipt["history_private"],
+            "private_path_matches_options": receipt["private_path_matches_options"],
+            "private_path_matches_bootstrapped": receipt["private_path_matches_bootstrapped"],
+            "real_bootstrapped_path_matches": receipt["real_bootstrapped_path_matches"],
+        });
+        eprintln!("PowerShell 私有启动诊断 {case}: {diagnostics}");
+    }
     (output.status.code().unwrap(), receipt)
 }
 
@@ -100,6 +116,8 @@ fn private_startup_preserves_history_policy_across_module_reload() {
     assert_eq!(result["unloaded_after_init"], json!(true));
     assert_eq!(result["style"], json!("SaveNothing"));
     assert_eq!(result["history_private"], json!(true));
+    assert_eq!(result["private_path_matches_options"], json!(true));
+    assert_eq!(result["private_path_matches_bootstrapped"], json!(true));
     assert_eq!(result["history_empty"], json!(true));
     assert_eq!(result["real_bootstrapped_path_matches"], json!(true));
     assert_eq!(result["init_shell_emitted"], json!(true));
@@ -171,6 +189,8 @@ fn local_session_takes_priority_over_inherited_ssh_flag() {
     assert_eq!(exit, 0);
     assert_eq!(result["style"], json!("SaveNothing"));
     assert_eq!(result["history_private"], json!(true));
+    assert_eq!(result["private_path_matches_options"], json!(true));
+    assert_eq!(result["private_path_matches_bootstrapped"], json!(true));
     assert_eq!(result["rc_executed"], json!(false));
     assert_eq!(result["real_bootstrapped_path_matches"], json!(true));
 }

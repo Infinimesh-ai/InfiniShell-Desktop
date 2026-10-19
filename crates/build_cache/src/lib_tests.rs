@@ -609,12 +609,23 @@ fn process_runner_classifies_spawn_nonzero_and_timeout() {
         })
     );
 
-    let mut timeout = Command::new_with_process_group("sh");
-    timeout.args(["-c", "sleep 1"]);
+    // 超时分类只需要一个直接子进程，避免 Windows 的 MSYS shell 额外派生 sleep。
+    let mut timeout = Command::new_with_process_group(std::env::current_exe().unwrap());
+    timeout.args([
+        "--ignored",
+        "--exact",
+        "tests::process_runner_timeout_fixture",
+    ]);
     assert_eq!(
         block_on(run_command_with_timeout(timeout, Duration::from_millis(10))),
         Err(CacheSetupError::Timeout)
     );
+}
+
+#[test]
+#[ignore = "仅由超时分类测试作为原生子进程调用"]
+fn process_runner_timeout_fixture() {
+    std::thread::sleep(Duration::from_secs(1));
 }
 
 #[cfg(unix)]
