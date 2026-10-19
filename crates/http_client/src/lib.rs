@@ -74,6 +74,7 @@ const EXTRA_HTTP_HEADERS_ENV_VAR: &str = "WARP_EXTRA_HTTP_HEADERS";
 /// run outside of a Tokio context.
 pub struct Client {
     wrapped: reqwest::Client,
+    include_warp_headers: bool,
 
     /// A callback that is executed before every request is sent with a cloned
     /// version of the outbound request.  If for some reason the request cannot be
@@ -172,6 +173,13 @@ impl Client {
         Self::from_client_builder(builder).expect("should not fail to create client")
     }
 
+    /// 外部服务只接收调用方显式提供的请求头，不附加应用元信息或环境凭据。
+    pub fn new_external() -> Self {
+        let mut client = Self::new();
+        client.include_warp_headers = false;
+        client
+    }
+
     #[cfg(feature = "test-util")]
     pub fn new_for_test() -> Self {
         let client_builder = reqwest::ClientBuilder::new()
@@ -187,6 +195,7 @@ impl Client {
     pub fn from_client_builder(client_builder: reqwest::ClientBuilder) -> reqwest::Result<Self> {
         client_builder.build().map(|client| Self {
             wrapped: client,
+            include_warp_headers: true,
             before_request_sent: None,
             after_response_received: None,
             iap_token_provider: None,
@@ -211,6 +220,12 @@ impl Client {
         include_warp_headers: bool,
         iap_token: Option<String>,
     ) -> RequestBuilder<'_> {
+        #[cfg(target_family = "wasm")]
+        let wrapped = if self.include_warp_headers {
+            wrapped
+        } else {
+            wrapped.fetch_credentials_omit()
+        };
         let mut builder = RequestBuilder {
             wrapped,
             client: self,
@@ -218,7 +233,7 @@ impl Client {
             prevent_sleep_reason: None,
         };
 
-        if include_warp_headers {
+        if include_warp_headers && self.include_warp_headers {
             builder = Self::add_warp_http_headers(builder);
         }
 
@@ -263,6 +278,9 @@ impl Client {
     /// Returns the IAP bearer token to attach to a request targeting
     /// `url`, scoped to the Warp server's origin.
     fn iap_token_for<U: IntoUrl>(&self, url: U) -> Option<String> {
+        if !self.include_warp_headers {
+            return None;
+        }
         let provider = self.iap_token_provider.as_ref()?;
         let url = url.into_url().ok()?;
         if !is_warp_server_origin(&url) {

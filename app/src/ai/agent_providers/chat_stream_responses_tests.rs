@@ -67,6 +67,85 @@ async fn collect_responses_request(
         .await
 }
 
+#[tokio::test]
+async fn responses_requests_send_only_provider_headers() {
+    let mut server = mockito::Server::new_async().await;
+    let mut mocks = Vec::new();
+    for (path, content_type, body) in [
+        (
+            "/v1/conversations",
+            "application/json",
+            r#"{"id":"conv_external"}"#,
+        ),
+        (
+            "/v1/responses/input_tokens",
+            "application/json",
+            r#"{"input_tokens":1000}"#,
+        ),
+        (
+            "/v1/responses",
+            "text/event-stream",
+            COMPLETED_RESPONSES_STREAM,
+        ),
+    ] {
+        let mut mock = server
+            .mock("POST", path)
+            .match_header("authorization", "Bearer test-key")
+            .match_header("x-provider-route", "explicit-route");
+        // 同时覆盖会话创建、计数和生成入口，避免未来新建客户端时漏用隔离构造器。
+        for prefix in ["x-infinishell", "x-zap"] {
+            for name in [
+                "client-version",
+                "os-category",
+                "os-name",
+                "os-version",
+                "os-linux-kernel-version",
+                "client-id",
+                "traceparent",
+            ] {
+                mock = mock.match_header(&format!("{prefix}-{name}"), Matcher::Missing);
+            }
+        }
+        mocks.push(
+            mock.with_header("content-type", content_type)
+                .with_body(body)
+                .expect(1)
+                .create_async()
+                .await,
+        );
+    }
+    let (_cancel, cancellation_rx) = futures::channel::oneshot::channel();
+    let stream = generate_byop_output(ByopOutputInput {
+        params: responses_continuation_params(),
+        base_url: format!("{}/v1", server.url()),
+        api_key: "test-key".to_owned(),
+        model_id: "gpt-5.6".to_owned(),
+        api_type: AgentProviderApiType::OpenAiResp,
+        reasoning_effort: crate::settings::ReasoningEffortSetting::Auto,
+        extra_headers: vec![("X-Provider-Route".to_owned(), "explicit-route".to_owned())],
+        responses: AgentProviderResponsesOptions {
+            state_mode: ResponsesStateModeSetting::Conversation,
+            ..Default::default()
+        },
+        task_id: "task-1".to_owned(),
+        target_task_id: "task-1".to_owned(),
+        needs_create_task: false,
+        lrc_command_id: None,
+        lrc_should_spawn_subagent: false,
+        context_window: Some(64_000),
+        cancellation_rx,
+        attachment_caps: Default::default(),
+    })
+    .await
+    .expect("隔离头部后的 Responses 请求应正常建立");
+    let events: Vec<_> = stream.collect().await;
+    assert!(!events.is_empty());
+    assert!(events.iter().all(Result::is_ok), "{events:?}");
+    for mock in mocks {
+        mock.assert_async().await;
+    }
+}
+
 #[cfg(windows)]
 const STREAM_SKILL_PATH: &str = r"C:\Users\member\.agents\skills\localmind\SKILL.md";
 #[cfg(not(windows))]

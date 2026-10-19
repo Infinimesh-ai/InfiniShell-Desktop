@@ -4347,7 +4347,7 @@ pub async fn generate_byop_output(
                     }
                     None => {
                         let responses_client = super::responses::ResponsesClient::new(
-                            Arc::new(http_client::Client::new()),
+                            Arc::new(http_client::Client::new_external()),
                             &base_url,
                             api_key.clone(),
                             extra_headers.clone(),
@@ -4475,7 +4475,7 @@ pub async fn generate_byop_output(
             None
         };
         let client = super::responses::ResponsesClient::new(
-            Arc::new(http_client::Client::new()),
+            Arc::new(http_client::Client::new_external()),
             &base_url,
             api_key.clone(),
             extra_headers.clone(),
