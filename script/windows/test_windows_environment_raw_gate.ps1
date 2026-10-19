@@ -50,12 +50,25 @@ $readFunctions = @($ast.FindAll({
     $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Get-RawPath'
 }, $true))
 if ($readFunctions.Count -ne 1) { throw '无法唯一定位实际原始字节读取函数' }
+$writeFunctions = @($ast.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Set-RawPath'
+}, $true))
+if ($writeFunctions.Count -ne 1) { throw '无法唯一定位实际原始字节写入函数' }
 $memoryClass = 'InfiniShellRawPathMemoryGate' + [Guid]::NewGuid().ToString('N')
 $memoryCode = @'
 using System;
 using System.Runtime.InteropServices;
 public static class RawPathMemoryGate {
     public static byte[] Bytes;
+    public static byte[] WrittenBuffer;
+    public static uint WrittenSize;
+    public static int SetValue(object key, string name, uint reserved,
+        uint type, byte[] data, uint size) {
+        WrittenBuffer = (byte[])data.Clone();
+        WrittenSize = size;
+        return 0;
+    }
     public static int QueryValue(object key, string name, IntPtr reserved,
         out uint type, [Out] byte[] data, ref uint size) {
         type = 1;
@@ -69,10 +82,12 @@ public static class RawPathMemoryGate {
 '@
 $memoryType = Add-Type -TypeDefinition ($memoryCode.Replace('RawPathMemoryGate', $memoryClass)) -PassThru
 . ([scriptblock]::Create($readFunctions[0].Extent.Text.Replace('[InfiniShellRawPathRegistry]', "[$memoryClass]")))
+. ([scriptblock]::Create($writeFunctions[0].Extent.Text.Replace('[InfiniShellRawPathRegistry]', "[$memoryClass]")))
 $key = [pscustomobject]@{ Handle = $null }
 $key | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
 $registry = [pscustomobject]@{ TestKey = $key }
 $registry | Add-Member -MemberType ScriptMethod -Name OpenSubKey -Value { param($name) $this.TestKey }
+$registry | Add-Member -MemberType ScriptMethod -Name CreateSubKey -Value { param($name) $this.TestKey }
 $keyPath = 'offline-fixture'
 foreach ($fixture in @(
     @{ bytes = [byte[]]@() },
@@ -84,5 +99,14 @@ foreach ($fixture in @(
     if ($actual.kind -ne 1 -or $actual.bytes -cne [Convert]::ToBase64String($fixture.bytes)) {
         throw '真实原始字节读取函数丢失假响应的字节或类型'
     }
+    # 捕获真实函数传给写 API 的缓冲区和计数；哨兵不得进入实际持久化字节数。
+    Set-RawPath 'write' $fixture.bytes 1
+    $written = $memoryType.GetField('WrittenBuffer').GetValue($null)
+    $size = $memoryType.GetField('WrittenSize').GetValue($null)
+    if ($size -ne $fixture.bytes.Length -or $written.Length -ne $size + 2 -or
+        [Convert]::ToBase64String($written, 0, $size) -cne [Convert]::ToBase64String($fixture.bytes) -or
+        $written[$size] -eq 0 -or $written[$size + 1] -eq 0) {
+        throw '真实原始字节写入函数未保留精确计数和非零尾哨兵'
+    }
 }
-[pscustomobject]@{ status = 'passed'; cases = 5; assertions = 8 }
+[pscustomobject]@{ status = 'passed'; cases = 8; assertions = 11 }

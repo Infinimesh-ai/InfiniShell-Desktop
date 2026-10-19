@@ -148,12 +148,14 @@ public static class InfiniShellRawPathRegistry {
 '@
 # 在任何测试键写入前核对真实句柄签名；不依赖 PowerShell 将安全句柄隐式转换为裸指针。
 $rawGate = & (Join-Path $sourceDirectory 'test_windows_environment_raw_gate.ps1') -SourcePath (Join-Path $sourceDirectory 'test_windows_environment.ps1')
-if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 8) { throw '原始字节夹具互操作门禁失败' }
+if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 11) { throw '原始字节夹具互操作门禁失败' }
 function Set-RawPath {
     param([string] $Name, [byte[]] $Bytes, [uint32] $Kind)
     $key = $registry.CreateSubKey("$keyPath\$Name")
     try {
-        $code = [InfiniShellRawPathRegistry]::SetValue($key.Handle, 'Path', 0, $Kind, $Bytes, $Bytes.Length)
+        # 给缺终止符夹具保留可读的非零后继字节，避免计数外偶然的 NUL 触发兼容补长。
+        [byte[]]$writeBytes = [byte[]]($Bytes + @(0xA5, 0x5A))
+        $code = [InfiniShellRawPathRegistry]::SetValue($key.Handle, 'Path', 0, $Kind, $writeBytes, $Bytes.Length)
         if ($code -ne 0) { throw "原始字节夹具写入失败：$Name，Win32=$code" }
     } finally { $key.Dispose() }
 }
@@ -458,17 +460,70 @@ function Invoke-NativeEdges {
     $result.known_limits += [pscustomobject]@{case=$name; observed='empty REG_EXPAND_SZ'; reason='original absence history already removed before new helper attached'}
 }
 
-function Invoke-RawPathBoundaries {
+function Get-RawPathFixtures {
     $prefix = [Text.Encoding]::Unicode.GetBytes('C:\raw')
-    $malformed = @(
+    @(
         @{ name = 'zero-bytes'; bytes = [byte[]]@() },
         @{ name = 'missing-nul'; bytes = $prefix },
         @{ name = 'extra-nul'; bytes = [byte[]]($prefix + @(0, 0, 0, 0)) },
         @{ name = 'odd-byte'; bytes = [byte[]]($prefix + @(0)) },
         @{ name = 'embedded-nul'; bytes = [byte[]]($prefix + @(0, 0, 65, 0, 0, 0)) },
         @{ name = 'high-surrogate'; bytes = [byte[]]@(0, 216, 0, 0) },
-        @{ name = 'low-surrogate'; bytes = [byte[]]@(0, 220, 0, 0) }
+        @{ name = 'low-surrogate'; bytes = [byte[]]@(0, 220, 0, 0) },
+        @{ name = 'valid-surrogate-pair'; bytes = [byte[]]($prefix + @(61, 216, 0, 222, 0, 0)) }
     )
+}
+
+function Invoke-RawFixturePreflight {
+    # 仅证明人工夹具可以原字节往返；独立测试根不调用任何生产 helper。
+    $preflightId = [Guid]::NewGuid().ToString('N')
+    $keyPath = "Software\InfiniShellEnvironmentRawTests\$preflightId"
+    $receipt = [ordered]@{ test_id = $preflightId; registry_root = "HKCU\$keyPath"; status = 'incomplete'; cases = @(); cleanup_passed = $false; production_helper_executed = $false; error = $null }
+    try {
+        $existing = $registry.OpenSubKey($keyPath)
+        if ($existing) { $existing.Dispose(); throw '原字节预检随机根已存在' }
+        $root = $registry.CreateSubKey($keyPath)
+        try { $root.SetValue('TestId', $preflightId, [Microsoft.Win32.RegistryValueKind]::String) }
+        finally { $root.Dispose() }
+        foreach ($kind in @(1, 2)) {
+            foreach ($fixture in Get-RawPathFixtures) {
+                $name = "$kind-$($fixture.name)"
+                Set-RawPath $name $fixture.bytes $kind
+                $actual = Get-RawPath $name
+                $expected = [Convert]::ToBase64String($fixture.bytes)
+                $passed = $actual.kind -eq $kind -and $actual.bytes -ceq $expected
+                $receipt.cases += [pscustomobject]@{ name = $name; kind = $kind; expected_bytes = $expected; actual = $actual; passed = $passed }
+                if (-not $passed) { throw "原字节预检写入后不一致：$name" }
+            }
+        }
+        $receipt.status = 'passed'
+    } catch {
+        $receipt.status = 'failed'
+        $receipt.error = $_.Exception.ToString()
+    } finally {
+        try {
+            # 失败现场保持可复查；成功后只清理有本轮身份的独占根。
+            if ($receipt.status -eq 'passed') {
+                if ($keyPath -cne "Software\InfiniShellEnvironmentRawTests\$preflightId") { throw '原字节预检根越界' }
+                $root = $registry.OpenSubKey($keyPath)
+                try { if (-not $root -or $root.GetValue('TestId') -cne $preflightId) { throw '原字节预检根身份不符' } }
+                finally { if ($root) { $root.Dispose() } }
+                $registry.DeleteSubKeyTree($keyPath, $false)
+                $remaining = $registry.OpenSubKey($keyPath)
+                if ($remaining) { $remaining.Dispose(); throw '原字节预检根清理失败' }
+                $receipt.cleanup_passed = $true
+            }
+        } catch {
+            $receipt.status = 'failed'
+            $receipt.error = "$($receipt.error) 清理失败：$($_.Exception.Message)"
+        }
+        $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'raw-fixture-preflight.json') -Encoding UTF8
+    }
+    $receipt
+}
+
+function Invoke-RawPathBoundaries {
+    $malformed = @(Get-RawPathFixtures | Where-Object { $_.name -ne 'valid-surrogate-pair' })
     foreach ($kind in @(1, 2)) {
         foreach ($fixture in $malformed) {
             foreach ($action in @('add', 'remove')) {
@@ -507,7 +562,7 @@ function Invoke-RawPathBoundaries {
         }
         $name = "raw-$kind-valid-surrogate-pair"
         # U+1F600 的 UTF-16 代理对；确认保护不会误拒绝有效的非 BMP 字符。
-        $bytes = [byte[]]($prefix + @(61, 216, 0, 222, 0, 0))
+        $bytes = (Get-RawPathFixtures | Where-Object { $_.name -eq 'valid-surrogate-pair' }).bytes
         Set-RawPath $name $bytes $kind
         $before = Get-RawPath $name
         Invoke-NativeAction $name 'new' 'add' 0
@@ -529,9 +584,13 @@ $result = [ordered]@{
     schema_version = 1; test_id = $testId; status = 'incomplete'; registry_root = "HKCU\$keyPath"
     compiler = $CompilerPath; helper_sha256 = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'environment.iss') -Algorithm SHA256).Hash.ToLowerInvariant()
     started_at = [DateTime]::UtcNow.ToString('o'); compiler_exit_code = $null; harness_exit_code = $null
-    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; raw_registry_mismatch = $null; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
+    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; raw_fixture_preflight_cases = 0; raw_fixture_preflight_cleanup_passed = $false; raw_registry_mismatch = $null; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
 }
 try {
+    $rawFixturePreflight = Invoke-RawFixturePreflight
+    $result.raw_fixture_preflight_cases = $rawFixturePreflight.cases.Count
+    $result.raw_fixture_preflight_cleanup_passed = $rawFixturePreflight.cleanup_passed
+    if ($rawFixturePreflight.status -cne 'passed' -or $rawFixturePreflight.cases.Count -ne 16 -or -not $rawFixturePreflight.cleanup_passed) { throw '原字节预检未通过，不执行长 Inno 测试' }
     $existing = $registry.OpenSubKey($keyPath)
     if ($existing) { $existing.Dispose(); throw '随机测试键已存在，拒绝覆盖' }
     $root = $registry.CreateSubKey($keyPath)

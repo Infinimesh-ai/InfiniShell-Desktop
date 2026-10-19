@@ -209,11 +209,19 @@ def validate_tests(args):
     full = read(root / 'test-output/full/result.json')
     fixed = {'status': 'passed', 'error': None, 'native_matrix_skipped': False, 'native_matrix_cases': 200,
              'native_edge_cases': 38, 'assertions': 1615, 'native_actions': 1438, 'native_step_assertions': 2572,
-             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 8,
+             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 11,
+             'raw_fixture_preflight_cases': 16, 'raw_fixture_preflight_cleanup_passed': True,
              'real_user_path_unchanged': True, 'cleanup_passed': True}
     for key, value in fixed.items():
         require(full.get(key) == value, '完整 PATH 回归字段不符：' + key)
     require(len(full['raw_registry_cases']) == 30, '原始注册表字节场景不完整')
+    raw = read(root / 'test-output/full/raw-fixture-preflight.json')
+    require(raw['status'] == 'passed' and raw['cleanup_passed'] is True and
+            raw['production_helper_executed'] is False and len(raw['cases']) == 16,
+            '原始字节夹具独立预检未完成')
+    require(all(case['passed'] is True and case['kind'] == case['actual']['kind'] and
+                case['expected_bytes'] == case['actual']['bytes'] for case in raw['cases']),
+            '原始字节夹具未按类型和字节精确往返')
     require(len(full['verified_cases']) == 362 and {item['case'] for item in full['known_limits']} ==
             {'native-limit-future-old-install', 'native-limit-missing-history'}, '完整回归场景/已知边界不符')
     reissue = read(root / 'test-output/reissue/result.json')
@@ -244,6 +252,7 @@ def validate_tests(args):
     save(root / 'evidence/path-regression-binding.json', {
         'status': 'passed', 'helper_sha256': HELPER_SHA, 'frozen_R4_sha256': LEGACY_SHA,
         'full_result': row(root / 'test-output/full/result.json', root),
+        'raw_fixture_preflight': row(root / 'test-output/full/raw-fixture-preflight.json', root),
         'reissue_result': row(root / 'test-output/reissue/result.json', root),
         'full_matrix_cases': 200, 'full_edge_cases': 38, 'full_known_limits': full['known_limits'],
         'reissue_positive_cases': 40, 'reissue_negativecontrols': controls,
