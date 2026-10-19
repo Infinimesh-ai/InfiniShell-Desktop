@@ -22,7 +22,13 @@
 //! `host_response_tests.rs` forces every new request variant to be
 //! classified one way or the other.
 
+use warp_util::file::FilePermissions;
+
+use crate::manager::HostRequestError;
 use crate::proto::{ServerMessage, server_message};
+
+/// 分块读取的缺失文件标记；只由 daemon 的 NotFound 分支发出。
+pub const READ_FILE_NOT_FOUND_PREFIX: &str = "[file-not-found] ";
 
 /// Interprets a per-operation response with the standard
 /// `Success | Error | (unset)` result shape. A missing `result` is an error
@@ -49,6 +55,33 @@ pub fn write_file_result(msg: &ServerMessage) -> Result<(), String> {
         crate::proto::write_file_response::Result,
         "WriteFile"
     )
+}
+
+/// 解析移动回执，保留源内容已保存的部分失败状态。
+pub fn rename_file_result(
+    msg: &ServerMessage,
+) -> Result<Option<FilePermissions>, HostRequestError> {
+    match &msg.message {
+        Some(server_message::Message::RenameFileResponse(response)) => match &response.result {
+            Some(crate::proto::rename_file_response::Result::Success(success)) => {
+                Ok(success.replaced_target_permissions.clone().map(Into::into))
+            }
+            Some(crate::proto::rename_file_response::Result::Error(error)) => {
+                if error.content_saved_at_source {
+                    Err(HostRequestError::RenameFailedAfterSave(
+                        error.message.clone(),
+                    ))
+                } else {
+                    Err(HostRequestError::OperationFailed(error.message.clone()))
+                }
+            }
+            None => Err(HostRequestError::UnexpectedResponse),
+        },
+        Some(server_message::Message::Error(error)) => {
+            Err(HostRequestError::OperationFailed(error.message.clone()))
+        }
+        _ => Err(HostRequestError::UnexpectedResponse),
+    }
 }
 
 /// Interprets a [`ServerMessage`] as the result of a `SaveBuffer` request.
@@ -88,3 +121,54 @@ fn unexpected_variant(op: &str, other: &Option<server_message::Message>) -> Stri
 #[cfg(test)]
 #[path = "host_response_tests.rs"]
 mod tests;
+
+impl From<FilePermissions> for crate::proto::FilePermissions {
+    fn from(permissions: FilePermissions) -> Self {
+        Self {
+            unix_mode: permissions.unix_mode,
+            readonly: permissions.readonly,
+        }
+    }
+}
+
+impl From<crate::proto::FilePermissions> for FilePermissions {
+    fn from(permissions: crate::proto::FilePermissions) -> Self {
+        Self {
+            unix_mode: permissions.unix_mode,
+            readonly: permissions.readonly,
+        }
+    }
+}
+
+/// 专用删除必须携带权限快照，缺失时不能宣称可恢复。
+pub fn delete_file_for_diff_result(
+    msg: &ServerMessage,
+) -> Result<FilePermissions, HostRequestError> {
+    match &msg.message {
+        Some(server_message::Message::DeleteFileForDiffResponse(response)) => {
+            match &response.result {
+                Some(crate::proto::delete_file_for_diff_response::Result::Permissions(
+                    permissions,
+                )) => Ok(permissions.clone().into()),
+                Some(crate::proto::delete_file_for_diff_response::Result::Error(error)) => {
+                    Err(HostRequestError::OperationFailed(error.message.clone()))
+                }
+                None => Err(HostRequestError::UnexpectedResponse),
+            }
+        }
+        Some(server_message::Message::Error(error)) => {
+            Err(HostRequestError::OperationFailed(error.message.clone()))
+        }
+        _ => Err(HostRequestError::UnexpectedResponse),
+    }
+}
+
+/// 撤销恢复使用独立回执，不能将普通写入回执视为恢复成功。
+pub fn restore_file_for_diff_result(msg: &ServerMessage) -> Result<(), String> {
+    file_op_result!(
+        msg,
+        server_message::Message::RestoreFileForDiffResponse,
+        crate::proto::restore_file_for_diff_response::Result,
+        "RestoreFileForDiff"
+    )
+}

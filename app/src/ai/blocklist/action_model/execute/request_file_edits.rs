@@ -312,7 +312,8 @@ impl RequestFileEditsExecutor {
                 &shell_launch_data,
                 &current_working_directory,
             );
-            let file_diff = FileDiff::new(diff.original_content, path, diff.diff_type);
+            let mut file_diff = FileDiff::new(diff.original_content, path, diff.diff_type);
+            file_diff.rename_target_original_content = diff.rename_target_original_content;
             diffs.push(file_diff);
         }
 

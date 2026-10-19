@@ -137,6 +137,9 @@ pub struct AIRequestedCodeDiff {
     /// Populated for edits and deletes; empty for new file creation.
     #[derivative(PartialEq = "ignore")]
     pub original_content: String,
+    /// 覆盖移动前的目标内容，仅用于撤销时恢复被替换的目标。
+    #[derivative(PartialEq = "ignore")]
+    pub rename_target_original_content: Option<String>,
 }
 
 impl AIRequestedCodeDiff {
@@ -377,6 +380,7 @@ pub fn fuzzy_match_diffs(
         },
         failures,
         original_content: file_content,
+        rename_target_original_content: None,
     }
 }
 
@@ -453,6 +457,7 @@ pub fn fuzzy_match_v4a_diffs(
         diff_type: DiffType::update(deltas, rename_to),
         failures,
         original_content: file_content,
+        rename_target_original_content: None,
     }
 }
 

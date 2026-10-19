@@ -13,6 +13,7 @@ use warp_core::SessionId;
 #[cfg(not(target_family = "wasm"))]
 use warp_core::channel::{Channel, ChannelState};
 use warp_errors::report_error;
+use warp_util::file::FilePermissions;
 use warp_util::remote_path::{RemoteNavigationResult, RemotePath};
 use warp_util::standardized_path::StandardizedPath;
 #[cfg(not(target_family = "wasm"))]
@@ -776,6 +777,9 @@ pub enum HostRequestError {
     /// server-provided message verbatim so callers can surface it directly.
     #[error("{0}")]
     OperationFailed(String),
+    /// 远端已保存源内容，但原生移动失败。
+    #[error("{0}")]
+    RenameFailedAfterSave(String),
     /// The request was cancelled client-side via
     /// [`RemoteServerManager::abort_host_request`].
     #[error("host request aborted")]
@@ -957,6 +961,87 @@ impl HostRequestHandle {
         crate::host_response::write_file_result(&msg).map_err(HostRequestError::OperationFailed)
     }
 
+    /// 按远端主机的原生文件系统语义移动并保存内容。
+    pub async fn rename_file(
+        &self,
+        path: String,
+        new_path: String,
+        content: String,
+        require_restorable: bool,
+        expected_target_content: Option<String>,
+    ) -> Result<Option<FilePermissions>, HostRequestError> {
+        let msg = self
+            .send(crate::proto::host_scoped_request::Message::RenameFile(
+                crate::proto::RenameFile {
+                    path,
+                    new_path,
+                    content,
+                    require_restorable,
+                    expected_target_content,
+                },
+            ))
+            .await?;
+        crate::host_response::rename_file_result(&msg)
+    }
+
+    /// 独立撤销移动请求在旧 daemon 上失败，不能降级为允许覆盖的移动。
+    pub async fn undo_move_file_for_diff(
+        &self,
+        path: String,
+        new_path: String,
+        content: String,
+    ) -> Result<Option<FilePermissions>, HostRequestError> {
+        let msg = self
+            .send(
+                crate::proto::host_scoped_request::Message::UndoMoveFileForDiff(
+                    crate::proto::UndoMoveFileForDiff {
+                        path,
+                        new_path,
+                        content,
+                    },
+                ),
+            )
+            .await?;
+        crate::host_response::rename_file_result(&msg)
+    }
+
+    /// Agent 删除使用独立请求，旧 daemon 必须拒绝而不是忽略身份保护。
+    pub async fn delete_file_for_diff(
+        &self,
+        path: String,
+    ) -> Result<FilePermissions, HostRequestError> {
+        let msg = self
+            .send(
+                crate::proto::host_scoped_request::Message::DeleteFileForDiff(
+                    crate::proto::DeleteFileForDiff { path },
+                ),
+            )
+            .await?;
+        crate::host_response::delete_file_for_diff_result(&msg)
+    }
+
+    /// 只在不存在的目录项恢复内容和权限，旧 daemon 必须拒绝未知请求。
+    pub async fn restore_file_for_diff(
+        &self,
+        path: String,
+        content: String,
+        permissions: FilePermissions,
+    ) -> Result<(), HostRequestError> {
+        let msg = self
+            .send(
+                crate::proto::host_scoped_request::Message::RestoreFileForDiff(
+                    crate::proto::RestoreFileForDiff {
+                        path,
+                        content,
+                        permissions: Some(permissions.into()),
+                    },
+                ),
+            )
+            .await?;
+        crate::host_response::restore_file_for_diff_result(&msg)
+            .map_err(HostRequestError::OperationFailed)
+    }
+
     /// Deletes a file on the remote host.
     pub async fn delete_file(&self, path: String) -> Result<(), HostRequestError> {
         let msg = self
@@ -1000,6 +1085,30 @@ impl HostRequestHandle {
             .map_err(|_| HostRequestError::AllSessionsDisconnected)?
             .ok_or(HostRequestError::AllSessionsDisconnected)?;
         Ok(client.open_buffer(path, force_reload).await?)
+    }
+
+    /// 读取原始字节分块，保留差异预处理和撤销所需的原始换行符。
+    pub async fn read_file_chunk(
+        &self,
+        path: String,
+        offset: u64,
+        max_bytes: u64,
+    ) -> Result<crate::proto::ReadFileChunkResponse, HostRequestError> {
+        let response = self
+            .send(crate::proto::host_scoped_request::Message::ReadFileChunk(
+                crate::proto::ReadFileChunk {
+                    path,
+                    offset,
+                    max_bytes,
+                },
+            ))
+            .await?;
+        match response.message {
+            Some(crate::proto::server_message::Message::ReadFileChunkResponse(response)) => {
+                Ok(response)
+            }
+            _ => Err(HostRequestError::UnexpectedResponse),
+        }
     }
 
     /// Batch-reads one or more files from the remote host with full context
@@ -3028,7 +3137,8 @@ impl RemoteServerManager {
                             HostRequestError::AllSessionsDisconnected => RemoteServerErrorKind::Disconnected,
                             HostRequestError::Timeout => RemoteServerErrorKind::Timeout,
                             HostRequestError::ServerError { .. }
-                            | HostRequestError::OperationFailed(_) => RemoteServerErrorKind::ServerError,
+                            | HostRequestError::OperationFailed(_)
+                            | HostRequestError::RenameFailedAfterSave(_) => RemoteServerErrorKind::ServerError,
                             HostRequestError::UnexpectedResponse
                             | HostRequestError::Aborted => RemoteServerErrorKind::Other,
                         };

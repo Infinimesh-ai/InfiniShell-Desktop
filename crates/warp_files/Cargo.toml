@@ -20,10 +20,11 @@ watcher.workspace = true
 notify-debouncer-full.workspace = true
 repo_metadata.workspace = true
 log.workspace = true
+same-file = "1.0"
+tempfile.workspace = true
 
 [features]
 test-util = []
 
 [dev-dependencies]
 async-channel.workspace = true
-tempfile.workspace = true

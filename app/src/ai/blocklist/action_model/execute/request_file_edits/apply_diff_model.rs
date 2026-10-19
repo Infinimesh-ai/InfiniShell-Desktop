@@ -8,8 +8,13 @@
 //! - **Local**: calls [`apply_edits`] with a `std::fs`-backed closure.
 //! - **Remote**: calls [`apply_edits`] with a [`RemoteServerClient`]-backed closure.
 
+use std::future::Future;
+
 use ai::diff_validation::AIRequestedCodeDiff;
 use futures::FutureExt;
+use remote_server::host_response::READ_FILE_NOT_FOUND_PREFIX;
+use remote_server::manager::{HostRequestError, HostRequestHandle};
+use remote_server::proto::{ReadFileChunkResponse, read_file_chunk_response};
 use vec1::Vec1;
 use warpui::r#async::BoxFuture;
 use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
@@ -100,60 +105,104 @@ impl ApplyDiffModel {
     }
 }
 
-// ── Remote file reading ──────────────────────────────────────────────────────────
+/// 远端差异的单文件预算与 daemon 单块读取上限。
+const MAX_DIFF_READ_BYTES: u64 = 10_000_000;
+const DIFF_READ_CHUNK_BYTES: u64 = 8 * 1024 * 1024;
 
-/// Per-file byte limit for remote diff application (10 MB).
-const MAX_DIFF_READ_BYTES: u32 = 10_000_000;
+async fn read_remote_file(handle: &HostRequestHandle, path: &str) -> FileReadResult {
+    read_remote_file_chunks(|offset, max_bytes| {
+        handle.read_file_chunk(path.to_owned(), offset, max_bytes)
+    })
+    .await
+}
 
-async fn read_remote_file(
-    handle: &remote_server::manager::HostRequestHandle,
-    path: &str,
-) -> FileReadResult {
-    let request = remote_server::proto::ReadFileContextRequest {
-        files: vec![remote_server::proto::ReadFileContextFile {
-            path: path.to_string(),
-            line_ranges: vec![],
-        }],
-        max_file_bytes: Some(MAX_DIFF_READ_BYTES),
-        max_batch_bytes: None,
-    };
-    match handle.read_file_context(request).await {
-        Ok(response) => {
-            if let Some(fc) = response.file_contexts.into_iter().next() {
-                // A whole-file read that was truncated by the byte limit will
-                // have line_range_start/end set even though no ranges were
-                // requested. Detect this and fail explicitly rather than
-                // applying the diff to partial content.
-                if fc.line_range_start.is_some() || fc.line_range_end.is_some() {
-                    return FileReadResult::ReadError(format!(
-                        "File exceeds the {MAX_DIFF_READ_BYTES}-byte limit for remote diff \
-                         application and was truncated. The diff cannot be applied safely."
-                    ));
-                }
-                match fc.content {
-                    Some(remote_server::proto::file_context_proto::Content::TextContent(
-                        content,
-                    )) => FileReadResult::Found(content),
-                    Some(remote_server::proto::file_context_proto::Content::BinaryContent(_)) => {
-                        // apply-diff only works with text files
-                        FileReadResult::ReadError("File is binary".to_string())
-                    }
-                    None => FileReadResult::Found(String::new()),
-                }
-            } else if let Some(failed) = response.failed_files.into_iter().next() {
-                let message = failed
-                    .error
-                    .map(|e| e.message)
-                    .unwrap_or_else(|| "Unknown error".to_string());
-                if message.contains("not found") || message.contains("Not found") {
+/// 完整拼接后再解码 UTF-8；分块不能改变换行、拆坏字符或静默接受截断。
+async fn read_remote_file_chunks<F, Fut>(mut read_chunk: F) -> FileReadResult
+where
+    F: FnMut(u64, u64) -> Fut,
+    Fut: Future<Output = Result<ReadFileChunkResponse, HostRequestError>>,
+{
+    let mut bytes = Vec::new();
+    let mut offset = 0;
+    let mut total_size = None;
+    // 最多两批内容；恰好达到预算时额外读取一字节，验证真正的 EOF。
+    for batch in 0..3 {
+        let remaining = MAX_DIFF_READ_BYTES - offset;
+        if batch == 2 && remaining != 0 {
+            return FileReadResult::ReadError(
+                "Remote file did not complete within the chunk budget".to_owned(),
+            );
+        }
+        let max_bytes = if remaining == 0 {
+            1
+        } else {
+            remaining.min(DIFF_READ_CHUNK_BYTES)
+        };
+        let response = match read_chunk(offset, max_bytes).await {
+            Ok(response) => response,
+            Err(error) => return FileReadResult::ReadError(error.to_string()),
+        };
+        let chunk = match response.result {
+            Some(read_file_chunk_response::Result::Success(chunk)) => chunk,
+            Some(read_file_chunk_response::Result::Error(error)) => {
+                return if offset == 0 && error.message.starts_with(READ_FILE_NOT_FOUND_PREFIX) {
                     FileReadResult::NotFound
                 } else {
-                    FileReadResult::ReadError(message)
-                }
-            } else {
-                FileReadResult::NotFound
+                    FileReadResult::ReadError(error.message)
+                };
             }
+            None => {
+                return FileReadResult::ReadError("Empty remote file chunk response".to_owned());
+            }
+        };
+        let Some(size) = chunk.total_size else {
+            return FileReadResult::ReadError(
+                "Missing remote file size for diff application".to_owned(),
+            );
+        };
+        if size > MAX_DIFF_READ_BYTES {
+            return FileReadResult::ReadError(format!(
+                "File exceeds the {MAX_DIFF_READ_BYTES}-byte limit for remote diff application"
+            ));
         }
-        Err(err) => FileReadResult::ReadError(format!("{err}")),
+        if total_size.is_some_and(|previous| previous != size) {
+            return FileReadResult::ReadError(
+                "Remote file size changed during diff preparation".to_owned(),
+            );
+        }
+        total_size = Some(size);
+        let read = chunk.bytes.len() as u64;
+        if read > max_bytes
+            || chunk.next_offset != offset + read
+            || chunk.next_offset > size
+            || chunk.next_offset > MAX_DIFF_READ_BYTES
+        {
+            return FileReadResult::ReadError(
+                "Invalid remote file chunk offset or length".to_owned(),
+            );
+        }
+        if chunk.eof && chunk.next_offset != size {
+            return FileReadResult::ReadError(
+                "Remote file was truncated during diff preparation".to_owned(),
+            );
+        }
+        if !chunk.eof && read == 0 {
+            return FileReadResult::ReadError("Remote file chunk made no progress".to_owned());
+        }
+        bytes.extend(chunk.bytes);
+        offset = chunk.next_offset;
+        if chunk.eof && (offset < MAX_DIFF_READ_BYTES || remaining == 0) {
+            return match String::from_utf8(bytes) {
+                Ok(content) => FileReadResult::Found(content),
+                Err(error) => {
+                    FileReadResult::ReadError(format!("Remote file is not valid UTF-8: {error}"))
+                }
+            };
+        }
     }
+    FileReadResult::ReadError("Remote file did not reach EOF within the read budget".to_owned())
 }
+
+#[cfg(all(test, feature = "local_fs", not(target_family = "wasm")))]
+#[path = "apply_diff_model_tests.rs"]
+mod tests;

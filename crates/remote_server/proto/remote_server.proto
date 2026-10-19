@@ -56,6 +56,10 @@ message HostScopedRequest {
     CreateDirectory create_directory = 24;
     ReadFileChunk read_file_chunk = 25;
     WriteFileChunk write_file_chunk = 26;
+    RenameFile rename_file = 27;
+    DeleteFileForDiff delete_file_for_diff = 28;
+    RestoreFileForDiff restore_file_for_diff = 29;
+    UndoMoveFileForDiff undo_move_file_for_diff = 30;
   }
 }
 
@@ -154,6 +158,9 @@ message ServerMessage {
     CliGrokOwnedResponse cli_grok_owned = 45;
     CliCodexOwnedResponse cli_codex_owned = 46;
     TerminalBindingResponse terminal_binding = 47;
+    RenameFileResponse rename_file_response = 48;
+    DeleteFileForDiffResponse delete_file_for_diff_response = 49;
+    RestoreFileForDiffResponse restore_file_for_diff_response = 50;
   }
 }
 
@@ -574,6 +581,66 @@ message WriteFileResponse {
 }
 
 message WriteFileSuccess {}
+
+message RenameFile {
+  string path = 1;
+  string new_path = 2;
+  string content = 3;
+  bool require_restorable = 4;
+  optional string expected_target_content = 5;
+}
+
+message UndoMoveFileForDiff {
+  string path = 1;
+  string new_path = 2;
+  string content = 3;
+}
+
+message RenameFileResponse {
+  oneof result {
+    RenameFileSuccess success = 1;
+    RenameFileError error = 2;
+  }
+}
+
+message DeleteFileForDiff {
+  string path = 1;
+}
+
+message FilePermissions {
+  optional uint32 unix_mode = 1;
+  bool readonly = 2;
+}
+
+message RenameFileSuccess {
+  FilePermissions replaced_target_permissions = 1;
+}
+
+message DeleteFileForDiffResponse {
+  oneof result {
+    FilePermissions permissions = 1;
+    FileOperationError error = 2;
+  }
+}
+
+message RestoreFileForDiff {
+  string path = 1;
+  string content = 2;
+  FilePermissions permissions = 3;
+}
+
+message RestoreFileForDiffResponse {
+  oneof result {
+    WriteFileSuccess success = 1;
+    FileOperationError error = 2;
+  }
+}
+
+message RenameFileError {
+  string message = 1;
+  // 源内容已写入但移动失败，客户端必须保留可恢复状态。
+  bool content_saved_at_source = 2;
+}
 
 // Client → server: delete a file.
 message DeleteFile {

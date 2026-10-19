@@ -7,8 +7,8 @@ use std::future::Future;
 use std::sync::Arc;
 
 use ai::diff_validation::{
-    AIRequestedCodeDiff, DiffDelta, DiffMatchFailures, DiffType, ParsedDiff, SearchAndReplace,
-    V4AHunk, fuzzy_match_diffs, fuzzy_match_v4a_diffs,
+    AIRequestedCodeDiff, DiffMatchFailures, DiffType, ParsedDiff, SearchAndReplace, V4AHunk,
+    fuzzy_match_diffs, fuzzy_match_v4a_diffs,
 };
 use itertools::Itertools;
 use vec1::Vec1;
@@ -440,11 +440,12 @@ async fn apply_create_file<F, Fut>(
                 diff_type: DiffType::creation(content),
                 failures: None,
                 original_content: String::new(),
+                rename_target_original_content: None,
             });
         }
         FileReadResult::ReadError(err) => {
             safe_warn!(
-                safe: ("Unable to check if file exists for Agent Code: {err}"),
+                safe: ("Unable to check if file exists for Agent Code"),
                 full: ("Unable to check if file exists for Agent Code: {absolute_path:?} {err}")
             );
             result.errors.push(DiffApplicationError::ReadFailed {
@@ -478,6 +479,7 @@ async fn apply_delete_file<F, Fut>(
                 diff_type: DiffType::deletion(num_lines),
                 failures: None,
                 original_content: file_content,
+                rename_target_original_content: None,
             })
         }
         FileReadResult::NotFound => {
@@ -487,7 +489,7 @@ async fn apply_delete_file<F, Fut>(
         }
         FileReadResult::ReadError(err) => {
             safe_warn!(
-                safe: ("Unable to read file for Agent Code: {err}"),
+                safe: ("Unable to read file for Agent Code"),
                 full: ("Unable to read file {absolute_path:?} for Agent Code: {err}")
             );
             result.errors.push(DiffApplicationError::ReadFailed {
@@ -525,6 +527,7 @@ async fn apply_search_replace<F, Fut>(
                             diff_type: DiffType::creation(replace),
                             failures: None,
                             original_content: String::new(),
+                            rename_target_original_content: None,
                         })
                     } else {
                         safe_warn!(
@@ -553,7 +556,7 @@ async fn apply_search_replace<F, Fut>(
         }
         FileReadResult::ReadError(err) => {
             safe_warn!(
-                safe: ("Unable to read file for Agent Code: {err}"),
+                safe: ("Unable to read file for Agent Code"),
                 full: ("Unable to read file {absolute_path:?} for Agent Code: {err}")
             );
             result.errors.push(DiffApplicationError::ReadFailed {
@@ -625,7 +628,7 @@ async fn apply_v4a_update<F, Fut>(
         }
         FileReadResult::ReadError(err) => {
             safe_warn!(
-                safe: ("Unable to read file for Agent Code: {err}"),
+                safe: ("Unable to read file for Agent Code"),
                 full: ("Unable to read file {absolute_path:?} for Agent Code: {err}")
             );
             result.errors.push(DiffApplicationError::ReadFailed {
@@ -642,6 +645,15 @@ async fn apply_v4a_update<F, Fut>(
         full: ("Matching V4A diffs for: {file_path:?}")
     );
 
+    // 移动目标使用会话所在主机的绝对路径，不能相对于 GUI 进程目录解释。
+    let rename_to = rename_to.map(|target| {
+        host_native_absolute_path(
+            &target,
+            session_context.shell(),
+            session_context.current_working_directory(),
+        )
+    });
+
     // Check if we're renaming to an existing file.
     let rename_target_content = if let Some(target) = &rename_to {
         let target_absolute = host_native_absolute_path(
@@ -654,7 +666,7 @@ async fn apply_v4a_update<F, Fut>(
             FileReadResult::NotFound => None,
             FileReadResult::ReadError(err) => {
                 safe_warn!(
-                    safe: ("Unable to read rename target file: {err}"),
+                    safe: ("Unable to read rename target file"),
                     full: ("Unable to read rename target file {target_absolute:?}: {err}")
                 );
                 result.errors.push(DiffApplicationError::ReadFailed {
@@ -668,90 +680,22 @@ async fn apply_v4a_update<F, Fut>(
         None
     };
 
-    if let Some(target_content) = rename_target_content {
-        // Renaming A to B where B already exists:
-        // 1. Create deletion for A.
-        // 2. Replace all of B with A.
-        // 3. Create update for B that applies the original diff to A.
-        let rename_target = rename_to.unwrap();
-
-        // First, match the V4A diffs against the source file (without rename)
-        let source_diffs = fuzzy_match_v4a_diffs(&file_path, &deltas, None, file_content.clone());
-        if source_diffs.warrants_failure() {
-            if let Some(failures) = source_diffs.failures.as_ref() {
-                safe_warn!(
-                    safe: ("Failure(s) applying V4A diff: {failures:?}"),
-                    full: ("Failure(s) applying V4A diff for {absolute_path:?}: {failures:?}")
-                );
-                result.errors.push(DiffApplicationError::UnmatchedDiffs {
-                    file: file_path.clone(),
-                    match_failures: *failures,
-                });
-            }
-            return;
+    // 目标已存在时也保留单个移动操作，避免先删除源文件并绕过身份校验。
+    let mut diffs = fuzzy_match_v4a_diffs(&file_path, &deltas, rename_to, file_content);
+    diffs.rename_target_original_content = rename_target_content;
+    if diffs.warrants_failure() {
+        if let Some(failures) = diffs.failures.as_ref() {
+            safe_warn!(
+                safe: ("Failure(s) applying V4A diff: {failures:?}"),
+                full: ("Failure(s) applying V4A diff for {absolute_path:?}: {failures:?}")
+            );
+            result.errors.push(DiffApplicationError::UnmatchedDiffs {
+                file: file_path.clone(),
+                match_failures: *failures,
+            });
         }
-
-        let target_num_lines = target_content.lines().count();
-        let source_num_lines = file_content.lines().count();
-
-        // Reuse the copy that fuzzy_match_v4a_diffs already
-        // made for its original_content field, so we only
-        // allocate once instead of cloning file_content again.
-        let deletion_original_content = source_diffs.original_content;
-
-        // Replace all of B's content with A's content.
-        // Moves file_content — no clone needed.
-        let mut new_deltas = Vec::new();
-        let replacement_range = if target_num_lines == 0 {
-            0..0
-        } else {
-            1..(target_num_lines + 1)
-        };
-        new_deltas.push(DiffDelta {
-            replacement_line_range: replacement_range,
-            insertion: file_content,
-        });
-
-        // Apply the original diff to A.
-        if let DiffType::Update {
-            deltas: source_deltas,
-            ..
-        } = source_diffs.diff_type
-        {
-            new_deltas.extend(source_deltas);
-        }
-
-        // Create deletion diff for source file A
-        result.diffs.push(AIRequestedCodeDiff {
-            file_name: file_path.clone(),
-            diff_type: DiffType::deletion(source_num_lines),
-            failures: None,
-            original_content: deletion_original_content,
-        });
-
-        result.diffs.push(AIRequestedCodeDiff {
-            file_name: rename_target,
-            diff_type: DiffType::update(new_deltas, None),
-            failures: None,
-            original_content: target_content,
-        });
-    } else {
-        // Normal case: no rename or rename to non-existent file
-        let diffs = fuzzy_match_v4a_diffs(&file_path, &deltas, rename_to, file_content);
-        if diffs.warrants_failure() {
-            if let Some(failures) = diffs.failures.as_ref() {
-                safe_warn!(
-                    safe: ("Failure(s) applying V4A diff: {failures:?}"),
-                    full: ("Failure(s) applying V4A diff for {absolute_path:?}: {failures:?}")
-                );
-                result.errors.push(DiffApplicationError::UnmatchedDiffs {
-                    file: file_path.clone(),
-                    match_failures: *failures,
-                });
-            }
-        }
-        result.diffs.push(diffs);
     }
+    result.diffs.push(diffs);
 }
 
 #[cfg(test)]

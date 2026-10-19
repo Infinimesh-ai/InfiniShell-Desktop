@@ -251,3 +251,126 @@ fn test_save_missing_directory() {
 }
 
 static TEST_FILE_CONTENT: &[u8] = include_bytes!("../test_data/test_file.rs");
+
+#[test]
+fn remote_move_reports_disconnected_host_through_future_and_event() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(RemoteServerManager::new);
+        let files = app.add_singleton_model(FileModel::new);
+        let (tx, rx) = unbounded();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&files, move |_, event, _| {
+                if let FileModelEvent::FailedToSave { id, error } = event {
+                    tx.try_send((*id, error.clone())).unwrap();
+                }
+            });
+        });
+        let file_id = files.update(&mut app, |model, _| {
+            model.register_remote_file(
+                HostId::new("disconnected-host".to_owned()),
+                StandardizedPath::try_new("/repo/source.txt").unwrap(),
+            )
+        });
+        let future = files
+            .update(&mut app, |model, ctx| {
+                model.rename_and_save(
+                    file_id,
+                    PathBuf::from("/repo/target.txt"),
+                    "updated\n".to_owned(),
+                    ContentVersion::new(),
+                    ctx,
+                )
+            })
+            .expect("remote move must dispatch without a local file path");
+
+        let error = future.await.unwrap_err();
+        assert!(matches!(&*error, FileSaveError::RemoteError(_)));
+        let (event_id, event_error) = rx.recv().await.unwrap();
+        assert_eq!(event_id, file_id);
+        assert_eq!(error.to_string(), event_error.to_string());
+    });
+}
+
+#[test]
+#[cfg(unix)]
+fn restore_prepares_private_permissions_and_leaves_no_file_after_invalid_snapshot() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("secret");
+    assert!(
+        restore_local_file(
+            &target,
+            "secret",
+            FilePermissions {
+                unix_mode: None,
+                readonly: false
+            }
+        )
+        .is_err()
+    );
+    assert!(!target.exists());
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    restore_local_file(
+        &target,
+        "secret",
+        FilePermissions {
+            unix_mode: Some(0o600),
+            readonly: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "secret");
+    assert!(
+        restore_local_file(
+            &target,
+            "replacement",
+            FilePermissions {
+                unix_mode: Some(0o755),
+                readonly: false
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "secret");
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+}
+
+#[test]
+#[cfg(windows)]
+fn restore_preserves_readonly_and_cleans_its_temporary_file_after_collision() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("readonly.txt");
+    let permissions = FilePermissions {
+        unix_mode: None,
+        readonly: true,
+    };
+    restore_local_file(&target, "original", permissions).unwrap();
+    assert!(std::fs::metadata(&target).unwrap().permissions().readonly());
+    assert!(restore_local_file(&target, "replacement", permissions).is_err());
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "original");
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    let mut writable = std::fs::metadata(&target).unwrap().permissions();
+    writable.set_readonly(false);
+    std::fs::set_permissions(&target, writable).unwrap();
+}
+
+#[test]
+fn native_undo_move_rejects_existing_destination_and_preserves_file_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("moved.txt");
+    let target = dir.path().join("original.txt");
+    std::fs::write(&source, "moved content").unwrap();
+    std::fs::write(&target, "new user file").unwrap();
+    let identity = same_file::Handle::from_path(&source).unwrap();
+    assert!(rename_file_noreplace(&source, &target).is_err());
+    assert_eq!(std::fs::read_to_string(&source).unwrap(), "moved content");
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "new user file");
+    std::fs::remove_file(&target).unwrap();
+    rename_file_noreplace(&source, &target).unwrap();
+    assert!(!source.exists());
+    assert_eq!(same_file::Handle::from_path(&target).unwrap(), identity);
+}

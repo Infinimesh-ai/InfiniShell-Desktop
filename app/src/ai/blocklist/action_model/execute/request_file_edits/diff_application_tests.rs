@@ -1079,44 +1079,23 @@ fn test_apply_v4a_rename_to_existing_file() {
         assert!(result.is_ok(), "Expected Ok result but got: {result:?}");
         let diffs = result.unwrap();
 
-        // Should produce TWO diffs: deletion for source, update for target
-        assert_eq!(diffs.len(), 2);
-
-        // First diff: deletion of source file A
+        // 覆盖目标仍保留单个移动，原目标内容只作为撤销快照。
+        assert_eq!(diffs.len(), 1);
         assert_eq!(diffs[0].file_name, source_path);
-        match &diffs[0].diff_type {
-            DiffType::Delete { .. } => {}
-            other => panic!("Expected Delete diff_type for source, got {other:?}"),
-        }
-
-        // Second diff: update of target file B with source content (after applying deltas)
-        assert_eq!(diffs[1].file_name, target_path);
-        match &diffs[1].diff_type {
-            DiffType::Update { deltas, rename } => {
-                assert!(rename.is_none(), "Target update should not have rename");
-                // Two deltas: one replaces target with source content, one applies the modification
-                assert_eq!(deltas.len(), 2);
-                // First delta: replaces target content with source content
-                assert!(
-                    deltas[0].insertion.contains("source line one"),
-                    "Should contain source content"
-                );
-                assert!(
-                    deltas[0].insertion.contains("source line two"),
-                    "First delta should contain original source"
-                );
-                assert!(
-                    deltas[0].insertion.contains("source line three"),
-                    "Should contain source content"
-                );
-                // Second delta: applies the modification
-                assert!(
-                    deltas[1].insertion.contains("MODIFIED LINE TWO"),
-                    "Should contain modified line"
-                );
-            }
-            other => panic!("Expected Update diff_type for target, got {other:?}"),
-        }
+        assert_eq!(
+            diffs[0].original_content,
+            "source line one\nsource line two\nsource line three\n"
+        );
+        assert_eq!(
+            diffs[0].rename_target_original_content.as_deref(),
+            Some("target old content\nshould be replaced\n")
+        );
+        let DiffType::Update { deltas, rename } = &diffs[0].diff_type else {
+            panic!("expected a move");
+        };
+        assert_eq!(rename.as_ref().unwrap().to_str().unwrap(), target_path);
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].insertion, "MODIFIED LINE TWO");
     });
 }
 
@@ -1159,26 +1138,49 @@ fn test_apply_v4a_rename_to_existing_file_no_deltas() {
         assert!(result.is_ok(), "Expected Ok result but got: {result:?}");
         let diffs = result.unwrap();
 
-        // Should produce TWO diffs: deletion for source, update for target
-        assert_eq!(diffs.len(), 2);
-
-        // First diff: deletion of source file A
+        assert_eq!(diffs.len(), 1);
         assert_eq!(diffs[0].file_name, source_path);
-        match &diffs[0].diff_type {
-            DiffType::Delete { .. } => {}
-            other => panic!("Expected Delete diff_type for source, got {other:?}"),
-        }
+        assert_eq!(diffs[0].original_content, "source content only\n");
+        assert_eq!(
+            diffs[0].rename_target_original_content.as_deref(),
+            Some("target old content\n")
+        );
+        let DiffType::Update { deltas, rename } = &diffs[0].diff_type else {
+            panic!("expected a move");
+        };
+        assert_eq!(rename.as_ref().unwrap().to_str().unwrap(), target_path);
+        assert!(deltas.is_empty());
+    });
+}
 
-        // Second diff: update of target file B with source content (no modifications)
-        assert_eq!(diffs[1].file_name, target_path);
-        match &diffs[1].diff_type {
-            DiffType::Update { deltas, rename } => {
-                assert!(rename.is_none());
-                assert_eq!(deltas.len(), 1);
-                // The insertion should be exactly the source content (including trailing newline from writeln!)
-                assert_eq!(deltas[0].insertion, "source content only\n");
-            }
-            other => panic!("Expected Update diff_type for target, got {other:?}"),
-        }
+#[test]
+fn target_snapshot_read_failure_does_not_prepare_a_move() {
+    App::test((), |app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source.txt");
+        let target = dir.path().join("target-directory");
+        std::fs::write(&source, "original\n").unwrap();
+        std::fs::create_dir(&target).unwrap();
+        let result = apply_edits(
+            vec![FileEdit::Edit(ParsedDiff::V4AEdit {
+                file: Some(source.to_str().unwrap().to_owned()),
+                move_to: Some(target.to_str().unwrap().to_owned()),
+                hunks: vec![],
+            })],
+            &SessionContext::new_for_test(),
+            &AIIdentifiers::default(),
+            app.background_executor(),
+            Arc::new(AuthState::new_for_test()),
+            false,
+            |path| async move { FileReadResult::from(std::fs::read_to_string(path)) },
+        )
+        .await;
+        let errors = result.unwrap_err();
+        assert!(matches!(
+            errors.first(),
+            DiffApplicationError::ReadFailed { .. }
+        ));
+        assert_eq!(std::fs::read_to_string(&source).unwrap(), "original\n");
+        assert!(target.is_dir());
     });
 }

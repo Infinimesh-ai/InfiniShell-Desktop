@@ -66,10 +66,11 @@ use super::diff_state_tracker::{
 use super::proto::{
     Abort, Authenticate, BranchInfo, BufferEdit, BufferUpdatedPush, ClientMessage, CloseBuffer,
     CodebaseIndexLimits, CodebaseIndexStatus, CodebaseIndexStatusUpdated,
-    CodebaseIndexStatusesSnapshot, CodebaseResyncMode, DeleteFile, DeleteFileResponse,
-    DeleteFileSuccess, DiscardFilesError, DiscardFilesResponse, DiscardFilesSuccess,
-    DropCodebaseIndex, ErrorCode, ErrorResponse, FailedFileRead, FileContextProto,
-    FileOperationError, FragmentMetadataLookupError as ProtoFragmentMetadataLookupError,
+    CodebaseIndexStatusesSnapshot, CodebaseResyncMode, DeleteFile, DeleteFileForDiffResponse,
+    DeleteFileResponse, DeleteFileSuccess, DiscardFilesError, DiscardFilesResponse,
+    DiscardFilesSuccess, DropCodebaseIndex, ErrorCode, ErrorResponse, FailedFileRead,
+    FileContextProto, FileOperationError,
+    FragmentMetadataLookupError as ProtoFragmentMetadataLookupError,
     FragmentMetadataLookupErrorCode, GetBranchesError, GetBranchesResponse, GetBranchesSuccess,
     GetDiffStateResponse, GetFragmentMetadataFromHash, GetFragmentMetadataFromHashResponse,
     GitCommitChainRequest, GitCommitChainResponse, GitCommitChainSuccess, GitCreatePrRequest,
@@ -80,16 +81,18 @@ use super::proto::{
     Initialize, InitializeResponse, NavigatedToDirectory, NavigatedToDirectoryResponse, OpenBuffer,
     OpenBufferResponse, ReadFileContextResponse, RemoteAgentContextSnapshot,
     RemoteContextFileProto, RemoteServerCapability, RemoteSkillProto, ResolveConflict,
-    ResolveConflictResponse, ResolveConflictSuccess, ResyncCodebase, RipgrepSearchRequest,
-    RunCommandError, RunCommandErrorCode, RunCommandRequest, RunCommandResponse, RunCommandSuccess,
-    SaveBuffer, SaveBufferResponse, SaveBufferSuccess, ServerMessage, SessionBootstrapped,
-    TextEdit, UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus, UploadHandoffSnapshot,
-    WriteFile, WriteFileResponse, WriteFileSuccess, client_message, delete_file_response,
-    discard_files_response, get_diff_state_response, get_fragment_metadata_from_hash_response,
-    git_commit_chain_response, git_create_pr_response, git_generate_commit_message_response,
-    git_get_committed_branch_files_response, git_push_response, host_scoped_request, notification,
-    remote_skill_proto, resolve_conflict_response, run_command_response, save_buffer_response,
-    server_message, session_scoped_request, write_file_response,
+    ResolveConflictResponse, ResolveConflictSuccess, RestoreFileForDiff,
+    RestoreFileForDiffResponse, ResyncCodebase, RipgrepSearchRequest, RunCommandError,
+    RunCommandErrorCode, RunCommandRequest, RunCommandResponse, RunCommandSuccess, SaveBuffer,
+    SaveBufferResponse, SaveBufferSuccess, ServerMessage, SessionBootstrapped, TextEdit,
+    UpdateGitHubPrInfo, UpdateGitHubRepoInfo, UpdateGitStatus, UploadHandoffSnapshot, WriteFile,
+    WriteFileResponse, WriteFileSuccess, client_message, delete_file_for_diff_response,
+    delete_file_response, discard_files_response, get_diff_state_response,
+    get_fragment_metadata_from_hash_response, git_commit_chain_response, git_create_pr_response,
+    git_generate_commit_message_response, git_get_committed_branch_files_response,
+    git_push_response, host_scoped_request, notification, remote_skill_proto,
+    resolve_conflict_response, restore_file_for_diff_response, run_command_response,
+    save_buffer_response, server_message, session_scoped_request, write_file_response,
 };
 // Buffer-sync 相关:依赖 GlobalBufferModel,后者的 server-local 操作只在
 // `local_fs` 下可用,因此整套服务端 buffer 处理都按 `local_fs` 门控。
@@ -103,6 +106,9 @@ use super::proto::{
     ResolvePathSuccess, WriteFileChunk, WriteFileChunkResponse, WriteFileChunkSuccess,
     create_directory_response, list_directory_response, read_file_chunk_response,
     resolve_path_response, write_file_chunk_response,
+};
+use super::proto::{
+    RenameFile, RenameFileError, RenameFileResponse, RenameFileSuccess, rename_file_response,
 };
 use super::server_buffer_tracker::{PendingBufferRequestKind, ServerBufferTracker};
 use super::{diff_state_proto, ripgrep_search};
@@ -248,6 +254,9 @@ enum CodebaseIndexRequestPathKind {
 enum FileOpKind {
     Write,
     Delete,
+    DeleteForDiff,
+    RestoreForDiff,
+    Rename,
 }
 
 struct PendingFileOp {
@@ -348,7 +357,13 @@ pub struct ServerModel {
         )
     ))]
     codex_owned: Option<Arc<CodexOwnedService>>,
-    #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
     tmux_owned: Option<Arc<super::tmux_owned::Service>>,
     #[cfg(all(
         feature = "local_fs",
@@ -468,7 +483,13 @@ impl ServerModel {
                 )
             ))]
             codex_owned: None,
-            #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
             tmux_owned: None,
             #[cfg(all(
                 feature = "local_fs",
@@ -529,6 +550,78 @@ impl ServerModel {
                             result: Some(delete_file_response::Result::Success(
                                 DeleteFileSuccess {},
                             )),
+                        })
+                    }
+                    (FileModelEvent::FileSaved { .. }, FileOpKind::DeleteForDiff) => {
+                        let result = match FileModel::as_ref(ctx).restoration_permissions(file_id) {
+                            Some(permissions) => {
+                                delete_file_for_diff_response::Result::Permissions(
+                                    permissions.into(),
+                                )
+                            }
+                            None => {
+                                delete_file_for_diff_response::Result::Error(FileOperationError {
+                                    message: "Missing permissions after deletion".to_owned(),
+                                })
+                            }
+                        };
+                        server_message::Message::DeleteFileForDiffResponse(
+                            DeleteFileForDiffResponse {
+                                result: Some(result),
+                            },
+                        )
+                    }
+                    (FileModelEvent::FileSaved { .. }, FileOpKind::RestoreForDiff) => {
+                        server_message::Message::RestoreFileForDiffResponse(
+                            RestoreFileForDiffResponse {
+                                result: Some(restore_file_for_diff_response::Result::Success(
+                                    WriteFileSuccess {},
+                                )),
+                            },
+                        )
+                    }
+                    (FileModelEvent::FailedToSave { error, .. }, FileOpKind::DeleteForDiff) => {
+                        server_message::Message::DeleteFileForDiffResponse(
+                            DeleteFileForDiffResponse {
+                                result: Some(delete_file_for_diff_response::Result::Error(
+                                    FileOperationError {
+                                        message: error.to_string(),
+                                    },
+                                )),
+                            },
+                        )
+                    }
+                    (FileModelEvent::FailedToSave { error, .. }, FileOpKind::RestoreForDiff) => {
+                        server_message::Message::RestoreFileForDiffResponse(
+                            RestoreFileForDiffResponse {
+                                result: Some(restore_file_for_diff_response::Result::Error(
+                                    FileOperationError {
+                                        message: error.to_string(),
+                                    },
+                                )),
+                            },
+                        )
+                    }
+                    (FileModelEvent::FileSaved { .. }, FileOpKind::Rename) => {
+                        server_message::Message::RenameFileResponse(RenameFileResponse {
+                            result: Some(rename_file_response::Result::Success(
+                                RenameFileSuccess {
+                                    replaced_target_permissions: FileModel::as_ref(ctx)
+                                        .restoration_permissions(file_id)
+                                        .map(Into::into),
+                                },
+                            )),
+                        })
+                    }
+                    (FileModelEvent::FailedToSave { error, .. }, FileOpKind::Rename) => {
+                        server_message::Message::RenameFileResponse(RenameFileResponse {
+                            result: Some(rename_file_response::Result::Error(RenameFileError {
+                                message: format!("{error}"),
+                                content_saved_at_source: matches!(
+                                    error.as_ref(),
+                                    warp_util::file::FileSaveError::RenameFailedAfterSave(_)
+                                ),
+                            })),
                         })
                     }
                     (FileModelEvent::FailedToSave { error, .. }, FileOpKind::Write) => {
@@ -993,7 +1086,11 @@ impl ServerModel {
         #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
         if let Some(connection) = self.terminal_binding_connections.remove(&conn_id) {
             let retired = connection.disconnect();
-            ctx.background_executor().spawn(async move { drop(retired); }).detach();
+            ctx.background_executor()
+                .spawn(async move {
+                    drop(retired);
+                })
+                .detach();
         }
         #[cfg(all(
             feature = "local_fs",
@@ -1122,7 +1219,35 @@ impl ServerModel {
                         self.handle_write_file(m, &request_id, conn_id, ctx)
                     }
                     Some(host_scoped_request::Message::DeleteFile(m)) => {
-                        self.handle_delete_file(m, &request_id, conn_id, ctx)
+                        self.handle_delete_file(m, false, &request_id, conn_id, ctx)
+                    }
+                    Some(host_scoped_request::Message::DeleteFileForDiff(m)) => self
+                        .handle_delete_file(
+                            DeleteFile { path: m.path },
+                            true,
+                            &request_id,
+                            conn_id,
+                            ctx,
+                        ),
+                    Some(host_scoped_request::Message::RestoreFileForDiff(m)) => {
+                        self.handle_restore_file_for_diff(m, &request_id, conn_id, ctx)
+                    }
+                    Some(host_scoped_request::Message::UndoMoveFileForDiff(m)) => self
+                        .handle_rename_file(
+                            RenameFile {
+                                path: m.path,
+                                new_path: m.new_path,
+                                content: m.content,
+                                require_restorable: true,
+                                expected_target_content: None,
+                            },
+                            true,
+                            &request_id,
+                            conn_id,
+                            ctx,
+                        ),
+                    Some(host_scoped_request::Message::RenameFile(m)) => {
+                        self.handle_rename_file(m, false, &request_id, conn_id, ctx)
                     }
                     Some(host_scoped_request::Message::ReadFileContext(m)) => {
                         self.handle_read_file_context(m, &request_id, conn_id, ctx)
@@ -1320,10 +1445,17 @@ impl ServerModel {
                         self.cancel_terminal_binding(request, conn_id, ctx);
                     }
                     Some(notification::Message::SessionBootstrapped(m)) => {
-                        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+                        #[cfg(all(
+                            feature = "local_fs",
+                            any(target_os = "macos", target_os = "linux")
+                        ))]
                         if let Some(connection) = self.terminal_binding_connections.get(&conn_id) {
                             let retired = connection.bootstrap(&m);
-                            ctx.background_executor().spawn(async move { drop(retired); }).detach();
+                            ctx.background_executor()
+                                .spawn(async move {
+                                    drop(retired);
+                                })
+                                .detach();
                         }
                         #[cfg(all(
                             feature = "local_fs",
@@ -1816,7 +1948,13 @@ impl ServerModel {
             if self.codex_owned.is_some() && self.image_staging.is_some() {
                 capabilities.push(RemoteServerCapability::CliCodexOwnedV1.into());
             }
-            #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
             if self.tmux_owned.is_some() && self.image_staging.is_some() {
                 capabilities.push(RemoteServerCapability::TmuxOwnedV1.into());
             }
@@ -1849,12 +1987,25 @@ impl ServerModel {
                 private_parent,
             )?));
             let tmux = Arc::new(super::tmux_owned::Service::new(
-                self.host_id.clone(), private_parent,
-                self.codex_owned.as_ref().expect("已初始化 Codex 票据").clone(),
-                self.grok_owned.as_ref().expect("已初始化 Grok 票据").clone(),
+                self.host_id.clone(),
+                private_parent,
+                self.codex_owned
+                    .as_ref()
+                    .expect("已初始化 Codex 票据")
+                    .clone(),
+                self.grok_owned
+                    .as_ref()
+                    .expect("已初始化 Grok 票据")
+                    .clone(),
             ));
-            self.grok_owned.as_ref().expect("已初始化 Grok 票据").set_tmux_owned(Arc::downgrade(&tmux));
-            self.codex_owned.as_ref().expect("已初始化 Codex 票据").set_tmux_owned(Arc::downgrade(&tmux));
+            self.grok_owned
+                .as_ref()
+                .expect("已初始化 Grok 票据")
+                .set_tmux_owned(Arc::downgrade(&tmux));
+            self.codex_owned
+                .as_ref()
+                .expect("已初始化 Codex 票据")
+                .set_tmux_owned(Arc::downgrade(&tmux));
             self.tmux_owned = Some(tmux);
         }
         let staging =
@@ -1867,7 +2018,13 @@ impl ServerModel {
             )
         ))]
         let staging = staging.with_codex_owned(self.codex_owned.clone());
-        #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
         let staging = staging.with_tmux_owned(self.tmux_owned.clone());
         self.image_staging = Some(Arc::new(staging));
         Ok(())
@@ -2553,6 +2710,53 @@ impl ServerModel {
         HandlerOutcome::Async(None)
     }
 
+    fn handle_rename_file(
+        &mut self,
+        msg: RenameFile,
+        undo_move: bool,
+        request_id: &RequestId,
+        conn_id: ConnectionId,
+        ctx: &mut ModelContext<Self>,
+    ) -> HandlerOutcome {
+        let path = resolve_daemon_file_path(&msg.path);
+        let new_path = resolve_daemon_file_path(&msg.new_path);
+        let (file_id, version) = self.pending_file_ops.insert(
+            &path,
+            request_id.clone(),
+            conn_id,
+            FileOpKind::Rename,
+            ctx,
+        );
+        let file_model = FileModel::handle(ctx);
+        if let Err(error) = file_model.update(ctx, |model, ctx| {
+            if undo_move {
+                model.undo_move_and_save_for_diff(file_id, new_path, msg.content, version, ctx)
+            } else if msg.require_restorable {
+                model.rename_and_save_for_diff(
+                    file_id,
+                    new_path,
+                    msg.content,
+                    msg.expected_target_content,
+                    version,
+                    ctx,
+                )
+            } else {
+                model.rename_and_save(file_id, new_path, msg.content, version, ctx)
+            }
+        }) {
+            self.pending_file_ops.remove(file_id, ctx);
+            return HandlerOutcome::Sync(server_message::Message::RenameFileResponse(
+                RenameFileResponse {
+                    result: Some(rename_file_response::Result::Error(RenameFileError {
+                        message: format!("Failed to initiate rename: {error}"),
+                        content_saved_at_source: false,
+                    })),
+                },
+            ));
+        }
+        HandlerOutcome::Async(None)
+    }
+
     /// Handles `DeleteFile` by registering the path and triggering an async
     /// delete via `FileModel`. On a successful dispatch, returns
     /// `HandlerOutcome::Async(None)` — the response is sent later by the
@@ -2562,6 +2766,7 @@ impl ServerModel {
     fn handle_delete_file(
         &mut self,
         msg: DeleteFile,
+        require_restorable: bool,
         request_id: &RequestId,
         conn_id: ConnectionId,
         ctx: &mut ModelContext<Self>,
@@ -2570,19 +2775,40 @@ impl ServerModel {
             "Handling DeleteFile path={} (request_id={request_id})",
             msg.path
         );
-        let path = Path::new(&msg.path);
+        let path = resolve_daemon_file_path(&msg.path);
 
         let (file_id, version) = self.pending_file_ops.insert(
-            path,
+            &path,
             request_id.clone(),
             conn_id,
-            FileOpKind::Delete,
+            if require_restorable {
+                FileOpKind::DeleteForDiff
+            } else {
+                FileOpKind::Delete
+            },
             ctx,
         );
 
         let file_model = FileModel::handle(ctx);
-        if let Err(err) = file_model.update(ctx, |m, ctx| m.delete(file_id, version, ctx)) {
+        if let Err(err) = file_model.update(ctx, |model, ctx| {
+            if require_restorable {
+                model.delete_for_diff(file_id, version, ctx)
+            } else {
+                model.delete(file_id, version, ctx)
+            }
+        }) {
             self.pending_file_ops.remove(file_id, ctx);
+            if require_restorable {
+                return HandlerOutcome::Sync(server_message::Message::DeleteFileForDiffResponse(
+                    DeleteFileForDiffResponse {
+                        result: Some(delete_file_for_diff_response::Result::Error(
+                            FileOperationError {
+                                message: format!("Failed to initiate delete: {err}"),
+                            },
+                        )),
+                    },
+                ));
+            }
             return HandlerOutcome::Sync(server_message::Message::DeleteFileResponse(
                 DeleteFileResponse {
                     result: Some(delete_file_response::Result::Error(FileOperationError {
@@ -2593,6 +2819,50 @@ impl ServerModel {
         }
 
         // Response sent asynchronously via the event subscription.
+        HandlerOutcome::Async(None)
+    }
+
+    /// 恢复请求不能退化为覆盖写入；缺少权限快照时先拒绝。
+    fn handle_restore_file_for_diff(
+        &mut self,
+        msg: RestoreFileForDiff,
+        request_id: &RequestId,
+        conn_id: ConnectionId,
+        ctx: &mut ModelContext<Self>,
+    ) -> HandlerOutcome {
+        let Some(permissions) = msg.permissions else {
+            return HandlerOutcome::Sync(server_message::Message::RestoreFileForDiffResponse(
+                RestoreFileForDiffResponse {
+                    result: Some(restore_file_for_diff_response::Result::Error(
+                        FileOperationError {
+                            message: "Missing permissions for restoration".to_owned(),
+                        },
+                    )),
+                },
+            ));
+        };
+        let path = resolve_daemon_file_path(&msg.path);
+        let (file_id, version) = self.pending_file_ops.insert(
+            &path,
+            request_id.clone(),
+            conn_id,
+            FileOpKind::RestoreForDiff,
+            ctx,
+        );
+        if let Err(error) = FileModel::handle(ctx).update(ctx, |model, ctx| {
+            model.restore_for_diff(file_id, msg.content, permissions.into(), version, ctx)
+        }) {
+            self.pending_file_ops.remove(file_id, ctx);
+            return HandlerOutcome::Sync(server_message::Message::RestoreFileForDiffResponse(
+                RestoreFileForDiffResponse {
+                    result: Some(restore_file_for_diff_response::Result::Error(
+                        FileOperationError {
+                            message: error.to_string(),
+                        },
+                    )),
+                },
+            ));
+        }
         HandlerOutcome::Async(None)
     }
 
@@ -3054,7 +3324,15 @@ impl ServerModel {
         let result = match result {
             Ok(success) => read_file_chunk_response::Result::Success(success),
             Err(err) => read_file_chunk_response::Result::Error(FileOperationError {
-                message: format!("Failed to read file chunk {}: {err}", msg.path),
+                message: if err.kind() == std::io::ErrorKind::NotFound {
+                    format!(
+                        "{}Failed to read file chunk {}: {err}",
+                        remote_server::host_response::READ_FILE_NOT_FOUND_PREFIX,
+                        msg.path
+                    )
+                } else {
+                    format!("Failed to read file chunk {}: {err}", msg.path)
+                },
             }),
         };
 

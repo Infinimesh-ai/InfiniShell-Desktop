@@ -31,8 +31,11 @@ futures-util.workspace = true
 log.workspace = true
 warp_errors.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [target.'cfg(windows)'.dependencies]
-windows.workspace = true
+windows = { workspace = true, features = ["Win32_Storage_FileSystem"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 gloo.workspace = true

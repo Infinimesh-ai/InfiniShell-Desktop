@@ -305,7 +305,9 @@ impl PassiveSuggestionsModel {
                                             &shell,
                                             &cwd,
                                         );
-                                        FileDiff::new(diff.original_content, path, diff.diff_type)
+                                        let mut file_diff = FileDiff::new(diff.original_content, path, diff.diff_type);
+                                        file_diff.rename_target_original_content = diff.rename_target_original_content;
+                                        file_diff
                                     })
                                     .collect();
 

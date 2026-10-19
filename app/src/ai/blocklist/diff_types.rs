@@ -27,6 +27,8 @@ pub struct DiffBase {
 pub struct FileDiff {
     pub base: DiffBase,
     pub diff_type: DiffType,
+    /// 覆盖移动前的目标内容，仅供恢复操作使用。
+    pub rename_target_original_content: Option<String>,
 }
 
 impl FileDiff {
@@ -35,6 +37,7 @@ impl FileDiff {
         FileDiff {
             base: DiffBase { content, file_path },
             diff_type,
+            rename_target_original_content: None,
         }
     }
 

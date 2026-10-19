@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 /// Allows opening and saving files in a single, central model.  Subscribers can watch for content
 /// when files are loaded, and request that content be saved to disk.
 use std::future::Future;
-use std::io;
+use std::io::{self, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -18,13 +18,16 @@ use futures::future::BoxFuture;
 use futures::io::{AsyncBufReadExt, BufReader};
 use futures::{FutureExt, StreamExt};
 use notify_debouncer_full::notify::{RecursiveMode, WatchFilter};
-use remote_server::manager::RemoteServerManager;
+use remote_server::manager::{HostRequestError, RemoteServerManager};
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::repository::{RepositorySubscriber, SubscriberId};
 use repo_metadata::{CanonicalizedPath, Repository, RepositoryUpdate, RepositoryWatchMode};
 use warp_core::HostId;
 use warp_util::content_version::ContentVersion;
-use warp_util::file::{FileId, FileLoadError, FileSaveError};
+use warp_util::file::{
+    FileId, FileLoadError, FilePermissions, FileSaveError, rename_file_noreplace,
+    restorable_file_permissions,
+};
 use warp_util::standardized_path::StandardizedPath;
 use warpui_core::r#async::SpawnedFutureHandle;
 use warpui_core::{Entity, ModelContext, ModelHandle, SingletonEntity};
@@ -88,6 +91,14 @@ enum WatcherType {
     Repository,
 }
 
+enum RenameMode {
+    Ordinary,
+    Diff {
+        expected_target_content: Option<String>,
+    },
+    UndoDiff,
+}
+
 /// Per-file backing store.
 /// Remote files dispatch host-scoped requests through a
 /// [`RemoteServerManager`] `HostRequestHandle`.
@@ -130,6 +141,8 @@ impl FileBackend {
 #[derive(Default)]
 struct LocalFile {
     path: Option<PathBuf>,
+    /// 保留用户请求的目录项，使删除和移动不会作用于符号链接的目标。
+    entry_path: Option<PathBuf>,
     version: Option<ContentVersion>,
     /// How this file is being watched for changes.
     watcher_type: WatcherType,
@@ -150,6 +163,7 @@ struct RepositorySubscription {
 
 impl LocalFile {
     fn new(path: PathBuf, watcher_type: WatcherType) -> Self {
+        let entry_path = path.clone();
         // If we cannot canonicalize the path, it could be because the file does not exist on disk yet.
         // In this case, keep its original input path.
         let canonicalized_path = CanonicalizedPath::try_from(&path)
@@ -157,6 +171,7 @@ impl LocalFile {
             .unwrap_or(path);
         Self {
             path: Some(canonicalized_path),
+            entry_path: Some(entry_path),
             version: None,
             watcher_type,
         }
@@ -296,6 +311,7 @@ impl RepoPathMappingState {
 
 pub struct FileModel {
     file_state: FileState,
+    restoration_permissions: HashMap<FileId, FilePermissions>,
     abort_handles: HashMap<FileId, SpawnedFutureHandle>,
     watcher: ModelHandle<BulkFilesystemWatcher>,
     /// Maps repository root path to its subscription. One subscription per repo.
@@ -315,6 +331,7 @@ impl FileModel {
         Self {
             watcher,
             file_state: FileState::default(),
+            restoration_permissions: HashMap::new(),
             abort_handles: HashMap::new(),
             repo_subscriptions: HashMap::new(),
             repo_path_mapping: RepoPathMappingState::default(),
@@ -339,6 +356,12 @@ impl FileModel {
         self.file_state
             .get_local(file_id)
             .and_then(|x| x.path.clone())
+    }
+
+    fn entry_path(&self, file_id: FileId) -> Option<PathBuf> {
+        self.file_state
+            .get_local(file_id)
+            .and_then(|file| file.entry_path.clone())
     }
 
     /// Register a remote file path and return a `FileId`.
@@ -637,6 +660,7 @@ impl FileModel {
     }
 
     pub fn unsubscribe(&mut self, file_id: FileId, ctx: &mut ModelContext<Self>) {
+        self.restoration_permissions.remove(&file_id);
         self.abort_handles.remove(&file_id);
         if let Some((FileBackend::Local(file), path_still_used)) = self.file_state.remove(file_id) {
             let path = file.path;
@@ -771,8 +795,8 @@ impl FileModel {
         Ok(async move { rx.await.unwrap_or(Ok(())) }.boxed())
     }
 
-    /// Renames a file and also saves its content, returning a future that
-    /// resolves with the write outcome.
+    /// 先保存再执行原生移动；移动失败时内容仍保留在源路径。
+    /// 相同路径按普通保存处理，返回值表示该次操作的最终结果。
     // TODO: refactor this against [`FileModel::save`].
     pub fn rename_and_save(
         &mut self,
@@ -782,65 +806,249 @@ impl FileModel {
         version: ContentVersion,
         ctx: &mut ModelContext<Self>,
     ) -> Result<SaveFuture, FileSaveError> {
-        let file_path = self
-            .file_path(file_id)
+        self.rename_and_save_inner(
+            file_id,
+            new_path,
+            content,
+            version,
+            RenameMode::Ordinary,
+            ctx,
+        )
+    }
+
+    /// Agent 移动必须能恢复目录项，链接身份不明时不写入任何内容。
+    pub fn rename_and_save_for_diff(
+        &mut self,
+        file_id: FileId,
+        new_path: PathBuf,
+        content: String,
+        expected_target_content: Option<String>,
+        version: ContentVersion,
+        ctx: &mut ModelContext<Self>,
+    ) -> Result<SaveFuture, FileSaveError> {
+        self.rename_and_save_inner(
+            file_id,
+            new_path,
+            content,
+            version,
+            RenameMode::Diff {
+                expected_target_content,
+            },
+            ctx,
+        )
+    }
+
+    /// 反向移动先确认原路径缺失，再由内核保证不会覆盖并发新建的文件。
+    pub fn undo_move_and_save_for_diff(
+        &mut self,
+        file_id: FileId,
+        new_path: PathBuf,
+        content: String,
+        version: ContentVersion,
+        ctx: &mut ModelContext<Self>,
+    ) -> Result<SaveFuture, FileSaveError> {
+        self.rename_and_save_inner(
+            file_id,
+            new_path,
+            content,
+            version,
+            RenameMode::UndoDiff,
+            ctx,
+        )
+    }
+
+    fn rename_and_save_inner(
+        &mut self,
+        file_id: FileId,
+        new_path: PathBuf,
+        content: String,
+        version: ContentVersion,
+        mode: RenameMode,
+        ctx: &mut ModelContext<Self>,
+    ) -> Result<SaveFuture, FileSaveError> {
+        let (require_restorable, undo_move, expected_target_content) = match mode {
+            RenameMode::Ordinary => (false, false, None),
+            RenameMode::Diff {
+                expected_target_content,
+            } => (true, false, expected_target_content),
+            RenameMode::UndoDiff => (true, true, None),
+        };
+        let backend = self
+            .file_state
+            .get(file_id)
             .ok_or(FileSaveError::NoFilePath(file_id))?;
-
-        let (tx, rx) = oneshot::channel();
-        ctx.spawn(
-            async move {
-                // Make sure the file we're renaming exists.
-                if let Err(err) = async_fs::metadata(&file_path).await {
-                    return Err(FileSaveError::IOError {
-                        error: err,
-                        path: file_path,
-                    });
-                }
-
-                // Make sure the components of the path we're moving to exists.
-                if let Err(err) = Self::ensure_parent_directories(&new_path).await {
-                    return Err(FileSaveError::IOError {
-                        error: err,
-                        path: new_path,
-                    });
-                }
-
-                // Write the updated contents to the old path first.
-                async_fs::write(&file_path, content).await.map_err(|err| {
-                    FileSaveError::IOError {
-                        error: err,
-                        path: file_path.clone(),
+        if let FileBackend::Remote { host_id, path } = backend {
+            let new_path = new_path.to_str().ok_or_else(|| {
+                FileSaveError::RemoteError("Invalid UTF-8 move target".to_owned())
+            })?;
+            let new_path = StandardizedPath::try_new(new_path)
+                .map_err(|error| FileSaveError::RemoteError(error.to_string()))?;
+            if &new_path == path {
+                return self.save(file_id, content, version, ctx);
+            }
+            let handle = RemoteServerManager::as_ref(ctx).host_request_handle(host_id);
+            let path = path.to_string();
+            let new_path = new_path.to_string();
+            let (tx, rx) = oneshot::channel();
+            ctx.spawn(
+                async move {
+                    if undo_move {
+                        handle
+                            .undo_move_file_for_diff(path, new_path, content)
+                            .await
+                    } else {
+                        handle
+                            .rename_file(
+                                path,
+                                new_path,
+                                content,
+                                require_restorable,
+                                expected_target_content,
+                            )
+                            .await
                     }
-                })?;
-
-                // Now rename.
-                async_fs::rename(&file_path, &new_path)
-                    .await
-                    .map_err(|err| FileSaveError::IOError {
-                        error: err,
-                        path: file_path.clone(),
-                    })
-            },
-            move |me, write_result: Result<(), FileSaveError>, ctx| {
-                let result = write_result.map_err(Arc::new);
-                match &result {
-                    Ok(()) => {
-                        me.set_version(file_id, version);
-                        ctx.emit(FileModelEvent::FileSaved {
-                            id: file_id,
-                            version,
+                },
+                move |me, result, ctx| {
+                    let result = result.map_err(|error| {
+                        Arc::new(match error {
+                            HostRequestError::RenameFailedAfterSave(message) => {
+                                FileSaveError::RenameFailedAfterSave(message)
+                            }
+                            other => FileSaveError::RemoteError(other.to_string()),
                         })
+                    });
+                    let result = result
+                        .map(|permissions| me.record_restoration_permissions(file_id, permissions));
+                    match &result {
+                        Ok(()) => {
+                            me.set_version(file_id, version);
+                            ctx.emit(FileModelEvent::FileSaved {
+                                id: file_id,
+                                version,
+                            });
+                        }
+                        Err(error) => ctx.emit(FileModelEvent::FailedToSave {
+                            id: file_id,
+                            error: error.clone(),
+                        }),
                     }
-                    Err(err) => ctx.emit(FileModelEvent::FailedToSave {
-                        id: file_id,
-                        error: err.clone(),
-                    }),
-                };
-                let _ = tx.send(result);
-            },
-        );
+                    let _ = tx.send(result);
+                },
+            );
+            Ok(async move {
+                rx.await.unwrap_or_else(|_| {
+                    Err(Arc::new(FileSaveError::Other(
+                        "Remote move completion was cancelled".to_owned(),
+                    )))
+                })
+            }
+            .boxed())
+        } else {
+            let file_path = self
+                .entry_path(file_id)
+                .ok_or(FileSaveError::NoFilePath(file_id))?;
+            let same_path = new_path == file_path
+                || StandardizedPath::try_from_local(&new_path)
+                    .ok()
+                    .zip(StandardizedPath::try_from_local(&file_path).ok())
+                    .is_some_and(|(target, source)| target == source);
+            if same_path {
+                return self.save(file_id, content, version, ctx);
+            }
 
-        Ok(async move { rx.await.unwrap_or(Ok(())) }.boxed())
+            let (tx, rx) = oneshot::channel();
+            ctx.spawn(
+                async move {
+                    // Make sure the file we're renaming exists.
+                    if let Err(err) = async_fs::metadata(&file_path).await {
+                        return Err(FileSaveError::IOError {
+                            error: err,
+                            path: file_path,
+                        });
+                    }
+
+                    let replaced_permissions = if require_restorable {
+                        restorable_file_permissions(&file_path).map_err(|error| FileSaveError::IOError { error, path: file_path.clone() })?;
+                        match restorable_file_permissions(&new_path) {
+                            Ok(permissions) => {
+                                let expected = expected_target_content.as_ref().ok_or_else(|| FileSaveError::Other("Move target appeared after the diff was prepared".to_owned()))?;
+                                let actual = async_fs::read_to_string(&new_path).await.map_err(|error| FileSaveError::IOError { error, path: new_path.clone() })?;
+                                if &actual != expected {
+                                    return Err(FileSaveError::Other("Move target changed after the diff was prepared".to_owned()));
+                                }
+                                Some(permissions)
+                            }
+                            Err(error) if error.kind() == io::ErrorKind::NotFound && expected_target_content.is_none() => None,
+                            Err(error) => return Err(FileSaveError::IOError { error, path: new_path }),
+                        }
+                    } else { None };
+
+                    match same_file::is_same_file(&file_path, &new_path) {
+                        Ok(true) => {
+                            return Err(FileSaveError::Other(format!(
+                                "Cannot move {file_path:?} to {new_path:?}: both entries refer to the same file"
+                            )));
+                        }
+                        Ok(false) => {}
+                        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                        Err(error) => return Err(FileSaveError::IOError { error, path: new_path }),
+                    }
+
+                    // Make sure the components of the path we're moving to exists.
+                    if let Err(err) = Self::ensure_parent_directories(&new_path).await {
+                        return Err(FileSaveError::IOError {
+                            error: err,
+                            path: new_path,
+                        });
+                    }
+
+                    // Write the updated contents to the old path first.
+                    async_fs::write(&file_path, content).await.map_err(|err| {
+                        FileSaveError::IOError {
+                            error: err,
+                            path: file_path.clone(),
+                        }
+                    })?;
+
+                    // 撤销使用原生不覆盖移动；普通接受保留已确认的目标覆盖语义。
+                    let rename_result = if undo_move {
+                        rename_file_noreplace(&file_path, &new_path)
+                    } else {
+                        async_fs::rename(&file_path, &new_path).await
+                    };
+                    rename_result.map_err(|error| FileSaveError::RenameFailedAfterSave(format!(
+                        "Saved content at {file_path:?}, but failed to rename to {new_path:?}: {error}"
+                    )))?;
+                    Ok(replaced_permissions)
+                },
+                move |me, write_result: Result<Option<FilePermissions>, FileSaveError>, ctx| {
+                    let result = write_result.map(|permissions| me.record_restoration_permissions(file_id, permissions)).map_err(Arc::new);
+                    match &result {
+                        Ok(()) => {
+                            me.set_version(file_id, version);
+                            ctx.emit(FileModelEvent::FileSaved {
+                                id: file_id,
+                                version,
+                            })
+                        }
+                        Err(err) => ctx.emit(FileModelEvent::FailedToSave {
+                            id: file_id,
+                            error: err.clone(),
+                        }),
+                    };
+                    let _ = tx.send(result);
+                },
+            );
+
+            Ok(async move {
+                rx.await.unwrap_or_else(|_| {
+                    Err(Arc::new(FileSaveError::Other(
+                        "Move completion was cancelled".to_owned(),
+                    )))
+                })
+            }
+            .boxed())
+        }
     }
 
     /// Deletes the specified file, returning a future that resolves with the
@@ -849,6 +1057,26 @@ impl FileModel {
         &mut self,
         file_id: FileId,
         version: ContentVersion,
+        ctx: &mut ModelContext<Self>,
+    ) -> Result<SaveFuture, FileSaveError> {
+        self.delete_inner(file_id, version, false, ctx)
+    }
+
+    /// Agent 删除保守拒绝当前无法恢复身份的链接目录项。
+    pub fn delete_for_diff(
+        &mut self,
+        file_id: FileId,
+        version: ContentVersion,
+        ctx: &mut ModelContext<Self>,
+    ) -> Result<SaveFuture, FileSaveError> {
+        self.delete_inner(file_id, version, true, ctx)
+    }
+
+    fn delete_inner(
+        &mut self,
+        file_id: FileId,
+        version: ContentVersion,
+        require_restorable: bool,
         ctx: &mut ModelContext<Self>,
     ) -> Result<SaveFuture, FileSaveError> {
         let backend = self
@@ -860,26 +1088,37 @@ impl FileModel {
         match backend {
             FileBackend::Local(_) => {
                 let file_path = self
-                    .file_path(file_id)
+                    .entry_path(file_id)
                     .ok_or(FileSaveError::NoFilePath(file_id))?;
 
                 ctx.spawn(
                     async move {
-                        if let Err(err) = Self::ensure_parent_directories(&file_path).await {
-                            return Err(FileSaveError::IOError {
-                                error: err,
-                                path: file_path,
-                            });
-                        }
+                        let permissions = if require_restorable {
+                            Some(restorable_file_permissions(&file_path).map_err(|error| {
+                                FileSaveError::IOError {
+                                    error,
+                                    path: file_path.clone(),
+                                }
+                            })?)
+                        } else {
+                            None
+                        };
                         async_fs::remove_file(&file_path).await.map_err(|err| {
                             FileSaveError::IOError {
                                 error: err,
                                 path: file_path,
                             }
-                        })
+                        })?;
+                        Ok(permissions)
                     },
-                    move |me, delete_result: Result<(), FileSaveError>, ctx| {
-                        let result = delete_result.map_err(Arc::new);
+                    move |me,
+                          delete_result: Result<Option<FilePermissions>, FileSaveError>,
+                          ctx| {
+                        let result = delete_result
+                            .map(|permissions| {
+                                me.record_restoration_permissions(file_id, permissions)
+                            })
+                            .map_err(Arc::new);
                         match &result {
                             Ok(()) => {
                                 me.set_version(file_id, version);
@@ -901,10 +1140,19 @@ impl FileModel {
                 let handle = RemoteServerManager::as_ref(ctx).host_request_handle(host_id);
                 let path = path.as_str().to_string();
                 ctx.spawn(
-                    async move { handle.delete_file(path).await },
+                    async move {
+                        if require_restorable {
+                            handle.delete_file_for_diff(path).await.map(Some)
+                        } else {
+                            handle.delete_file(path).await.map(|()| None)
+                        }
+                    },
                     move |me, result, ctx| {
-                        let result =
-                            result.map_err(|e| Arc::new(FileSaveError::RemoteError(e.to_string())));
+                        let result = result
+                            .map(|permissions| {
+                                me.record_restoration_permissions(file_id, permissions)
+                            })
+                            .map_err(|e| Arc::new(FileSaveError::RemoteError(e.to_string())));
                         match &result {
                             Ok(()) => {
                                 me.set_version(file_id, version);
@@ -926,7 +1174,103 @@ impl FileModel {
             }
         }
 
-        Ok(async move { rx.await.unwrap_or(Ok(())) }.boxed())
+        Ok(async move {
+            rx.await.unwrap_or_else(|_| {
+                Err(Arc::new(FileSaveError::Other(
+                    "Delete completion was cancelled".to_owned(),
+                )))
+            })
+        }
+        .boxed())
+    }
+
+    /// 只在仍被订阅的操作上保留撤销快照，避免临时注册项完成后泄漏。
+    fn record_restoration_permissions(
+        &mut self,
+        file_id: FileId,
+        permissions: Option<FilePermissions>,
+    ) {
+        if self.file_state.get(file_id).is_some() {
+            if let Some(permissions) = permissions {
+                self.restoration_permissions.insert(file_id, permissions);
+            } else {
+                self.restoration_permissions.remove(&file_id);
+            }
+        }
+    }
+
+    pub fn restoration_permissions(&self, file_id: FileId) -> Option<FilePermissions> {
+        self.restoration_permissions.get(&file_id).copied()
+    }
+
+    /// 撤销只能恢复到空缺的目录项，先准备完整内容和权限，再禁止覆盖地发布。
+    pub fn restore_for_diff(
+        &mut self,
+        file_id: FileId,
+        content: String,
+        permissions: FilePermissions,
+        version: ContentVersion,
+        ctx: &mut ModelContext<Self>,
+    ) -> Result<SaveFuture, FileSaveError> {
+        let backend = self
+            .file_state
+            .get(file_id)
+            .ok_or(FileSaveError::NoFilePath(file_id))?;
+        let operation: BoxFuture<'static, Result<(), FileSaveError>> = match backend {
+            FileBackend::Local(_) => {
+                let path = self
+                    .entry_path(file_id)
+                    .ok_or(FileSaveError::NoFilePath(file_id))?;
+                async move {
+                    Self::ensure_parent_directories(&path)
+                        .await
+                        .map_err(|error| FileSaveError::IOError {
+                            error,
+                            path: path.clone(),
+                        })?;
+                    restore_local_file(&path, &content, permissions)
+                        .map_err(|error| FileSaveError::IOError { error, path })
+                }
+                .boxed()
+            }
+            FileBackend::Remote { host_id, path } => {
+                let handle = RemoteServerManager::as_ref(ctx).host_request_handle(host_id);
+                let path = path.to_string();
+                async move {
+                    handle
+                        .restore_file_for_diff(path, content, permissions)
+                        .await
+                        .map_err(|error| FileSaveError::RemoteError(error.to_string()))
+                }
+                .boxed()
+            }
+        };
+        let (tx, rx) = oneshot::channel();
+        ctx.spawn(operation, move |me, result, ctx| {
+            let result = result.map_err(Arc::new);
+            match &result {
+                Ok(()) => {
+                    me.set_version(file_id, version);
+                    ctx.emit(FileModelEvent::FileSaved {
+                        id: file_id,
+                        version,
+                    });
+                }
+                Err(error) => ctx.emit(FileModelEvent::FailedToSave {
+                    id: file_id,
+                    error: error.clone(),
+                }),
+            }
+            let _ = tx.send(result);
+        });
+        Ok(async move {
+            rx.await.unwrap_or_else(|_| {
+                Err(Arc::new(FileSaveError::Other(
+                    "Restore completion was cancelled".to_owned(),
+                )))
+            })
+        }
+        .boxed())
     }
 
     pub fn set_version(&mut self, file_id: FileId, version: ContentVersion) {
@@ -1225,3 +1569,55 @@ impl RepositorySubscriber for FileRepositorySubscriber {
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+/// 临时文件默认以 0600 创建；任何写入失败都发生在目标目录项发布之前。
+fn restore_local_file(path: &Path, content: &str, permissions: FilePermissions) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".infinishell-restore-")
+        .tempfile_in(parent)?;
+    temporary.write_all(content.as_bytes())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = permissions.unix_mode.ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Missing Unix permissions for restoration",
+            )
+        })?;
+        temporary
+            .as_file()
+            .set_permissions(std::fs::Permissions::from_mode(mode & 0o7777))?;
+    }
+    #[cfg(windows)]
+    {
+        let mut restored = temporary.as_file().metadata()?.permissions();
+        restored.set_readonly(permissions.readonly);
+        temporary.as_file().set_permissions(restored)?;
+    }
+    #[cfg(not(any(unix, windows)))]
+    return Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Permission restoration is unavailable",
+    ));
+    #[cfg(any(unix, windows))]
+    match temporary.persist_noclobber(path) {
+        Ok(_) => Ok(()),
+        Err(error) => {
+            #[cfg(windows)]
+            {
+                // 只修改自持的临时文件，避免只读属性阻止失败后的清理。
+                if let Ok(metadata) = error.file.as_file().metadata() {
+                    let mut writable = metadata.permissions();
+                    writable.set_readonly(false);
+                    let _ = error.file.as_file().set_permissions(writable);
+                }
+            }
+            Err(error.error)
+        }
+    }
+}
