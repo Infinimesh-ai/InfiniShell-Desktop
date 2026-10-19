@@ -445,36 +445,40 @@
       "run_linux_default": true,
       "runs_on_every_main_push": false,
       "repeat_online_gui_or_remote_gates_for_docs_only": false,
-      "latest_change_remote_status": "本轮仅文档和回传复核，不重派远端检查。保留5068 Linux、5ac Windows原门禁及Mac/12资产原证据；R9成功CI39134031520属于a4e279安装器控制器，实际桌面另有回传复核。"
+      "latest_change_remote_status": "受测源码8b46bcc3…已快进并push main，local/origin/remote一致，PR26 MERGED；第八39256631029 completed/success，PATH/reissue/readonly/通知及四组Rust1902次定向执行全过，app内i18n11。七失败原件保留，非全库或真实SSH；GUI待钥匙串，正式新包未造、未公开发布。"
     },
     "next_release_required": [
       {
         "item": "发行产物校验",
-        "status": "passed_for_fixed_candidate",
-        "when": "本候选完整12资产集合、包内资源、签名公证装订及全量Draft三方摘要核验已完成",
+        "status": "historical_full12_passed_r9_replacement_roundtrip_passed",
+        "when": "原12资产完整验收按原字节保留；当前Draft仅Setup替换为受验R9且回下载大小/SHA一致",
         "pass_condition": "同一源码和正式标签；12件既定资产、内嵌SSH资源、全量下载摘要；macOS Developer ID签名、公证及装订检查",
         "scope": "ARM64 macOS桌面、Windows x64桌面、四份Linux桌面包及六份SSH扩展；保留Intel macOS SSH，不恢复Intel桌面DMG",
         "historical_completed": "旧01.46的12资产与三方摘要回验通过，仅属于旧字节；完整原对象保存在release_candidate_history",
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/evidence-index.json",
-        "future_candidate_boundary": "原12件身份未变，R9不在集合；后续正式候选变更需重新核对受影响资产。"
+        "future_candidate_boundary": "本次R9资产655995368替换旧640654138；其余11件ID/size/digest不变。R9应用仍5068且不含本轮修复；任何新源码或新包需独立绑定与补验。",
+        "current_integration_ref": "main_acceptance.release_integration_20261019",
+        "asset_replacement_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json"
       },
       {
         "item": "Windows安装生命周期",
-        "status": "r9_review_passed_final_release_integration_required",
-        "when": "后续正式发版候选冻结时审核整合和资产绑定，字节变化按影响补验",
+        "status": "native_path_reissue_passed_source_main_new_package_acceptance_pending",
+        "when": "第七/八PATH1683/366与reissue通过，readonly第八通过，源码已main；本轮没有新产品Setup/桌面验收，旧R9结论不扩展。",
         "pass_condition": "用户完成baseline/installed/launched/uri_activated/closed/uninstalled六阶段，包含真实Shell URI唤起及窗口目录对应，助手审核安装、退出、官方卸载与归属清理；保留用户数据，不预称零残留",
         "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md",
-        "completed": "原1ad Setup的URI问题关闭，PATH原文不恢复；R9六阶段、PATH原文类型存在性恢复及卸载清理通过。",
-        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/windows-review/result.json"
+        "completed": "原1ad Setup的URI问题关闭，PATH原文不恢复；R9六阶段、PATH原文类型存在性恢复及卸载清理通过。 R9原字节现已替换Draft旧Setup并完成回下载大小/SHA校验；PR #26完整祖先已随受测源码8b46快进并推送main，PR实时状态MERGED；原R9包身份不变。",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/windows-review/result.json",
+        "current_integration_ref": "main_acceptance.release_integration_20261019"
       },
       {
         "item": "近期GUI候选包冒烟",
-        "status": "passed_six_checks_for_fixed_signed_candidate",
-        "when": "16.45最终签名DMG已完成实际六项GUI及同包重启恢复",
+        "status": "historical_signed_candidate_passed_new_runtime_startup_keychain_blocked",
+        "when": "历史正式签名DMG结论保留；本轮Apple Development运行ZIP已冻结，启动等待用户钥匙串处理，尚无新GUI验收。",
         "pass_condition": "绑定新候选源码和最终签名二进制；必要冒烟及重启恢复，保留模型路由/strict schema、浮窗、Retina输入选择、英中错误及Plan提示判据",
         "linux_desktop_matrix_required": false,
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json",
-        "historical_completed": "旧01.46结果仅按旧包保留；本轮使用16.45真实包独立执行，不继承旧结论"
+        "historical_completed": "旧01.46结果仅按旧包保留；本轮使用16.45真实包独立执行，不继承旧结论",
+        "current_integration_ref": "main_acceptance.release_integration_20261019"
       },
       {
         "item": "Ubuntu DEB安装生命周期",
@@ -489,9 +493,12 @@
       {
         "item": "更新版本方向与失败处理",
         "id": "RELEASE-UPDATE-ORDER-01",
-        "status": "required_before_future_formal_release",
+        "status": "source_main_local_and_cross_platform_gates_passed_runtime_gui_pending",
         "pass_condition": "实际发行格式和有无v的版本比较、相同/旧/新版本及明确回滚策略回归；解析失败不按新版处理；必要本地化门禁及最终包定向GUI复验",
-        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/update-version-reproduction.json"
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/update-version-reproduction.json",
+        "completed": "实际发行格式、前缀归一化、版本方向和失败保守处理已实现并推送84fbb124…；英中文案同步，61/61 nextest、显式i18n 12/12与warp/warp_tui check通过。",
+        "remaining": "源码已main，第八Windows readonly/app/i18n已通过；MacGUI仍待钥匙串，正式新包及实际SSH未验。下次候选按影响补验，不要求现在重复旧包六阶段。",
+        "current_integration_ref": "main_acceptance.release_integration_20261019"
       }
     ],
     "ongoing_boundaries": {
@@ -517,8 +524,8 @@
         "boundary": "续行快照与TUI补全门禁完成；本轮文档不改变受测产品源码"
       }
     ],
-    "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。 01.46完整current_release_candidate对象追加至既有release_candidate_history；新13.00不继承旧包通过。替换前根级当前摘要保存在historical_current_summary_before_windows_uri_candidate_20261014。 13.00完整current对象原样追加至release_candidate_history，主动取消与替代结论另存superseded_candidate_closeouts；替换前当前摘要保存在historical_current_summary_before_unified_candidate_20261014。 16.45 GUI与完整12资产收尾前入口全量保存在github/macos-full12-closeout-20261015/before-index.json，原失败和未验边界不删除。 2026-10-19用户证据复核前完整入口保存在native-validation/user-acceptance-review-20261019/before-index.json；现场非正式标记、失败、旧包及嵌套历史均保留。用户确认本轮仅演练，未来正式发版事项不强制转为本轮执行任务。",
-    "localization": "无需本地化变更；本次仅验收复核与状态文档，无Rust/Fluent或产品行为变化。",
+    "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。 01.46完整current_release_candidate对象追加至既有release_candidate_history；新13.00不继承旧包通过。替换前根级当前摘要保存在historical_current_summary_before_windows_uri_candidate_20261014。 13.00完整current对象原样追加至release_candidate_history，主动取消与替代结论另存superseded_candidate_closeouts；替换前当前摘要保存在historical_current_summary_before_unified_candidate_20261014。 16.45 GUI与完整12资产收尾前入口全量保存在github/macos-full12-closeout-20261015/before-index.json，原失败和未验边界不删除。 2026-10-19用户证据复核前完整入口保存在native-validation/user-acceptance-review-20261019/before-index.json；现场非正式标记、失败、旧包及嵌套历史均保留。用户确认本轮仅演练，未来正式发版事项不强制转为本轮执行任务。 本轮整合前被替换的当前导航字段及README当前入口保存在historical_status_navigation_before_release_integration_20261019。原current_release_candidate等验收对象及历史原件不改写；Draft Setup替换、源码修复与待验事项以release_integration_20261019续记。",
+    "localization": "当前整合涉及更新器用户功能，About及无障碍文案已同步英文和简体中文；定向nextest及显式i18n 12/12通过，warp/warp_tui check通过；新包英中GUI布局仍待验。",
     "macos_gui_smoke": {
       "date": "2026-10-13",
       "source_commit": "45a8911075277d127e959510631c3d4b01b44903",
@@ -1472,12 +1479,1821 @@
     },
     "user_evidence_review_performed_in_this_revision": true,
     "current_work_scope": {
-      "status": "rehearsal_and_multiplatform_review_closed",
-      "user_direction": "本轮只跑通流程并多端验收，不正式发布；另一会话周期性合并上游，后续另行正式发版。",
+      "status": "source_main_integrated_ci_passed_gui_and_future_package_pending",
+      "user_direction": "原多端演练已收尾；用户授权继续源码整合、定向验证及受验R9替换Draft Setup，正式发布另行安排。",
       "publication_requested": false,
-      "upstream_merge_owned_by_other_chat": true,
-      "source_changes_in_this_revision": false,
-      "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/README.zh-CN.md"
+      "upstream_merge_owned_by_other_chat": false,
+      "source_changes_in_this_revision": true,
+      "integration_source_changes": true,
+      "authority_ref": "main_acceptance.release_integration_20261019",
+      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json",
+      "implementation_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
+    },
+    "release_integration_20261019": {
+      "as_of": "2026-10-19",
+      "status": "source_main_integrated_eighth_ci_passed_gui_keychain_blocked_future_package_pending",
+      "source_record": "/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md",
+      "history_boundary": "current_release_candidate、macos_gui_smoke、documentation_validation及历史对象保留原日期、原字节和原验收范围；本对象只续记当前整合，不将旧结果转记为新源码或新包通过。",
+      "draft_asset_replacement": {
+        "status": "r9_draft_asset_roundtrip_passed",
+        "checked_at": "2026-10-19T10:49:59.681054+00:00",
+        "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json",
+        "release_id": 412823983,
+        "tag": "v0.2026.10.14.16.45.oss_00",
+        "draft": true,
+        "published_at": null,
+        "asset_name": "InfiniShellSetup.exe",
+        "old_asset_id": 640654138,
+        "new_asset_id": 655995368,
+        "size": 580325911,
+        "sha256": "c18725c5326ce74e3407957606e7a55691a2eec28b755112a7e7ae29d170e503",
+        "roundtrip_size_and_sha256_match": true,
+        "other_assets_unchanged": 11,
+        "other_assets_identity_fields_unchanged": [
+          "id",
+          "size",
+          "digest"
+        ],
+        "tag_object_sha": "27d40029759b541dc8903a0deb9ec0948e9670fa",
+        "application_source_sha": "5068dae9c75b79628865a0872684113647c204d8",
+        "installer_source_sha": "a4e279c745bbd67aed1f8a926f45a32bda9343c8",
+        "authenticode": "NotSigned",
+        "includes_current_upstream_or_updater_fixes": false,
+        "public_latest": "v0.2026.10.07.01.09.oss_00",
+        "acceptance_boundary": "本次只将旧Setup替换为已受验R9原字节；其六阶段、PATH恢复和卸载结论仍属于c18725c5…及a4e279c…安装器。R9内应用仍为5068dae9c…，不含本轮上游或更新器修复。"
+      },
+      "windows_path_source_integration": {
+        "pr": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/pull/26",
+        "status": "source_main_native_path_reissue_passed",
+        "scope": "helper0c56…第七/八PATH1683/366、1438actions/2572step、30raw/90assert及reissue通过；第八readonly及后续Rust通过，源码已main，无新Setup验收。",
+        "new_package_acceptance": "required_if_new_bytes_are_built",
+        "merge_sha": "fd4c75fbf0a5dc0cd246aa957abe01ead60f6200"
+      },
+      "updater": {
+        "id": "RELEASE-UPDATE-ORDER-01",
+        "status": "source_main_local_and_ci_gates_passed_runtime_gui_pending",
+        "implemented": [
+          "统一处理版本v前缀并支持实际oss发行格式",
+          "同版和旧版不自动更新；显式rollback只放行可成功比较的旧版",
+          "解析失败保守拒绝并显示CheckFailed，不宣称已是最新",
+          "共用macOS/Windows/Linux更新调用链及About失败提示、无障碍文案同步英文与简体中文"
+        ],
+        "nextest": {
+          "status": "passed",
+          "passed": 61,
+          "total": 61,
+          "scope": [
+            "channel_versions",
+            "autoupdate",
+            "i18n"
+          ],
+          "evidence_binding": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/updater-local-test-binding.json",
+          "run_id": "r-29864436",
+          "filtered_out": 8945,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-29864436.json"
+        },
+        "cargo_test_i18n_explicit_command": "passed_12_of_12",
+        "final_cargo_check": "passed",
+        "current_integration_ci": "linux_reused_with_cfg_equivalence_eighth_windows_success",
+        "new_runtime_package_gui": "startup_waiting_for_manual_keychain_action_not_validated",
+        "final_source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "acceptance_boundary": "61项nextest、显式12项i18n、warp/warp_tui check及第八Windows定向组通过；Windows app内i18n11，源码已main。新运行包英中GUI未验，不构成新包/正式发布通过。",
+        "warp_tui_cargo_check": "passed"
+      },
+      "runtime_package_followup": {
+        "planned_profile": "release-lto",
+        "status": "built_signed_runtime_zip_gui_startup_keychain_blocked",
+        "formal_release_candidate": false,
+        "scope": "本轮独立release-lto运行包仅用10.14复验公开latest10.07旧版误提示，并核对英中失败提示；包身份已冻结，实际GUI待用户处理钥匙串，不是正式候选。",
+        "run_id": "r-426c5f7f",
+        "source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "test_version": "v0.2026.10.14.16.45.oss_00",
+        "source_equivalence": "包内产品源码84fbb124…，冻结时checkout661f3359…；后续8e55…仅Windows测试/控制器，不改变Rust/资源。",
+        "build_stage": "release-lto构建exit0，运行ZIP已冻结；应用启动等待钥匙串授权处理",
+        "gui_started": true,
+        "binding": {
+          "created_at": "2026-10-19T11:44:44.216945+00:00",
+          "status": "built_signed_and_archived_runtime_only",
+          "app": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/InfiniShell.app",
+          "executable": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/InfiniShell.app/Contents/MacOS/infinishell",
+          "test_version": "v0.2026.10.14.16.45.oss_00",
+          "product_source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+          "checkout_sha": "661f335938ed8676d000faa521c34fcdb94866b8",
+          "source_equivalence_changed_paths": [
+            "script/windows/reissue_release_installer.py",
+            "script/windows/test_windows_environment.ps1",
+            "script/windows/test_windows_environment_raw_gate.ps1"
+          ],
+          "build_run": "r-426c5f7f",
+          "executable_sha256": "5d3416466701497f26ff340c032e5fdeb2ca02e7df56e21884f7f9c1cb034649",
+          "architecture": "arm64",
+          "signature_kind": "Apple Development",
+          "strict_signature_verified": true,
+          "notarized": false,
+          "zip": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/InfiniShell-update-gui-runtime.zip",
+          "zip_size": 156973880,
+          "formal_release_candidate": false,
+          "published": false,
+          "six_remote_server_payloads_injected": false,
+          "licenses_generated": false,
+          "boundary": "本轮更新 GUI 定向运行包；不替代正式发行 DMG、六资源或多端验收。",
+          "zip_sha256": "27749685b0209e54dc7f0ec6a990d442052d2698701fe2730cca455099c24248"
+        },
+        "binding_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/binding.json",
+        "artifact_hashes_independently_verified": true,
+        "gui_acceptance_started": false,
+        "build_run": {
+          "run_id": "r-426c5f7f",
+          "exit_code": 0,
+          "original_record": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-426c5f7f.json",
+          "original_cleanup_ready": false,
+          "original_retained_child_pid": 55365,
+          "cleanup_recheck": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r-426c5f7f-cleanup-recheck.json",
+          "current_cleanup_status": "cleaned",
+          "boundary": "原始收据未改写；子进程退出后另核目录身份、进程、launchd与lsof并清理。"
+        },
+        "artifact_freeze_run": {
+          "run_id": "r-f1cd2cff",
+          "exit_code": 0,
+          "status": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-f1cd2cff.json"
+        },
+        "gui_launch": {
+          "run_id": "r-7e0c826e",
+          "status": "active_startup_blocked",
+          "record": "/Users/zhishi/InfiniShell-Tests/records/r-7e0c826e.json",
+          "blocker": "SecKeychainFindGenericPassword等待钥匙串处理；CUA对SecurityAgent操作受安全限制。",
+          "requested_user_action": "已向用户异步请求手动拒绝钥匙串提示或解锁，尚未收到回应。",
+          "acceptance_result": "not_run",
+          "boundary": "不绕过钥匙串安全对话框；运行包构建和启动进程不构成GUI通过。"
+        },
+        "current_source_equivalence": "84->046文件输入一致及8b46 Unix条件编译行为等价由各收据分段绑定；第八Windows原生已过。冻结Mac包/TUI保留原字节身份，未重建为8b46候选，GUI未验。"
+      },
+      "formal_publication": {
+        "status": "awaiting_user_arrangement",
+        "requested": false,
+        "keep_draft": true
+      },
+      "unchanged_boundaries": {
+        "deferred_cli_matrix": [
+          "V01",
+          "V02",
+          "V05"
+        ],
+        "g09": "closed",
+        "nonblocking_followups": "沿用原验收复核记录，不因本次资产替换或源码测试扩大关闭范围"
+      },
+      "pending_record": [
+        "文档提交后独立final-closeout记录文档HEAD、受测源码8b46、远端与Draft/tag，不回写历史回执",
+        "GUI等待钥匙串；新运行包英中About/失败重试/无障碍仍待真实界面验证",
+        "下次正式候选绑定三端桌面、最终Setup、六daemon内嵌资源，按影响补验Agent文件操作/有序输入/更新器及实际SSH删除移动撤销",
+        "正式构建/12资产回验/签名公证及公开发布等用户安排；不要求现在重复旧包六阶段",
+        "七失败、旧candidate/history、延期V01/V02/V05及关闭G09保留；1902是定向执行次数，非全库或唯一测试数"
+      ],
+      "source_integration": {
+        "branch": "codex/upstream-essence-2026-10-19",
+        "status": "fast_forward_pushed_to_main",
+        "windows_merge_sha": "fd4c75fbf0a5dc0cd246aa957abe01ead60f6200",
+        "windows_merge_second_parent": "2e3406e7bce33fab7fc292622c68239db77e0e88",
+        "updater_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "main_integration": "completed_source",
+        "boundary": "源码主线吸收和PR26合并已有真实回执；不等于GUI/新包或公开发布通过。",
+        "latest_branch_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "latest_change_scope": "8b46 Windows readonly修复在第八原生通过；整个受测源码从1e8142快进并push main，文档提交另绑定。",
+        "tested_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/main-source-integration.json",
+        "receipt": {
+          "recorded_at": "2026-10-19T13:39:46.512850+00:00",
+          "repository": "/Volumes/SanDisk/github/InfiniShell-Desktop",
+          "before_main": "1e8142d6b87d7c57a0cb3177ca4ca5c5cb4fa496",
+          "tested_source_main": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "local_main": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "origin_main": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "remote_main": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "worktree_clean": true,
+          "method": "fast-forward",
+          "ci_run": 39256631029,
+          "ci_conclusion": "success",
+          "artifact_sha256": "2093e1bc8c12b71bdd99822ea2d8e2fd61e218cd38281053506918d9b93b94e9",
+          "main_vs_upstream": [
+            "1535",
+            "532"
+          ],
+          "merge_base_upstream": "b076027deb2e8d1b98e1073f9cd0f20fbf75a8ae",
+          "upstream_reviewed_sha": "ae60375ef1d3895908756878fe4a07cbe703ce1a",
+          "release_published": false,
+          "gui_verified": false,
+          "documentation_closeout_pending": true
+        }
+      },
+      "local_gate_records": {
+        "r-384c44cd": {
+          "run_id": "r-384c44cd",
+          "command": [
+            "env",
+            "CARGO_TARGET_DIR=/Volumes/SanDisk/github/InfiniShell-Desktop/target",
+            "CARGO_BUILD_JOBS=2",
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "warp",
+            "--lib",
+            "--features",
+            "warpui/test-util,rust-embed/debug-embed",
+            "i18n::tests"
+          ],
+          "source_sha": "d1b6df56ac9ff89529bf895500bb8884aa8ae328",
+          "started_at": "2026-10-19T10:52:04.568244+00:00",
+          "ended_at": "2026-10-19T10:58:45.696926+00:00",
+          "exit_code": 0,
+          "status": "completed",
+          "cleanup_ready": false,
+          "temporary_path": "/Users/zhishi/InfiniShell-Tests/r-384c44cd",
+          "cleaned_at": null,
+          "source_unchanged": false,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-384c44cd.json",
+          "log": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-384c44cd.log",
+          "log_sha256_verified": true,
+          "committed_code_inputs_match": "84fbb124744ecfd6d0044b6498e304b685b05848",
+          "passed": 12,
+          "filtered_out": 8968,
+          "source_change_boundary": "运行期间只有两份specs当前导航变化，受测代码摘要未变。",
+          "cleanup_boundary": "原运行收据保留cleanup_ready=false；独立复查确认所有记录进程/labels消失、lsof空及身份后已清理，当前状态见cleanup_recheck。",
+          "current_cleanup_status": "cleaned_via_recheck",
+          "cleanup_recheck": {
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r-384c44cd-cleanup-recheck.json",
+            "result": {
+              "run_id": "r-384c44cd",
+              "checked_at": "2026-10-19T12:15:53.015167+00:00",
+              "original_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-384c44cd.json",
+              "status": "cleaned",
+              "cleanup_ready": true,
+              "identity": {
+                "device": 16777235,
+                "inode": 106882490,
+                "owner": 502
+              },
+              "live_pids": [],
+              "services": [
+                {
+                  "label": "application.com.apple.dt.Devices.106160657.106160662",
+                  "found": false
+                },
+                {
+                  "label": "com.apple.mdworker.shared.02000000-0600-0000-0000-000000000000",
+                  "found": false
+                },
+                {
+                  "label": "com.apple.mdworker.shared.08000000-0500-0000-0000-000000000000",
+                  "found": false
+                },
+                {
+                  "label": "com.apple.mdworker.shared.0E000000-0700-0000-0000-000000000000",
+                  "found": false
+                }
+              ],
+              "lsof_returncode": 1,
+              "temporary_path": "/Users/zhishi/InfiniShell-Tests/r-384c44cd",
+              "cleaned_at": "2026-10-19T12:15:53.039757+00:00"
+            }
+          }
+        },
+        "r-9ce93977": {
+          "run_id": "r-9ce93977",
+          "command": [
+            "env",
+            "CARGO_TARGET_DIR=/Volumes/SanDisk/github/InfiniShell-Desktop/target",
+            "CARGO_BUILD_JOBS=2",
+            "cargo",
+            "check",
+            "--locked",
+            "-p",
+            "warp"
+          ],
+          "source_sha": "d1b6df56ac9ff89529bf895500bb8884aa8ae328",
+          "started_at": "2026-10-19T10:58:46.319420+00:00",
+          "ended_at": "2026-10-19T11:01:19.790214+00:00",
+          "exit_code": 0,
+          "status": "cleaned",
+          "cleanup_ready": true,
+          "temporary_path": "/Users/zhishi/InfiniShell-Tests/r-9ce93977",
+          "cleaned_at": "2026-10-19T11:01:20.448399+00:00",
+          "source_unchanged": true,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-9ce93977.json",
+          "log": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-9ce93977.log",
+          "log_sha256_verified": true,
+          "committed_code_inputs_match": "84fbb124744ecfd6d0044b6498e304b685b05848"
+        },
+        "r-700c727e": {
+          "run_id": "r-700c727e",
+          "command": [
+            "env",
+            "CARGO_TARGET_DIR=/Volumes/SanDisk/github/InfiniShell-Desktop/target",
+            "CARGO_BUILD_JOBS=2",
+            "cargo",
+            "check",
+            "--locked",
+            "-p",
+            "warp_tui"
+          ],
+          "source_sha": "d1b6df56ac9ff89529bf895500bb8884aa8ae328",
+          "started_at": "2026-10-19T11:01:20.502819+00:00",
+          "ended_at": "2026-10-19T11:03:01.155177+00:00",
+          "exit_code": 0,
+          "status": "cleaned",
+          "cleanup_ready": true,
+          "temporary_path": "/Users/zhishi/InfiniShell-Tests/r-700c727e",
+          "cleaned_at": "2026-10-19T11:03:02.094901+00:00",
+          "source_unchanged": true,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-700c727e.json",
+          "log": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-700c727e.log",
+          "log_sha256_verified": true,
+          "committed_code_inputs_match": "84fbb124744ecfd6d0044b6498e304b685b05848"
+        }
+      },
+      "current_ci": {
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029",
+        "run_id": 39256631029,
+        "status": "completed",
+        "expected_head_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "verified_head_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "windows_result": "success",
+        "linux_result": "reused_initial_run_success_reviewed",
+        "linux_source_run_id": 39242160374,
+        "linux_source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "boundary": "第八head8b46 success，四组574/528/11/789全过共1902次执行，app内i18n11、readonly回归通过；定向非全库，2真实SSH E2E仍ignore，无GUI/新包验收。",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json"
+      },
+      "windows_first_ci_failure": {
+        "run_id": 39242160374,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39242160374",
+        "head_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "windows_job_id": 118025380127,
+        "windows_conclusion": "failure",
+        "failed_step": "验证 Windows PATH 原生恢复与清理门禁",
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39242160374",
+        "result": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39242160374/windows/windows-path/full/result.json",
+        "job_log": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39242160374/windows-job-118025380127.raw.log",
+        "cause": "新增原始注册表字节夹具将RegistryKey.Handle得到的SafeRegistryHandle传给C# IntPtr首参，PowerShell绑定失败；不是已证明的生产PATH helper故障。",
+        "completed": {
+          "inno_assertions": 1615,
+          "native_edge_cases": 38,
+          "native_actions": 218,
+          "native_step_assertions": 224,
+          "registration_assertions": 80,
+          "registration_status": "passed",
+          "fixed_compiler_preparation": "passed",
+          "compiler_preparation_tests": {
+            "total": 15,
+            "passed": 14,
+            "skipped": 1,
+            "skip_reason": "符号链接权限不足"
+          }
+        },
+        "unexecuted": {
+          "raw_registry_assertions": 0,
+          "native_matrix_cases": 0,
+          "planned_native_matrix_cases": 200,
+          "reissue_gate": "not_run",
+          "windows_notification_regression": "not_run",
+          "later_rust_and_i18n_tests": "not_run"
+        },
+        "real_user_path_unchanged": true,
+        "cleanup_passed": false,
+        "retained_registry_root": "HKCU\\Software\\InfiniShellEnvironmentTests\\fe2125473d34408996216eda07c59165",
+        "preservation": "故意保留失败HKCU测试根与原始工件，不删除现场、不将未执行部分写成通过。",
+        "production_helper_sha256": "d90a0a529d19c1aca5a329c0b9928434702f7a15f5f3f981dd0ac986a6af5fd9"
+      },
+      "windows_fixture_followup": {
+        "fix_sha": "43388041d86a95ecf419e944c0865fef8f1f8561",
+        "status": "completed_failure_in_fixture_readback",
+        "changed_paths": [
+          "script/windows/reissue_release_installer.py",
+          "script/windows/test_windows_environment.ps1",
+          "script/windows/test_windows_environment_raw_gate.ps1"
+        ],
+        "production_helper_unchanged": true,
+        "rust_and_resources_equivalent_to": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "positive_reflection_gate": {
+          "run_id": "r-f9805e08",
+          "exit_code": 0,
+          "cases": 2,
+          "assertions": 4,
+          "status": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-f9805e08.json"
+        },
+        "old_failed_source_negative_control": {
+          "run_id": "r-e73b97d0",
+          "exit_code": 1,
+          "expected_failure": true,
+          "status": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-e73b97d0.json"
+        },
+        "dispatch_condition": "在原run Linux成功完成后才派发，未取消原Linux；actual head43388041…已核对，最终失败保留于windows_second_ci_failure。",
+        "native_result": "failure",
+        "run_id": 39244460247,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39244460247",
+        "expected_head_sha": "43388041d86a95ecf419e944c0865fef8f1f8561",
+        "verified_head_sha": "43388041d86a95ecf419e944c0865fef8f1f8561",
+        "boundary": "首轮SafeRegistryHandle修复的4项source gate通过，随后missing-nul-add夹具读回失败；详见windows_second_ci_failure，不覆盖首轮或此轮失败。"
+      },
+      "initial_ci": {
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39242160374",
+        "run_id": 39242160374,
+        "status": "completed_linux_success_windows_failure",
+        "expected_head_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "verified_head_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "linux_result": "success",
+        "windows_result": "failure",
+        "boundary": "原run已完成：Linux定向门禁通过并完成数量审计、Windows首次夹具失败；完整失败、未执行项和现场保留。",
+        "linux_review": {
+          "job_result": "success",
+          "rust": {
+            "command-musl": {
+              "run": 9,
+              "passed": 9,
+              "skipped": 21
+            },
+            "crate-tests": {
+              "run": 585,
+              "passed": 585,
+              "skipped": 6
+            },
+            "zap-crate-tests": {
+              "run": 525,
+              "passed": 525,
+              "skipped": 7
+            },
+            "completer-tests": {
+              "run": 22,
+              "passed": 22,
+              "skipped": 114
+            },
+            "app-tests": {
+              "run": 801,
+              "passed": 801,
+              "skipped": 9055
+            }
+          },
+          "i18n_passed": 11,
+          "notification_tests": {
+            "run": 131,
+            "passed": 129,
+            "skipped_windows_only": 2
+          },
+          "deb_maintainer_tests": 1,
+          "musl_check_targets": [
+            "x86_64-unknown-linux-musl",
+            "aarch64-unknown-linux-musl"
+          ],
+          "source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39242160374/evidence-review.json",
+          "rust_executions_total": 1942,
+          "coverage_boundary": "五组定向nextest合计1942次执行，包含重叠范围可能性；skip含定向过滤及既有ignore，不是全工作区通过。i18n11属于app801，不额外加总。",
+          "reuse_scope": "43388041…仅3份Windows测试/控制器差异，LinuxRust/资源与84fbb124…等价；按此范围复用。"
+        }
+      },
+      "windows_second_ci_failure": {
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39244460247",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39244460247/evidence-review.json",
+        "review": {
+          "reviewed_at": "2026-10-19T11:35:29.520862+00:00",
+          "run_id": 39244460247,
+          "source_sha": "43388041d86a95ecf419e944c0865fef8f1f8561",
+          "status": "completed",
+          "conclusion": "failure",
+          "first_failed_step": "验证 Windows PATH 原生恢复与清理门禁",
+          "confirmed_first_failure": "raw-1-missing-nul-add fixture readback differs before production helper invocation",
+          "actual_mismatch_bytes": "not saved by this version; exact native mismatch cause unproven",
+          "raw_source_gate_assertions": 4,
+          "raw_cases_completed": [
+            {
+              "name": "raw-1-zero-bytes-add",
+              "kind": 1,
+              "action": "add",
+              "expected_success": false,
+              "before": {
+                "kind": 1,
+                "bytes": ""
+              },
+              "after": {
+                "kind": 1,
+                "bytes": ""
+              },
+              "ownership_unchanged": true
+            },
+            {
+              "name": "raw-1-zero-bytes-remove",
+              "kind": 1,
+              "action": "remove",
+              "expected_success": false,
+              "before": {
+                "kind": 1,
+                "bytes": ""
+              },
+              "after": {
+                "kind": 1,
+                "bytes": ""
+              },
+              "ownership_unchanged": true
+            }
+          ],
+          "raw_registry_assertions": 6,
+          "native_actions": 222,
+          "native_step_assertions": 226,
+          "native_edge_cases": 38,
+          "native_matrix_cases": 0,
+          "inno_assertions": 1615,
+          "verified_cases": 0,
+          "registry_root_retained_by_design": "HKCU\\Software\\InfiniShellEnvironmentTests\\36a237db8f784d82b9a7d444161a968b",
+          "real_user_path_unchanged": true,
+          "cleanup_passed": false,
+          "reissue_started": false,
+          "downstream_notification_and_rust": "skipped",
+          "followup": {
+            "change": "explicit Out for native output byte array; typed buffer; retain mismatch bytes in future failure receipts",
+            "scope": "test fixture only; production helper unchanged",
+            "source_gate_assertions": 8,
+            "local_positive_run": "r-ccb91c1a",
+            "archived_old_source_expected_rejection_run": "r-2e7f6bd4",
+            "local_probe_disproved_object_array_on_pwsh7_run": "r-337832fc",
+            "native_api_revalidation": "pending"
+          },
+          "sources": [
+            "https://learn.microsoft.com/en-us/dotnet/standard/native-interop/best-practices",
+            "https://learn.microsoft.com/en-us/dotnet/standard/native-interop/blittable-and-non-blittable-types"
+          ]
+        },
+        "cause_boundary": "missing-nul-add在调用生产helper前的夹具读回不匹配；旧记录未保存actual字节，具体原生原因未定，不能将Out缺失断言为已证实根因。"
+      },
+      "windows_output_buffer_followup": {
+        "fix_sha": "661f335938ed8676d000faa521c34fcdb94866b8",
+        "status": "native_revalidation_failed_before_helper",
+        "changed_paths": [
+          "script/windows/reissue_release_installer.py",
+          "script/windows/test_windows_environment.ps1",
+          "script/windows/test_windows_environment_raw_gate.ps1"
+        ],
+        "changes": [
+          "QueryValue的原生输出byte数组显式声明[Out]",
+          "读取缓冲区使用显式byte[]及UInt32长度参数",
+          "只为人工fixture记录expected/actual原始字节诊断；不读取真实PATH内容作为诊断"
+        ],
+        "production_helper_unchanged": true,
+        "assertions_not_relaxed": true,
+        "rust_and_resources_equivalent_to": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "positive_contract_gate": {
+          "run_id": "r-ccb91c1a",
+          "cases": 5,
+          "assertions": 8,
+          "exit_code": 0,
+          "status": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-ccb91c1a.json",
+          "scope": "实际声明反射与Get-RawPath假响应，仅验证PowerShell契约，不验证Windows API。"
+        },
+        "previous_source_negative_control": {
+          "run_id": "r-2e7f6bd4",
+          "source_sha": "43388041d86a95ecf419e944c0865fef8f1f8561",
+          "exit_code": 1,
+          "expected_rejection": "QueryValue输出数组声明缺Out",
+          "status": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-2e7f6bd4.json"
+        },
+        "official_contract_sources": [
+          "https://learn.microsoft.com/en-us/dotnet/standard/native-interop/best-practices",
+          "https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types"
+        ],
+        "cause_boundary": "第三轮仍在人工fixture读回处失败：12字节C:\\raw读回14字节附一个NUL。尚未确定写入或读回边界；不能以Out变化解释原因或证明生产helper失败。",
+        "native_run_id": 39245777003,
+        "native_result": "failure"
+      },
+      "windows_third_ci_failure": {
+        "run_id": 39245777003,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39245777003",
+        "head_sha": "661f335938ed8676d000faa521c34fcdb94866b8",
+        "status": "completed",
+        "conclusion": "failure",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39245777003/windows/windows-path/full/result.json",
+        "run_observation": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39245777003/run-observed.json",
+        "failure_case": "raw-1-missing-nul-add",
+        "failure_stage": "fixture_before_production_helper",
+        "raw_source_gate_assertions": 8,
+        "raw_cases_completed": [
+          {
+            "name": "raw-1-zero-bytes-add",
+            "kind": 1,
+            "action": "add",
+            "expected_success": false,
+            "before": {
+              "kind": 1,
+              "bytes": ""
+            },
+            "after": {
+              "kind": 1,
+              "bytes": ""
+            },
+            "ownership_unchanged": true
+          },
+          {
+            "name": "raw-1-zero-bytes-remove",
+            "kind": 1,
+            "action": "remove",
+            "expected_success": false,
+            "before": {
+              "kind": 1,
+              "bytes": ""
+            },
+            "after": {
+              "kind": 1,
+              "bytes": ""
+            },
+            "ownership_unchanged": true
+          }
+        ],
+        "raw_registry_assertions": 6,
+        "observed_mismatch": {
+          "expected_kind": "REG_SZ",
+          "actual_kind": "REG_SZ",
+          "expected_utf16le": "C:\\raw",
+          "expected_bytes": 12,
+          "expected_terminal_nul": false,
+          "expected_base64": "QwA6AFwAcgBhAHcA",
+          "actual_bytes": 14,
+          "actual_terminal_nul_code_units": 1,
+          "actual_base64": "QwA6AFwAcgBhAHcAAAA="
+        },
+        "cause_status": "unresolved_write_or_read_boundary",
+        "cause_boundary": "当前只证明人工fixture读回额外一个UTF-16 NUL；尚未区分写入与读回边界，不归因Out或OS，生产helper尚未进入。",
+        "inno_assertions": 1615,
+        "native_actions": 222,
+        "native_step_assertions": 226,
+        "native_matrix_cases": 0,
+        "real_user_path_unchanged": true,
+        "cleanup_passed": false,
+        "retained_registry_root": "HKCU\\Software\\InfiniShellEnvironmentTests\\cf78c9a21b60497395a24720d749e944",
+        "production_helper_sha256": "d90a0a529d19c1aca5a329c0b9928434702f7a15f5f3f981dd0ac986a6af5fd9",
+        "production_helper_unchanged": true,
+        "later_raw_matrix_reissue_and_windows_rust": "not_run_after_fixture_failure"
+      },
+      "windows_exact_count_fixture_followup": {
+        "fix_sha": "8e55aabdbaf33143c1636b98be039a160268630e",
+        "status": "native_fixture_preflight_passed_production_case_failed",
+        "scope": "仅三份Windows测试/控制器；生产helper和Rust/资源未变",
+        "changes": "Set-RawPath非零尾哨兵且cbData保持原始长度；source gate要求11断言；新增16项native fixture preflight，与production case独立计数。",
+        "native_fixture_preflight_planned_cases": 16,
+        "native_fixture_preflight_result": "passed_16_cases_cleanup_true",
+        "positive_contract_gate": {
+          "run_id": "r-a92f2899",
+          "cases": 8,
+          "assertions": 11,
+          "exit_code": 0,
+          "cleanup": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-a92f2899.json"
+        },
+        "previous_661_source_negative_control": {
+          "run_id": "r-f6f4f67c",
+          "exit_code": 1,
+          "expected_rejection": true,
+          "cleanup": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-f6f4f67c.json"
+        },
+        "controller_tests": {
+          "run_id": "r-c8ab7f10",
+          "passed": 3,
+          "skipped_windows_only": 3,
+          "exit_code": 0,
+          "cleanup": "cleaned",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-c8ab7f10.json"
+        },
+        "independent_review": "acp独立审查未发现确定缺陷；不代替Windows API实跑。",
+        "cause_boundary": "第四轮16项fixture类型/字节全部一致，之前读回阻塞不再复现于此预检；生产有效代理对add尝试247失败，原因仍需独立定位，不宣称UTF16检查或helper缺陷确诊。",
+        "production_case_result": "valid_surrogate_pair_add_expected_success_failed_root_cause_pending"
+      },
+      "tui_smoke_followup": {
+        "attempts": [
+          {
+            "run_id": "r-f8c20aa3",
+            "exit_code": 101,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-f8c20aa3.json",
+            "boundary": "保留第一次启动失败，不从该轮无pane内容推定产品故障。"
+          },
+          {
+            "run_id": "r-b2fe8bf4",
+            "exit_code": 101,
+            "status": "completed_retained",
+            "cleanup_ready": false,
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-b2fe8bf4.json",
+            "cause": "保留pane证明所选warp_tui包不直接拥有rust-embed/debug-embed feature，属于构建参数选择。",
+            "cleanup_boundary": "原运行及失败pane保留，cleanup_ready=false为当时状态；原launchd身份消失并复核全部进程/lsof/目录身份后已清理。",
+            "current_cleanup_status": "cleaned_via_recheck",
+            "cleanup_recheck": {
+              "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r-b2fe8bf4-cleanup-recheck.json",
+              "result": {
+                "run_id": "r-b2fe8bf4",
+                "checked_at": "2026-10-19T12:15:53.253410+00:00",
+                "original_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-b2fe8bf4.json",
+                "status": "cleaned",
+                "cleanup_ready": true,
+                "identity": {
+                  "device": 16777235,
+                  "inode": 106905058,
+                  "owner": 502
+                },
+                "live_pids": [],
+                "services": [
+                  {
+                    "label": "application.at.obdev.littlesnitch.softwareupdate.62486891.62486932",
+                    "found": false
+                  }
+                ],
+                "lsof_returncode": 1,
+                "temporary_path": "/Users/zhishi/InfiniShell-Tests/r-b2fe8bf4",
+                "cleaned_at": "2026-10-19T12:15:53.258016+00:00"
+              }
+            }
+          },
+          {
+            "run_id": "r-375a0354",
+            "status": "passed_scoped_pty_smoke",
+            "record": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-375a0354.json",
+            "change": "额外选择-p warp以选择依赖feature；不改产品功能。",
+            "result": "passed_scoped_smoke",
+            "exit_code": 0,
+            "tmux_exit_code": 0,
+            "cleanup": "cleaned"
+          }
+        ],
+        "product_failure_proven": false,
+        "actual_tui_validation": "passed_scoped_smoke",
+        "binding": {
+          "run_id": "r-375a0354",
+          "profile": "tui-essence-20261019-910bf84c",
+          "executable": "/Volumes/SanDisk/github/InfiniShell-Desktop/target/debug/infinishell-tui",
+          "sha256": "03cae552c2dfdf3f4ac7aacd2e04850ec312c6876a5809c3da93d3b8d6d99ea7",
+          "size": 884765040,
+          "source_sha_at_start": "661f335938ed8676d000faa521c34fcdb94866b8",
+          "current_source": "8e55aabdbaf33143c1636b98be039a160268630e",
+          "source_changes_since_start": [
+            "script/windows/reissue_release_installer.py",
+            "script/windows/test_windows_environment.ps1",
+            "script/windows/test_windows_environment_raw_gate.ps1"
+          ],
+          "strict_signature_verified": true,
+          "scope": "真实PTY启动、资源渲染与基本键盘交互；不证明真实SSH文件持久化或模型调用"
+        },
+        "binding_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/tui-smoke/binding.json",
+        "result": {
+          "completed_at": "2026-10-19T11:56:22.017021+00:00",
+          "status": "passed_scoped_smoke",
+          "run_id": "r-375a0354",
+          "tests": [
+            "真实120x36 PTY启动，主界面与资源可见",
+            "问号快捷键展开和收回",
+            "显式shell模式执行固定printf，实际输出精确匹配",
+            "空输入Ctrl-D正常退出，进程与独占tmux均exit0"
+          ],
+          "model_requests_submitted": false,
+          "ssh_transport_verified": false,
+          "gui_verified": false,
+          "temporary_directory_status": "cleaned",
+          "executable_unchanged": true,
+          "profile_paths": [
+            {
+              "path": "/Users/zhishi/.infinishell_cli-tui-essence-20261019-910bf84c",
+              "exists": true,
+              "retained": true
+            },
+            {
+              "path": "/Users/zhishi/.infinishell-tui-essence-20261019-910bf84c",
+              "exists": true,
+              "retained": true
+            },
+            {
+              "path": "/Users/zhishi/Library/Application Support/dev.infinishell.InfiniShellTUI-tui-essence-20261019-910bf84c",
+              "exists": true,
+              "retained": true
+            }
+          ],
+          "screens": {
+            "01-startup.txt": "7336d807d6594686cf7357ce241f3477c470bed468e49704dae60ea8b9b1b618",
+            "02-shortcuts.txt": "b6040c61be87519d9e24bb3ff4ae84dd6546799797aba36c0a51d97cd370eb8e",
+            "03-shell-command.txt": "ecaa6cb278888ba8a2b319367e129d431309048be864cbe68e7ab2389f366d80"
+          }
+        },
+        "result_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/tui-smoke/result.json",
+        "frames_sha256_verified": true,
+        "scope_boundary": "真实120x36 PTY启动/资源、?展开收回、显式shell printf固定marker、空输入Ctrl-D及TUI/tmux正常退出；未发模型请求、不是SSH或GUI验证，3个测试profile目录保留。"
+      },
+      "windows_fourth_ci_failure": {
+        "run_id": 39247315588,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39247315588",
+        "head_sha": "8e55aabdbaf33143c1636b98be039a160268630e",
+        "conclusion": "failure",
+        "result": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39247315588/windows/windows-path/full/result.json",
+        "fixture_preflight": {
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39247315588/windows/windows-path/full/raw-fixture-preflight.json",
+          "status": "passed",
+          "cases": 16,
+          "all_kind_and_bytes_match": true,
+          "cleanup_passed": true,
+          "production_helper_executed": false
+        },
+        "raw_source_gate_assertions": 11,
+        "completed_production_boundary_cases": {
+          "registry_kind": "REG_SZ",
+          "cases": 14,
+          "actions": "异常add/remove均拒绝且原字节与归属保持",
+          "raw_assertions": 42
+        },
+        "native_actions_completed": 246,
+        "first_failed_attempt": {
+          "index": 247,
+          "case": "raw-1-valid-surrogate-pair",
+          "action": "add A",
+          "expected_success": true,
+          "action_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39247315588/windows/windows-path/full/action-00247.txt",
+          "receipt_suffix": ":0",
+          "boundary": "result.native_actions=246是成功完成数；action00246是此前low-surrogate-remove，不能把246写为本次失败编号。"
+        },
+        "cause_status": "under_investigation_not_confirmed_as_production_helper_defect",
+        "cause_boundary": "失败已从fixture原字节读回移到预期成功的有效代理对add；根因未确定，不能定为UTF16检查或helper缺陷。",
+        "native_matrix_cases": 0,
+        "remaining_raw_matrix_reissue_windows_rust": "not_fully_run",
+        "real_user_path_unchanged": true,
+        "cleanup_passed": false,
+        "retained_registry_root": "HKCU\\Software\\InfiniShellEnvironmentTests\\d039d9da36ed45beb1241b21d047ae6e",
+        "production_helper_sha256": "d90a0a529d19c1aca5a329c0b9928434702f7a15f5f3f981dd0ac986a6af5fd9"
+      },
+      "windows_diagnostic_followup": {
+        "source_sha": "69d7f0af0d39b3219c4c703ea7ab279c0ad45f5d",
+        "status": "diagnostic_ci_completed_failure_predicate_unresolved",
+        "changed_files": 8,
+        "scope": "仅测试/控制器/工作流；production environment.iss未变",
+        "diagnostic_additions": {
+          "unicode_test_only_assertions_added": 20,
+          "inno_total_target": 1635,
+          "final_cases_added": 2,
+          "final_cases_target": 364,
+          "raw_source_gate_target": 14,
+          "raw_gate_new_boundaries": [
+            "missing-strict",
+            "diagnostic-missing",
+            "permission-error"
+          ],
+          "failed_action_observation": "新增native_actions_attempted及失败前后人工fixture快照，区分成功数与尝试编号。"
+        },
+        "native_targets_status": "本轮source14与fixture16通过，但Inno仅5项后失败；1635及364仍是未完成目标，不计全部通过。",
+        "local_contract_results": [
+          {
+            "run_id": "r-b8bdf683",
+            "cases": 11,
+            "assertions": 14,
+            "exit_code": 0,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-b8bdf683.json"
+          },
+          {
+            "run_id": "r-7c2eae63",
+            "scope": "旧8e55源码负例按预期拒绝",
+            "exit_code": 1,
+            "expected_rejection": true,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-7c2eae63.json"
+          },
+          {
+            "run_id": "r-4ad45ca0",
+            "scope": "三份实际PowerShell AST及消费端14断言门禁",
+            "exit_code": 0,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-4ad45ca0.json"
+          },
+          {
+            "run_id": "r-04d10d3e",
+            "scope": "实际Invoke-NativeAction函数的3项合成失败记账/人工快照断言",
+            "assertions": 3,
+            "exit_code": 0,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-04d10d3e.json"
+          }
+        ],
+        "workflow": {
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/windows-path-step-order.json",
+          "scope": "仅将Windows Python/PATH步骤前移到cargo check之前",
+          "step_count": 19,
+          "step_bodies_conditions_timeouts_and_other_jobs_unchanged": true,
+          "actionlint": "passed"
+        },
+        "boundary": "第五原生诊断证实初始UTF16读取及PATH/元数据写入有效；Projection恢复校验或移交完成的具体predicate未定。本地契约通过不覆盖完整生产门禁。"
+      },
+      "windows_fifth_ci_failure": {
+        "run_id": 39249448503,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39249448503",
+        "status": "completed",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39249448503/evidence-review.json",
+        "review": {
+          "reviewed_utc": "2026-10-19T12:11:45.106637+00:00",
+          "head_sha": "69d7f0af0d39b3219c4c703ea7ab279c0ad45f5d",
+          "conclusion": "failure",
+          "artifact_id": 12185520257,
+          "artifact_sha256": "6e432099b5a65e67feb2bd010dab1dac772c99a2bed0a62206d91202f3b02129",
+          "production_helper_sha256": "d90a0a529d19c1aca5a329c0b9928434702f7a15f5f3f981dd0ac986a6af5fd9",
+          "source_gate_assertions": 14,
+          "raw_fixture_preflight": {
+            "cases_exact": 16,
+            "cleanup_passed": true,
+            "production_helper_executed": false
+          },
+          "native_inno": {
+            "passed_assertions": 5,
+            "first_failure": "unicode-roundtrip-1: add",
+            "confirmed_before_add": [
+              "Length=8",
+              "Ord high=55357 low=56832",
+              "REG_SZ raw18 bytes includes one NUL",
+              "ReadEnvironmentPath true and exact value/type"
+            ],
+            "confirmed_after_add": [
+              "Path68 bytes contains original nonBMP text and target",
+              "ReadEnvironmentValue true for Path, State, Projection, OriginalValue, AddedPath",
+              "Pending absent",
+              "Projection remains; its 7 serialized fields parse correctly by UTF16 units and owner SHA matches target"
+            ],
+            "failure_scope": "RecoverEnvironmentProjection validation or later handoff completion; specific predicate not yet established"
+          },
+          "native_completed_actions": 0,
+          "native_attempted_actions": 0,
+          "cleanup_passed": false,
+          "failed_registry_root_retained": "HKCU\\Software\\InfiniShellEnvironmentTests\\1799f1c320dd4908a7fb9473af15416b",
+          "real_user_path_unchanged": true,
+          "not_run": [
+            "REG_EXPAND_SZ unicode roundtrip",
+            "remaining baseline1635 assertions",
+            "1438 native action matrix",
+            "raw malformed/helper boundaries in this run",
+            "reissue",
+            "cargo check",
+            "Windows notification/Rust/i18n downstream"
+          ],
+          "diagnosis_limit": "Inno native evidence rules out initial UTF16 validation rejection; do not claim TArrayOfString or Ord implementation defect without further evidence."
+        },
+        "cause_boundary": "PATH和元数据的合法UTF16读取/写入已经证实；失败范围为Projection恢复校验或后续移交完成，具体predicate未定。不能归因初始UTF16检查、TArrayOfString或Ord实现。"
+      },
+      "progress_history_note": "current_ci第八completed/success，main源码已快进push；七失败、旧候选及原收据保留当时状态。收据内历史pending不代表现在，现态看顶层/source_integration/windows_eighth_ci_success。GUI与正式新包未验。",
+      "document_progress_archive": {
+        "manifest": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/document-progress-snapshots/20261019T121920.731222Z/manifest.json",
+        "scope": "收拢前五份未提交文档完整原件，含逐次阶段快照；摘要、大小与来源在manifest，不修改已提交历史或失败原件。"
+      },
+      "windows_sixth_ci_failure": {
+        "run_id": 39250927363,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39250927363",
+        "status": "completed",
+        "conclusion": "failure",
+        "head_sha": "e4739c4748249edf2012c63130afcf0aec41fcf2",
+        "job_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39250927363/windows-job.json",
+        "result_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39250927363/windows/windows-path/full/result.json",
+        "predicate_log": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39250927363/windows/windows-path/full/inno.log",
+        "source_gate_assertions": 14,
+        "raw_fixture_preflight": {
+          "cases_exact": 16,
+          "cleanup_passed": true,
+          "production_helper_executed": false,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39250927363/windows/windows-path/full/raw-fixture-preflight.json"
+        },
+        "native_inno": {
+          "passed_assertions": 5,
+          "first_failure": "unicode-roundtrip-1: add",
+          "first_false_predicate": "original-value.allowed=0",
+          "prior_read_parse_and_metadata_predicates_passed": true,
+          "stored_original_utf16_units": [
+            67,
+            58,
+            92,
+            114,
+            97,
+            119,
+            55357,
+            56832
+          ],
+          "inline_comparisons": {
+            "matches_original": false,
+            "matches_base": false
+          }
+        },
+        "native_completed_actions": 0,
+        "native_attempted_actions": 0,
+        "tested_production_helper_sha256": "d90a0a529d19c1aca5a329c0b9928434702f7a15f5f3f981dd0ac986a6af5fd9",
+        "real_user_path_unchanged": true,
+        "cleanup_passed": false,
+        "failed_registry_root_retained": "HKCU\\Software\\InfiniShellEnvironmentTests\\f2bc1ee295c84a7ba19f5c968e69c1ca",
+        "not_run": [
+          "REG_EXPAND_SZ Unicode roundtrip",
+          "remaining 1635-assertion baseline",
+          "1438 native action matrix",
+          "raw production boundaries",
+          "reissue",
+          "cargo check",
+          "Windows notification/Rust/i18n downstream"
+        ],
+        "boundary": "只记录第六失败原件；后续修复不继承本轮helper SHA，未验证通过。"
+      },
+      "windows_non_bmp_fix_followup": {
+        "status": "native_path_and_reissue_verified_eighth_success_source_main",
+        "cause": "固定PascalScript的Copy声明返回AnyString(btString)，内联比较预分配ANSI临时；Unicode结果回写时非BMP丢失。显式String局部接收避免该转换。",
+        "compiler": {
+          "inno_version": "6.7.1",
+          "pascalscript_commit": "d6e25439080c37e15af23badb48c39760a2b8d4d",
+          "source": "https://github.com/remobjects/pascalscript/blob/d6e25439080c37e15af23badb48c39760a2b8d4d/Source/uPSCompiler.pas",
+          "verified_lines": {
+            "anystring_btstring": 12458,
+            "copy_return_declaration": 13113,
+            "inline_result_allocation": [
+              6319,
+              6321
+            ],
+            "result_copy_back": [
+              9463,
+              9467
+            ],
+            "unicode_destination_reuse": [
+              9482,
+              9506
+            ]
+          }
+        },
+        "existing_pr26_boundary": {
+          "source_sha": "2e3406e7bce33fab7fc292622c68239db77e0e88",
+          "source_path": "script/windows/environment.iss",
+          "inline_copy_lines": [
+            327,
+            484,
+            524,
+            705
+          ],
+          "r9_fixed_compiler_version": "6.7.1",
+          "scope": "扩大非BMP覆盖发现的PR26既有边界，不是本轮原始UTF16读取引入；R9六阶段仅覆盖已测场景，不宣称其覆盖非BMP。"
+        },
+        "planned_change": "四处完整字符串Copy比较已改为显式String局部，并增加非BMP目标路径回归",
+        "validated_pass": true,
+        "final_helper_sha256": "0c56bb22d41007001f4a899502bd6f737f949629aaa87407d7d2c6ea91bae62a",
+        "final_test_counts": {
+          "inno_assertions": 1683,
+          "verified_cases": 366,
+          "native_actions": 1438,
+          "native_step_assertions": 2572,
+          "raw_registry_cases": 30,
+          "raw_registry_assertions": 90,
+          "reissue_positive_cases": 40,
+          "reissue_negative_control_cases": 2,
+          "reissue_assertions": 2476
+        },
+        "final_source_sha": "046f429aaa371893e26146a55c8f8b047dcb2113",
+        "expected_test_counts": {
+          "inno_assertions": 1683,
+          "final_cases": 366,
+          "raw_source_gate_assertions": 14,
+          "added_assertions_formula": "4 + (22 * 2) = 48",
+          "independently_recounted": true
+        },
+        "independent_review": "passed_source_review_only",
+        "localization": "无需本地化变更；本轮helper/测试没有用户可见文案变化。",
+        "native_ci": {
+          "run_id": 39252231214,
+          "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39252231214",
+          "verified_head_sha": "046f429aaa371893e26146a55c8f8b047dcb2113",
+          "status": "completed",
+          "result": "failure",
+          "path_result": "passed",
+          "reissue_result": "passed",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39252231214/evidence-review.json"
+        },
+        "local_contract_results": [
+          {
+            "run_id": "r-a60f92db",
+            "scope": "实际raw source gate",
+            "cases": 11,
+            "assertions": 14,
+            "exit_code": 0,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-a60f92db.json",
+            "log_sha256_verified": true
+          },
+          {
+            "run_id": "r-612224fc",
+            "scope": "实际PowerShell AST及两项Unicode目标fixture注册；未执行Windows API",
+            "unicode_fixture_registrations": 2,
+            "exit_code": 0,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-612224fc.json",
+            "log_sha256_verified": true
+          },
+          {
+            "run_id": "r-c779bc6c",
+            "scope": "重发控制器；Windows-only项目跳过",
+            "passed": 3,
+            "skipped_windows_only": 3,
+            "exit_code": 0,
+            "status": "cleaned",
+            "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-c779bc6c.json",
+            "log_sha256_verified": true
+          }
+        ],
+        "validated_scope": "helper0c56…第七/八PATH及reissue通过，源码已main；不代表GUI/新Setup通过。",
+        "latest_native_ci": {
+          "run_id": 39256631029,
+          "status": "completed",
+          "conclusion": "success",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json"
+        }
+      },
+      "source_equivalence_046f429aa": {
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/046f429aa-source-equivalence.json",
+        "receipt": {
+          "checked_at": "2026-10-19T12:30:11.514208+00:00",
+          "product_baseline": "84fbb124744ecfd6d0044b6498e304b685b05848",
+          "implementation_head": "046f429aaa371893e26146a55c8f8b047dcb2113",
+          "changed_files": [
+            ".github/workflows/cross-platform-preflight.yml",
+            "script/windows/environment-action-tests.iss",
+            "script/windows/environment-diagnostics.iss",
+            "script/windows/environment-tests.iss",
+            "script/windows/environment.iss",
+            "script/windows/reissue_release_installer.py",
+            "script/windows/test_windows_environment.ps1",
+            "script/windows/test_windows_environment_raw_gate.ps1",
+            "script/windows/test_windows_environment_reissue.ps1"
+          ],
+          "unchanged_product_paths": [
+            "app",
+            "crates",
+            "resources",
+            "Cargo.toml",
+            "Cargo.lock"
+          ],
+          "production_windows_helper_sha256": "0c56bb22d41007001f4a899502bd6f737f949629aaa87407d7d2c6ea91bae62a",
+          "reuse_scope": [
+            "Linux product tests from 39242160374",
+            "macOS updater local Rust and i18n gates",
+            "frozen macOS update GUI runtime bytes",
+            "TUI limited PTY smoke"
+          ],
+          "limits": [
+            "Windows helper changed and requires its own native CI",
+            "macOS GUI is still unverified and waiting for user keychain handling",
+            "unchanged source does not grant new package acceptance"
+          ],
+          "workflow_difference_receipt": "windows-path-step-order.json"
+        }
+      },
+      "windows_seventh_ci_failure": {
+        "run_id": 39252231214,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39252231214",
+        "status": "completed",
+        "conclusion": "failure",
+        "head_sha": "046f429aaa371893e26146a55c8f8b047dcb2113",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39252231214/evidence-review.json",
+        "review": {
+          "reviewed_utc": "2026-10-19T12:54:24.099159+00:00",
+          "run_id": 39252231214,
+          "head_sha": "046f429aaa371893e26146a55c8f8b047dcb2113",
+          "conclusion": "failure",
+          "artifact_id": 12186592776,
+          "artifact_sha256": "86fc6fa08055fbcae34d267e5f9edabad1280a8526f5040c0d70f5145aa467f1",
+          "production_helper_sha256": "0c56bb22d41007001f4a899502bd6f737f949629aaa87407d7d2c6ea91bae62a",
+          "path_full": {
+            "status": "passed",
+            "assertions": 1683,
+            "verified_cases": 366,
+            "native_actions": 1438,
+            "native_actions_attempted": 1438,
+            "native_action_failure": null,
+            "native_step_assertions": 2572,
+            "native_matrix_cases": 200,
+            "native_edge_cases": 38,
+            "raw_registry_cases": 30,
+            "raw_registry_assertions": 90,
+            "raw_rejected_preserving_bytes_and_ownership": 28,
+            "raw_valid_utf16_roundtrips_preserving_bytes_and_removing_ownership": 2,
+            "source_gate_assertions": 14,
+            "unicode_final_fixtures": [
+              {
+                "name": "unicode-roundtrip-1",
+                "kind": 1,
+                "value": "C:\\raw😀"
+              },
+              {
+                "name": "unicode-roundtrip-2",
+                "kind": 2,
+                "value": "C:\\raw😀"
+              },
+              {
+                "name": "unicode-target-1",
+                "kind": 1,
+                "value": "C:\\raw😀;D:\\User"
+              },
+              {
+                "name": "unicode-target-2",
+                "kind": 2,
+                "value": "C:\\raw😀;D:\\User"
+              }
+            ],
+            "historical_limits": [
+              {
+                "case": "native-limit-future-old-install",
+                "observed": "empty REG_EXPAND_SZ",
+                "reason": "new owner created after last new helper handoff"
+              },
+              {
+                "case": "native-limit-missing-history",
+                "observed": "empty REG_EXPAND_SZ",
+                "reason": "original absence history already removed before new helper attached"
+              }
+            ],
+            "cleanup_passed": true,
+            "real_user_path_unchanged": true
+          },
+          "raw_fixture_preflight": {
+            "cases": 16,
+            "all_kind_and_bytes_exact": true,
+            "cleanup_passed": true,
+            "production_helper_executed": false
+          },
+          "reissue": {
+            "status": "passed",
+            "positive_cases": 40,
+            "negative_control_cases": 2,
+            "native_actions": 342,
+            "independent_step_snapshots": 342,
+            "assertions": 2476,
+            "source_gate_assertions": 4,
+            "cleanup_passed": true,
+            "positive_test_registry_cleanup_passed": true,
+            "negative_registry_evidence_preserved": true,
+            "execution_context_hkcu_environment_path_unchanged": true,
+            "desktop_environment_path_verified": false,
+            "negative_actual_failed": 1,
+            "negative_actual_passed": 1
+          },
+          "source_binding": {
+            "files_match_frozen_head": [
+              "environment-action-tests.iss",
+              "environment-diagnostics.iss",
+              "environment-legacy-r4.iss",
+              "environment.iss",
+              "test_windows_environment_reissue.ps1",
+              "test_windows_environment_reissue_gate.ps1"
+            ],
+            "source_binding_sha256": "9d3eac1cbbb15c6f90802812f4c0758e6ae4785c0776ca3700741d08c7da241e",
+            "compiler_version": "6.7.1",
+            "real_product_installer_built": false
+          },
+          "windows_registration": {
+            "assertions": 80,
+            "cleanup_passed": true
+          },
+          "cargo_check": "passed",
+          "codex_notification_tests": {
+            "run": 128,
+            "passed": 123,
+            "skipped": 5,
+            "skip_reasons": "Unix symlink x2, Unix modes x1, Unix control terminal x1, Unix Bash/jq x1"
+          },
+          "hook_trust": [
+            {
+              "version": "0.147.0",
+              "hooks": 5,
+              "executable_sha256": "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d",
+              "native_config_unchanged": true,
+              "model_request_attempted": false
+            },
+            {
+              "version": "0.156.1",
+              "hooks": 5,
+              "executable_sha256": "70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301",
+              "native_config_unchanged": true,
+              "model_request_attempted": false
+            }
+          ],
+          "rust": {
+            "run": 574,
+            "passed": 573,
+            "failed": 1,
+            "skipped": 9,
+            "passed_by_crate": {
+              "channel_versions": 26,
+              "http_client": 20,
+              "mcp": 48,
+              "remote_server": 163,
+              "warp_completer": 184,
+              "warp_files": 32,
+              "warp_util": 100
+            },
+            "failed_test": "warp_files::tests::restore_preserves_readonly_and_cleans_its_temporary_file_after_collision",
+            "panic_file": "crates/warp_files/src/lib_tests.rs",
+            "panic_line": 352,
+            "assertion": "std::fs::metadata(&target).unwrap().permissions().readonly()",
+            "cause": "restore_local_file sets readonly before NamedTempFile.persist_noclobber; locked tempfile 3.23.0 Windows persist resets all attributes to FILE_ATTRIBUTE_NORMAL before MoveFileExW.",
+            "cause_source": "tempfile-3.23.0/src/file/imp/windows.rs:99",
+            "skip_source_audit": "2 explicit ignored real SSH tests + 4 known completion tests + 3 Windows path separator completion tests"
+          },
+          "not_run": [
+            "window migration and sync crate test group",
+            "v2 path completion group",
+            "application regression and i18n group",
+            "full workspace",
+            "real desktop or newly built release installer acceptance"
+          ],
+          "historical_failed_runs_preserved": true,
+          "source_modified_by_monitor": false
+        },
+        "boundary": "PATH/reissue/通知链真实通过与Rust首错分开记；没有新产品安装器或桌面验收，修复readonly未完成。"
+      },
+      "windows_readonly_restore_followup": {
+        "status": "windows_native_passed_source_main",
+        "failed_test": "warp_files::tests::restore_preserves_readonly_and_cleans_its_temporary_file_after_collision",
+        "cause": "restore_local_file sets readonly before NamedTempFile.persist_noclobber; locked tempfile 3.23.0 Windows persist resets all attributes to FILE_ATTRIBUTE_NORMAL before MoveFileExW.",
+        "cause_source": "tempfile-3.23.0/src/file/imp/windows.rs:99",
+        "source_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39252231214/evidence-review.json",
+        "scope": "Windows普通create_new File/Builder.make_in，写入设readonly后无覆盖rename，成功禁旧名清理，失败经自持句柄清readonly；Unix保留persist_noclobber。第八回归通过readonly/TEMPORARY==0/碰撞内容与readonly/无自持临时残留。",
+        "validated_pass": true,
+        "final_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "validation_result": "local_and_eighth_windows_native_passed",
+        "remaining_groups": [
+          "full workspace",
+          "2 ignored real SSH end-to-end tests",
+          "real desktop or newly built release installer acceptance",
+          "Linux or macOS rerun in this Windows-only workflow"
+        ],
+        "independent_review": "passed_actual_two_file_diff",
+        "localization": "无需本地化变更",
+        "local_gate_binding": {
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/readonly-fix-local-binding.json",
+          "receipt": {
+            "recorded_at": "2026-10-19T12:58:29.653359+00:00",
+            "base_sha": "046f429aaa371893e26146a55c8f8b047dcb2113",
+            "files": {
+              "crates/warp_files/src/lib.rs": "42fe54a9ef91eb5be1ebe434a515b2d5ba45e0c7a510c4ef6b1bc0b50e0c43f2",
+              "crates/warp_files/src/lib_tests.rs": "f01209e5b24b2a4de12420fd292f33757a0f3313d5bfd1f5395068b158a2fe89"
+            },
+            "local_run": "r-448defe1",
+            "independent_review": "ACP actual two-file diff reviewed; no new findings",
+            "localization": "无需本地化变更",
+            "windows_native_status": "pending",
+            "limitations": [
+              "No crash durability guarantee",
+              "Temporary-path cleanup remains best-effort",
+              "No new protection from malicious same-permission parent-directory replacements"
+            ],
+            "local_results": [
+              {
+                "run_id": "r-448defe1",
+                "exit_code": 0,
+                "status": "cleaned",
+                "command": [
+                  "env",
+                  "CARGO_TARGET_DIR=/Volumes/SanDisk/github/InfiniShell-Desktop/target",
+                  "CARGO_BUILD_JOBS=2",
+                  "cargo",
+                  "nextest",
+                  "run",
+                  "--locked",
+                  "--no-fail-fast",
+                  "--no-tests",
+                  "fail",
+                  "--retries",
+                  "0",
+                  "-p",
+                  "warp_files",
+                  "--lib",
+                  "--features",
+                  "warpui_core/test-util"
+                ],
+                "source_unchanged": true,
+                "changed_nonproduct_files": [],
+                "rust_source_hashes_match": true,
+                "log_sha256": "17c5a4b09ba837b24fc0959225d04f618ec73d719593b344e0fbb81952ec72db"
+              },
+              {
+                "run_id": "r-85fd318a",
+                "exit_code": 0,
+                "status": "cleaned",
+                "command": [
+                  "env",
+                  "CARGO_TARGET_DIR=/Volumes/SanDisk/github/InfiniShell-Desktop/target",
+                  "CARGO_BUILD_JOBS=2",
+                  "cargo",
+                  "check",
+                  "--locked",
+                  "-p",
+                  "warp"
+                ],
+                "source_unchanged": false,
+                "changed_nonproduct_files": [
+                  "specs/cli-agent-parity/CURRENT_STATUS.json",
+                  "specs/cli-agent-parity/README.md"
+                ],
+                "rust_source_hashes_match": true,
+                "log_sha256": "e48e3e75e791bbd0b02eaa50305464aea450c52191b429271fd5a827c5e66ceb"
+              }
+            ],
+            "local_results_recorded_at": "2026-10-19T13:00:47.634851+00:00"
+          }
+        },
+        "local_passed_tests": 33,
+        "local_cargo_check": "passed",
+        "local_cleanup": "both_cleaned",
+        "windows_ci": {
+          "run_id": 39256631029,
+          "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029",
+          "verified_head_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "status": "completed",
+          "result": "success",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json"
+        },
+        "reuse_boundary": "Unix条件编译后行为等价，不是源码blob完全一致；冻结运行包和TUI仅按原字节/范围保留。",
+        "native_regression": {
+          "status": "passed",
+          "log": "windows/crate-tests.log",
+          "line": 498,
+          "text": "PASS [   0.035s] (444/574) warp_files tests::restore_preserves_readonly_and_cleans_its_temporary_file_after_collision",
+          "assertions_covered": "restored readonly; no FILE_ATTRIBUTE_TEMPORARY; collision preserves target readonly/content; no temporary leftovers"
+        },
+        "scope_boundary": "全工作区、2项ignore真实SSH、GUI或新产品Setup未验；原收据pending保留当时快照，现态以第八审核为准。"
+      },
+      "source_equivalence_8b46bcc33": {
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/8b46bcc33-source-equivalence.json",
+        "receipt": {
+          "checked_at": "2026-10-19T13:01:50.055271+00:00",
+          "head": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "parent": "046f429aaa371893e26146a55c8f8b047dcb2113",
+          "changed_files": [
+            "crates/warp_files/src/lib.rs",
+            "crates/warp_files/src/lib_tests.rs"
+          ],
+          "source_hashes": {
+            "crates/warp_files/src/lib.rs": "42fe54a9ef91eb5be1ebe434a515b2d5ba45e0c7a510c4ef6b1bc0b50e0c43f2",
+            "crates/warp_files/src/lib_tests.rs": "f01209e5b24b2a4de12420fd292f33757a0f3313d5bfd1f5395068b158a2fe89"
+          },
+          "windows_delta": "Ordinary create_new temporary file; prepare readonly before native no-replace rename; cleanup owned handle on failure; disable old-path cleanup after success",
+          "unix_reuse_basis": "Two independent diff reviews confirm unchanged Unix tempfile creation, writes, mode setting and persist_noclobber behavior after cfg elimination. macOS warp_files 33 tests and cargo check passed on these exact Rust bytes. This is conditional source equivalence, not identical file blobs.",
+          "reused_evidence": [
+            "Linux product tests 39242160374; prior 84->046 equality receipt still scoped to that range",
+            "macOS updater 61 nextest and 12 i18n tests; updater files and resources unchanged",
+            "Frozen macOS updater runtime and TUI PTY smoke retain their own byte identities, not rebuilt as 8b46bcc33 artifacts"
+          ],
+          "local_gate_binding": "readonly-fix-local-binding.json",
+          "installer_helper_unchanged": "0c56bb22d41007001f4a899502bd6f737f949629aaa87407d7d2c6ea91bae62a",
+          "new_windows_run": 39256631029,
+          "new_windows_status": "pending",
+          "limits": [
+            "New Windows behavior requires native validation",
+            "Mac GUI remains unverified pending user keychain action",
+            "No new formal package acceptance or publication"
+          ]
+        }
+      },
+      "next_formal_candidate_impact_verification": {
+        "status": "future_candidate_scoped_acceptance_awaiting_user_release_arrangement",
+        "repeat_old_package_six_stage_now": false,
+        "old_acceptance_scope": "原包生命周期作为基线，不继承给新包",
+        "scopes": [
+          {
+            "area": "macOS/Windows/Linux desktop",
+            "required": "新字节的更新器同/旧/新版本、失败重试英中UI，以及Agent文件操作和输入顺序"
+          },
+          {
+            "area": "Windows final Setup",
+            "required": "包含新helper的最终Setup PATH/卸载及非BMP路径定向验收；旧R9仅原场景基线"
+          },
+          {
+            "area": "six remote-server archives and embedded resources",
+            "artifact_kind": "infinishell-{macos,linux,windows}-{arch}是remote-server，不是Windows桌面便携包",
+            "required": "本轮proto/server/FileModel变化绑定六份新daemon及桌面内嵌资源；补文件删除/移动/撤销的实际SSH路径",
+            "existing_coverage_limit": "handler/unit不等于真实SSH验证"
+          },
+          {
+            "area": "formal release asset set",
+            "required": "按用户另行安排完成正式构建、12资产身份/下载核验、正式签名公证装订与发布"
+          }
+        ],
+        "publication_authorized": false
+      },
+      "pr26_main_integration": {
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/pr26-main-integration.json",
+        "receipt": {
+          "recorded_at": "2026-10-19T13:40:18.390129+00:00",
+          "source": "gh pr view --repo Infinimesh-ai/InfiniShell-Desktop",
+          "pull_request": {
+            "baseRefName": "main",
+            "headRefOid": "2e3406e7bce33fab7fc292622c68239db77e0e88",
+            "isDraft": true,
+            "mergeCommit": {
+              "oid": "fd4c75fbf0a5dc0cd246aa957abe01ead60f6200"
+            },
+            "mergedAt": "2026-10-19T13:39:46Z",
+            "number": 26,
+            "state": "MERGED"
+          }
+        }
+      },
+      "windows_eighth_ci_success": {
+        "run_id": 39256631029,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json",
+        "review": {
+          "reviewed_utc": "2026-10-19T13:40:23.988730+00:00",
+          "run_id": 39256631029,
+          "job_id": 118073509555,
+          "head_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+          "conclusion": "success",
+          "artifact": {
+            "downloaded_utc": "2026-10-19T13:38:14.428673+00:00",
+            "run_id": 39256631029,
+            "head_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+            "artifact_id": 12191526444,
+            "artifact_name": "upstream-essence-windows-8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+            "provider_digest": "sha256:2093e1bc8c12b71bdd99822ea2d8e2fd61e218cd38281053506918d9b93b94e9",
+            "local_sha256": "2093e1bc8c12b71bdd99822ea2d8e2fd61e218cd38281053506918d9b93b94e9",
+            "zip_size": 3164162,
+            "members": 7363,
+            "expanded_bytes": 9220441,
+            "path_validation": "passed"
+          },
+          "production_helper_sha256": "0c56bb22d41007001f4a899502bd6f737f949629aaa87407d7d2c6ea91bae62a",
+          "path_full": {
+            "status": "passed",
+            "assertions": 1683,
+            "verified_cases": 366,
+            "native_actions": 1438,
+            "native_actions_attempted": 1438,
+            "native_action_failure": null,
+            "native_step_assertions": 2572,
+            "native_matrix_cases": 200,
+            "native_edge_cases": 38,
+            "raw_registry_cases": 30,
+            "raw_registry_assertions": 90,
+            "raw_rejected_preserving_bytes_and_ownership": 28,
+            "raw_valid_utf16_roundtrips_preserving_bytes_and_removing_ownership": 2,
+            "source_gate_assertions": 14,
+            "unicode_final_fixtures": [
+              {
+                "name": "unicode-roundtrip-1",
+                "kind": 1,
+                "value": "C:\\raw😀"
+              },
+              {
+                "name": "unicode-roundtrip-2",
+                "kind": 2,
+                "value": "C:\\raw😀"
+              },
+              {
+                "name": "unicode-target-1",
+                "kind": 1,
+                "value": "C:\\raw😀;D:\\User"
+              },
+              {
+                "name": "unicode-target-2",
+                "kind": 2,
+                "value": "C:\\raw😀;D:\\User"
+              }
+            ],
+            "historical_limits": [
+              {
+                "case": "native-limit-future-old-install",
+                "observed": "empty REG_EXPAND_SZ",
+                "reason": "new owner created after last new helper handoff"
+              },
+              {
+                "case": "native-limit-missing-history",
+                "observed": "empty REG_EXPAND_SZ",
+                "reason": "original absence history already removed before new helper attached"
+              }
+            ],
+            "cleanup_passed": true,
+            "real_user_path_unchanged": true,
+            "started_at": "2026-10-19T13:02:23.1949869Z",
+            "finished_at": "2026-10-19T13:13:55.9090872Z"
+          },
+          "raw_fixture_preflight": {
+            "cases": 16,
+            "all_kind_and_bytes_exact": true,
+            "cleanup_passed": true,
+            "production_helper_executed": false
+          },
+          "reissue": {
+            "status": "passed",
+            "positive_cases": 40,
+            "negative_control_cases": 2,
+            "native_actions": 342,
+            "independent_step_snapshots": 342,
+            "assertions": 2476,
+            "source_gate_assertions": 4,
+            "cleanup_passed": true,
+            "positive_test_registry_cleanup_passed": true,
+            "negative_registry_evidence_preserved": true,
+            "execution_context_hkcu_environment_path_unchanged": true,
+            "desktop_environment_path_verified": false,
+            "negative_actual_failed": 1,
+            "negative_actual_passed": 1,
+            "started_utc": "2026-10-19T13:13:56.6086580Z",
+            "finished_utc": "2026-10-19T13:16:45.2207045Z"
+          },
+          "source_binding": {
+            "files_match_frozen_head": [
+              "environment-action-tests.iss",
+              "environment-diagnostics.iss",
+              "environment-legacy-r4.iss",
+              "environment.iss",
+              "test_windows_environment_reissue.ps1",
+              "test_windows_environment_reissue_gate.ps1"
+            ],
+            "source_binding_sha256": "a8c7c612b4b846de8f8742ff14c08226f7a34f88460e4a9a28c826948c7f81c5",
+            "compiler_version": "6.7.1",
+            "real_product_installer_built": false
+          },
+          "python_preflight": {
+            "reissue_controller": {
+              "run": 6,
+              "passed": 6
+            },
+            "compiler_preparation": {
+              "run": 15,
+              "passed": 14,
+              "skipped": 1,
+              "skipped_test": "test_rejects_symbolic_link_in_ancestor",
+              "reason": "runner account cannot create symbolic links"
+            }
+          },
+          "windows_registration": {
+            "assertions": 80,
+            "cleanup_passed": true
+          },
+          "cargo_check": {
+            "status": "passed",
+            "features": "release_bundle,warpui/test-util,rust-embed/debug-embed"
+          },
+          "codex_notification_tests": {
+            "run": 128,
+            "passed": 123,
+            "skipped": 5,
+            "skip_reasons": "Unix symlink x2, Unix modes x1, Unix control terminal x1, Unix Bash/jq x1"
+          },
+          "hook_trust": [
+            {
+              "version": "0.147.0",
+              "hooks": 5,
+              "executable_sha256": "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d",
+              "native_config_unchanged": true,
+              "model_request_attempted": false
+            },
+            {
+              "version": "0.156.1",
+              "hooks": 5,
+              "executable_sha256": "70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301",
+              "native_config_unchanged": true,
+              "model_request_attempted": false
+            }
+          ],
+          "rust_groups": [
+            {
+              "log": "crate-tests.log",
+              "run": 574,
+              "passed": 574,
+              "failed": 0,
+              "skipped": 9,
+              "duration_seconds": 12.511,
+              "passed_by_crate": {
+                "channel_versions": 26,
+                "http_client": 20,
+                "mcp": 48,
+                "remote_server": 163,
+                "warp_completer": 184,
+                "warp_files": 33,
+                "warp_util": 100
+              },
+              "skip_note": "2 explicit ignored SSH end-to-end tests plus 7 known completion tests"
+            },
+            {
+              "log": "zap-crate-tests.log",
+              "run": 528,
+              "passed": 528,
+              "failed": 0,
+              "skipped": 7,
+              "duration_seconds": 3.332,
+              "passed_by_crate": {
+                "infinishell_sync": 68,
+                "persistence": 5,
+                "warp_ssh_manager": 136,
+                "warpui_core": 319
+              },
+              "skip_note": "7 explicitly ignored warpui_core tests"
+            },
+            {
+              "log": "completer-tests.log",
+              "run": 11,
+              "passed": 11,
+              "failed": 0,
+              "skipped": 116,
+              "duration_seconds": 0.073,
+              "passed_by_crate": {
+                "warp_completer": 11
+              },
+              "skip_note": "filtered selection and existing ignored tests; not 116 ignored tests"
+            },
+            {
+              "log": "app-tests.log",
+              "run": 789,
+              "passed": 789,
+              "failed": 0,
+              "skipped": 8602,
+              "duration_seconds": 218.212,
+              "passed_by_crate": {
+                "warp_tui": 10,
+                "warp": 779
+              },
+              "skip_note": "filtered selection and existing ignored tests; not full workspace coverage"
+            }
+          ],
+          "rust_passed_executions": 1902,
+          "rust_count_note": "1902 test executions across groups; not a unique-test or full-workspace count",
+          "readonly_regression": {
+            "status": "passed",
+            "log": "windows/crate-tests.log",
+            "line": 498,
+            "text": "PASS [   0.035s] (444/574) warp_files tests::restore_preserves_readonly_and_cleans_its_temporary_file_after_collision",
+            "assertions_covered": "restored readonly; no FILE_ATTRIBUTE_TEMPORARY; collision preserves target readonly/content; no temporary leftovers"
+          },
+          "i18n": {
+            "passed": 11,
+            "log": "windows/app-tests.log",
+            "tests": [
+              {
+                "line": 803,
+                "test": "english_and_simplified_chinese_have_the_same_message_ids"
+              },
+              {
+                "line": 804,
+                "test": "english_and_simplified_chinese_use_the_same_variables"
+              },
+              {
+                "line": 805,
+                "test": "fallback_chain_works"
+              },
+              {
+                "line": 806,
+                "test": "init_is_idempotent"
+              },
+              {
+                "line": 807,
+                "test": "literal_translation_key_scanner_ignores_docs_and_finds_calls"
+              },
+              {
+                "line": 808,
+                "test": "production_literal_translation_keys_exist_in_english_resources"
+              },
+              {
+                "line": 809,
+                "test": "requested_languages_fall_back_to_english_when_empty"
+              },
+              {
+                "line": 810,
+                "test": "requested_languages_keep_preferred_order"
+              },
+              {
+                "line": 811,
+                "test": "settings_ui_helpers_do_not_receive_hardcoded_visible_text"
+              },
+              {
+                "line": 812,
+                "test": "shared_runtime_loader_includes_tui_resources"
+              },
+              {
+                "line": 813,
+                "test": "workflow_command_placeholder_renders_literal_template_braces"
+              }
+            ]
+          },
+          "not_run": [
+            "full workspace",
+            "2 ignored real SSH end-to-end tests",
+            "real desktop or newly built release installer acceptance",
+            "Linux or macOS rerun in this Windows-only workflow"
+          ],
+          "historical_failed_runs_preserved": true,
+          "source_modified_by_monitor": false
+        },
+        "boundary": "完整已派发定向job成功；非全工作区/唯一测试数，不计GUI、真实SSH或新产品安装器验收。"
+      },
+      "documentation_closeout": {
+        "status": "document_commit_and_final_receipt_pending",
+        "tested_code_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "main_source_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/main-source-integration.json",
+        "boundary": "文档提交后根线程另写final-closeout.json绑定doc HEAD/受测源码/远端/Draft/tag；不预填文档SHA或改写源码回执。"
+      }
     }
   },
   "current_goal_scope": {
@@ -8931,7 +10747,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "本轮流程演练及多端验收复核收尾，不推进正式发布。原候选Windows URI关闭；R9重发Windows六阶段及Ubuntu固定DEB六阶段通过。Windows PATH修复整合/正式资产绑定、共用更新版本误判转为下一次正式发版前必处理。原Mac GUI和12资产结果保留；旧CLI矩阵延期、G09关闭；另一会话负责周期性上游整合。",
+  "status_zh": "受测源码8b46bcc3…已快进并push main，local/origin/remote一致，PR26 MERGED；第八39256631029 completed/success，PATH/reissue/readonly/通知及四组Rust1902次定向执行全过，app内i18n11。七失败原件保留，非全库或真实SSH；GUI待钥匙串，正式新包未造、未公开发布。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -11142,7 +12958,7 @@
       }
     }
   },
-  "authority": "当前结论读取根级status、current_goal_scope、required_goal_merge_gate及main_acceptance，并与README当前入口核对。historical_*与其余逐轮对象保留原日期/源码范围；旧对象内部的当前状态声明不覆盖本入口。",
+  "authority": "当前结论读取根级状态、current_goal_scope、required_goal_merge_gate及main_acceptance.release_integration_20261019，并与README当前入口核对。current_release_candidate和其余原验收对象保留原字节/日期范围；historical_*及旧对象内部的当前声明不覆盖本轮整合入口。",
   "assessed_branch": "main",
   "assessment_baseline": "5068dae9c75b79628865a0872684113647c204d8",
   "fixed_versions": {
@@ -11343,7 +13159,7 @@
   "tracked_items_total": 18,
   "gap_register": "KNOWN_GAPS.md",
   "partial_merge_is_goal_waiver": false,
-  "source_behavior_changed_in_this_revision": false,
+  "source_behavior_changed_in_this_revision": true,
   "supersedes_overall_completion_conclusions": [
     {
       "sha256": "1abf5f02fb6e9d751f0824b717cd175ad751d05de7358a335bdd557b6fac16ba",
@@ -11367,7 +13183,7 @@
   ],
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 38534655990,
-  "localization": "无需本地化变更；Windows登记及Linux卸载修复没有用户可见文案或布局变化，本次仅更新状态入口。",
+  "localization": "当前整合涉及更新器用户功能，About及无障碍文案已同步英文和简体中文；定向nextest及显式i18n 12/12通过，warp/warp_tui check通过；新包英中GUI布局仍待验。",
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "原批准范围11项保持关闭。新候选Windows与Ubuntu24.04 x86_64 DEB安装生命周期由用户操作、助手审核；旧Linux/Windows CLI认证V01/V02/V05矩阵继续按原决定延期，自动检查与本轮包冒烟不代替真实模型、完整输入法或审批矩阵验收。",
@@ -11376,23 +13192,21 @@
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
-    "authority_ref": "main_acceptance.macos_gui_smoke",
-    "base_source_commit": "45a8911075277d127e959510631c3d4b01b44903",
-    "source_commit": "1ca59d352972cac0de0e562a9fcebd8c8066668f",
-    "scope": "修复alt-screen浮窗父布局限宽及同帧拖选状态；macOS四项GUI复验和同提交Linux/Windows自动检查通过",
+    "authority_ref": "main_acceptance.release_integration_20261019",
+    "base_source_commit": "88829618557cad7c162d43d3de8bc01e262d1291",
+    "source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+    "scope": "受测源码8b46已快进并push main；第八Windows成功、readonly与app/i18n补跑闭合，七历史失败保留。源码/定向门禁不代替GUI、实际SSH或新包验收。",
     "product_changed": true,
-    "localization": "无需本地化变更；双语布局实测通过",
-    "closed_defects": [
-      "MAC-GUI-B01",
-      "MAC-GUI-B02"
-    ],
-    "closed_gaps": []
+    "localization": "更新器About及无障碍文案已同步英中；定向nextest和显式i18n 12/12通过，双语真实GUI待验。",
+    "formal_publication": "awaiting_user_arrangement"
   },
   "latest_resume": {
-    "authority_ref": "main_acceptance.current_release_candidate",
+    "authority_ref": "main_acceptance.release_integration_20261019",
     "source_commit": "5068dae9c75b79628865a0872684113647c204d8",
-    "status": "演练及用户证据复核完成，保留后续正式发版待办",
-    "next_step": "本轮归档收尾，等待用户后续正式发版安排；不发布、不替换资产、不介入另一会话上游合并。后续整合Windows PATH修复并修复共用更新比较，绑定实际新候选与受影响验收。"
+    "source_commit_scope": "仅为Draft R9所封装原应用；当前主线受测源码8b46另由integration_source_commit绑定，不改写R9身份",
+    "status": "受测源码已在main，第八CI成功；GUI与正式新包待验，保持Draft",
+    "next_step": "文档提交后独立final-closeout绑定doc HEAD/受测源码/远端/Draft/tag；GUI等钥匙串，下次正式候选按影响补验实际SSH与三端界面，不公开发布。",
+    "integration_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
   },
   "g01_g07_guard_followup": {
     "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",
@@ -13508,7 +15322,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "5068dae9c75b79628865a0872684113647c204d8",
-  "latest_increment": "unified_windows_uri_linux_deb_fix_candidate_building_20261014",
+  "latest_increment": "release_integration_source_main_and_eighth_ci_passed_20261019",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -20344,5 +22158,113 @@
         }
       }
     }
+  },
+  "historical_status_navigation_before_release_integration_20261019": {
+    "as_of_before_update": "2026-10-19",
+    "scope": "本轮R9 Draft替换及更新器整合续记前的当前导航；保留旧断言仅供追溯，不覆盖新入口。",
+    "root_fields": {
+      "status_zh": "本轮流程演练及多端验收复核收尾，不推进正式发布。原候选Windows URI关闭；R9重发Windows六阶段及Ubuntu固定DEB六阶段通过。Windows PATH修复整合/正式资产绑定、共用更新版本误判转为下一次正式发版前必处理。原Mac GUI和12资产结果保留；旧CLI矩阵延期、G09关闭；另一会话负责周期性上游整合。",
+      "latest_increment": "unified_windows_uri_linux_deb_fix_candidate_building_20261014",
+      "latest_resume": {
+        "authority_ref": "main_acceptance.current_release_candidate",
+        "source_commit": "5068dae9c75b79628865a0872684113647c204d8",
+        "status": "演练及用户证据复核完成，保留后续正式发版待办",
+        "next_step": "本轮归档收尾，等待用户后续正式发版安排；不发布、不替换资产、不介入另一会话上游合并。后续整合Windows PATH修复并修复共用更新比较，绑定实际新候选与受影响验收。"
+      },
+      "current_increment": {
+        "authority_ref": "main_acceptance.macos_gui_smoke",
+        "base_source_commit": "45a8911075277d127e959510631c3d4b01b44903",
+        "source_commit": "1ca59d352972cac0de0e562a9fcebd8c8066668f",
+        "scope": "修复alt-screen浮窗父布局限宽及同帧拖选状态；macOS四项GUI复验和同提交Linux/Windows自动检查通过",
+        "product_changed": true,
+        "localization": "无需本地化变更；双语布局实测通过",
+        "closed_defects": [
+          "MAC-GUI-B01",
+          "MAC-GUI-B02"
+        ],
+        "closed_gaps": []
+      },
+      "localization": "无需本地化变更；Windows登记及Linux卸载修复没有用户可见文案或布局变化，本次仅更新状态入口。",
+      "authority": "当前结论读取根级status、current_goal_scope、required_goal_merge_gate及main_acceptance，并与README当前入口核对。historical_*与其余逐轮对象保留原日期/源码范围；旧对象内部的当前状态声明不覆盖本入口。"
+    },
+    "main_acceptance_navigation": {
+      "current_work_scope": {
+        "status": "rehearsal_and_multiplatform_review_closed",
+        "user_direction": "本轮只跑通流程并多端验收，不正式发布；另一会话周期性合并上游，后续另行正式发版。",
+        "publication_requested": false,
+        "upstream_merge_owned_by_other_chat": true,
+        "source_changes_in_this_revision": false,
+        "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/README.zh-CN.md"
+      },
+      "localization": "无需本地化变更；本次仅验收复核与状态文档，无Rust/Fluent或产品行为变化。",
+      "history_policy": "原入口字段保存在historical_entry_before_20261013；原current_goal_scope和required_goal_merge_gate的完整对象分别改名保留为historical_goal_scope_before_merge和historical_required_goal_merge_gate。其余逐轮记录及内部当前状态声明仅属于原日期/源码。 本轮替换的旧根级当前摘要完整保存在historical_current_summaries_before_gui_closeout_20261013，日期化历史大对象不改写。 01.46完整current_release_candidate对象追加至既有release_candidate_history；新13.00不继承旧包通过。替换前根级当前摘要保存在historical_current_summary_before_windows_uri_candidate_20261014。 13.00完整current对象原样追加至release_candidate_history，主动取消与替代结论另存superseded_candidate_closeouts；替换前当前摘要保存在historical_current_summary_before_unified_candidate_20261014。 16.45 GUI与完整12资产收尾前入口全量保存在github/macos-full12-closeout-20261015/before-index.json，原失败和未验边界不删除。 2026-10-19用户证据复核前完整入口保存在native-validation/user-acceptance-review-20261019/before-index.json；现场非正式标记、失败、旧包及嵌套历史均保留。用户确认本轮仅演练，未来正式发版事项不强制转为本轮执行任务。",
+      "continuous_gates": {
+        "when": "相关代码变更时",
+        "checks": [
+          "cargo check",
+          "必要的i18n测试和本地化审计",
+          "受影响功能的定向回归",
+          "相关Linux/Windows源码门禁"
+        ],
+        "workflow": ".github/workflows/cross-platform-preflight.yml",
+        "linux_checks_retained": true,
+        "triggers": [
+          "push ci/**",
+          "workflow_dispatch"
+        ],
+        "run_linux_default": true,
+        "runs_on_every_main_push": false,
+        "repeat_online_gui_or_remote_gates_for_docs_only": false,
+        "latest_change_remote_status": "本轮仅文档和回传复核，不重派远端检查。保留5068 Linux、5ac Windows原门禁及Mac/12资产原证据；R9成功CI39134031520属于a4e279安装器控制器，实际桌面另有回传复核。"
+      },
+      "next_release_required": [
+        {
+          "item": "发行产物校验",
+          "status": "passed_for_fixed_candidate",
+          "when": "本候选完整12资产集合、包内资源、签名公证装订及全量Draft三方摘要核验已完成",
+          "pass_condition": "同一源码和正式标签；12件既定资产、内嵌SSH资源、全量下载摘要；macOS Developer ID签名、公证及装订检查",
+          "scope": "ARM64 macOS桌面、Windows x64桌面、四份Linux桌面包及六份SSH扩展；保留Intel macOS SSH，不恢复Intel桌面DMG",
+          "historical_completed": "旧01.46的12资产与三方摘要回验通过，仅属于旧字节；完整原对象保存在release_candidate_history",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/full12-roundtrip/evidence-index.json",
+          "future_candidate_boundary": "原12件身份未变，R9不在集合；后续正式候选变更需重新核对受影响资产。"
+        },
+        {
+          "item": "Windows安装生命周期",
+          "status": "r9_review_passed_final_release_integration_required",
+          "when": "后续正式发版候选冻结时审核整合和资产绑定，字节变化按影响补验",
+          "pass_condition": "用户完成baseline/installed/launched/uri_activated/closed/uninstalled六阶段，包含真实Shell URI唤起及窗口目录对应，助手审核安装、退出、官方卸载与归属清理；保留用户数据，不预称零残留",
+          "entry": "../../docs/windows-final-installer-acceptance.zh-CN.md",
+          "completed": "原1ad Setup的URI问题关闭，PATH原文不恢复；R9六阶段、PATH原文类型存在性恢复及卸载清理通过。",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/windows-review/result.json"
+        },
+        {
+          "item": "近期GUI候选包冒烟",
+          "status": "passed_six_checks_for_fixed_signed_candidate",
+          "when": "16.45最终签名DMG已完成实际六项GUI及同包重启恢复",
+          "pass_condition": "绑定新候选源码和最终签名二进制；必要冒烟及重启恢复，保留模型路由/strict schema、浮窗、Retina输入选择、英中错误及Plan提示判据",
+          "linux_desktop_matrix_required": false,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json",
+          "historical_completed": "旧01.46结果仅按旧包保留；本轮使用16.45真实包独立执行，不继承旧结论"
+        },
+        {
+          "item": "Ubuntu DEB安装生命周期",
+          "status": "passed_for_fixed_deb",
+          "when": "本轮已完成，后续正式发版新包按影响补验",
+          "pass_condition": "用户在Ubuntu24.04 x86_64完成baseline/installed/launched/uri_activated/closed/uninstalled，助手审核实际GUI、URI新窗口和目录标记、正常退出、官方卸载及本包命令链接清理；保留用户数据和外来替换入口",
+          "entry": "../../docs/ubuntu-final-installer-acceptance.zh-CN.md",
+          "completed": "原DEB六阶段和GNOME Wayland实际桌面回执复核通过；更新误判独立保留；物理IME按用户确认计证。",
+          "scope_boundary": "不重开G09，不关闭仍延期的旧CLI认证V01/V02/V05矩阵",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/ubuntu-review/independent-review.json"
+        },
+        {
+          "item": "更新版本方向与失败处理",
+          "id": "RELEASE-UPDATE-ORDER-01",
+          "status": "required_before_future_formal_release",
+          "pass_condition": "实际发行格式和有无v的版本比较、相同/旧/新版本及明确回滚策略回归；解析失败不按新版处理；必要本地化门禁及最终包定向GUI复验",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/update-version-reproduction.json"
+        }
+      ]
+    },
+    "readme_current_entry": "# 三款 CLI 支持与能力对齐\n\n本目录维护当前规格、能力边界、剩余工作和验证结论。**原批准合并范围中的 G01–G10、V03 共 11 项已关闭并合入主线；全平台实机验收尚未全部完成。** 当前结论以本页及 `CURRENT_STATUS.json` 的当前入口为准；历史记录保留原构建、平台、失败和未验边界。\n\n## 当前主线状态（2026-10-19）\n\n**本轮流程演练和多端验收已完成复核，按演练范围收尾，不推进本候选正式发版。** 用户已同步另一会话正在周期性合并上游，后续另行正式发版。Windows PATH 修复未整合至正式资产、共用更新逻辑把旧版本误判为新版，作为后续正式发版前必处理事项保留。 详细结论、包身份、关闭条件与证据边界见[最终验收梳理](../../docs/release-acceptance-review-20261019.zh-CN.md)。不再把两端用户操作列为待办。\n\n| 范围 | 当前结论 |\n|---|---|\n| Windows URI | 原候选 `1ad878fb…` 的 R3 六阶段及截图确认修复生效，`WIN-RELEASE-URI-01` 关闭；旧 `01.46` 失败保留 |\n| Windows R9 生命周期 | CI 重发 Setup `c18725c5…` 的六阶段、PATH 精确恢复与集成清理通过；[PR #26](https://github.com/Infinimesh-ai/InfiniShell-Desktop/pull/26) 仍 draft/open，原 Draft 的旧 Setup 未替换，`WIN-RELEASE-PATH-01` 仍阻塞 |\n| Ubuntu DEB 生命周期 | 固定 `2442bf8b…` DEB 在 Ubuntu 24.04 x86_64 GNOME Wayland 六阶段通过；本地采集器修订及受保护进程补证已独立复核，保留原非正式标记与失败 |\n| 更新逻辑 | `RELEASE-UPDATE-ORDER-01` 阻塞：10.14 候选把 10.07 提示为新版；源码和现有比较器已直接复现去 `v` 后解析失败，尚未修复 |\n| Mac GUI／12 资产 | 原字节的六项 Mac GUI、签名公证装订及 12 资产完整回下载结果保留；本次核对封存摘要及实时 provider 的 ID／大小／摘要均未变，不外推新 R9 或后续新包 |\n\n本轮只完成证据复核与状态归档，产品源码仍冻结 `5068dae9c75b79628865a0872684113647c204d8`，tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa` 不变。R9 安装器／控制器为独立源码 `a4e279c745bbd67aed1f8a926f45a32bda9343c8`，不能混写成全包同源。Draft `412823983` 未公开；公开 Latest 仍为 `v0.2026.10.07.01.09.oss_00`。\n\n后续正式发版前必做：审核整合 Windows 修复并统一正式安装器与验收包身份；修复更新比较及解析失败行为，完成定向回归和最终包复验。新包字节变化时补对应身份与受影响检查，不把旧验收转记为新包通过。SSH 窄侧栏截断、一次中文命令被自动识别为 Agent（Ctrl-I 可恢复）、Mac 中文连字搜索作为非阻塞跟进；物理 IME 按用户确认和提交／输出截图计证。旧 CLI V01／V02／V05 仍延期，G09 关闭，Linux 自动检查保留。\n\n[本次归档及证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/README.zh-CN.md)保留两份原 ZIP、历史链、截图及工具修订边界。`cargo check --locked` 通过（5 条既有警告）；无需本地化变更。下述 10 月 15 日内容为当时的交付与收尾快照，待验字段不代表本次当前状态。\n\n"
   }
 }

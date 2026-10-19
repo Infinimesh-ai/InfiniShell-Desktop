@@ -4,21 +4,13 @@
 
 ## 当前主线状态（2026-10-19）
 
-**本轮流程演练和多端验收已完成复核，按演练范围收尾，不推进本候选正式发版。** 用户已同步另一会话正在周期性合并上游，后续另行正式发版。Windows PATH 修复未整合至正式资产、共用更新逻辑把旧版本误判为新版，作为后续正式发版前必处理事项保留。 详细结论、包身份、关闭条件与证据边界见[最终验收梳理](../../docs/release-acceptance-review-20261019.zh-CN.md)。不再把两端用户操作列为待办。
+**本轮受测源码 `8b46bcc3…` 已快进合入并推送 main，PR #26 已合并；第八 Windows CI 成功，readonly、PATH／reissue、通知及 Rust／i18n 定向门禁通过。七次失败保留。Mac GUI 仍待钥匙串处理，正式新包未构建、未公开发布。** 精确身份、计数及边界见[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)，不在本页复制逐次进度。
 
-| 范围 | 当前结论 |
-|---|---|
-| Windows URI | 原候选 `1ad878fb…` 的 R3 六阶段及截图确认修复生效，`WIN-RELEASE-URI-01` 关闭；旧 `01.46` 失败保留 |
-| Windows R9 生命周期 | CI 重发 Setup `c18725c5…` 的六阶段、PATH 精确恢复与集成清理通过；[PR #26](https://github.com/Infinimesh-ai/InfiniShell-Desktop/pull/26) 仍 draft/open，原 Draft 的旧 Setup 未替换，`WIN-RELEASE-PATH-01` 仍阻塞 |
-| Ubuntu DEB 生命周期 | 固定 `2442bf8b…` DEB 在 Ubuntu 24.04 x86_64 GNOME Wayland 六阶段通过；本地采集器修订及受保护进程补证已独立复核，保留原非正式标记与失败 |
-| 更新逻辑 | `RELEASE-UPDATE-ORDER-01` 阻塞：10.14 候选把 10.07 提示为新版；源码和现有比较器已直接复现去 `v` 后解析失败，尚未修复 |
-| Mac GUI／12 资产 | 原字节的六项 Mac GUI、签名公证装订及 12 资产完整回下载结果保留；本次核对封存摘要及实时 provider 的 ID／大小／摘要均未变，不外推新 R9 或后续新包 |
+- 原 Windows R9 和 Ubuntu DEB 用户演练已经收尾；R9 `c18725c5…` 已替换 Draft Setup，回下载大小／SHA 一致，其余 11 件资产未变。R9 原应用仍 `5068dae9c…`，不含本轮上游／updater，`NotSigned` 和 Draft 边界保留。
+- 更新器共用链路及英中失败提示已实现；本地 61／61 nextest、显式 i18n 12／12、warp／warp_tui check 通过。Linux 定向 1942 次 Rust 执行和第八 Windows 1902 次执行通过，均非全库；Windows app 内 i18n 11 通过。新包双语 GUI 和实际 SSH 未验。
+- 旧 CLI V01／V02／V05 仍延期，G09 关闭，原 SSH／输入分类／中文搜索非阻塞项不变。TUI 冒烟未发模型请求，不等于真实 SSH 或 GUI 验证。
 
-本轮只完成证据复核与状态归档，产品源码仍冻结 `5068dae9c75b79628865a0872684113647c204d8`，tag 对象 `27d40029759b541dc8903a0deb9ec0948e9670fa` 不变。R9 安装器／控制器为独立源码 `a4e279c745bbd67aed1f8a926f45a32bda9343c8`，不能混写成全包同源。Draft `412823983` 未公开；公开 Latest 仍为 `v0.2026.10.07.01.09.oss_00`。
-
-后续正式发版前必做：审核整合 Windows 修复并统一正式安装器与验收包身份；修复更新比较及解析失败行为，完成定向回归和最终包复验。新包字节变化时补对应身份与受影响检查，不把旧验收转记为新包通过。SSH 窄侧栏截断、一次中文命令被自动识别为 Agent（Ctrl-I 可恢复）、Mac 中文连字搜索作为非阻塞跟进；物理 IME 按用户确认和提交／输出截图计证。旧 CLI V01／V02／V05 仍延期，G09 关闭，Linux 自动检查保留。
-
-[本次归档及证据索引](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/README.zh-CN.md)保留两份原 ZIP、历史链、截图及工具修订边界。`cargo check --locked` 通过（5 条既有警告）；无需本地化变更。下述 10 月 15 日内容为当时的交付与收尾快照，待验字段不代表本次当前状态。
+证据入口：[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)（源码／包身份、七轮失败简表、清理复查、待验及下次正式候选影响补验）；[机器可读当前记录](/Volumes/SanDisk/github/InfiniShell-Desktop/specs/cli-agent-parity/CURRENT_STATUS.json)的 `main_acceptance.release_integration_20261019`；[R9 回下载](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json)；[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)。`r-384c44cd`／`r-b2fe8bf4` 已依独立复查 cleaned，原 cleanup=false 收据保留；活跃 GUI `r-7e0c826e` 不清理。原 `current_release_candidate` 及历史对象继续绑定原字节；不要求现在重跑旧包六阶段，新候选按影响补验，下面 10 月 15 日内容仅为当时快照。
 
 ## 2026-10-15 状态快照（历史保留）
 
@@ -177,7 +169,7 @@ Linux AppImage／DEB／RPM／Arch 均完成只读解包、元数据与 ELF 检�
 | 目的 | 文档 |
 | --- | --- |
 | 目标、P0–P5、实施与验收要求 | [PLAN.md](PLAN.md) |
-| 当前关闭、延期与发版必验清单 | [本页当前状态](#当前主线状态2026-10-14)、[CURRENT_STATUS.json](CURRENT_STATUS.json) 的 `main_acceptance` |
+| 当前关闭、延期与发版必验清单 | [本页当前状态](/Volumes/SanDisk/github/InfiniShell-Desktop/specs/cli-agent-parity/README.md#当前主线状态2026-10-19)、[CURRENT_STATUS.json](/Volumes/SanDisk/github/InfiniShell-Desktop/specs/cli-agent-parity/CURRENT_STATUS.json) 的 `main_acceptance.release_integration_20261019` |
 | 原关闭条件、原生差异与历史缺口 | [KNOWN_GAPS.md](KNOWN_GAPS.md)，按顶部当前入口区分历史快照 |
 | 三方能力与消费者可用范围 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md)、[RELEASE_SUPPORT.md](RELEASE_SUPPORT.md) |
 | 自动升级、渠道与事务约定 | [CLI_AUTOUPDATE.md](CLI_AUTOUPDATE.md) |
@@ -222,4 +214,4 @@ git show e3ef39689cd8b686dfe040b90217ed1067b4d268:specs/cli-agent-parity/<原相
 
 整理前已在维护机器的仓库外保留完整压缩备份及逐文件 SHA-256 清单；备份位于 `~/Documents/InfiniShell-Archives/cli-agent-parity/`，以完整提交号命名。跨机器追溯以固定 Git 提交为准，不依赖该本机目录。
 
-当前机器可读结论位于 `CURRENT_STATUS.json` 的根级状态、`current_goal_scope`、`required_goal_merge_gate` 与 `main_acceptance`。原入口值保存在 `historical_entry_before_20261013`，原 Goal 大对象及合并门禁分别原样保留为 `historical_goal_scope_before_merge` 和 `historical_required_goal_merge_gate`；其余逐轮快照继续按各自来源阅读。本轮替换的旧当前摘要完整保存在 `historical_current_summaries_before_gui_closeout_20261013`。原始证据链接仅用于追溯，不能取代当前状态；后续更新结论仍需绑定实际实现和验证。
+当前机器可读结论位于 `CURRENT_STATUS.json` 的根级状态、`current_goal_scope`、`required_goal_merge_gate` 与 `main_acceptance.release_integration_20261019`；原 `current_release_candidate` 及验收对象保留原字节范围。原入口值保存在 `historical_entry_before_20261013`，原 Goal 大对象及合并门禁分别原样保留为 `historical_goal_scope_before_merge` 和 `historical_required_goal_merge_gate`；其余逐轮快照继续按各自来源阅读。本轮替换的旧当前摘要完整保存在 `historical_current_summaries_before_gui_closeout_20261013`。原始证据链接仅用于追溯，不能取代当前状态；后续更新结论仍需绑定实际实现和验证。
