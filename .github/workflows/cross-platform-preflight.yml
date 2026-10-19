@@ -485,32 +485,12 @@ jobs:
               -p command --lib -E 'test(socket_identity)'
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/command-musl.log"
 
-      - name: 检查主应用及启动条件编译
-        shell: bash
-        run: |
-          set -euo pipefail
-          {
-            echo "cargo check --locked -p warp --features $APP_FEATURES"
-            cargo check --locked -p warp --features "$APP_FEATURES"
-          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/cargo-check.log"
-
       - name: 准备 Windows 作业内 Python
         id: windows_notification_python
         if: ${{ matrix.platform == 'windows' }}
         shell: pwsh
         timeout-minutes: 5
         run: ./script/cli-agent-parity/prepare_windows_python.ps1
-
-      - name: 准备 Linux 固定 Python
-        id: linux_notification_python
-        if: ${{ matrix.platform == 'linux' }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        timeout-minutes: 10
-        with:
-          python-version: '3.13.15'
-          architecture: x64
-          check-latest: false
-          update-environment: true
 
       - name: 验证 Windows PATH 原生恢复与清理门禁
         if: ${{ matrix.platform == 'windows' }}
@@ -530,6 +510,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw '完整 Windows PATH 回归失败。' }
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File script/windows/test_windows_environment_reissue.ps1 -CompilerPath $compiler -OutputDirectory (Join-Path $outputRoot 'reissue')
           if ($LASTEXITCODE -ne 0) { throw 'Windows PATH 重发回归失败。' }
+
+      - name: 检查主应用及启动条件编译
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "cargo check --locked -p warp --features $APP_FEATURES"
+            cargo check --locked -p warp --features "$APP_FEATURES"
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/cargo-check.log"
+
+      - name: 准备 Linux 固定 Python
+        id: linux_notification_python
+        if: ${{ matrix.platform == 'linux' }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        timeout-minutes: 10
+        with:
+          python-version: '3.13.15'
+          architecture: x64
+          check-latest: false
+          update-environment: true
 
       - name: 验证 Codex 通知安装事务与真实终端传输
         shell: bash

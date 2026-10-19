@@ -19,7 +19,7 @@ $gateResult = & (Join-Path $PSScriptRoot 'test_windows_environment_reissue_gate.
 if ($gateResult.status -cne 'passed') { throw '重发最终门禁回归失败' }
 $sourceDirectory = Join-Path $OutputDirectory 'source'
 New-Item -ItemType Directory -Path $sourceDirectory | Out-Null
-foreach ($name in @('environment.iss','environment-legacy-r4.iss','environment-action-tests.iss','test_windows_environment_reissue.ps1','test_windows_environment_reissue_gate.ps1')) {
+foreach ($name in @('environment.iss','environment-legacy-r4.iss','environment-action-tests.iss', 'environment-diagnostics.iss','test_windows_environment_reissue.ps1','test_windows_environment_reissue_gate.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $sourceDirectory $name)
 }
 $testId = [Guid]::NewGuid().ToString('N')

@@ -34,6 +34,7 @@ INPUTS = [
 ]
 TESTS = ['script/windows/' + name for name in (
     'environment-tests.iss', 'environment-action-tests.iss', 'environment-legacy-r4.iss',
+    'environment-diagnostics.iss',
     'test_windows_environment.ps1', 'test_windows_environment_reissue.ps1',
     'test_windows_environment_reissue_gate.ps1', 'test_windows_environment_raw_gate.ps1',
     'reissue_release_installer.ps1', 'reissue_release_installer.py', 'reissue_release_installer_tests.py',
@@ -208,8 +209,9 @@ def validate_tests(args):
     root = args.output
     full = read(root / 'test-output/full/result.json')
     fixed = {'status': 'passed', 'error': None, 'native_matrix_skipped': False, 'native_matrix_cases': 200,
-             'native_edge_cases': 38, 'assertions': 1615, 'native_actions': 1438, 'native_step_assertions': 2572,
-             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 11,
+             'native_edge_cases': 38, 'assertions': 1635, 'native_actions': 1438, 'native_actions_attempted': 1438,
+             'native_action_failure': None, 'native_step_assertions': 2572,
+             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 14,
              'raw_fixture_preflight_cases': 16, 'raw_fixture_preflight_cleanup_passed': True,
              'real_user_path_unchanged': True, 'cleanup_passed': True}
     for key, value in fixed.items():
@@ -222,7 +224,7 @@ def validate_tests(args):
     require(all(case['passed'] is True and case['kind'] == case['actual']['kind'] and
                 case['expected_bytes'] == case['actual']['bytes'] for case in raw['cases']),
             '原始字节夹具未按类型和字节精确往返')
-    require(len(full['verified_cases']) == 362 and {item['case'] for item in full['known_limits']} ==
+    require(len(full['verified_cases']) == 364 and {item['case'] for item in full['known_limits']} ==
             {'native-limit-future-old-install', 'native-limit-missing-history'}, '完整回归场景/已知边界不符')
     reissue = read(root / 'test-output/reissue/result.json')
     fixed = {'status': 'passed', 'execution_error': None, 'positive_cases': 40, 'negative_control_cases': 2,

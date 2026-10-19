@@ -61,6 +61,7 @@ using System;
 using System.Runtime.InteropServices;
 public static class RawPathMemoryGate {
     public static byte[] Bytes;
+    public static int QueryStatus;
     public static byte[] WrittenBuffer;
     public static uint WrittenSize;
     public static int SetValue(object key, string name, uint reserved,
@@ -72,6 +73,7 @@ public static class RawPathMemoryGate {
     public static int QueryValue(object key, string name, IntPtr reserved,
         out uint type, [Out] byte[] data, ref uint size) {
         type = 1;
+        if (QueryStatus != 0) { return QueryStatus; }
         if (data == null) { size = (uint)Bytes.Length; return 0; }
         if (size < Bytes.Length || data.Length < Bytes.Length) { return 234; }
         Buffer.BlockCopy(Bytes, 0, data, 0, Bytes.Length);
@@ -109,4 +111,17 @@ foreach ($fixture in @(
         throw '真实原始字节写入函数未保留精确计数和非零尾哨兵'
     }
 }
-[pscustomobject]@{ status = 'passed'; cases = 8; assertions = 11 }
+# 缺失值只在诊断模式下返回明确不存在；权限失败不能混同不存在。
+$memoryType.GetField('QueryStatus').SetValue($null, 2)
+$rejected = $false
+try { Get-RawPath 'missing' | Out-Null } catch { $rejected = $_.Exception.Message.Contains('Win32=2') }
+if (-not $rejected) { throw '默认原始夹具读取必须拒绝不存在的 PATH' }
+$missing = Get-RawPath 'missing' -AllowMissing
+if ($missing.exists -ne $false -or $missing.kind -ne 0 -or $null -ne $missing.bytes) {
+    throw '诊断读取未明确记录不存在的 PATH'
+}
+$memoryType.GetField('QueryStatus').SetValue($null, 5)
+$rejected = $false
+try { Get-RawPath 'denied' -AllowMissing | Out-Null } catch { $rejected = $_.Exception.Message.Contains('Win32=5') }
+if (-not $rejected) { throw '诊断读取不得将权限失败当成不存在' }
+[pscustomobject]@{ status = 'passed'; cases = 11; assertions = 14 }

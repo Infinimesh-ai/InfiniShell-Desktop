@@ -13,6 +13,9 @@ OutputDir={#EvidenceDir}
 Compression=none
 
 #include HelperFile
+#if HelperFlavor == "new"
+#include "environment-diagnostics.iss"
+#endif
 
 [Code]
 function InitializeSetup(): Boolean;
@@ -36,9 +39,15 @@ begin
   else if Product = 'C' then Path := 'E:\第三个 产品\bin'
   else RaiseException('Invalid product');
   Key := Key + '\' + Name;
+#if HelperFlavor == "new"
+  if Pos('raw-', Name) = 1 then TraceEnvironmentTestState(Key, Path, Name + ': before ' + Action);
+#endif
   if Action = 'add' then Success := AddEnvironmentPath(HKCU, Key, Path)
   else if Action = 'remove' then Success := RemoveEnvironmentPath(HKCU, Key, Path)
   else RaiseException('Invalid action');
+#if HelperFlavor == "new"
+  if Pos('raw-', Name) = 1 then TraceEnvironmentTestState(Key, Path, Name + ': after ' + Action);
+#endif
   if not SaveStringToFile('{#EvidenceDir}\' + Receipt + '.txt',
     '{#TestId}:' + IntToStr(Ord(Success)), False) then RaiseException('Cannot write action receipt');
 end;

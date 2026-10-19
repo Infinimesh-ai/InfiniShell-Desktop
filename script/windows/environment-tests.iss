@@ -13,6 +13,7 @@ OutputDir={#EvidenceDir}
 Compression=none
 
 #include "environment.iss"
+#include "environment-diagnostics.iss"
 
 [Code]
 const
@@ -85,6 +86,36 @@ begin
     0: Result := TestPath;
     1: Result := OtherPath;
     2: Result := 'E:\第三个 产品\bin';
+  end;
+end;
+
+procedure UnicodeRoundTrips();
+var
+  Value, Name: String;
+  Kind: LongWord;
+  Success: Boolean;
+begin
+  { 长矩阵之前验证原生脚本的 UTF-16 单元语义和真实 helper 的每个阶段。 }
+  Value := 'C:\raw' + #55357#56832;
+  Log('fixture unicode input length=' + IntToStr(Length(Value)) + ' units=' + EnvironmentTestCodeUnits(Value));
+  Require(Length(Value) = 8, 'unicode: UTF-16 length');
+  Require((Ord(Value[7]) = 55357) and (Ord(Value[8]) = 56832), 'unicode: separate surrogate code units');
+  for Kind := 1 to 2 do begin
+    Name := 'unicode-roundtrip-' + IntToStr(Kind);
+    if Kind = 1 then Success := RegWriteStringValue(HKCU, CaseKey(Name), 'Path', Value)
+    else Success := RegWriteExpandStringValue(HKCU, CaseKey(Name), 'Path', Value);
+    Require(Success, Name + ': native fixture write');
+    TraceEnvironmentTestState(CaseKey(Name), TestPath, Name + ': before read');
+    CheckState(Name, Value, Kind);
+    Success := AddEnvironmentPath(HKCU, CaseKey(Name), TestPath);
+    TraceEnvironmentTestState(CaseKey(Name), TestPath, Name + ': after add');
+    Require(Success, Name + ': add');
+    CheckState(Name, Value + ';' + TestPath, Kind);
+    Success := RemoveEnvironmentPath(HKCU, CaseKey(Name), TestPath);
+    TraceEnvironmentTestState(CaseKey(Name), TestPath, Name + ': after remove');
+    Require(Success, Name + ': remove');
+    CheckState(Name, Value, Kind);
+    CheckOwners(Name, 0);
   end;
 end;
 
@@ -433,6 +464,8 @@ begin
     Require(SaveStringToFile('{#EvidenceDir}\completed-retry.txt', '{#TestId}', False), 'retry completion receipt');
     exit;
   end;
+
+  UnicodeRoundTrips();
 
   RoundTrip('missing');
   RoundTrip('empty-sz');

@@ -28,7 +28,7 @@ if (Test-Path -LiteralPath $OutputDirectory) {
 # 每轮保留实际编译的源码，失败后也能独立复查。
 $sourceDirectory = Join-Path $OutputDirectory 'source'
 New-Item -ItemType Directory -Path $sourceDirectory | Out-Null
-foreach ($sourceName in @('environment.iss', 'environment-tests.iss', 'test_windows_environment.ps1', 'test_windows_environment_raw_gate.ps1', 'environment-legacy-r4.iss', 'environment-action-tests.iss')) {
+foreach ($sourceName in @('environment.iss', 'environment-tests.iss', 'test_windows_environment.ps1', 'test_windows_environment_raw_gate.ps1', 'environment-legacy-r4.iss', 'environment-action-tests.iss', 'environment-diagnostics.iss')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $sourceName) -Destination (Join-Path $sourceDirectory $sourceName)
 }
 
@@ -46,6 +46,8 @@ Add-Fixture 'missing' $null 0 $null 0
 Add-Fixture 'empty-sz' '' 1 '' 1
 Add-Fixture 'empty-expand' '' 2 '' 2
 Add-Fixture 'plain' 'C:\Windows' 1 'C:\Windows' 1
+$unicodePath = 'C:\raw' + [char]0xD83D + [char]0xDE00
+foreach ($kind in 1..2) { Add-Fixture "unicode-roundtrip-$kind" $unicodePath $kind $unicodePath $kind }
 Add-Fixture 'separators' ';C:\Windows;;;D:\中文 路径;' 1 ';C:\Windows;;;D:\中文 路径;' 1
 Add-Fixture 'expand' '%SystemRoot%\System32;D:\中文;%NOT_DEFINED_InfiniShell%;' 2 '%SystemRoot%\System32;D:\中文;%NOT_DEFINED_InfiniShell%;' 2
 Add-Fixture 'delimiter-only' ';;' 1 ';;' 1
@@ -148,7 +150,7 @@ public static class InfiniShellRawPathRegistry {
 '@
 # 在任何测试键写入前核对真实句柄签名；不依赖 PowerShell 将安全句柄隐式转换为裸指针。
 $rawGate = & (Join-Path $sourceDirectory 'test_windows_environment_raw_gate.ps1') -SourcePath (Join-Path $sourceDirectory 'test_windows_environment.ps1')
-if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 11) { throw '原始字节夹具互操作门禁失败' }
+if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 14) { throw '原始字节夹具互操作门禁失败' }
 function Set-RawPath {
     param([string] $Name, [byte[]] $Bytes, [uint32] $Kind)
     $key = $registry.CreateSubKey("$keyPath\$Name")
@@ -160,13 +162,15 @@ function Set-RawPath {
     } finally { $key.Dispose() }
 }
 function Get-RawPath {
-    param([string] $Name)
+    param([string] $Name, [switch] $AllowMissing)
     $key = $registry.OpenSubKey("$keyPath\$Name")
     try {
         if (-not $key) { throw "原始字节夹具键缺失：$Name" }
         [uint32]$kind = 0
         [uint32]$size = 0
         $code = [InfiniShellRawPathRegistry]::QueryValue($key.Handle, 'Path', [IntPtr]::Zero, [ref]$kind, $null, [ref]$size)
+        # 只有诊断快照允许明确的 ERROR_FILE_NOT_FOUND；原始夹具断言仍严格要求值存在。
+        if ($AllowMissing -and $code -eq 2) { return [pscustomobject]@{ exists = $false; kind = 0; bytes = $null } }
         if ($code -ne 0) { throw "原始字节长度读取失败：$Name，Win32=$code" }
         # 零字节值也传非空缓冲区，避免第二次调用被解释为仅查询长度。
         [byte[]]$bytes = New-Object byte[] ([int][Math]::Max([uint32]1, $size))
@@ -260,6 +264,12 @@ function Read-Ownership {
 function Invoke-NativeAction {
     param([string] $Name, [string] $Flavor, [string] $Action, [int] $Product, [bool] $ExpectedSuccess = $true)
     $script:nativeActionIndex++
+    $result.native_actions_attempted = $script:nativeActionIndex
+    $rawBefore = $null; $ownersBefore = $null
+    if ($Flavor -ceq 'new' -and $Name.StartsWith('raw-', [StringComparison]::Ordinal)) {
+        $rawBefore = Get-RawPath $Name -AllowMissing
+        $ownersBefore = Read-Ownership $Name
+    }
     $receipt = 'action-{0:d5}' -f $script:nativeActionIndex
     $letter = @('A', 'B', 'C')[$Product]
     $code = Invoke-HiddenProcess (Join-Path $OutputDirectory "environment-action-$Flavor.exe") @(
@@ -267,7 +277,20 @@ function Invoke-NativeAction {
         "/product=$letter", "/receipt=$receipt", "/LOG=$(Join-Path $OutputDirectory "$receipt.inno.log")"
     ) $receipt
     $expectedReceipt = "${testId}:$([int]$ExpectedSuccess)"
-    if ($code -ne 1 -or [IO.File]::ReadAllText((Join-Path $OutputDirectory "$receipt.txt")) -cne $expectedReceipt) {
+    $receiptText = $null
+    if (Test-Path -LiteralPath (Join-Path $OutputDirectory "$receipt.txt")) {
+        $receiptText = [IO.File]::ReadAllText((Join-Path $OutputDirectory "$receipt.txt"))
+    }
+    $rawSnapshot = $null
+    if ($rawBefore) {
+        # helper 失败也先保存人工夹具的前后原字节与归属，不能只留下 false 回执。
+        $rawSnapshot = [ordered]@{ case = $Name; action = $Action; receipt = $receipt; attempted_index = $script:nativeActionIndex;
+            before = $rawBefore; after = (Get-RawPath $Name -AllowMissing); ownership_before = $ownersBefore; ownership_after = (Read-Ownership $Name) }
+        $rawSnapshot | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $OutputDirectory "$receipt.raw.json") -Encoding UTF8
+    }
+    if ($code -ne 1 -or $receiptText -cne $expectedReceipt) {
+        $result.native_action_failure = [ordered]@{ attempted_index = $script:nativeActionIndex; case = $Name;
+            action = $Action; helper = $Flavor; exit_code = $code; expected_receipt = $expectedReceipt; actual_receipt = $receiptText; raw_fixture = $rawSnapshot }
         throw "真实 $Flavor helper 动作结果不符：$Name $Action $letter"
     }
     # 每个旧进程返回后立刻读取，绝不再调新版收尾来掩盖旧版残留。
@@ -584,7 +607,7 @@ $result = [ordered]@{
     schema_version = 1; test_id = $testId; status = 'incomplete'; registry_root = "HKCU\$keyPath"
     compiler = $CompilerPath; helper_sha256 = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'environment.iss') -Algorithm SHA256).Hash.ToLowerInvariant()
     started_at = [DateTime]::UtcNow.ToString('o'); compiler_exit_code = $null; harness_exit_code = $null
-    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; raw_fixture_preflight_cases = 0; raw_fixture_preflight_cleanup_passed = $false; raw_registry_mismatch = $null; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
+    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_actions_attempted = 0; native_action_failure = $null; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; raw_fixture_preflight_cases = 0; raw_fixture_preflight_cleanup_passed = $false; raw_registry_mismatch = $null; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
 }
 try {
     $rawFixturePreflight = Invoke-RawFixturePreflight
