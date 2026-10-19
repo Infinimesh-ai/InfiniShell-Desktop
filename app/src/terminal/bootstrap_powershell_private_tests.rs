@@ -6,16 +6,22 @@ use serde_json::{Value, json};
 use warp_core::session_id::SessionId;
 use warpui::AssetProvider;
 
-use super::{ShellType, init_shell_script_for_shell};
+use super::{SESSION_ID_PLACEHOLDER, ShellType, init_shell_script_for_shell, load_script};
 
 struct InitAssets;
 
 impl AssetProvider for InitAssets {
     fn get(&self, path: &str) -> anyhow::Result<Cow<'_, [u8]>> {
-        assert_eq!(path, "bundled/bootstrap/pwsh_init_shell.ps1");
-        Ok(Cow::Borrowed(include_bytes!(
-            "../../assets/bundled/bootstrap/pwsh_init_shell.ps1"
-        )))
+        let content: &[u8] = match path {
+            "bundled/bootstrap/pwsh_private_startup.ps1" => {
+                include_bytes!("../../assets/bundled/bootstrap/pwsh_private_startup.ps1")
+            }
+            "bundled/bootstrap/pwsh_init_shell.ps1" => {
+                include_bytes!("../../assets/bundled/bootstrap/pwsh_init_shell.ps1")
+            }
+            other => anyhow::bail!("非预期初始化资产: {other}"),
+        };
+        Ok(Cow::Borrowed(content))
     }
 }
 
@@ -25,11 +31,14 @@ fn run_case(case: &str) -> (i32, Value) {
         .tempdir()
         .unwrap();
     let init_path = fixture.path().join("init.ps1");
-    std::fs::write(
-        &init_path,
-        init_shell_script_for_shell(ShellType::PowerShell, &InitAssets, SessionId::from(42)),
-    )
-    .unwrap();
+    let init_script = if case == "remote" {
+        // 真实 SSH 只发送通用初始化，不能用本机私有前缀提前清空远端夹具状态。
+        load_script("bundled/bootstrap/pwsh_init_shell.ps1", &InitAssets)
+            .replace(SESSION_ID_PLACEHOLDER, "42")
+    } else {
+        init_shell_script_for_shell(ShellType::PowerShell, &InitAssets, SessionId::from(42))
+    };
+    std::fs::write(&init_path, init_script).unwrap();
     // 使用 Windows 自带的固定入口；不跳过失败，也不执行任何真实 profile。
     let powershell = Path::new(&std::env::var_os("SystemRoot").unwrap())
         .join("System32/WindowsPowerShell/v1.0/powershell.exe");

@@ -324,7 +324,12 @@ pub fn init_shell_script_for_shell(
         ShellType::Zsh => load_and_escape_script("bundled/bootstrap/zsh_init_shell.sh", assets),
         ShellType::Bash => load_and_escape_script("bundled/bootstrap/bash_init_shell.sh", assets),
         ShellType::Fish => load_and_escape_script("bundled/bootstrap/fish_init_shell.sh", assets),
-        ShellType::PowerShell => load_script("bundled/bootstrap/pwsh_init_shell.ps1", assets),
+        ShellType::PowerShell => {
+            // 本机私有历史初始化不随 SSH 发送，避免挤占远端启动命令的长度预算。
+            let private_startup = load_script("bundled/bootstrap/pwsh_private_startup.ps1", assets);
+            let init_shell = load_script("bundled/bootstrap/pwsh_init_shell.ps1", assets);
+            format!("{private_startup};{init_shell}")
+        }
     };
     script.replace(SESSION_ID_PLACEHOLDER, &session_id.as_u64().to_string())
 }
@@ -426,7 +431,10 @@ pub fn raw_init_shell_script_for_shell(
         ShellType::Bash => "bundled/bootstrap/bash_init_shell.sh",
         ShellType::Zsh => "bundled/bootstrap/zsh_init_shell.sh",
         ShellType::Fish => "bundled/bootstrap/fish_init_shell.sh",
-        ShellType::PowerShell => "bundled/bootstrap/pwsh_init_shell.ps1",
+        ShellType::PowerShell => {
+            return init_shell_script_for_shell(shell_type, assets, session_id)
+                .replace("@@USING_CON_PTY_BOOLEAN@@", &(cfg!(windows).to_string()));
+        }
     };
     load_script(file, assets)
         .replace("@@USING_CON_PTY_BOOLEAN@@", &(cfg!(windows).to_string()))

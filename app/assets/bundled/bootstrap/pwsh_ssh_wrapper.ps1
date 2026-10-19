@@ -357,7 +357,34 @@ if (-not [String]::IsNullOrEmpty('$remoteWorkerRelativePath')) {
 $sshHookCommand
 $initShell
 "@
-    $encodedBootstrap = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrapScript))
+    # 连同环境和 SSH hook 一起压缩，兼容直接读取原始 init 资产的调用方。
+    $bootstrapBytes = [Text.Encoding]::UTF8.GetBytes($bootstrapScript)
+    $bootstrapBuffer = [IO.MemoryStream]::new()
+    try {
+        $bootstrapCompressor = [IO.Compression.GZipStream]::new($bootstrapBuffer, [IO.Compression.CompressionLevel]::Optimal, $true)
+        try {
+            $bootstrapCompressor.Write($bootstrapBytes, 0, $bootstrapBytes.Length)
+        } finally {
+            $bootstrapCompressor.Dispose()
+        }
+        $bootstrapPayload = [Convert]::ToBase64String($bootstrapBuffer.ToArray())
+    } finally {
+        $bootstrapBuffer.Dispose()
+    }
+    # 解压临时变量留在子作用域，init 继续在原作用域执行。
+    $bootstrapLoader = @"
+. ([ScriptBlock]::Create((& {
+`$m=[IO.MemoryStream]::new([Convert]::FromBase64String('$bootstrapPayload'))
+try {
+`$g=[IO.Compression.GZipStream]::new(`$m,[IO.Compression.CompressionMode]::Decompress)
+try {
+`$r=[IO.StreamReader]::new(`$g,[Text.Encoding]::UTF8)
+try { `$r.ReadToEnd() } finally { `$r.Dispose() }
+} finally { `$g.Dispose() }
+} finally { `$m.Dispose() }
+})))
+"@
+    $encodedBootstrap = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrapLoader))
     return "powershell.exe -NoLogo -NoExit -EncodedCommand $encodedBootstrap"
 }
 

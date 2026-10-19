@@ -13,6 +13,9 @@ if (($PSEdition -eq 'Desktop' -or $IsWindows) -and $env:WARP_IS_LOCAL_SHELL_SESS
         [Environment]::Exit(1)
     }
     Remove-Variable privateOptions -ErrorAction Ignore
+} else {
+    # 远端和普通会话不继承 profile 中可能残留的本机私有历史状态。
+    $global:_warpPrivateHistoryPath = $null
 }
 
 # Wrap things in a module to avoid cluttering the global scope. We assign it to '$null' to suppress

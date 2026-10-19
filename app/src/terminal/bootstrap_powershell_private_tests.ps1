@@ -34,6 +34,7 @@ if ($Case -eq 'junction') {
 if ($Case -eq 'remote') {
     $env:WARP_IS_LOCAL_SHELL_SESSION = '0'
     $env:WARP_IS_SSH = '1'
+    $global:_warpPrivateHistoryPath = 'stale-private-history-from-profile'
 }
 if ($Case -eq 'local_inherited_ssh') { $env:WARP_IS_SSH = '1' }
 if ($Case -eq 'init_options_failure') { function global:Set-PSReadLineOption { throw 'fixture_options_failure' } }

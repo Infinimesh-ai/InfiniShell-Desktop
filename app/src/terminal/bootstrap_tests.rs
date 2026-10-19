@@ -283,6 +283,173 @@ fn windows_remote_bootstrap_command_fits_cmd_exe_limit() {
 
 #[cfg(unix)]
 #[test]
+fn windows_remote_bootstrap_with_full_hook_fits_cmd_exe_limit() {
+    let helper = embed_windows_remote_init_shell(
+        include_str!("../../assets/bundled/bootstrap/ssh_remote_shell_probe.sh").to_string(),
+        &crate::ASSETS,
+        ShellType::Bash,
+    );
+    // 使用完整 SSH hook、长控制路径和最大会话 ID，覆盖最小夹具之外的命令开销。
+    let hook = r#"{"hook": "SSH", "value": {"socket_path": "/Users/test/.infinishell/ssh/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/control.sock", "transport": {"version": 1, "type": "control_master", "socket_path": "/Users/test/.infinishell/ssh/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/control.sock", "ownership": "warp_managed"}, "remote_shell": "pwsh", "session_id": 18446744073709551615, "remote_session_id": 18446744073709551615, "control_scope": "remote", "hop_depth": 8, "external_control_master": false}}"#;
+    let hook_hex = hex::encode(hook);
+    let script = format!(
+        "{helper}\nwarp_windows_powershell_bootstrap_command 18446744073709551615 {hook_hex} v0.2026.10.19.15.30.oss_00 1 8"
+    );
+    let output = Command::new("bash")
+        .arg("-c")
+        .arg(script)
+        .output()
+        .expect("bash 应能生成带完整 SSH hook 的 Windows 启动命令");
+    assert!(output.status.success());
+    // Cmd.exe 的总命令上限是 8191 字符；现有最小夹具仍保留 4096 字节预算。
+    assert!(output.stdout.is_ascii());
+    assert!(
+        output.stdout.len() <= 8191,
+        "Windows bootstrap command with full SSH hook is {} bytes",
+        output.stdout.len()
+    );
+}
+
+#[test]
+fn powershell_windows_bootstrap_compresses_real_init_and_preserves_full_hook() {
+    let Some(powershell) = powershell_executable() else {
+        eprintln!("当前环境没有 PowerShell,跳过真实 Windows bootstrap payload 测试");
+        return;
+    };
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+. $env:WARP_TEST_SSH_HELPER
+$script:WarpPwshInitShell = [IO.File]::ReadAllText($env:WARP_TEST_INIT, [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
+function Warp-Encode-HexString([string]$str) {
+    [BitConverter]::ToString([Text.Encoding]::UTF8.GetBytes($str)).Replace('-', '')
+}
+$global:_warpSessionId = [UInt64]::MaxValue
+$controlPath = '/tmp/' + ('a' * 98)
+$hookHex = Warp-New-SshHookHex -RemoteSessionId ([UInt64]::MaxValue) -RemoteShell 'pwsh' -Transport @{
+    version = 1; type = 'control_master'; socket_path = $controlPath; ownership = 'warp_managed'
+} -SocketPath $controlPath -ExternalControlMaster $false
+$env:WARP_CLIENT_VERSION = 'v0.2026.10.19.15.30.oss_00'
+$env:WARP_CLI_AGENT_PROTOCOL_VERSION = '1'
+$env:WARP_SSH_HOP_DEPTH = '7'
+$env:WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH = '.infinishell/remote-server/infinishell-v0.2026.10.19.15.30.oss_00.exe'
+$env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE = 'previous-host-worker'
+$command = Warp-New-WindowsBootstrapCommand -RemoteSessionId ([UInt64]::MaxValue) -SshHookHex $hookHex
+$decoded = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(($command -split ' ')[-1]))
+$expected = $script:WarpPwshInitShell.Replace('@@WARP_SESSION_ID@@', [string][UInt64]::MaxValue)
+$payload = [regex]::Match($decoded, "FromBase64String\('([^']+)'\)").Groups[1].Value
+$memory = [IO.MemoryStream]::new([Convert]::FromBase64String($payload))
+try {
+    $gzip = [IO.Compression.GZipStream]::new($memory, [IO.Compression.CompressionMode]::Decompress)
+    try {
+        $reader = [IO.StreamReader]::new($gzip, [Text.Encoding]::UTF8)
+        try { $roundTrip = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    } finally { $gzip.Dispose() }
+} finally { $memory.Dispose() }
+$null = [ScriptBlock]::Create($decoded)
+$null = [ScriptBlock]::Create($roundTrip)
+# 仅加载自带模块并执行 init，不读取共享 profile，不启动 SSH 或交互 shell。
+Import-Module (Join-Path $PSHOME 'Modules/PSReadLine/PSReadLine.psd1') -ErrorAction Stop
+$m = 'caller-memory'; $g = 'caller-gzip'; $r = 'caller-reader'
+$originalOutput = [Console]::Out
+$capturedOutput = [IO.StringWriter]::new()
+try {
+    [Console]::SetOut($capturedOutput)
+    . ([ScriptBlock]::Create($decoded))
+} finally {
+    [Console]::SetOut($originalOutput)
+    $emittedHook = $capturedOutput.ToString()
+    $capturedOutput.Dispose()
+}
+$initOutput = @(prompt 6>&1 | ForEach-Object { [string]$_ }) -join ''
+$initHex = [regex]::Match($initOutput, '\x1b\]9278;d;([0-9A-F]+)\x07').Groups[1].Value
+$initBytes = New-Object byte[] ($initHex.Length / 2)
+for ($i = 0; $i -lt $initBytes.Length; $i++) { $initBytes[$i] = [Convert]::ToByte($initHex.Substring($i * 2, 2), 16) }
+$initHook = [Text.Encoding]::UTF8.GetString($initBytes) | ConvertFrom-Json
+$env:WARP_SSH_HOP_DEPTH = '7'
+$quietCommand = Warp-New-WindowsBootstrapCommand -RemoteSessionId ([UInt64]::MaxValue) -SshHookHex $hookHex -EmitSshHook $false
+$quietDecoded = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(($quietCommand -split ' ')[-1]))
+$quietPayload = [regex]::Match($quietDecoded, "FromBase64String\('([^']+)'\)").Groups[1].Value
+$quietMemory = [IO.MemoryStream]::new([Convert]::FromBase64String($quietPayload))
+try {
+    $quietGzip = [IO.Compression.GZipStream]::new($quietMemory, [IO.Compression.CompressionMode]::Decompress)
+    try {
+        $quietReader = [IO.StreamReader]::new($quietGzip, [Text.Encoding]::UTF8)
+        try { $quietDecoded = $quietReader.ReadToEnd() } finally { $quietReader.Dispose() }
+    } finally { $quietGzip.Dispose() }
+} finally { $quietMemory.Dispose() }
+ConvertTo-Json -Compress -InputObject @{
+    command_bytes = [Text.Encoding]::UTF8.GetByteCount($command)
+    control_path_bytes = $controlPath.Length
+    ascii = ($command -cmatch '^[\x00-\x7f]+$')
+    no_exit = $command.StartsWith('powershell.exe -NoLogo -NoExit -EncodedCommand ')
+    round_trip = ($roundTrip.Contains($expected) -and -not $roundTrip.Contains('@@WARP_SESSION_ID@@'))
+    common_only = -not $roundTrip.Contains('WARP_POWERSHELL_PRIVATE_STARTUP_ROOT')
+    hook_matches = $emittedHook -ceq (([char]27) + ']9278;d;' + $hookHex + [char]7)
+    quiet_hook_omitted = -not $quietDecoded.Contains('[Console]::Out.Write(')
+    session_matches = ($initHook.hook -ceq 'InitShell' -and [UInt64]$initHook.value.session_id -eq [UInt64]::MaxValue -and $initHook.value.shell -ceq 'pwsh')
+    loader_scope_preserved = ($m -ceq 'caller-memory' -and $g -ceq 'caller-gzip' -and $r -ceq 'caller-reader')
+    environment_matches = ($env:TERM_PROGRAM -ceq 'WarpTerminal' -and $env:WARP_IS_SSH -ceq '1' -and $env:WARP_IS_LOCAL_SHELL_SESSION -ceq '0' -and $env:WARP_CLIENT_VERSION -ceq 'v0.2026.10.19.15.30.oss_00' -and $env:WARP_CLI_AGENT_PROTOCOL_VERSION -ceq '1' -and $env:WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH -ceq '.infinishell/remote-server/infinishell-v0.2026.10.19.15.30.oss_00.exe' -and $env:WARP_RUST_SSH_EXECUTABLE -ceq (Join-Path $HOME '.infinishell/remote-server/infinishell-v0.2026.10.19.15.30.oss_00.exe') -and [String]::IsNullOrEmpty($env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE))
+    hop_matches = $roundTrip.Contains("`$env:WARP_SSH_HOP_DEPTH = '8'")
+}
+"#;
+    let output = powershell_test_command(powershell)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ])
+        .env(
+            "WARP_TEST_SSH_HELPER",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1"
+            ),
+        )
+        .env(
+            "WARP_TEST_INIT",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/bundled/bootstrap/pwsh_init_shell.ps1"
+            ),
+        )
+        .output()
+        .expect("PowerShell 应能执行真实 Windows init 解码器");
+    assert!(
+        output.status.success(),
+        "PowerShell init 解码失败: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("PowerShell 应输出有效 JSON");
+    assert_eq!(result["control_path_bytes"], json!(103));
+    let length = result["command_bytes"].as_u64().unwrap();
+    assert!(length <= 8191, "完整 PowerShell bootstrap 为 {length} 字节");
+    for field in [
+        "ascii",
+        "no_exit",
+        "round_trip",
+        "common_only",
+        "hook_matches",
+        "quiet_hook_omitted",
+        "session_matches",
+        "loader_scope_preserved",
+        "environment_matches",
+        "hop_matches",
+    ] {
+        assert_eq!(
+            result[field],
+            json!(true),
+            "PowerShell init 字段失败: {field}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
 fn remote_shell_probe_accepts_bash() {
     assert!(remote_shell_probe_supports_bootstrap(
         "__WARP_REMOTE_SHELL__/bin/bash\n"
@@ -583,6 +750,16 @@ $encodedWindowsRecursive = ($windowsRecursiveCommand -split ' ')[-1]
 $decodedWindowsRecursive = [Text.Encoding]::Unicode.GetString(
     [Convert]::FromBase64String($encodedWindowsRecursive)
 )
+# 完整 bootstrap 已压缩；解包后继续检查原有环境与递归跳数语义。
+$recursivePayload = [regex]::Match($decodedWindowsRecursive, "FromBase64String\('([^']+)'\)").Groups[1].Value
+$recursiveMemory = [IO.MemoryStream]::new([Convert]::FromBase64String($recursivePayload))
+try {
+    $recursiveGzip = [IO.Compression.GZipStream]::new($recursiveMemory, [IO.Compression.CompressionMode]::Decompress)
+    try {
+        $recursiveReader = [IO.StreamReader]::new($recursiveGzip, [Text.Encoding]::UTF8)
+        try { $decodedWindowsRecursive = $recursiveReader.ReadToEnd() } finally { $recursiveReader.Dispose() }
+    } finally { $recursiveGzip.Dispose() }
+} finally { $recursiveMemory.Dispose() }
 $windowsCommand = Warp-New-WindowsBootstrapCommand -RemoteSessionId 42 -SshHookHex '7B7D'
 $workerArgs = @(Warp-New-RustSshWorkerArguments `
     -SessionId 99 `
