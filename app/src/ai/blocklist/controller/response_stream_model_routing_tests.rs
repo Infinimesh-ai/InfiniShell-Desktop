@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use settings::Setting;
 use warp_multi_agent_api::{ResponseEvent, response_event};
 use warpui::{App, ViewHandle};
@@ -246,7 +248,13 @@ fn 未设cli模型时请求使用与界面相同的回退() {
 #[test]
 fn cli重试和压缩保留原请求模型快照() {
     with_routing_app(|fixture, app| {
-        let request = fixture.request(&fixture.cli_task_id, app);
+        let mut request = fixture.request(&fixture.cli_task_id, app);
+        request.input_messages.push((
+            fixture.cli_task_id.clone(),
+            vec![AIAgentInput::ResumeConversation {
+                context: Arc::from([]),
+            }],
+        ));
         let params = fixture.params(&request, app);
         let stream =
             ResponseStream::new_for_test_with_params(ResponseStreamId::new_local(), params);
@@ -259,8 +267,14 @@ fn cli重试和压缩保留原请求模型快照() {
         );
         let mut resumed = fixture.request(&fixture.root_task_id, app);
         assert_eq!(resumed.model_id, llm_id::encode("base", "model"));
+        resumed.input_messages = request.input_messages.clone();
         stream.preserve_request_models(&mut resumed);
         let resumed_params = fixture.params(&resumed, app);
+        assert_eq!(
+            resumed_params.byop_target_task_id,
+            Some(fixture.cli_task_id.to_string())
+        );
+        assert_eq!(resumed_params.input, stream.params.input);
         assert_eq!(
             fixture.dispatch(&resumed_params, app).base_url,
             "https://cli-selected.invalid/v1/"
@@ -305,5 +319,141 @@ fn cli工具结果续轮使用cli模型但混合目标保持base() {
             )
         });
         assert_eq!(mixed.model_id, llm_id::encode("base", "model"));
+    });
+}
+
+#[test]
+fn ordered_cli_result_batches_keep_selected_model_and_byop_target() {
+    with_routing_app(|fixture, app| {
+        let first = AIAgentActionResult {
+            id: AIAgentActionId::from("cli-first".to_owned()),
+            task_id: fixture.cli_task_id.clone(),
+            result: AIAgentActionResultType::SuggestPrompt(SuggestPromptResult::Cancelled),
+        };
+        let second = AIAgentActionResult {
+            id: AIAgentActionId::from("cli-second".to_owned()),
+            task_id: fixture.cli_task_id.clone(),
+            result: AIAgentActionResultType::SuggestPrompt(SuggestPromptResult::Cancelled),
+        };
+        let request = fixture.terminal.read(app, |terminal, ctx| {
+            RequestInput::for_actions_results(
+                vec![first, second],
+                Arc::from([]),
+                terminal.active_session(),
+                None,
+                fixture.conversation_id,
+                terminal.id(),
+                ctx,
+            )
+        });
+
+        let params = fixture.params(&request, app);
+
+        assert_eq!(request.input_messages.len(), 2);
+        assert_eq!(request.model_id, llm_id::encode("cli-selected", "model"));
+        assert_eq!(
+            params.byop_target_task_id,
+            Some(fixture.cli_task_id.to_string())
+        );
+        assert!(matches!(
+            params.input.as_slice(),
+            [AIAgentInput::ActionResult { result: first, .. }, AIAgentInput::ActionResult { result: second, .. }]
+                if first.id.to_string() == "cli-first" && second.id.to_string() == "cli-second"
+        ));
+        assert_eq!(
+            fixture.dispatch(&params, app).base_url,
+            "https://cli-selected.invalid/v1/"
+        );
+    });
+}
+
+#[test]
+fn ordered_interleaved_results_keep_transport_order_and_base_model() {
+    with_routing_app(|fixture, app| {
+        let first = AIAgentActionResult {
+            id: AIAgentActionId::from("root-first".to_owned()),
+            task_id: fixture.root_task_id.clone(),
+            result: AIAgentActionResultType::SuggestPrompt(SuggestPromptResult::Cancelled),
+        };
+        let middle = AIAgentActionResult {
+            id: AIAgentActionId::from("cli-middle".to_owned()),
+            task_id: fixture.cli_task_id.clone(),
+            result: AIAgentActionResultType::SuggestPrompt(SuggestPromptResult::Cancelled),
+        };
+        let last = AIAgentActionResult {
+            id: AIAgentActionId::from("root-last".to_owned()),
+            task_id: fixture.root_task_id.clone(),
+            result: AIAgentActionResultType::SuggestPrompt(SuggestPromptResult::Cancelled),
+        };
+        let request = fixture.terminal.read(app, |terminal, ctx| {
+            RequestInput::for_actions_results(
+                vec![first, middle, last],
+                Arc::from([]),
+                terminal.active_session(),
+                None,
+                fixture.conversation_id,
+                terminal.id(),
+                ctx,
+            )
+        });
+
+        let params = fixture.params(&request, app);
+
+        assert_eq!(request.model_id, llm_id::encode("base", "model"));
+        assert_eq!(params.byop_target_task_id, None);
+        assert!(matches!(
+            params.input.as_slice(),
+            [
+                AIAgentInput::ActionResult { result: first, .. },
+                AIAgentInput::ActionResult { result: middle, .. },
+                AIAgentInput::ActionResult { result: last, .. },
+            ] if first.id.to_string() == "root-first"
+                && middle.id.to_string() == "cli-middle"
+                && last.id.to_string() == "root-last"
+        ));
+    });
+}
+
+#[test]
+fn ordered_result_dedup_preserves_surviving_batches_and_empty_history_tasks() {
+    with_routing_app(|fixture, app| {
+        let result = AIAgentInput::ActionResult {
+            result: AIAgentActionResult {
+                id: AIAgentActionId::from("persisted-result".to_owned()),
+                task_id: fixture.cli_task_id.clone(),
+                result: AIAgentActionResultType::SuggestPrompt(SuggestPromptResult::Cancelled),
+            },
+            context: Arc::from([]),
+        };
+        let mut request = fixture.request(&fixture.root_task_id, app);
+        let query = request.input_messages[0].1[0].clone();
+        request.input_messages = vec![
+            (fixture.cli_task_id.clone(), vec![result.clone()]),
+            (fixture.root_task_id.clone(), vec![query]),
+            (fixture.cli_task_id.clone(), vec![result]),
+            (
+                fixture.root_task_id.clone(),
+                vec![AIAgentInput::ResumeConversation {
+                    context: Arc::from([]),
+                }],
+            ),
+        ];
+
+        let removed = request.remove_action_results_by_tool_call_id(&HashSet::from([(
+            fixture.cli_task_id.to_string(),
+            "persisted-result".to_owned(),
+        )]));
+        let params = fixture.params(&request, app);
+
+        assert_eq!(removed, 2);
+        assert_eq!(request.input_messages.len(), 4);
+        assert!(request.input_messages[0].1.is_empty());
+        assert!(request.input_messages[2].1.is_empty());
+        assert_eq!(params.byop_target_task_id, None);
+        assert!(matches!(
+            params.input.as_slice(),
+            [AIAgentInput::UserQuery { query, .. }, AIAgentInput::ResumeConversation { .. }]
+                if query == "检查当前终端"
+        ));
     });
 }

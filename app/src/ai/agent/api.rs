@@ -458,15 +458,7 @@ impl RequestParams {
             && !BlocklistAIPermissions::as_ref(app)
                 .get_run_agents_setting(app, terminal_view_id)
                 .is_never_allow();
-        let byop_target_task_id = if request_input.input_messages.len() == 1 {
-            request_input
-                .input_messages
-                .keys()
-                .next()
-                .map(ToString::to_string)
-        } else {
-            None
-        };
+        let byop_target_task_id = request_input.single_task_id().map(ToString::to_string);
 
         // Reconcile the persisted override against the active base model's
         // current `LLMContextWindow` instead of trusting whatever was stored

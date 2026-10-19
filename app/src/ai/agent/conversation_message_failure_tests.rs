@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use ai::skills::SkillPathOrigin;
 use chrono::{Local, TimeZone as _};
 use warp_multi_agent_api as api;
@@ -66,7 +64,7 @@ fn start_request(
         .update_for_new_request_input(
             RequestInput {
                 conversation_id: conversation.id(),
-                input_messages: HashMap::from([(TaskId::new(task_id.into()), input)]),
+                input_messages: Vec::from([(TaskId::new(task_id.into()), input)]),
                 working_directory: Some("/workspace".into()),
                 model_id: "test-model".into(),
                 coding_model_id: "test-model".into(),

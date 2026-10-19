@@ -1376,7 +1376,7 @@ fn prompt_history_candidates_seeds_from_snapshot_then_appends_session_prompts() 
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -1476,7 +1476,7 @@ fn test_ai_queries_for_terminal_view_up_arrow_history() {
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -1522,7 +1522,7 @@ fn test_ai_queries_for_terminal_view_up_arrow_history() {
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -1582,7 +1582,7 @@ fn test_ai_queries_for_terminal_view_up_arrow_history() {
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -1665,7 +1665,7 @@ fn test_transcript_viewer_terminal_view_is_not_marked_historical() {
 
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -2219,7 +2219,7 @@ fn test_all_cleared_conversations_includes_terminal_view_id() {
 
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -2815,7 +2815,7 @@ fn test_truncate_from_exchange_to_empty_persist_event_has_empty_updated_tasks() 
             let exchange = create_exchange_with_query("truncate me", now, None);
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(
+                input_messages: Vec::from([(
                     crate::ai::agent::task::TaskId::new(server_root_id.clone()),
                     exchange.input,
                 )]),
@@ -3049,7 +3049,7 @@ fn test_initialize_output_for_response_stream_persists_updated_conversation_stat
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -3249,7 +3249,7 @@ fn test_find_by_token_after_initialize_output_for_response_stream() {
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -3423,7 +3423,7 @@ fn test_find_by_token_after_mark_conversations_historical_for_terminal_surface()
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: std::collections::HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -4367,7 +4367,7 @@ fn statuses_after_stream_error(
                 .clone();
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: HashMap::from([(task_id, exchange.input)]),
+                input_messages: Vec::from([(task_id, exchange.input)]),
                 working_directory: exchange.working_directory,
                 model_id: exchange.model_id,
                 coding_model_id: exchange.coding_model_id,
@@ -5071,7 +5071,7 @@ fn straddle_rewind_followup_requests_are_clean_and_durable() {
             let exchange = create_exchange_with_query("follow up B", Local::now(), None);
             let request_input = RequestInput {
                 conversation_id,
-                input_messages: HashMap::from([(
+                input_messages: Vec::from([(
                     TaskId::new(root_task_id.to_string()),
                     exchange.input,
                 )]),

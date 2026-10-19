@@ -222,7 +222,8 @@ pub enum BlocklistAIControllerEvent {
 #[derive(Debug, Clone)]
 pub struct RequestInput {
     pub conversation_id: AIConversationId,
-    pub input_messages: HashMap<TaskId, Vec<AIAgentInput>>,
+    /// 按提交顺序保存输入批次；同一任务可以重复出现，空批次仍保留历史 exchange。
+    pub input_messages: Vec<(TaskId, Vec<AIAgentInput>)>,
     pub working_directory: Option<String>,
     pub model_id: LLMId,
     pub coding_model_id: LLMId,
@@ -262,7 +263,7 @@ impl RequestInput {
             terminal_view_id,
             app,
         );
-        me.input_messages.insert(task_id, inputs);
+        me.input_messages.push((task_id, inputs));
         me.select_task_model(app);
         me
     }
@@ -284,23 +285,20 @@ impl RequestInput {
             app,
         );
         for result in action_results.into_iter() {
-            me.input_messages
-                .entry(result.task_id.clone())
-                .or_default()
-                .push(AIAgentInput::ActionResult {
+            me.input_messages.push((
+                result.task_id.clone(),
+                vec![AIAgentInput::ActionResult {
                     result,
                     context: context.clone(),
-                });
+                }],
+            ));
         }
         me.select_task_model(app);
         me
     }
 
     fn select_task_model(&mut self, ctx: &AppContext) {
-        if self.input_messages.len() != 1 {
-            return;
-        }
-        let target = self.input_messages.keys().next().and_then(|task_id| {
+        let target = self.single_task_id().and_then(|task_id| {
             BlocklistAIHistoryModel::as_ref(ctx)
                 .conversation(&self.conversation_id)?
                 .get_task(task_id)
@@ -313,7 +311,16 @@ impl RequestInput {
     }
 
     pub fn all_inputs(&self) -> impl Iterator<Item = &AIAgentInput> {
-        self.input_messages.values().flatten()
+        self.input_messages.iter().flat_map(|(_, inputs)| inputs)
+    }
+
+    /// 同一任务的多批次仍是单任务请求，不能因此丢失 CLI 模型或 BYOP 目标。
+    pub fn single_task_id(&self) -> Option<&TaskId> {
+        let (first_task_id, _) = self.input_messages.first()?;
+        self.input_messages
+            .iter()
+            .all(|(task_id, _)| task_id == first_task_id)
+            .then_some(first_task_id)
     }
 
     pub fn with_supported_tools(mut self, tools: Vec<ToolType>) -> Self {
@@ -323,7 +330,7 @@ impl RequestInput {
 
     fn remove_action_results_by_tool_call_id(&mut self, keys: &HashSet<(String, String)>) -> usize {
         let mut removed = 0;
-        for inputs in self.input_messages.values_mut() {
+        for (_, inputs) in &mut self.input_messages {
             let before = inputs.len();
             inputs.retain(|input| {
                 let AIAgentInput::ActionResult { result, .. } = input else {
@@ -1659,14 +1666,13 @@ impl BlocklistAIController {
                 ctx,
             );
             for result in finished_results {
-                request_input
-                    .input_messages
-                    .entry(result.task_id.clone())
-                    .or_default()
-                    .push(AIAgentInput::ActionResult {
+                request_input.input_messages.push((
+                    result.task_id.clone(),
+                    vec![AIAgentInput::ActionResult {
                         result,
                         context: context.clone(),
-                    });
+                    }],
+                ));
             }
         }
 
@@ -1729,19 +1735,11 @@ impl BlocklistAIController {
                 self.get_current_response_initiator(),
             );
             // 空历史重载会重新创建根任务；恢复输入不能继续指向已消失的任务 ID。
-            let mut restored_inputs: HashMap<TaskId, Vec<AIAgentInput>> = HashMap::new();
-            for (task_id, inputs) in request.input_messages {
-                let restored_task_id = if conversation.get_task(&task_id).is_some() {
-                    task_id
-                } else {
-                    conversation.get_root_task_id().clone()
-                };
-                restored_inputs
-                    .entry(restored_task_id)
-                    .or_default()
-                    .extend(inputs);
+            for (task_id, _) in &mut request.input_messages {
+                if conversation.get_task(task_id).is_none() {
+                    *task_id = conversation.get_root_task_id().clone();
+                }
             }
-            request.input_messages = restored_inputs;
             let _ = self.send_request_input_with_compaction(
                 request,
                 None,
@@ -3127,7 +3125,7 @@ impl BlocklistAIController {
             )
         });
         request.conversation_id = conversation_id;
-        request.input_messages = HashMap::from([(task_id, input)]);
+        request.input_messages = vec![(task_id, input)];
         request.supported_tools_override = Some(vec![]);
         Ok(request)
     }

@@ -10,7 +10,7 @@ use crate::ai::byop_compaction::state::CompactionState;
 fn request(input: AIAgentInput) -> RequestInput {
     RequestInput {
         conversation_id: AIConversationId::new(),
-        input_messages: HashMap::from([(TaskId::new("root".into()), vec![input])]),
+        input_messages: Vec::from([(TaskId::new("root".into()), vec![input])]),
         working_directory: Some("/workspace".into()),
         model_id: LLMId::from("byop:original"),
         coding_model_id: LLMId::from("coding"),
@@ -23,8 +23,12 @@ fn request(input: AIAgentInput) -> RequestInput {
 }
 
 fn query() -> AIAgentInput {
+    query_with_text("分析附件")
+}
+
+fn query_with_text(query: &str) -> AIAgentInput {
     AIAgentInput::UserQuery {
-        query: "分析附件".into(),
+        query: query.into(),
         context: Arc::from([
             AIAgentContext::SelectedText("选中的日志".into()),
             AIAgentContext::Image(ImageContext {
@@ -84,6 +88,37 @@ fn pending_compaction_roundtrip_preserves_multimodal_query_for_manual_continue()
 }
 
 #[test]
+fn pending_compaction_roundtrip_preserves_interleaved_task_query_order() {
+    let first = query_with_text("先处理根任务");
+    let middle = query_with_text("再处理子任务");
+    let last = query_with_text("最后返回根任务");
+    let mut original = request(first.clone());
+    original.input_messages = vec![
+        (TaskId::new("z-root".into()), vec![first]),
+        (TaskId::new("a-child".into()), vec![middle]),
+        (TaskId::new("z-root".into()), vec![last]),
+    ];
+    let pending = PendingCompactionRecovery::from_request(&original);
+    let restored: PendingCompactionRecovery =
+        serde_json::from_str(&serde_json::to_string(&pending).unwrap()).unwrap();
+
+    let resumed = restored.to_request_input(
+        original.conversation_id,
+        &TaskId::new("fallback".into()),
+        None,
+    );
+
+    assert_eq!(resumed.input_messages, original.input_messages);
+    assert_eq!(
+        resumed
+            .all_inputs()
+            .filter_map(AIAgentInput::user_query)
+            .collect::<Vec<_>>(),
+        vec!["先处理根任务", "再处理子任务", "最后返回根任务"],
+    );
+}
+
+#[test]
 fn pending_tool_continuation_restores_context_without_replaying_tool_results() {
     let context: Arc<[AIAgentContext]> =
         Arc::from([AIAgentContext::SelectedText("工具上下文".into())]);
@@ -102,7 +137,7 @@ fn pending_tool_continuation_restores_context_without_replaying_tool_results() {
         pending.to_request_input(original.conversation_id, &TaskId::new("root".into()), None);
 
     assert_eq!(
-        resumed.input_messages[&TaskId::new("root".into())],
+        resumed.input_messages[0].1,
         vec![AIAgentInput::ResumeConversation { context }],
     );
     assert!(pending.queries.is_empty());

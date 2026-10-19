@@ -31,7 +31,7 @@ fn pending_query() -> PendingCompactionRecovery {
     };
     let request = RequestInput {
         conversation_id: AIConversationId::new(),
-        input_messages: HashMap::from([(TaskId::new("root".into()), vec![input])]),
+        input_messages: Vec::from([(TaskId::new("root".into()), vec![input])]),
         working_directory: Some("/workspace".into()),
         model_id: LLMId::from("byop:original"),
         coding_model_id: LLMId::from("coding"),

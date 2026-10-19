@@ -30,7 +30,7 @@ fn request_input(
 ) -> RequestInput {
     RequestInput {
         conversation_id,
-        input_messages: HashMap::from([(task_id, vec![input])]),
+        input_messages: Vec::from([(task_id, vec![input])]),
         working_directory: None,
         model_id: LLMId::from("原请求模型"),
         coding_model_id: LLMId::from("测试编程模型"),
@@ -67,9 +67,9 @@ fn automatic_summary_targets_original_conversation_and_model() {
                 let summary = controller.byop_compaction_request_input(target, Some(&original), ctx).unwrap();
                 assert_eq!(summary.conversation_id, target);
                 assert_eq!(summary.model_id, LLMId::from("原请求模型"));
-                assert!(matches!(summary.input_messages[&root_task].as_slice(), [AIAgentInput::SummarizeConversation { overflow: true, .. }]));
+                assert!(matches!(summary.input_messages[0].1.as_slice(), [AIAgentInput::SummarizeConversation { overflow: true, .. }]));
                 assert_eq!(summary.supported_tools_override, Some(vec![]));
-                assert!(matches!(original.input_messages[&root_task].as_slice(), [AIAgentInput::UserQuery { query, .. }] if query == "待发问题"));
+                assert!(matches!(original.input_messages[0].1.as_slice(), [AIAgentInput::UserQuery { query, .. }] if query == "待发问题"));
             });
         });
     });

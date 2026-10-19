@@ -923,7 +923,7 @@ fn received_agent_messages_rewind_preserves_colliding_earlier_query_and_tool_res
                 .update_for_new_request_input(
                     RequestInput {
                         conversation_id: conversation.id(),
-                        input_messages: HashMap::from([(
+                        input_messages: Vec::from([(
                             TaskId::new("parent-1".to_owned()),
                             vec![user_input("处理子任务消息")],
                         )]),

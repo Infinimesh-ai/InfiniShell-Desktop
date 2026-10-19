@@ -1,7 +1,6 @@
 //! 为真实 PTY 停止测试建立本地会话，不访问模型提供方。
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use chrono::Local;
@@ -52,7 +51,7 @@ impl MonitoringCommandFixture {
                                 .update_for_new_request_input(
                                     RequestInput {
                                         conversation_id,
-                                        input_messages: HashMap::from([(
+                                        input_messages: Vec::from([(
                                             task_id,
                                             vec![AIAgentInput::UserQuery {
                                                 query: "每 10 秒刷新一次运行状态".to_owned(),

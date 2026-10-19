@@ -249,7 +249,7 @@ fn mock_response_stream_updates_history_through_controller() {
                         .update_conversation_for_new_request_input(
                             RequestInput {
                                 conversation_id,
-                                input_messages: HashMap::from([(task_id, vec![])]),
+                                input_messages: Vec::from([(task_id, vec![])]),
                                 working_directory: None,
                                 model_id: LLMId::from("test-model"),
                                 coding_model_id: LLMId::from("test-coding-model"),
@@ -361,7 +361,7 @@ fn fail_conversation_due_to_shell_exit_reports_error_and_survives_manual_cancel(
                         .update_conversation_for_new_request_input(
                             RequestInput {
                                 conversation_id,
-                                input_messages: HashMap::from([(task_id, vec![])]),
+                                input_messages: Vec::from([(task_id, vec![])]),
                                 working_directory: None,
                                 model_id: LLMId::from("test-model"),
                                 coding_model_id: LLMId::from("test-coding-model"),
@@ -450,7 +450,7 @@ fn optimistic_cli_subagent_completion_with_in_flight_stream_reports_success() {
                         .update_conversation_for_new_request_input(
                             RequestInput {
                                 conversation_id,
-                                input_messages: HashMap::from([(task_id, vec![])]),
+                                input_messages: Vec::from([(task_id, vec![])]),
                                 working_directory: None,
                                 model_id: LLMId::from("test-model"),
                                 coding_model_id: LLMId::from("test-coding-model"),

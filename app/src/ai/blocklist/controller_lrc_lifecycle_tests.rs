@@ -9,7 +9,7 @@ use warpui::App;
 fn request_input(conversation_id: AIConversationId, task_id: TaskId) -> RequestInput {
     RequestInput {
         conversation_id,
-        input_messages: HashMap::from([(task_id, vec![])]),
+        input_messages: Vec::from([(task_id, vec![])]),
         working_directory: None,
         model_id: LLMId::from("test-model"),
         coding_model_id: LLMId::from("test-model"),

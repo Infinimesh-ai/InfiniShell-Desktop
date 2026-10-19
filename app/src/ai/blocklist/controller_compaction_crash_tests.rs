@@ -133,7 +133,7 @@ fn request_for(
 ) -> RequestInput {
     RequestInput {
         conversation_id,
-        input_messages: HashMap::from([(TaskId::new(ROOT_TASK.to_owned()), vec![input])]),
+        input_messages: Vec::from([(TaskId::new(ROOT_TASK.to_owned()), vec![input])]),
         working_directory: None,
         model_id: model_id.clone(),
         coding_model_id: model_id.clone(),

@@ -72,9 +72,8 @@ pub struct PendingCompactionRecovery {
 
 impl PendingCompactionRecovery {
     pub fn from_request(request: &RequestInput) -> Self {
-        let mut tasks = request.input_messages.iter().collect::<Vec<_>>();
-        tasks.sort_by(|(left, _), (right, _)| left.cmp(right));
-        let queries: Vec<_> = tasks
+        let queries: Vec<_> = request
+            .input_messages
             .iter()
             .flat_map(|(task_id, inputs)| {
                 inputs.iter().filter_map(move |input| {
@@ -89,7 +88,7 @@ impl PendingCompactionRecovery {
                         return None;
                     };
                     Some(PendingCompactionQuery {
-                        task_id: (*task_id).clone(),
+                        task_id: task_id.clone(),
                         query: query.clone(),
                         context: context.clone(),
                         referenced_attachments: referenced_attachments.clone(),
@@ -99,9 +98,8 @@ impl PendingCompactionRecovery {
             })
             .collect();
         let resume_context = if queries.is_empty() {
-            tasks
-                .iter()
-                .flat_map(|(_, inputs)| inputs.iter())
+            request
+                .all_inputs()
                 .find_map(AIAgentInput::context)
                 .map(Arc::from)
                 .unwrap_or_default()
@@ -113,7 +111,10 @@ impl PendingCompactionRecovery {
             owner_exchange_id: None,
             queries,
             resume_context,
-            resume_task_id: tasks.first().map(|(task_id, _)| (*task_id).clone()),
+            resume_task_id: request
+                .input_messages
+                .first()
+                .map(|(task_id, _)| task_id.clone()),
             anchor_message_id: None,
             summary_request_id: None,
             request_start_ts: request.request_start_ts,
@@ -137,15 +138,12 @@ impl PendingCompactionRecovery {
         fallback_task_id: &TaskId,
         response_initiator: Option<ParticipantId>,
     ) -> RequestInput {
-        let mut input_messages: HashMap<TaskId, Vec<AIAgentInput>> = HashMap::new();
+        let mut input_messages = Vec::new();
         for query in &self.queries {
-            input_messages
-                .entry(query.task_id.clone())
-                .or_default()
-                .push(query.to_input());
+            input_messages.push((query.task_id.clone(), vec![query.to_input()]));
         }
         if input_messages.is_empty() {
-            input_messages.insert(
+            input_messages.push((
                 self.resume_task_id
                     .as_ref()
                     .unwrap_or(fallback_task_id)
@@ -153,7 +151,7 @@ impl PendingCompactionRecovery {
                 vec![AIAgentInput::ResumeConversation {
                     context: self.resume_context.clone(),
                 }],
-            );
+            ));
         }
         RequestInput {
             conversation_id,
