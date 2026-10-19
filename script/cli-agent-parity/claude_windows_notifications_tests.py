@@ -188,6 +188,89 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             self.assertNotIn("--session-id", command)
             self.assertIn("--init-only", probe.native_command(Path("claude.exe"), plugin, init_only=True))
 
+    def test_diagnostic_argv_only_appends_explicit_debug_file(self):
+        plugin, debug = Path("plugin"), Path("private/claude.debug.log")
+        original = probe.native_command(Path("claude.exe"), plugin)
+        self.assertEqual(probe.native_command(Path("claude.exe"), plugin, debug_file=debug),
+                         original + ["--debug-file", str(debug)])
+        self.assertNotIn("--debug-file", original)
+        self.assertEqual((probe.CASE_TIMEOUT, probe.OUTER_TIMEOUT), (45, 420))
+
+    def test_debug_projection_counts_fixed_shapes_without_disclosing_payloads(self):
+        secret = "synthetic-secret-token-email@example.test-C:\\private\\account"
+        prefix = "2026-10-20T01:02:03.123Z [DEBUG] "
+        records = ["Registered 7 hooks from 1 plugins",
+                   "Getting matching hook commands for SessionStart with query: startup",
+                   'Matched 1 unique hooks for query "startup" (1 before deduplication)',
+                   "Successfully parsed and validated hook JSON output",
+                   "Hook SessionStart:startup (SessionStart) success:\n" + json.dumps({"terminalSequence": osc(notification()).decode()}),
+                   "Hook SessionStart:startup (SessionStart) error:\n" + secret,
+                   "Hook command failed to spawn (SessionStart:startup): " + secret,
+                   "Hook output does not start with {, treating as plain text",
+                   "SessionStart hooks cancelled (control stream closed)", secret]
+        raw = ("\n".join(prefix + record for record in records) + "\n").encode()
+        result = probe.debug_projection(raw, expected())
+        self.assertEqual(result["state"], "markers_observed")
+        for key in ("registered", "session_start_matching", "startup_query_matched", "session_start_success",
+                    "session_start_error", "session_start_spawn_error", "session_start_cancelled",
+                    "hook_json_validated", "hook_plain_text", "terminal_sequence_json", "terminal_sequence_target_osc"):
+            self.assertEqual(result["occurrences"][key], 1, key)
+        self.assertEqual(result["numeric_totals"], {"registered_hooks": 7, "registered_plugins": 1, "startup_matched_hooks": 1})
+        self.assertEqual(result["unknown_records"], 1)
+        self.assertEqual(result["forwarding"], "unknown")
+        for sensitive in (secret, expected()["cwd"], expected()["session_id"], "terminalSequence", "[DEBUG]"):
+            self.assertNotIn(sensitive, json.dumps(result))
+        self.assertEqual(result["sha256"], probe.hashlib.sha256(raw).hexdigest())
+        invalid = evidence()
+        invalid["transport_cases"][0]["native"]["native_session_start_received"] = False
+        invalid["debug_diagnostics"] = result
+        with self.assertRaises(ValueError):
+            probe.validate_acceptance(invalid)
+
+    def test_debug_unknown_formats_and_nonmatching_sequence_are_not_negative_evidence(self):
+        prefix = "2026-10-20T01:02:03.123Z [DEBUG] "
+        for raw in (b"arbitrary secret text", b"Registered 7 hooks from 1 plugins",
+                    (prefix + "Registered 7 hooks from 1 plugins suffix").encode(),
+                    (prefix + "Hook SessionStart:other (SessionStart) success:\nsecret").encode()):
+            result = probe.debug_projection(raw)
+            self.assertEqual(result["state"], "unknown_format")
+            self.assertTrue(all(value == "unknown" for value in result["observations"].values()))
+        self.assertEqual(probe.debug_projection(b"\xff")["state"], "unknown_encoding")
+        raw = (prefix + "Registered 7 hooks from 1 plugins\n" +
+               prefix.replace("[DEBUG]", "[WARN]") + "private warning\n" +
+               prefix.replace("[DEBUG]", "[INFO]") + "private info").encode()
+        result = probe.debug_projection(raw)
+        self.assertEqual(result["occurrences"]["registered"], 1)
+        self.assertEqual(result["unknown_records"], 2)
+        raw = (prefix + json.dumps("Hook SessionStart:startup (SessionStart) success:\n" +
+                                   json.dumps({"terminalSequence": osc(notification()).decode()}))).encode()
+        result = probe.debug_projection(raw, {"cwd": "different private project"})
+        self.assertEqual(result["occurrences"]["terminal_sequence_json"], 1)
+        self.assertEqual(result["observations"]["terminal_sequence_target_osc"], "unknown")
+
+    def test_debug_file_requires_empty_job_private_regular_bounded_stable_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / ".probe-owned").write_bytes(probe.MARKER)
+            case = root / "interactive-0"
+            case.mkdir()
+            path = case / "claude.debug.log"
+            self.assertEqual(probe.debug_diagnostics(root, case, job_empty=False), {"state": "unknown_job_active"})
+            self.assertEqual(probe.debug_diagnostics(root, case, job_empty=True), {"state": "unknown_missing"})
+            path.write_bytes(b"synthetic secret")
+            with mock.patch.object(probe, "MAX_DEBUG_BYTES", 4):
+                self.assertEqual(probe.debug_diagnostics(root, case, job_empty=True)["state"], "unknown_oversize")
+            original = probe.regular_file
+            def changed(target):
+                info = original(target)
+                if target == path:
+                    path.write_bytes(b"changed secret contents")
+                return info
+            with mock.patch.object(probe, "regular_file", side_effect=changed):
+                self.assertEqual(probe.debug_diagnostics(root, case, job_empty=True)["state"], "unknown_unreadable")
+            with mock.patch.object(Path, "is_symlink", return_value=True):
+                self.assertEqual(probe.debug_diagnostics(root, case, job_empty=True)["state"], "unknown_unreadable")
+
     def test_formal_tree_is_real_resource_combination_without_instrumentation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -412,6 +495,38 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
                 with self.assertRaises(FileExistsError):
                     probe.public_run(args)
             self.assertFalse(probe.bounded_json(args.output)["passed"])
+            self.assertFalse(probe.bounded_json(args.output)["diagnostic_debug"])
+
+    def test_diagnostic_failure_retains_private_debug_but_exports_only_projection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            private = root / "owned"
+            case = private / "interactive-0"
+            case.mkdir(parents=True)
+            debug = case / "claude.debug.log"
+            debug.write_bytes(b"synthetic secret debug")
+            args = argparse.Namespace(output=root / "report.json", executable=root / "claude.exe",
+                bash_executable=root / "bash.exe", jq_executable=root / "jq.exe",
+                claude_version="2.1.280", diagnostic_debug=True)
+            with mock.patch.object(probe, "require_native_host"), mock.patch.object(probe, "verify_binary", return_value={}), \
+                 mock.patch.object(probe, "select_dependencies", return_value=(args.bash_executable, args.jq_executable)), \
+                 mock.patch.object(probe.tempfile, "mkdtemp", return_value=str(private)), \
+                 mock.patch.object(probe, "identity", side_effect=ValueError("synthetic private failure")), \
+                 mock.patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(probe.public_run(args), 1)
+            report = probe.bounded_json(args.output)
+            self.assertFalse(report["passed"])
+            self.assertTrue(report["diagnostic_debug"])
+            self.assertFalse(report["private_directory_removed"])
+            self.assertTrue(report["debug_raw_retained_private"])
+            self.assertFalse(report["cleanup_ready"])
+            self.assertEqual(report["retained_private_directory_identity"]["inode"], private.stat().st_ino)
+            self.assertEqual(debug.read_bytes(), b"synthetic secret debug")
+            self.assertEqual(report["debug_diagnostics"]["case-0"]["state"], "unknown_format")
+            self.assertEqual(report["debug_diagnostics"]["case-1"]["state"], "unknown_missing")
+            self.assertNotIn("synthetic secret", args.output.read_text())
+            self.assertNotIn("synthetic private failure", args.output.read_text())
+            self.assertEqual({path.name for path in root.iterdir()}, {"owned", "report.json"})
 
     def test_interactive_driver_inherits_conpty_and_sends_only_exit_keys(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -427,6 +542,7 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             config = {"schema": 1, "private_root": str(root), "case_root": str(case_root), "project": str(project),
                       "plugin": str(plugin), "executable": str(root / "claude.exe"), "dependencies": {"PATH": "tools"},
                       "claude_version": "2.1.278",
+                      "diagnostic_debug": True,
                       "session_id": session_id, "raw_output": str(raw), "driver_report": str(root / "driver.json"),
                       "plugin_hashes": {}}
             config_path = root / "driver.config.json"
@@ -452,12 +568,17 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             self.assertEqual(console_open.call_args_list[1].args, ("CONOUT$", "wb"))
             self.assertEqual(set(launch.call_args.kwargs), {"env", "cwd", "stdin", "stdout", "stderr"})
             self.assertIs(launch.call_args.kwargs["stdout"], launch.call_args.kwargs["stderr"])
+            self.assertEqual(launch.call_args.args[0][-2:], ["--debug-file", str(case_root / "claude.debug.log")])
+            self.assertEqual(launch.call_args.kwargs["env"]["CLAUDE_CODE_DEBUG_LOG_LEVEL"], "verbose")
+            self.assertNotIn("CLAUDE_CODE_VERSION", launch.call_args.kwargs["env"])
             exit_key.assert_called_once_with(api)
             result = probe.bounded_json(root / "driver.json")
             self.assertTrue(result["passed"])
             self.assertTrue(result["native_session_start_received"])
             self.assertEqual(result["model_inputs_sent"], 0)
             self.assertFalse(result["scripts_instrumented"])
+            self.assertTrue(result["formal_resource_hashes_match_after_cleanup"])
+            self.assertEqual(result["debug_diagnostics"], {"state": "unknown_missing"})
 
     def test_worker_early_failure_still_writes_failed_receipt(self):
         with tempfile.TemporaryDirectory() as directory:

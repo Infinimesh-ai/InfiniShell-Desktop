@@ -177,7 +177,7 @@ jobs:
 
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
           scope = inputs.get("windows_atomic_debug_scope", "all")
-          known_scopes = {"all", "upstream_essence", "stdio", "nul_token", "g09_tokens", "g09_netcredentials", "g09_stdio_lifetime", "codex_hooks", "g09_image_contract", "g09_powershell_contract", "g09_clr_fixture", "g09_npm_powershell"}
+          known_scopes = {"all", "upstream_essence", "stdio", "nul_token", "g09_tokens", "g09_netcredentials", "g09_stdio_lifetime", "codex_hooks", "claude_notifications", "g09_image_contract", "g09_powershell_contract", "g09_clr_fixture", "g09_npm_powershell"}
           release_mode = isinstance(scope, str) and re.fullmatch(r"(?:release|reissue)-installer:[1-9][0-9]*", scope)
           if scope not in known_scopes and not release_mode:
               sys.exit("未知专项范围；仅允许既有白名单或 release/reissue-installer:<正整数runid>")
@@ -222,6 +222,12 @@ jobs:
               conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if conflicts or not all(inputs.get(name, False) for name in required):
                   sys.exit("固定 Codex hooks 复验只允许单独 Windows 范围：" + ", ".join(sorted(conflicts)))
+          if scope == "claude_notifications":
+              required = {"run_windows", "run_atomic_windows_debug"}
+              defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
+              conflicts = [name for name, value in inputs.items() if name not in required | {"windows_atomic_debug_scope"} and (value if isinstance(value, bool) else defaults.get(name) != value)]
+              if conflicts or inputs.get("run_linux") is not False or not all(inputs.get(name) is True for name in required):
+                  sys.exit("固定 Claude 通知诊断只允许单独 Windows，其他开关必须关闭或保持默认：" + ", ".join(sorted(conflicts)))
           if inputs.get("run_windows_npm_native_witness", False):
               required = {"run_windows", "windows_grok_installer_only", "run_windows_codex_npm_updates", "run_windows_npm_native_witness"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_debug_scope": "g09_npm_powershell" if inputs.get("windows_atomic_debug_scope") == "g09_npm_powershell" else "all", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
@@ -1908,6 +1914,69 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows_claude_notifications:
+    name: Windows fixed Claude 2.1.280 notification diagnostics
+    needs: validate_scope
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && !inputs.run_linux && !inputs.full_workspace_tests && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'claude_notifications' }}
+    runs-on: [self-hosted, windows, x64, infinishell-ci]
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Prepare job-local Python for fixed Claude notification diagnostics
+        id: native_python
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/prepare_windows_python.ps1
+
+      - name: Test fixed Claude Windows notification contracts
+        id: claude_contracts
+        if: ${{ success() && steps.native_python.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          python -B script/cli-agent-parity/claude_windows_notifications_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Claude Windows notification contract tests failed' }
+
+      - name: Prepare fixed native Claude without credentials
+        id: fixed_claude
+        if: ${{ success() && steps.native_python.outcome == 'success' && steps.claude_contracts.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.280 --download-dir "$env:RUNNER_TEMP\claude-notifications-inputs-${{ github.run_id }}-${{ github.run_attempt }}"
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed native Claude preparation failed' }
+          "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # 探针核对原生 Git Bash、jq 和仓库 ConPTY 资产；诊断不能替代两场景的正式 OSC。
+      - name: Diagnose fixed Claude Windows SessionStart notification without credentials
+        id: claude_windows_notifications
+        if: ${{ success() && steps.native_python.outcome == 'success' && steps.claude_contracts.outcome == 'success' && steps.fixed_claude.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          python -B script/cli-agent-parity/probe_claude_windows_notifications.py --diagnostic-debug --claude-version 2.1.280 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output (Join-Path $env:RUNNER_TEMP 'claude-notifications-${{ github.run_id }}-${{ github.run_attempt }}/claude-windows-notifications.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 原生 SessionStart 通知未通过，诊断不能替代正式 OSC' }
+
+      - name: Preserve fixed Claude Windows notification diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: claude-windows-notifications-diagnostic-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/claude-notifications-${{ github.run_id }}-${{ github.run_attempt }}/claude-windows-notifications.json
+            ${{ runner.temp }}/claude-notifications-${{ github.run_id }}-${{ github.run_attempt }}/claude-windows-notifications.case-0.pty.bin
+            ${{ runner.temp }}/claude-notifications-${{ github.run_id }}-${{ github.run_attempt }}/claude-windows-notifications.case-1.pty.bin
+          if-no-files-found: error
+          retention-days: 14
+
   windows_stdio_lifetime:
     name: Windows Rust stdio logon lifetime
     needs: validate_scope
@@ -1956,7 +2025,7 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_windows && !startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') && !startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:') &&
-       inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime' &&
+       inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'claude_notifications' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime' &&
        (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, windows, x64, infinishell-ci]
     timeout-minutes: ${{ inputs.full_workspace_tests && 240 || 180 }}

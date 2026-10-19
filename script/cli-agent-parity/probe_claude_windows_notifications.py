@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -29,6 +30,7 @@ SCHEMA = 1
 MARKER = b"isolated Claude Windows notification verification\n"
 OUTER_TIMEOUT = 420
 CASE_TIMEOUT = 45
+MAX_DEBUG_BYTES = 8 * 1024 * 1024
 CASE_NAMES = ("插件 空 格", "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()")
 SCRIPT_NAMES = (
     "probe_claude_windows_notifications.py", "prepare_claude_cli.py", "apply_notification_patch.py",
@@ -152,13 +154,125 @@ def seed_completed_onboarding(root, project):
     return value
 
 
-def native_command(executable, plugin, *, init_only=False):
+def native_command(executable, plugin, *, init_only=False, debug_file=None):
     arguments = [str(executable)]
     if init_only:
         arguments.append("--init-only")
     arguments.extend(("--setting-sources", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
                       "--plugin-dir", str(plugin)))
+    if debug_file is not None:
+        arguments.extend(("--debug-file", str(debug_file)))
     return arguments
+
+
+def debug_projection(raw, expected=None):
+    # 固定 2.1.280 的 Yc/dMt/PF/JPt 模板；只计日志形态，不保证该分支会记录。
+    # Yc 在输出为空时不记录完成行；零次不能证明阶段未发生，更不能代替 OSC。
+    result = {"state": "unknown", "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
+              "marker_semantics": "log_shape_occurrences_only", "forwarding": "unknown"}
+    try:
+        lines = raw.decode("utf-8").splitlines()
+    except UnicodeError:
+        return {**result, "state": "unknown_encoding"}
+    result["line_count"] = len(lines)
+    counts = dict.fromkeys(("registered", "session_start_matching", "startup_query_matched",
+                           "session_start_success", "session_start_error", "session_start_cancelled",
+                           "session_start_spawn_error", "hook_json_validated", "hook_plain_text",
+                           "terminal_sequence_json", "terminal_sequence_target_osc",
+                           "session_start_terminal_sequence_rejected"), 0)
+    totals = dict.fromkeys(("registered_hooks", "registered_plugins", "startup_matched_hooks"), 0)
+    records = []
+    for line in lines:
+        match = re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z \[(?:DEBUG|VERBOSE|INFO|WARN|ERROR)\] (.*)", line)
+        if match:
+            records.append([True, match[1]])
+        elif records and records[-1][0]:
+            records[-1][1] += "\n" + line
+        else:
+            records.append([False, line])
+    unknown = 0
+    for prefixed, record in records:
+        if not prefixed:
+            unknown += 1
+            continue
+        # 某些版本把整个消息编码为 JSON 字符串，仍只识别解码后的完整形态。
+        if record.startswith('"'):
+            try:
+                decoded = json.loads(record)
+                if isinstance(decoded, str):
+                    record = decoded
+            except (ValueError, RecursionError):
+                pass
+        registered = re.fullmatch(r"Registered ([0-9]{1,6}) hooks from ([0-9]{1,6}) plugins", record)
+        matched = re.fullmatch(r'Matched ([0-9]{1,6}) unique hooks for query "startup" \([0-9]{1,6} before deduplication\)', record)
+        if registered:
+            counts["registered"] += 1
+            totals["registered_hooks"] += int(registered[1])
+            totals["registered_plugins"] += int(registered[2])
+        elif record == "Getting matching hook commands for SessionStart with query: startup":
+            counts["session_start_matching"] += 1
+        elif matched:
+            counts["startup_query_matched"] += 1
+            totals["startup_matched_hooks"] += int(matched[1])
+        elif re.fullmatch(r"Hook command failed to spawn \(SessionStart:startup\): .+", record, re.DOTALL):
+            counts["session_start_spawn_error"] += 1
+        elif record == "SessionStart hooks cancelled (control stream closed)":
+            counts["session_start_cancelled"] += 1
+        elif record == "Successfully parsed and validated hook JSON output":
+            counts["hook_json_validated"] += 1
+        elif record == "Hook output does not start with {, treating as plain text":
+            counts["hook_plain_text"] += 1
+        elif record == ("Hook SessionStart:startup (SessionStart) returned a terminalSequence that was rejected by the allowlist "
+                        "(only OSC 0/1/2/9/99/777 and BEL are permitted, and OSC 9 bodies may not begin with a digit unless in the 9;4 progress form)"):
+            counts["session_start_terminal_sequence_rejected"] += 1
+        else:
+            match = re.fullmatch(r"Hook SessionStart:startup \(SessionStart\) (success|error):\n(.*)", record, re.DOTALL)
+            if not match:
+                unknown += 1
+                continue
+            counts["session_start_" + match[1]] += 1
+            if match[1] == "success":
+                try:
+                    output = json.loads(match[2])
+                    if isinstance(output, dict) and set(output) == {"terminalSequence"} and isinstance(output["terminalSequence"], str):
+                        counts["terminal_sequence_json"] += 1
+                        if expected is not None:
+                            try:
+                                transport_match(output["terminalSequence"].encode("utf-8"), expected)
+                                counts["terminal_sequence_target_osc"] += 1
+                            except (ValueError, UnicodeError):
+                                pass
+                except (ValueError, RecursionError):
+                    pass
+    result.update(state="markers_observed" if any(counts.values()) else "unknown_format",
+                  occurrences=counts, numeric_totals=totals, unknown_records=unknown,
+                  observations={key: "observed" if count else "unknown" for key, count in counts.items()})
+    return result
+
+
+def debug_diagnostics(root, case_root, *, job_empty, expected=None):
+    if not job_empty:
+        return {"state": "unknown_job_active"}
+    try:
+        owned_root(root)
+        path = private_path(root, str(case_root / "claude.debug.log"), exists=True)
+        before = regular_file(path)
+        if before.st_size > MAX_DEBUG_BYTES:
+            return {"state": "unknown_oversize", "bytes": before.st_size}
+        with path.open("rb") as source:
+            opened = os.fstat(source.fileno())
+            require((opened.st_dev, opened.st_ino) == (before.st_dev, before.st_ino), "调试文件身份改变")
+            raw = source.read(MAX_DEBUG_BYTES + 1)
+        after = regular_file(private_path(root, str(path), exists=True))
+        require((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+                == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                and len(raw) == before.st_size, "调试文件读取期间改变")
+        return debug_projection(raw, expected)
+    except FileNotFoundError:
+        return {"state": "unknown_missing"}
+    except Exception as error:
+        # 不归档原生错误文本、debug 行、账号、命令、路径或环境内容。
+        return {"state": "unknown_unreadable", "error": failure(error)}
 
 
 def prepare_plugin(repo, destination, staging_parent):
@@ -351,6 +465,7 @@ def load_configuration(path):
     value = bounded_json(path)
     require(type(value.get("schema")) is int and value["schema"] == SCHEMA
             and isinstance(value.get("private_root"), str)
+            and type(value.get("diagnostic_debug", False)) is bool
             and value.get("claude_version") in RELEASE_CATALOG, "私有配置格式不符")
     root = Path(value["private_root"])
     owned_root(root)
@@ -376,7 +491,12 @@ def run_driver(configuration):
         verify_binary(executable, "win32-x64", config["claude_version"])
         env = case_environment(root, config["dependencies"], executable)
         seed_completed_onboarding(root, project)
-        command = native_command(executable, plugin)
+        debug_file = None
+        if config.get("diagnostic_debug", False):
+            debug_file = private_path(Path(config["private_root"]), str(root / "claude.debug.log"))
+            require(not debug_file.exists(), "调试文件必须为本轮新文件")
+            env["CLAUDE_CODE_DEBUG_LOG_LEVEL"] = "verbose"
+        command = native_command(executable, plugin, debug_file=debug_file)
         api = WinApi()
         # CPython 作为 ConPTY driver 时其 CRT 标准句柄会被子进程识别为 pipe，
         # Claude 因此误入 --print 路径并在 UI 绘制前退出。显式传入当前 HPCON 的字符设备。
@@ -427,6 +547,18 @@ def run_driver(configuration):
             cleanup_process(process, job, report)
         except Exception as error:
             report["cleanup_failure"] = failure(error)
+        if report.get("job_empty") is True:
+            try:
+                verify_plugin(plugin, config["plugin_hashes"])
+                report["formal_resource_hashes_match_after_cleanup"] = True
+            except Exception as error:
+                report["formal_resource_hashes_match_after_cleanup"] = False
+                report["resource_check_failure"] = failure(error)
+                report["passed"] = False
+        if config.get("diagnostic_debug", False):
+            report["debug_diagnostics"] = debug_diagnostics(
+                Path(config["private_root"]), root, job_empty=report.get("job_empty") is True,
+                expected={"cwd": str(project)})
         report["credential_boundary"] = credential_boundary(root)
         report["passed"] = report["passed"] and report.get("job_empty") is True and not report["forced_cleanup"] and not report.get("cleanup_failure") and report["credential_boundary"]
         write_json(Path(config["driver_report"]), report, exclusive=True)
@@ -548,6 +680,14 @@ def run_worker(configuration):
                 case["passed"] = True
             except Exception as error:
                 case["failure"] = failure(error)
+            finally:
+                try:
+                    verify_plugin(plugin, hashes)
+                    case["formal_resource_hashes_match_after_attempt"] = True
+                except Exception as error:
+                    case["formal_resource_hashes_match_after_attempt"] = False
+                    case["resource_check_failure"] = failure(error)
+                    case["passed"] = False
             write_json(Path(config["worker_report"]), report)
         require(source_hashes(repo) == report["source_sha256"]
                 and verify_binary(executable, "win32-x64", config["claude_version"]) == report["binary"],
@@ -654,6 +794,7 @@ def public_run(args):
             and not output.resolve().is_relative_to(repo), "报告必须位于仓库之外")
     output.parent.mkdir(parents=True, exist_ok=True)
     report = {"schema": SCHEMA, "passed": False, "host_os": sys.platform, "outer_timeout_seconds": OUTER_TIMEOUT,
+              "diagnostic_debug": getattr(args, "diagnostic_debug", False),
               "credentials_provided": False, "credential_files_read": False, "model_inputs_sent": 0,
               "fixture_completed_onboarding": True, "default_first_run_verified": False,
               "production_windows_gate_changed": False, "forced_cleanup": False,
@@ -674,6 +815,7 @@ def public_run(args):
         report["source_commit"] = identity(repo, env)
         config = {"schema": SCHEMA, "repo": str(repo), "private_root": str(root), "executable": str(executable),
                   "claude_version": args.claude_version,
+                  "diagnostic_debug": getattr(args, "diagnostic_debug", False),
                   "bash": str(bash), "jq": str(jq), "worker_report": str(root / "worker.json")}
         config_path = root / "worker.config.json"
         write_json(config_path, config, exclusive=True)
@@ -713,8 +855,19 @@ def public_run(args):
                         except Exception as error:
                             report.setdefault("receipt_errors", {})[name] = failure(error)
                 archive_raw_pty(root, output, report)
-                shutil.rmtree(root)
-                report["private_directory_removed"] = True
+                if getattr(args, "diagnostic_debug", False):
+                    report["debug_diagnostics"] = {f"case-{index}": debug_diagnostics(
+                        root, root / f"interactive-{index}", job_empty=True,
+                        expected={"cwd": str(root / f"interactive-{index}" / "工作区 空格")}) for index in range(len(CASE_NAMES))}
+                if getattr(args, "diagnostic_debug", False) and not report["passed"]:
+                    # 诊断失败保留私有原件供同一受控入口补解析，不上传原文、不改变原失败。
+                    report.update(private_directory_removed=False, debug_raw_retained_private=True, cleanup_ready=False)
+                    info = root.lstat()
+                    report["retained_private_directory_identity"] = {"device": info.st_dev, "inode": info.st_ino,
+                        "owner": info.st_uid, "name": root.name}
+                else:
+                    shutil.rmtree(root)
+                    report["private_directory_removed"] = True
             except Exception as error:
                 report["private_directory_removed"] = False
                 report["cleanup_failure"] = failure(error)
@@ -728,6 +881,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
                         help=f"与准备器相同的精确官方版本；缺省为 {DEFAULT_VERSION}")
+    parser.add_argument("--diagnostic-debug", action="store_true",
+                        help="仅记录私有调试文件的安全摘要；失败时保留私有目录，不上传原始日志")
     for name in ("executable", "bash-executable", "jq-executable", "output", "worker-config", "driver-config"):
         parser.add_argument("--" + name, type=Path, help=argparse.SUPPRESS if name.endswith("config") else None)
     args = parser.parse_args()
