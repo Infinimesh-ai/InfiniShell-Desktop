@@ -1597,10 +1597,25 @@ jobs:
 
       - name: Run desktop workspace unit tests
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        id: test_workspace
         shell: bash
+        env:
+          INFINISHELL_WORKSPACE_TMP_RECEIPT: ${{ runner.temp }}/desktop-workspace-tmp-${{ github.run_id }}-${{ github.run_attempt }}.safe.json
         # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
         # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
-        run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+        run: >-
+          python3 -I -B script/cli-agent-parity/run_private_linux_tmp.py
+          --receipt "$INFINISHELL_WORKSPACE_TMP_RECEIPT" --
+          cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
+
+      - name: Preserve Linux workspace test temporary directory evidence
+        if: ${{ always() && (steps.test_workspace.outcome == 'success' || steps.test_workspace.outcome == 'failure' || steps.test_workspace.outcome == 'cancelled') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-workspace-tmp-linux-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/desktop-workspace-tmp-${{ github.run_id }}-${{ github.run_attempt }}.safe.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Report Linux source-only gate boundary
         if: ${{ always() && inputs.source_gate_only }}
