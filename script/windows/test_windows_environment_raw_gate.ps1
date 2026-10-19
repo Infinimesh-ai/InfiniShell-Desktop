@@ -39,5 +39,50 @@ foreach ($oldPointerSignature in @($false, $true)) {
             throw "原始字节夹具句柄签名不符：$method，旧指针负对照=$oldPointerSignature"
         }
     }
+    if (-not $oldPointerSignature -and -not $compiledType.GetMethod('QueryValue').GetParameters()[4].IsOut) {
+        throw '原生输出数组必须声明 Out，不能依赖 blittable pin 优化的偶然写回'
+    }
 }
-[pscustomobject]@{ status = 'passed'; cases = 2; assertions = 4 }
+
+# 执行真实读取函数的缓冲区与编码路径；假响应只验证 PowerShell 契约，不代替 Windows API。
+$readFunctions = @($ast.FindAll({
+    param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Get-RawPath'
+}, $true))
+if ($readFunctions.Count -ne 1) { throw '无法唯一定位实际原始字节读取函数' }
+$memoryClass = 'InfiniShellRawPathMemoryGate' + [Guid]::NewGuid().ToString('N')
+$memoryCode = @'
+using System;
+using System.Runtime.InteropServices;
+public static class RawPathMemoryGate {
+    public static byte[] Bytes;
+    public static int QueryValue(object key, string name, IntPtr reserved,
+        out uint type, [Out] byte[] data, ref uint size) {
+        type = 1;
+        if (data == null) { size = (uint)Bytes.Length; return 0; }
+        if (size < Bytes.Length || data.Length < Bytes.Length) { return 234; }
+        Buffer.BlockCopy(Bytes, 0, data, 0, Bytes.Length);
+        size = (uint)Bytes.Length;
+        return 0;
+    }
+}
+'@
+$memoryType = Add-Type -TypeDefinition ($memoryCode.Replace('RawPathMemoryGate', $memoryClass)) -PassThru
+. ([scriptblock]::Create($readFunctions[0].Extent.Text.Replace('[InfiniShellRawPathRegistry]', "[$memoryClass]")))
+$key = [pscustomobject]@{ Handle = $null }
+$key | Add-Member -MemberType ScriptMethod -Name Dispose -Value { }
+$registry = [pscustomobject]@{ TestKey = $key }
+$registry | Add-Member -MemberType ScriptMethod -Name OpenSubKey -Value { param($name) $this.TestKey }
+$keyPath = 'offline-fixture'
+foreach ($fixture in @(
+    @{ bytes = [byte[]]@() },
+    @{ bytes = [Text.Encoding]::Unicode.GetBytes('C:\raw') },
+    @{ bytes = [byte[]]@(67, 0, 58) }
+)) {
+    $memoryType.GetField('Bytes').SetValue($null, $fixture.bytes)
+    $actual = Get-RawPath 'readback'
+    if ($actual.kind -ne 1 -or $actual.bytes -cne [Convert]::ToBase64String($fixture.bytes)) {
+        throw '真实原始字节读取函数丢失假响应的字节或类型'
+    }
+}
+[pscustomobject]@{ status = 'passed'; cases = 5; assertions = 8 }

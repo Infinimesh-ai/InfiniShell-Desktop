@@ -209,7 +209,7 @@ def validate_tests(args):
     full = read(root / 'test-output/full/result.json')
     fixed = {'status': 'passed', 'error': None, 'native_matrix_skipped': False, 'native_matrix_cases': 200,
              'native_edge_cases': 38, 'assertions': 1615, 'native_actions': 1438, 'native_step_assertions': 2572,
-             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 4,
+             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 8,
              'real_user_path_unchanged': True, 'cleanup_passed': True}
     for key, value in fixed.items():
         require(full.get(key) == value, '完整 PATH 回归字段不符：' + key)

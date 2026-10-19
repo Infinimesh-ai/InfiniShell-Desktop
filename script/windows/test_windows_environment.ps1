@@ -143,12 +143,12 @@ public static class InfiniShellRawPathRegistry {
         uint type, byte[] data, uint size);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "RegQueryValueExW")]
     public static extern int QueryValue(SafeRegistryHandle key, string name, IntPtr reserved,
-        out uint type, byte[] data, ref uint size);
+        out uint type, [Out] byte[] data, ref uint size);
 }
 '@
 # 在任何测试键写入前核对真实句柄签名；不依赖 PowerShell 将安全句柄隐式转换为裸指针。
 $rawGate = & (Join-Path $sourceDirectory 'test_windows_environment_raw_gate.ps1') -SourcePath (Join-Path $sourceDirectory 'test_windows_environment.ps1')
-if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 4) { throw '原始字节夹具句柄门禁失败' }
+if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 8) { throw '原始字节夹具互操作门禁失败' }
 function Set-RawPath {
     param([string] $Name, [byte[]] $Bytes, [uint32] $Kind)
     $key = $registry.CreateSubKey("$keyPath\$Name")
@@ -167,7 +167,7 @@ function Get-RawPath {
         $code = [InfiniShellRawPathRegistry]::QueryValue($key.Handle, 'Path', [IntPtr]::Zero, [ref]$kind, $null, [ref]$size)
         if ($code -ne 0) { throw "原始字节长度读取失败：$Name，Win32=$code" }
         # 零字节值也传非空缓冲区，避免第二次调用被解释为仅查询长度。
-        $bytes = New-Object byte[] ([Math]::Max(1, $size))
+        [byte[]]$bytes = New-Object byte[] ([int][Math]::Max([uint32]1, $size))
         $code = [InfiniShellRawPathRegistry]::QueryValue($key.Handle, 'Path', [IntPtr]::Zero, [ref]$kind, $bytes, [ref]$size)
         if ($code -ne 0) { throw "原始字节读取失败：$Name，Win32=$code" }
         [pscustomobject]@{ kind = $kind; bytes = [Convert]::ToBase64String($bytes, 0, $size) }
@@ -483,11 +483,17 @@ function Invoke-RawPathBoundaries {
                 Set-RawPath $name $fixture.bytes $kind
                 $before = Get-RawPath $name
                 $expectedBytes = [Convert]::ToBase64String($fixture.bytes)
-                if ($before.kind -ne $kind -or $before.bytes -cne $expectedBytes) { throw "原生字节夹具不符：$name" }
+                if ($before.kind -ne $kind -or $before.bytes -cne $expectedBytes) {
+                    $result.raw_registry_mismatch = [pscustomobject]@{ name = $name; stage = 'fixture'; expected_kind = $kind; expected_bytes = $expectedBytes; actual = $before }
+                    throw "原生字节夹具不符：$name"
+                }
                 $ownersBefore = ConvertTo-Json -InputObject (Read-Ownership $name) -Depth 12 -Compress
                 Invoke-NativeAction $name 'new' $action 0 $false
                 $after = Get-RawPath $name
-                if ($after.kind -ne $kind -or $after.bytes -cne $expectedBytes) { throw "拒绝后 PATH 原始字节或类型被修改：$name" }
+                if ($after.kind -ne $kind -or $after.bytes -cne $expectedBytes) {
+                    $result.raw_registry_mismatch = [pscustomobject]@{ name = $name; stage = 'rejected-action'; expected_kind = $kind; expected_bytes = $expectedBytes; actual = $after }
+                    throw "拒绝后 PATH 原始字节或类型被修改：$name"
+                }
                 $ownersAfter = ConvertTo-Json -InputObject (Read-Ownership $name) -Depth 12 -Compress
                 if ($ownersAfter -cne $ownersBefore) { throw "拒绝后归属记录被修改：$name" }
                 $result.raw_registry_assertions += 3
@@ -507,7 +513,10 @@ function Invoke-RawPathBoundaries {
         Invoke-NativeAction $name 'new' 'add' 0
         Invoke-NativeAction $name 'new' 'remove' 0
         $after = Get-RawPath $name
-        if ($after.kind -ne $kind -or $after.bytes -cne [Convert]::ToBase64String($bytes)) { throw "有效 UTF-16 原始字节未恢复：$name" }
+        if ($after.kind -ne $kind -or $after.bytes -cne [Convert]::ToBase64String($bytes)) {
+            $result.raw_registry_mismatch = [pscustomobject]@{ name = $name; stage = 'roundtrip'; expected_kind = $kind; expected_bytes = [Convert]::ToBase64String($bytes); actual = $after }
+            throw "有效 UTF-16 原始字节未恢复：$name"
+        }
         if (Read-Ownership $name) { throw "有效 UTF-16 往返后存在归属残留：$name" }
         $result.raw_registry_assertions += 3
         $result.raw_registry_cases += [pscustomobject]@{ name = $name; kind = $kind; action = 'roundtrip'; expected_success = $true; before = $before; after = $after; ownership_removed = $true }
@@ -520,7 +529,7 @@ $result = [ordered]@{
     schema_version = 1; test_id = $testId; status = 'incomplete'; registry_root = "HKCU\$keyPath"
     compiler = $CompilerPath; helper_sha256 = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'environment.iss') -Algorithm SHA256).Hash.ToLowerInvariant()
     started_at = [DateTime]::UtcNow.ToString('o'); compiler_exit_code = $null; harness_exit_code = $null
-    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
+    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; raw_registry_mismatch = $null; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
 }
 try {
     $existing = $registry.OpenSubKey($keyPath)
