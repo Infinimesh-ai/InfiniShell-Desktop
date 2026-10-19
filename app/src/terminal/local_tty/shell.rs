@@ -15,6 +15,7 @@ use crate::terminal::ShellLaunchData;
 use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::bootstrap::{generate_session_id, init_shell_script_for_shell};
 use crate::terminal::local_tty::docker_sandbox::DockerSandboxShellStarter;
+use crate::terminal::model::session::command_executor::shell_escape_single_quotes;
 use crate::terminal::shell::{ShellName, ShellType};
 use crate::util::path::resolve_executable;
 #[cfg(windows)]
@@ -648,15 +649,23 @@ fn arguments_for_session_spawning_command(
              * in order to show nothing to the user when we input characters. We later
              * restore the echo'ing in the bootstrap script.
              *
+             * 7. argv[0] 为 bash 时，Bash 按继承的 PATH 推导 $BASH。
+             * Dock 启动的 PATH 可能指向另一个 Bash，rcfile 必须固定实际启动路径。
+             *
              * TODO(zheng) Add error handling
              */
+            let escaped_shell_path =
+                shell_escape_single_quotes(resolved_shell_path, ShellType::Bash);
+            let set_bash_var = shell_escape_single_quotes(
+                &format!("BASH='{escaped_shell_path}'"),
+                ShellType::Bash,
+            );
             vec![
                 "-c".to_owned().into(),
                 // Keep this command up-to-date with the one in the bootstrap script
                 // Notice the first level of escaping is the double-brackets in the macro string {{}}
                 format!(
-                    r#"exec -a bash '{}' --rcfile <(echo '{}')"#,
-                    resolved_shell_path,
+                    r#"exec -a bash '{escaped_shell_path}' --rcfile <(echo '{set_bash_var};{}')"#,
                     init_shell_script_for_shell(ShellType::Bash, &crate::ASSETS, session_id)
                 )
                 .into(),
