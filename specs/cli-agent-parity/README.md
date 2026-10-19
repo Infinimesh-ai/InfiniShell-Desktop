@@ -4,9 +4,11 @@
 
 ## 当前主线状态（2026-10-19）
 
+**发布准备状态：未公开候选已按用户授权退役，本地和 origin 仅保留 main，当前无活动候选或 Draft；未公开新版本。** 清理清单、恢复入口及后续正式发布范围见[候选退役与正式发布准备](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-preparation-20261019.zh-CN.md)。以下原 R9／Draft 资产替换和验收结论保留为历史，不代表该 Draft 仍在线。
+
 **本轮受测源码 `8b46bcc3…` 已快进合入并推送 main，PR #26 已合并；第八 Windows CI 成功，readonly、PATH／reissue、通知及 Rust／i18n 定向门禁通过。七次失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过并清理；中文失败 AX 公告已在同包前台手动检查中补验通过，正式新包未构建、未公开发布。** 精确身份、计数及边界见[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)，不在本页复制逐次进度。
 
-- 原 Windows R9 和 Ubuntu DEB 用户演练已经收尾；R9 `c18725c5…` 已替换 Draft Setup，回下载大小／SHA 一致，其余 11 件资产未变。R9 原应用仍 `5068dae9c…`，不含本轮上游／updater，`NotSigned` 和 Draft 边界保留。
+- 原 Windows R9 和 Ubuntu DEB 用户演练已经收尾；R9 `c18725c5…` 曾替换 Draft Setup，回下载大小／SHA 一致，其余 11 件资产未变。R9 原应用仍 `5068dae9c…`，不含本轮上游／updater，`NotSigned` 和原包验收边界保留，原 Draft 已退役。
 - 更新器共用链路及英中失败提示已实现；本地 61／61 nextest、显式 i18n 12／12、warp／warp_tui check 通过。Linux 定向 1942 次 Rust 执行和第八 Windows 1902 次执行通过，均非全库；Windows app 内 i18n 11 通过。本轮 Mac 更新状态双语布局已在 2560×1600 实测；最终三端新包与实际 SSH 未验。
 - 旧 CLI V01／V02／V05 仍延期，G09 关闭，原 SSH／输入分类／中文搜索非阻塞项不变。TUI 冒烟未发模型请求，不等于真实 SSH 或 GUI 验证。
 

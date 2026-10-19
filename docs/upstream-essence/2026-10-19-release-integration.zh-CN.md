@@ -1,5 +1,7 @@
 # 2026-10-19 发布修复整合续记
 
+后续状态：用户已授权退役未发布候选，详见[候选退役与正式发布准备](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-preparation-20261019.zh-CN.md)。本页源码、验收与 Draft 回执保留原阶段事实；当前没有活动 Draft，后续正式发布另行安排。
+
 **本轮源码已在 main 吸收并推送，受测源码为 `8b46bcc3…`；第八轮 Windows CI 成功，readonly、PATH／reissue、通知链及四组 Rust 定向门禁通过。七次历史失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过，相关进程已清理；中文失败 AX 公告已在同包前台手动检查中补验通过，实际 SSH 与正式新包未验，未公开发布，保持 Draft。** [第八轮 39256631029](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029) actual head 为 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`；精确计数和限制见[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)。源码吸收和自动门禁通过不等于新包验收通过。
 
 本记录承接[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)及[本轮上游巡检和吸收报告](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19.md)。已审 upstream 断点仍为 `ae60375ef1d3895908756878fe4a07cbe703ce1a`，没有扩大上游扫描范围。旧包验收只属于原字节，不转记为本轮新源码或新包通过。收拢前的五份未提交文档已完整保存在[进度快照及 SHA-256 清单](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/document-progress-snapshots/20261019T121920.731222Z/manifest.json)；原始失败证据及已提交历史不改写。

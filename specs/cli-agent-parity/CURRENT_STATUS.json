@@ -1483,17 +1483,97 @@
     },
     "user_evidence_review_performed_in_this_revision": true,
     "current_work_scope": {
-      "status": "source_main_integrated_ci_and_scoped_macos_gui_passed_future_package_pending",
-      "user_direction": "用户要求仅补齐中文失败无障碍公告；仍保持Draft，不公开发布，不重跑已完成的旧包验收。",
+      "status": "unpublished_candidates_retired_merged_branches_removed",
+      "user_direction": "删除未正式发布tag和产物，清理无用分支，为后续正式发布准备；本轮不公开发布。",
       "publication_requested": false,
-      "upstream_merge_owned_by_other_chat": false,
       "source_changes_in_this_revision": false,
-      "integration_source_changes": true,
-      "authority_ref": "main_acceptance.release_integration_20261019",
-      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json",
-      "implementation_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
-      "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43",
-      "current_main_at_zh_a11y_followup": "1f5041fed0645c328425715a8a01d8387020d6cb"
+      "authority_ref": "main_acceptance.release_retirement_20261019",
+      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/result.json",
+      "base_main": "ea8f136605a8a90a13b7ec8dd24431abc1d39b1f",
+      "implementation_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
+    },
+    "release_retirement_20261019": {
+      "as_of": "2026-10-19T15:07:44.531508+00:00",
+      "status": "unpublished_candidates_retired_merged_branches_removed",
+      "user_direction": "删除未正式发布tag和产物，清理无用分支，为后续正式发布准备；本轮不公开发布。",
+      "base_main": "ea8f136605a8a90a13b7ec8dd24431abc1d39b1f",
+      "active_candidate": null,
+      "draft_release_count": 0,
+      "deleted": {
+        "draft_release_ids": [
+          412823983,
+          412209685
+        ],
+        "release_asset_count": 24,
+        "release_asset_bytes": 6748962505,
+        "candidate_tags": [
+          "v0.2026.10.13.15.44.oss_00",
+          "v0.2026.10.13.16.19.oss_00",
+          "v0.2026.10.13.22.25.oss_00",
+          "v0.2026.10.14.01.46.oss_00",
+          "v0.2026.10.14.13.00.oss_00",
+          "v0.2026.10.14.16.45.oss_00"
+        ],
+        "actions_artifact_count": 42,
+        "actions_artifact_bytes": 8033583882,
+        "remote_branches": [
+          "codex/fix-byop-cli-routing-20261013",
+          "codex/fix-linux-deb-cleanup-20261014",
+          "codex/fix-windows-uri-20261014",
+          "codex/macos-gui-smoke-fixes",
+          "codex/release-musl-fix",
+          "codex/upstream-essence-2026-10-19",
+          "codex/windows-uninstall-entry"
+        ],
+        "local_branches": [
+          "codex/cli-input-default-20261014",
+          "codex/fix-byop-cli-routing-20261013",
+          "codex/fix-linux-deb-cleanup-20261014",
+          "codex/fix-windows-uri-20261014",
+          "codex/macos-gui-smoke-fixes",
+          "codex/release-candidate-20261013",
+          "codex/release-candidate-20261013b",
+          "codex/release-candidate-20261014",
+          "codex/release-musl-fix",
+          "codex/upstream-essence-2026-10-19"
+        ]
+      },
+      "retained": {
+        "published_release_count": 10,
+        "published_releases_and_asset_id_name_size_digest_unchanged": true,
+        "public_latest": "v0.2026.10.07.01.09.oss_00",
+        "unrelated_actions_artifacts": 146,
+        "local_worktrees": 11,
+        "newly_detached_worktrees": 9,
+        "local_worktree_directories_and_ignored_data_unchanged": true,
+        "local_release_and_acceptance_archives_unchanged": true,
+        "upstream_review_zap_and_other_tags_unchanged": true,
+        "original_workflow_run_histories_retained": true
+      },
+      "product_source_changed": false,
+      "localization": "无需本地化变更",
+      "documentation_validation": {
+        "command": "cargo check --locked -p warp",
+        "exit_code": 0,
+        "source_sha": "ea8f136605a8a90a13b7ec8dd24431abc1d39b1f",
+        "source_unchanged": true,
+        "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-e0f7ff5b.json",
+        "audit": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/documentation-validation.json"
+      },
+      "result_receipt": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/result.json",
+      "result_sha256": "6613c72251aa34eb18c95e724aa4757544a05018c21126a9679a013bbca1e90e",
+      "recovery_readme": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/README.zh-CN.md",
+      "source_record": "/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-preparation-20261019.zh-CN.md",
+      "documentation_closeout": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/closeout.json",
+      "historical_candidate_field_role": "current_release_candidate及release_candidate_history是原字节/原阶段记录，不代表远端候选仍在线。",
+      "next_formal_release": {
+        "new_version": null,
+        "source_to_freeze": "届时main",
+        "published": false,
+        "awaiting_user_arrangement": true,
+        "impact_verification_ref": "main_acceptance.release_integration_20261019.next_formal_candidate_impact_verification",
+        "old_package_acceptance_rerun": false
+      }
     },
     "release_integration_20261019": {
       "as_of": "2026-10-19T14:12:40.814640+00:00",
@@ -9951,7 +10031,7 @@
     "pr_draft_required": true
   },
   "schema": 1,
-  "status": "main_merged_with_deferred_platform_acceptance",
+  "status": "main_integrated_unpublished_candidates_retired_future_release_pending",
   "g09_pathext_fix_candidate_20261007": {
     "base_head": "d7610c5b8bd3af67322e2f8301e273c7a727888e",
     "status": "minimal_pathext_fix_local_gates_passed_original_runner_pending",
@@ -10940,7 +11020,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "受测源码8b46已在main，本次中文失败AX补验起点1f5041fed；第八Windows及既有定向门禁通过，七失败保留。本轮冻结Mac运行包英中旧版拒绝、失败/重试及英文恢复限定通过；中文失败AX在同包前台手动检查中补验通过，进程清理、设置字节还原。正式新三端包和实际SSH未验，Draft未公开，无用户待操作。",
+  "status_zh": "未公开候选已退役：2 Draft/24资产、6候选tag、42构建artifact、7远端与10本地已合并分支已删除；本地/origin仅main，无活动候选。受测源码8b46和限定GUI/AX结论保留，10个公开Release及146其他CI artifact未变。未构建或公开新正式版本，旧包验收不重跑，正式新包按影响补验。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -13151,7 +13231,7 @@
       }
     }
   },
-  "authority": "当前结论读取根级状态、current_goal_scope、required_goal_merge_gate及main_acceptance.release_integration_20261019，并与README当前入口核对。current_release_candidate和其余原验收对象保留原字节/日期范围；historical_*及旧对象内部的当前声明不覆盖本轮整合入口。",
+  "authority": "当前候选存续与清理状态读取main_acceptance.release_retirement_20261019；源码与验证范围读取release_integration_20261019，并核对README当前入口。current_release_candidate及历史对象仅保留原字节/阶段，不代表远端候选仍存在；旧Draft声明由退役记录覆盖当前含义。",
   "assessed_branch": "main",
   "assessment_baseline": "5068dae9c75b79628865a0872684113647c204d8",
   "fixed_versions": {
@@ -13385,26 +13465,24 @@
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
-    "authority_ref": "main_acceptance.release_integration_20261019",
-    "base_source_commit": "1f5041fed0645c328425715a8a01d8387020d6cb",
-    "source_commit": "1f5041fed0645c328425715a8a01d8387020d6cb",
-    "scope": "本次只补齐同一冻结Mac运行包中文失败AX、恢复及清理证据；无产品源码变化。前台手动检查失败AX值通过，不扩大VoiceOver语音、正式三端新包或实际SSH。",
+    "authority_ref": "main_acceptance.release_retirement_20261019",
+    "base_source_commit": "ea8f136605a8a90a13b7ec8dd24431abc1d39b1f",
+    "source_commit": "ea8f136605a8a90a13b7ec8dd24431abc1d39b1f",
+    "source_commit_scope": "本次清理与文档起点；最终文档提交由release-retirement/2026-10-19/closeout.json绑定",
+    "scope": "仅退役未公开候选和已合并分支、续记正式发布准备；本地工作树/缓存/验收原件保留。",
     "product_changed": false,
-    "localization": "无需本地化变更；既有英中更新文案在2560×1600真实界面检查无截断或重叠，英文失败AX已捕获，中文失败AX在同包前台手动检查中补验通过。",
+    "localization": "无需本地化变更",
     "formal_publication": "awaiting_user_arrangement",
-    "integrated_product_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
-    "source_commit_scope": "本次仅补验与文档续记的起点；实际最终提交由zh-failure-a11y/closeout.json绑定",
-    "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json"
+    "evidence": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/result.json"
   },
   "latest_resume": {
-    "authority_ref": "main_acceptance.release_integration_20261019",
-    "source_commit": "5068dae9c75b79628865a0872684113647c204d8",
-    "source_commit_scope": "仅为Draft R9所封装原应用；当前主线受测源码8b46另由integration_source_commit绑定，不改写R9身份",
-    "status": "源码及定向门禁已在主线；冻结Mac运行包限定更新GUI已通过并清理，正式新包待安排，保持Draft",
-    "next_step": "前轮GUI续记由gui-resume-closeout.json绑定，本次中文失败AX补验由zh-failure-a11y/closeout.json绑定；未来正式候选按影响补验三端UI、最终Setup和实际SSH，不公开发布。",
+    "authority_ref": "main_acceptance.release_retirement_20261019",
+    "source_commit": "ea8f136605a8a90a13b7ec8dd24431abc1d39b1f",
+    "source_commit_scope": "本次清理起点main，产品源码未变",
+    "status": "候选已退役，无活动Draft；本地/origin仅main，已发布版本保留",
+    "next_step": "届时从main冻结新版本及包字节，按影响补验并完成资产/签名/公证核验；正式发布另行安排",
     "integration_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
-    "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43",
-    "gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"
+    "evidence": "/Volumes/SanDisk/InfiniShell-Archives/release-retirement/2026-10-19/result.json"
   },
   "g01_g07_guard_followup": {
     "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",
@@ -15520,7 +15598,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "5068dae9c75b79628865a0872684113647c204d8",
-  "latest_increment": "macos_updater_scoped_gui_resumed_passed_and_cleaned_20261019",
+  "latest_increment": "release_retirement_20261019",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
