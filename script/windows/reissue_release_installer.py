@@ -35,7 +35,7 @@ INPUTS = [
 TESTS = ['script/windows/' + name for name in (
     'environment-tests.iss', 'environment-action-tests.iss', 'environment-legacy-r4.iss',
     'test_windows_environment.ps1', 'test_windows_environment_reissue.ps1',
-    'test_windows_environment_reissue_gate.ps1',
+    'test_windows_environment_reissue_gate.ps1', 'test_windows_environment_raw_gate.ps1',
     'reissue_release_installer.ps1', 'reissue_release_installer.py', 'reissue_release_installer_tests.py',
     'verify_release_installer.ps1')]
 
@@ -209,7 +209,7 @@ def validate_tests(args):
     full = read(root / 'test-output/full/result.json')
     fixed = {'status': 'passed', 'error': None, 'native_matrix_skipped': False, 'native_matrix_cases': 200,
              'native_edge_cases': 38, 'assertions': 1615, 'native_actions': 1438, 'native_step_assertions': 2572,
-             'raw_registry_assertions': 90,
+             'raw_registry_assertions': 90, 'raw_source_gate_assertions': 4,
              'real_user_path_unchanged': True, 'cleanup_passed': True}
     for key, value in fixed.items():
         require(full.get(key) == value, '完整 PATH 回归字段不符：' + key)

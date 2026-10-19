@@ -28,7 +28,7 @@ if (Test-Path -LiteralPath $OutputDirectory) {
 # 每轮保留实际编译的源码，失败后也能独立复查。
 $sourceDirectory = Join-Path $OutputDirectory 'source'
 New-Item -ItemType Directory -Path $sourceDirectory | Out-Null
-foreach ($sourceName in @('environment.iss', 'environment-tests.iss', 'test_windows_environment.ps1', 'environment-legacy-r4.iss', 'environment-action-tests.iss')) {
+foreach ($sourceName in @('environment.iss', 'environment-tests.iss', 'test_windows_environment.ps1', 'test_windows_environment_raw_gate.ps1', 'environment-legacy-r4.iss', 'environment-action-tests.iss')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $sourceName) -Destination (Join-Path $sourceDirectory $sourceName)
 }
 
@@ -136,15 +136,19 @@ function Get-Actual {
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 public static class InfiniShellRawPathRegistry {
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "RegSetValueExW")]
-    public static extern int SetValue(IntPtr key, string name, uint reserved,
+    public static extern int SetValue(SafeRegistryHandle key, string name, uint reserved,
         uint type, byte[] data, uint size);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "RegQueryValueExW")]
-    public static extern int QueryValue(IntPtr key, string name, IntPtr reserved,
+    public static extern int QueryValue(SafeRegistryHandle key, string name, IntPtr reserved,
         out uint type, byte[] data, ref uint size);
 }
 '@
+# 在任何测试键写入前核对真实句柄签名；不依赖 PowerShell 将安全句柄隐式转换为裸指针。
+$rawGate = & (Join-Path $sourceDirectory 'test_windows_environment_raw_gate.ps1') -SourcePath (Join-Path $sourceDirectory 'test_windows_environment.ps1')
+if ($rawGate.status -cne 'passed' -or $rawGate.assertions -ne 4) { throw '原始字节夹具句柄门禁失败' }
 function Set-RawPath {
     param([string] $Name, [byte[]] $Bytes, [uint32] $Kind)
     $key = $registry.CreateSubKey("$keyPath\$Name")
@@ -516,7 +520,7 @@ $result = [ordered]@{
     schema_version = 1; test_id = $testId; status = 'incomplete'; registry_root = "HKCU\$keyPath"
     compiler = $CompilerPath; helper_sha256 = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'environment.iss') -Algorithm SHA256).Hash.ToLowerInvariant()
     started_at = [DateTime]::UtcNow.ToString('o'); compiler_exit_code = $null; harness_exit_code = $null
-    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
+    native_matrix_skipped = [bool]$SkipNativeMatrix; assertions = 0; native_actions = 0; native_step_assertions = 0; native_matrix_cases = 0; native_edge_cases = 0; raw_registry_cases = @(); raw_registry_assertions = 0; raw_source_gate_assertions = $rawGate.assertions; known_limits = @(); verified_cases = @(); real_user_path_unchanged = $null; cleanup_passed = $false; error = $null
 }
 try {
     $existing = $registry.OpenSubKey($keyPath)
