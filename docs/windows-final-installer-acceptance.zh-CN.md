@@ -1,5 +1,15 @@
 # Windows 最终安装器验收
 
+## 当前复核结论（2026-10-19）
+
+用户已确认本轮只做流程演练与多端验收，后续另行正式发版；本次按演练范围收尾，以下未解决问题转为正式发版前待办。
+
+**R9 重发安装器六阶段及 PATH 精确恢复通过；原候选 URI 问题已关闭。当前 Draft 仍含旧 Setup，其 PATH 原文恢复缺陷尚未由正式发行资产消除。** PR #26 仍为草稿、未合并；不能用 R9 通过结论替代原 Draft 安装器验收。完整结果、阻塞关闭条件及可延期项见[最终验收梳理](release-acceptance-review-20261019.zh-CN.md)。本轮用户操作和助手审核已完成；不再要求用户重跑同包完整生命周期。产品修复及后续新包的受影响检查另行绑定。保持 Draft，不公开发版。
+
+## 2026-10-15 交付时快照（历史保留）
+
+以下待验字段仅描述当时交付状态，当前结论以上述复核为准。
+
 当前结论：**统一 `16.45` 正式构建成功，新 Windows 安装器原生静态审核通过，便携验收 ZIP 和 Draft 回下载对照通过，可交付；用户六阶段复验仍待完成。** 产品源码为 `5068dae9c75b79628865a0872684113647c204d8`，主线整合及只读核验控制器为 `203d08e5053413d5d6a14971208de4e125eb2f1c`；独立 GUI 改动 `b4e59a8cda491ba1e6430175b924b07101dbea54` 不属于本候选。
 
 Windows 实现字节与已验证的 `5acb349c7032c0fc07ba4fbbfaba93d87fa6407b` 一致，见[Git 对照](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/github/windows-source-equivalence.json)。[Windows 门禁 38512735757](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38512735757)的 80 项 Inno 断言、6 项隔离注册表回归、616 项应用测试（含该 6 项）、492 项 crate、528 项 Zap、11 项 completer 保留原 5ac 范围，不称为 5068 新运行。5068 的[Linux 原生门禁 38534655990](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38534655990)和本机 cargo check／i18n 12/12 已通过；源码通过不代替最终安装器。
