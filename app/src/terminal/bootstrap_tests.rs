@@ -1,4 +1,6 @@
 use std::io::Read as _;
+#[cfg(windows)]
+use std::path::PathBuf;
 
 use command::blocking::Command;
 use flate2::read::GzDecoder;
@@ -312,6 +314,16 @@ fn windows_remote_bootstrap_with_full_hook_fits_cmd_exe_limit() {
 
 #[test]
 fn powershell_windows_bootstrap_compresses_real_init_and_preserves_full_hook() {
+    // Windows 必须执行系统原生入口，缺少入口直接失败，不能退回探测后的跳过分支。
+    #[cfg(windows)]
+    let powershell =
+        PathBuf::from(std::env::var_os("SystemRoot").expect("Windows 测试需要 SystemRoot"))
+            .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    #[cfg(windows)]
+    let powershell = powershell
+        .to_str()
+        .expect("Windows PowerShell 路径应为 UTF-8");
+    #[cfg(not(windows))]
     let Some(powershell) = powershell_executable() else {
         eprintln!("当前环境没有 PowerShell,跳过真实 Windows bootstrap payload 测试");
         return;
@@ -348,8 +360,13 @@ try {
 } finally { $memory.Dispose() }
 $null = [ScriptBlock]::Create($decoded)
 $null = [ScriptBlock]::Create($roundTrip)
-# 仅加载自带模块并执行 init，不读取共享 profile，不启动 SSH 或交互 shell。
-Import-Module (Join-Path $PSHOME 'Modules/PSReadLine/PSReadLine.psd1') -ErrorAction Stop
+# 与私有启动夹具使用相同的系统模块来源，不读取用户模块或共享 profile。
+$moduleRoots = @((Join-Path $PSHOME 'Modules'))
+if ($PSEdition -eq 'Desktop') {
+    $moduleRoots += Join-Path $env:ProgramFiles 'WindowsPowerShell/Modules'
+}
+$env:PSModulePath = $moduleRoots -join [IO.Path]::PathSeparator
+Import-Module PSReadLine -ErrorAction Stop
 $m = 'caller-memory'; $g = 'caller-gzip'; $r = 'caller-reader'
 $originalOutput = [Console]::Out
 $capturedOutput = [IO.StringWriter]::new()
