@@ -1,12 +1,12 @@
 # 2026-10-19 发布修复整合续记
 
-**本轮源码已在 main 吸收并推送，受测源码为 `8b46bcc3…`；第八轮 Windows CI 成功，readonly、PATH／reissue、通知链及四组 Rust 定向门禁通过。七次历史失败保留。Mac GUI 仍等待钥匙串响应，实际 SSH 与正式新包未验，未公开发布，保持 Draft。** [第八轮 39256631029](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029) actual head 为 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`；精确计数和限制见[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)。源码吸收和自动门禁通过不等于新包验收通过。
+**本轮源码已在 main 吸收并推送，受测源码为 `8b46bcc3…`；第八轮 Windows CI 成功，readonly、PATH／reissue、通知链及四组 Rust 定向门禁通过。七次历史失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过，相关进程已清理；中文失败 AX 公告未捕获，实际 SSH 与正式新包未验，未公开发布，保持 Draft。** [第八轮 39256631029](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029) actual head 为 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`；精确计数和限制见[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)。源码吸收和自动门禁通过不等于新包验收通过。
 
 本记录承接[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)及[本轮上游巡检和吸收报告](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19.md)。已审 upstream 断点仍为 `ae60375ef1d3895908756878fe4a07cbe703ce1a`，没有扩大上游扫描范围。旧包验收只属于原字节，不转记为本轮新源码或新包通过。收拢前的五份未提交文档已完整保存在[进度快照及 SHA-256 清单](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/document-progress-snapshots/20261019T121920.731222Z/manifest.json)；原始失败证据及已提交历史不改写。
 
 ## 源码与包身份
 
-实施分支为 `codex/upstream-essence-2026-10-19`。[源码合入回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/main-source-integration.json)确认：`2026-10-19T13:39:46.512850Z` 根仓库 main 从 `1e8142d6…` 快进并推送到 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`，当时 local／origin／remote 一致且根工作树干净。相对已审 upstream `ae60375e…` 的双向提交数为 main 侧 1535／upstream 侧 532，共祖 `b076027deb2e8d1b98e1073f9cd0f20fbf75a8ae`。[PR #26 回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/pr26-main-integration.json)为 `MERGED`，mergedAt 为 `2026-10-19T13:39:46Z`，mergeCommit `fd4c75fb…`；`isDraft=true` 只是保留元数据。文档提交与最终远端收尾回执另行绑定，不改写源码合入原件。
+实施分支为 `codex/upstream-essence-2026-10-19`。[源码合入回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/main-source-integration.json)确认：`2026-10-19T13:39:46.512850Z` 根仓库 main 从 `1e8142d6…` 快进并推送到 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`，当时 local／origin／remote 一致且根工作树干净。相对已审 upstream `ae60375e…` 的双向提交数为 main 侧 1535／upstream 侧 532，共祖 `b076027deb2e8d1b98e1073f9cd0f20fbf75a8ae`。[PR #26 回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/pr26-main-integration.json)为 `MERGED`，mergedAt 为 `2026-10-19T13:39:46Z`，mergeCommit `fd4c75fb…`；`isDraft=true` 只是保留元数据。原[文档收尾回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/final-closeout.json)已绑定 main／实施分支 `d18f9b354a53e64718fb3878d23feb51b617bc43` 与受测产品源码 `8b46bcc3…`；该回执中的 GUI 待验状态是当时快照，后续状态见本页 GUI 续验。本次仅续记文档，不改写原件。
 
 | 对象 | 固定身份及范围 |
 |---|---|
@@ -38,7 +38,7 @@ Draft `412823983` 已仅将旧 Setup asset `640654138` 换为受验 R9 asset `65
 
 检查错误进入 `CheckFailed`，不宣称最新、不发出可用更新事件、不将错误响应写入 `downloaded_update`，关于页及无障碍反馈提供失败和重试语义。GitHub 响应元数据缓存仍会在获取响应时写入；本轮未修改所有下载／安装失败的完整状态链。历史 Ubuntu 复现只证明旧版被误标新版，用户未点击更新，不记为实际降级。
 
-英文和简体中文同步四个无变量消息键：`settings-about-update-check-failed`、`autoupdate-a11y-available`、`autoupdate-a11y-install-help`、`autoupdate-a11y-no-updates`。失败文案为 “Could not check for updates. Please try again.”／“检查更新失败，请重试。”；i18n 门禁已过，双语真实 GUI 截断、换行、控件尺寸仍待验。PATH helper、诊断及门禁没有新增用户界面文案，无需本地化变更。
+英文和简体中文同步四个无变量消息键：`settings-about-update-check-failed`、`autoupdate-a11y-available`、`autoupdate-a11y-install-help`、`autoupdate-a11y-no-updates`。失败文案为 “Could not check for updates. Please try again.”／“检查更新失败，请重试。”；i18n 门禁已过；本轮 2560×1600 真实界面已核对英中无更新、检查中、失败及重试入口，无截断或重叠。英文失败 AX 已捕获，中文失败 AX 公告未捕获，后者不标通过；不扩大为 VoiceOver 语音或所有窗口尺寸。PATH helper、诊断及门禁没有新增用户界面文案，无需本地化变更。
 
 ## 已通过门禁与清理状态
 
@@ -54,7 +54,7 @@ Draft `412823983` 已仅将旧 Setup asset `640654138` 换为受验 R9 asset `65
 | Windows 检查／通知链 | cargo check 通过；登记 80 断言且清理通过；通知 Python 128 中 123 过／5 Unix-only skip；Codex 0.147.0／0.156.1 各 5 hooks 信任验证通过 | 同一[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)；原生配置未变，未发模型请求；四组 Rust 与 app／i18n 已在第八运行通过；没有真实桌面或新产品安装器验收 |
 | Windows Rust／readonly／i18n | 第八四组 574／528／11／789 全过，合计 1902 次执行；skip 9／7／116／8602。应用组 warp 779＋TUI 10，内含 i18n 11；readonly 回归通过 | [审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)及[readonly PASS 日志](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/windows/crate-tests.log:498)；1902 非唯一测试数或全库。后两组 skip 含筛选与既有 ignore，2 项真实 SSH E2E 仍 ignore。compiler 准备 14 过／1 链接权限 skip，重发控制器 6／6 |
 | TUI 真 PTY 冒烟 | `r-375a0354`：120×36 PTY 启动／资源、`?` 展开收回、显式 shell 固定 marker `printf`、空输入 Ctrl-D；TUI／tmux exit 0，run cleaned | [binding](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/tui-smoke/binding.json)／[result](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/tui-smoke/result.json)；实际 EXE SHA `03cae552c2dfdf3f4ac7aacd2e04850ec312c6876a5809c3da93d3b8d6d99ea7`。未发模型请求，非真实 SSH／GUI 验证；3 个 profile 目录保留 |
-| Mac 构建与冻结 | `r-426c5f7f` release-lto 构建 exit 0；`r-f1cd2cff` 包冻结 exit 0／cleaned | [收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-426c5f7f.json)／[收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-f1cd2cff.json)；只证明运行包构建与身份，不证明 GUI 通过 |
+| Mac 构建与冻结 | `r-426c5f7f` release-lto 构建 exit 0；`r-f1cd2cff` 包冻结 exit 0／cleaned | [收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-426c5f7f.json)／[收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-f1cd2cff.json)；本行只证明构建与身份；后续 GUI 限定结果见下文独立续验 |
 
 当前修复的三份本地收据及日志摘要已核对：[`r-a60f92db`](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-a60f92db.json) 的 gate 11 case／14 assert 通过；[`r-612224fc`](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-612224fc.json) 的实际 PowerShell AST 和 2 项 Unicode 目标 fixture 注册通过（未执行 Windows API）；[`r-c779bc6c`](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-c779bc6c.json) 的控制器 3 过／3 Windows-only skip。三轮均 `cleaned`，独立源码 review 通过；本轮无用户文案变化，无需本地化变更。
 
@@ -65,7 +65,8 @@ Draft `412823983` 已仅将旧 Setup asset `640654138` 换为受验 R9 asset `65
 | `r-426c5f7f` | 原收据 `cleanup=false`，受追踪子进程 55365 尚未退出 | 子进程退出后核对身份、所有已记录进程、launchd 和 lsof，[复查为 cleaned](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r-426c5f7f-cleanup-recheck.json)；原件不改 |
 | `r-384c44cd` | 原收据 `cleanup=false`，Device Hub launchd 身份未确认 | 原 labels 已消失，进程／lsof 为空且 owner／device／inode／祖先复核后，[复查为 cleaned](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r-384c44cd-cleanup-recheck.json)；原件不改 |
 | `r-b2fe8bf4` | 第二次 TUI 启动 exit 101，Little Snitch updater launchd 身份未确认，原 `cleanup=false` | [复查为 cleaned](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r-b2fe8bf4-cleanup-recheck.json)；失败 pane 仍证明 feature 包选择问题，不改成产品故障或启动成功 |
-| `r-7e0c826e` | GUI 启动仍活跃，等待钥匙串处理 | 不清理，不记 GUI 通过 |
+| `r-7e0c826e` | 原启动曾等待钥匙串；原 `source_unchanged=false` 保留 | 用户处理后完成英中旧版拒绝，exit 0／cleaned；冻结 EXE 未变，[最终续验](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json)按字节身份计证 |
+| `r-3a089b95` | 故障客户端重启曾再次等待钥匙串 | 用户处理后完成英中失败／重试及英文恢复，exit 0／cleaned；两次 503 夹具与恢复隧道三轮均 exit 0／cleaned，端口已关闭 |
 
 TUI 前两次 exit 101 的原始收据保留；第三次额外选择 `-p warp` 后完成上述限定验证。重复 i18n／重叠运行不加总为新增独立覆盖。
 
@@ -92,7 +93,7 @@ TUI 前两次 exit 101 的原始收据保留；第三次额外选择 `-p warp` �
 
 四处完整字符串内联比较在 PR #26 原来源 `2e3406e7…` 的 [327](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/2e3406e7bce33fab7fc292622c68239db77e0e88/script/windows/environment.iss#L327)、[484](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/2e3406e7bce33fab7fc292622c68239db77e0e88/script/windows/environment.iss#L484)、[524](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/2e3406e7bce33fab7fc292622c68239db77e0e88/script/windows/environment.iss#L524)、[705](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/2e3406e7bce33fab7fc292622c68239db77e0e88/script/windows/environment.iss#L705) 行已经存在，R9 reissue 也固定使用 6.7.1。**这是扩大非 BMP 覆盖后发现的既有边界，不是本轮原始 UTF-16 读取修订引入。** R9 六阶段通过仍只属于已测场景，不能宣称旧 R9 已覆盖非 BMP。当前四处显式 `String` 局部和非 BMP 目标路径回归已在 `046f429aaa371893e26146a55c8f8b047dcb2113` 推送，helper SHA 见身份表；第七轮实际 PATH 与 reissue 回归已通过，但整轮在后续 Rust readonly 恢复测试失败，不扩大为新包或全部门禁通过。
 
-[源码等价收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/046f429aa-source-equivalence.json)证明 `84fbb124…` 到 `046f429a…` 仅 9 份 Windows／测试／工作流文件变化，`app`、`crates`、`resources`、Cargo 清单与锁文件未变。因此只按既有范围复用 Linux 产品测试、Mac 更新器本地 Rust／i18n、已冻结 Mac 运行字节和 TUI 限定 PTY 输入；Windows helper 已在第七轮按上述范围独立原生验证。此等价收据仅截至 `046f429a…`，readonly 修复的条件编译等价与原生结果另见后文；源码等价不授予 GUI 或任何新包通过，Mac GUI 仍未验。
+[源码等价收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/046f429aa-source-equivalence.json)证明 `84fbb124…` 到 `046f429a…` 仅 9 份 Windows／测试／工作流文件变化，`app`、`crates`、`resources`、Cargo 清单与锁文件未变。因此只按既有范围复用 Linux 产品测试、Mac 更新器本地 Rust／i18n、已冻结 Mac 运行字节和 TUI 限定 PTY 输入；Windows helper 已在第七轮按上述范围独立原生验证。此等价收据仅截至 `046f429a…`，readonly 修复的条件编译等价与原生结果另见后文；源码等价本身不授予 GUI 或任何新包通过；冻结 Mac 运行包的限定 GUI 结果另由下文实际续验计证。
 
 第七轮的 Rust 失败与前六轮 PATH 失败不同。[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39252231214/evidence-review.json)定位 `restore_local_file` 在 `NamedTempFile.persist_noclobber` 前设置 readonly，而锁定的 tempfile 3.23.0 Windows 实现在移动前将属性设为 `FILE_ATTRIBUTE_NORMAL`，导致目标 readonly 丢失。Windows 专用修复已在 `8b46bcc3…` 进入 main，独立 review 和第八原生 readonly 回归通过；迁移／同步、v2 补全、app／i18n 均在第八补跑成功。第七的 9 项 skip 为 2 项显式忽略的真实 SSH、4 项既有补全、3 项 Windows 路径分隔补全，原失败及未跑快照仍保留；现态见[第八审核](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)。
 
@@ -100,13 +101,29 @@ TUI 前两次 exit 101 的原始收据保留；第三次额外选择 `-p warp` �
 
 [8b46 输入等价收据](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/8b46bcc33-source-equivalence.json)记录：两份 Rust 文件 blob 已变化，但 Unix 条件编译后的临时文件创建、写入、权限与 `persist_noclobber` 行为经两次独立 diff 复核等价；不能写成文件字节完全一致。Linux 原产品测试和 Mac 更新器既有门禁按原范围复用，冻结 Mac 运行包与 TUI 冒烟继续绑定各自原字节，没有重建为 `8b46…` 包。check 收据的 `source_unchanged=false` 仅因两份 specs 导航变化，相关 Rust 前后摘要一致，见[本地输入绑定](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/readonly-fix-local-binding.json)。
 
+## Mac 更新 GUI 续验（本轮运行包）
+
+[最终续验回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json)记录于 `2026-10-19T14:12:40.814640+00:00`，SHA-256 `6a75e6c7bab2583c827165c96215c41718b893eb88453e2d412add37da758eac`。本轮使用上表同一冻结 EXE 与 Apple Development 运行 ZIP，未重建成正式候选；续验开始时 `main` 为 `d18f9b354…`，产品受测源码仍为 `8b46bcc3…`。此前钥匙串等待与[第一阶段回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-phase-1.json)均为历史快照；用户已完成两次处理，当前无需用户待操作。
+
+| 本轮实际范围 | 结果及边界 |
+|---|---|
+| 英中旧版拒绝 | 手动检查后显示 `InfiniShell is up to date.`／`已是最新版本。`；AX 分别为 `No updates available.`／`暂无可用更新。`。公开 Latest 10.07 来自独立 GitHub API 观察；应用为 10.14 |
+| 英中失败与重试 | 英文 `Could not check for updates. Please try again.`、中文 `检查更新失败，请重试。` 均保留检查更新入口；点击后分别捕获 Checking／正在检查更新，本机单次端点收到 `CONNECT api.github.com:443` 后延迟 5 秒返回 503，界面回到失败并可再次重试 |
+| 无障碍及恢复 | 英文失败 AX 与英文恢复后的 `No updates available.` 已捕获；中文失败 AX 快照没有公告值，不标该项通过。英文恢复使用同进程重试，经只允许 `api.github.com:443` 的本机 TLS 密文直通隧道恢复真实请求，未解密 TLS 或保留请求头／正文 |
+| 双语布局 | 2560×1600 原始截图中，本次状态、检查中、失败和重试入口无截断或重叠；切换语言后重建设置页，不外推全应用免重启切换、VoiceOver 语音或所有尺寸 |
+| 退出与恢复 | 两个 GUI 及三轮夹具均正常 exit 0／cleaned，夹具端口关闭；GUI 恢复 System 后设置与原始 3543 字节完全相同，SHA-256 `6842e3695fcf85b847358c0d800a59b83650446a0834d0529771cb13d4a6dc52`，原不存在的代理字段仍不存在；自动化未修改系统网络或钥匙串设置，用户手动响应后的整个钥匙串状态未审计 |
+
+[独立复核](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-independent-review.json)通过并保留两项限缩：钥匙串结论仅指自动化未修改设置；夹具现存脚本已审，但原 run 只绑定路径与日志，未锁定运行时脚本 SHA，不倒记为当时锁定。23 件截图／AX 原件的摘要与长度均已复核；截图接口实际返回 JPEG，保留原始 `.png` 文件名和字节。`RUST_LOG=warn` 未保留应用解析版本的日志；手动 No updates AX 与冻结源码支持本次检查未进入新下载分支，不冒称网络抓包或整个历史进程／缓存没有下载。同版、新版、显式回滚和非法版本仍按源码单元测试计证，不修改正式 Release 元数据制造场景。`r-7e0c826e` 的原 `source_unchanged=false` 不改写，冻结 EXE 摘要前后一致；后续 `r-3a089b95` 及三夹具摘要按各自收据保留。
+
+[GUI 后远端回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/remote-after-gui.json)确认 PR #26 仍为 `MERGED`，Draft 仍 `true`／`published_at=null`，12 件资产的 ID／名称／大小／digest 与原收尾一致，tag 对象及 peeled 源码未变。原 `final-closeout.json` 保留不覆写；本次限定 GUI 通过不授予新三端正式包或实际 SSH 验收通过。
+
 ## 待验与发布边界
 
-- 源码已主线吸收，定向自动门禁已闭合；文档提交和最终远端／Draft／tag 回执另行绑定。七次失败现场与原件保留，不把第八定向结果扩大为全库、实际 SSH 或正式包通过。
-- GUI `r-7e0c826e` 在 `SecKeychainFindGenericPassword` 等待钥匙串处理，SecurityAgent 操作受工具安全限制；已请求用户手动处理，尚无回应。继续后用上述真实运行包在“设置 → 关于 → 检查更新”核对 10.14 对公开 10.07 拒绝降级、失败／重试及英中布局和无障碍。必要失败态只按既有私有备份／增量恢复约定使用应用内代理，不改系统网络或正式 Release 元数据；同版／新版／显式回滚已有单元覆盖。
+- 源码与前轮文档已主线吸收，定向自动门禁已闭合；本次 GUI 续记的实际文档提交与远端状态由独立[续验收尾回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/gui-resume-closeout.json)绑定，不覆盖原收尾。七次失败现场与原件保留，不把第八定向结果扩大为全库、实际 SSH 或正式包通过。
+- 本轮 Mac 更新器限定 GUI 已完成，设置字节恢复、两次 GUI 与三个夹具清理均已核实，无钥匙串待操作。中文失败 AX 公告未捕获，不标该项通过；正式三端候选仍按下表补验，不能以本轮运行 ZIP 或源码单元测试替代最终包。
 - 原 Mac 签名 DMG、Windows R9、Ubuntu 24.04 GNOME Wayland DEB 六阶段及原资产验收按[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)保留；任何新正式候选仍须绑定源码、包字节、签名和受影响的多端补验。当前运行 ZIP、TUI 冒烟或 R9 资产替换都不能关闭新包验收。
 - 旧 CLI `V01`／`V02`／`V05` 继续延期，`G09` 已关闭，Linux 自动检查保留。SSH 窄侧栏空态裁切、一次中文命令被识别为 Agent（Ctrl-I 可恢复）、Mac 中文“连字”搜索继续作为原非阻塞跟进。物理 IME 只按用户确认及提交／输出截图计证，不扩大为完整组合过程矩阵通过。
-- 受测源码 `8b46bcc3…`、main 整合和第八 CI 已有回执；实际 GUI、新 Setup 与正式候选的独立验收仍待续记。正式发布需要用户另行安排；保持 Draft，不预填发布或候选通过。
+- 受测源码 `8b46bcc3…`、main 整合和第八 CI 已有回执；本轮限定 GUI 已另行续记，新 Setup 与正式三端候选的独立验收仍待后续安排。正式发布需要用户另行安排；保持 Draft，不预填发布或候选通过。
 
 ## 下次正式候选按影响补验
 

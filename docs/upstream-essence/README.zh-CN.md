@@ -2,7 +2,7 @@
 
 本目录记录 InfiniShell 对 `warpdotdev/warp` 的周期巡检结果、引入决策和本地落地提交。目标不是追平上游，而是持续筛选适合本项目定位的终端、TUI、Agent/多代理、稳定性、性能、安全与跨平台改动。
 
-最新记录：[2026-10-19 巡检与吸收](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19.md)与[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)。本轮已审 43 个新增上游提交，**受测源码 `8b46bcc3…` 已在 main 吸收并推送，第八 Windows CI 成功（1902 次 Rust 定向执行，非全库）；本地及 Linux 定向门禁、TUI 限定 PTY 结果按原范围保留。GUI 仍待钥匙串响应，正式新包未构建、未公开发布。** 七次失败、源码／包身份及下次候选影响补验集中在整合续记。受验 R9 已替换 Draft Setup 并回下载一致，其原应用仍 `5068…`，不含本轮修复。下次从已审 upstream `ae60375ef1d3895908756878fe4a07cbe703ce1a` 之后继续，核对 main 祖先及本轮已吸收记录，避免重复推荐。
+最新记录：[2026-10-19 巡检与吸收](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19.md)与[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)。本轮已审 43 个新增上游提交，**受测源码 `8b46bcc3…` 已在 main 吸收并推送，第八 Windows CI 成功（1902 次 Rust 定向执行，非全库）；本地及 Linux 定向门禁、TUI 限定 PTY 结果按原范围保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过并清理；中文失败 AX 公告未捕获，正式新包未构建、未公开发布。** 七次失败、源码／包身份及下次候选影响补验集中在整合续记。受验 R9 已替换 Draft Setup 并回下载一致，其原应用仍 `5068…`，不含本轮修复。下次从已审 upstream `ae60375ef1d3895908756878fe4a07cbe703ce1a` 之后继续，核对 main 祖先及本轮已吸收记录，避免重复推荐。
 
 [2026-10-12](./2026-10-12.md) 的续行快照修复和 TUI 补全预热测试隔离已在主线，本地提交分别为 `1c827ebac`、`4690945ea`；[Linux/Windows 专项预检](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/38198269728) 均通过，不重复推荐。全库格式与 lint 的既有问题及验证边界见该期报告。
 

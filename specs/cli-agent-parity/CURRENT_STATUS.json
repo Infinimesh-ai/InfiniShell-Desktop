@@ -472,13 +472,14 @@
       },
       {
         "item": "近期GUI候选包冒烟",
-        "status": "historical_signed_candidate_passed_new_runtime_startup_keychain_blocked",
-        "when": "历史正式签名DMG结论保留；本轮Apple Development运行ZIP已冻结，启动等待用户钥匙串处理，尚无新GUI验收。",
+        "status": "historical_candidate_preserved_scoped_macos_updater_runtime_passed_final_candidate_pending",
+        "when": "本轮冻结Apple Development运行ZIP已完成英中旧版拒绝、失败/重试和英文恢复，2560×1600布局通过并清理；中文失败AX公告未捕获，不替代正式三端候选。",
         "pass_condition": "绑定新候选源码和最终签名二进制；必要冒烟及重启恢复，保留模型路由/strict schema、浮窗、Retina输入选择、英中错误及Plan提示判据",
         "linux_desktop_matrix_required": false,
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json",
         "historical_completed": "旧01.46结果仅按旧包保留；本轮使用16.45真实包独立执行，不继承旧结论",
-        "current_integration_ref": "main_acceptance.release_integration_20261019"
+        "current_integration_ref": "main_acceptance.release_integration_20261019",
+        "current_runtime_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"
       },
       {
         "item": "Ubuntu DEB安装生命周期",
@@ -493,12 +494,13 @@
       {
         "item": "更新版本方向与失败处理",
         "id": "RELEASE-UPDATE-ORDER-01",
-        "status": "source_main_local_and_cross_platform_gates_passed_runtime_gui_pending",
+        "status": "source_main_gates_and_scoped_macos_runtime_gui_passed",
         "pass_condition": "实际发行格式和有无v的版本比较、相同/旧/新版本及明确回滚策略回归；解析失败不按新版处理；必要本地化门禁及最终包定向GUI复验",
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/update-version-reproduction.json",
         "completed": "实际发行格式、前缀归一化、版本方向和失败保守处理已实现并推送84fbb124…；英中文案同步，61/61 nextest、显式i18n 12/12与warp/warp_tui check通过。",
-        "remaining": "源码已main，第八Windows readonly/app/i18n已通过；MacGUI仍待钥匙串，正式新包及实际SSH未验。下次候选按影响补验，不要求现在重复旧包六阶段。",
-        "current_integration_ref": "main_acceptance.release_integration_20261019"
+        "remaining": "中文失败AX公告未捕获；未来正式三端新包、最终Setup和实际SSH按影响补验。本轮GUI和夹具已清理，设置字节已还原，无用户待操作。",
+        "current_integration_ref": "main_acceptance.release_integration_20261019",
+        "current_gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"
       }
     ],
     "ongoing_boundaries": {
@@ -1479,19 +1481,20 @@
     },
     "user_evidence_review_performed_in_this_revision": true,
     "current_work_scope": {
-      "status": "source_main_integrated_ci_passed_gui_and_future_package_pending",
+      "status": "source_main_integrated_ci_and_scoped_macos_gui_passed_future_package_pending",
       "user_direction": "原多端演练已收尾；用户授权继续源码整合、定向验证及受验R9替换Draft Setup，正式发布另行安排。",
       "publication_requested": false,
       "upstream_merge_owned_by_other_chat": false,
-      "source_changes_in_this_revision": true,
+      "source_changes_in_this_revision": false,
       "integration_source_changes": true,
       "authority_ref": "main_acceptance.release_integration_20261019",
-      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json",
-      "implementation_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
+      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+      "implementation_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+      "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43"
     },
     "release_integration_20261019": {
-      "as_of": "2026-10-19",
-      "status": "source_main_integrated_eighth_ci_passed_gui_keychain_blocked_future_package_pending",
+      "as_of": "2026-10-19T14:12:40.814640+00:00",
+      "status": "source_main_ci_and_scoped_macos_updater_gui_passed_cleaned_future_package_pending",
       "source_record": "/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md",
       "history_boundary": "current_release_candidate、macos_gui_smoke、documentation_validation及历史对象保留原日期、原字节和原验收范围；本对象只续记当前整合，不将旧结果转记为新源码或新包通过。",
       "draft_asset_replacement": {
@@ -1531,7 +1534,7 @@
       },
       "updater": {
         "id": "RELEASE-UPDATE-ORDER-01",
-        "status": "source_main_local_and_ci_gates_passed_runtime_gui_pending",
+        "status": "source_main_gates_and_scoped_macos_gui_passed",
         "implemented": [
           "统一处理版本v前缀并支持实际oss发行格式",
           "同版和旧版不自动更新；显式rollback只放行可成功比较的旧版",
@@ -1555,21 +1558,21 @@
         "cargo_test_i18n_explicit_command": "passed_12_of_12",
         "final_cargo_check": "passed",
         "current_integration_ci": "linux_reused_with_cfg_equivalence_eighth_windows_success",
-        "new_runtime_package_gui": "startup_waiting_for_manual_keychain_action_not_validated",
+        "new_runtime_package_gui": "scoped_macos_old_release_failure_retry_and_english_recovery_passed_zh_failure_ax_not_captured",
         "final_source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
-        "acceptance_boundary": "61项nextest、显式12项i18n、warp/warp_tui check及第八Windows定向组通过；Windows app内i18n11，源码已main。新运行包英中GUI未验，不构成新包/正式发布通过。",
+        "acceptance_boundary": "61项nextest、显式12项i18n、warp/warp_tui check及第八Windows定向组通过。冻结Mac运行包英中旧版拒绝、失败/重试和英文恢复已实测；2560×1600布局通过，中文失败AX公告未捕获；不构成最终三端新包、实际SSH或正式发布通过。",
         "warp_tui_cargo_check": "passed"
       },
       "runtime_package_followup": {
         "planned_profile": "release-lto",
-        "status": "built_signed_runtime_zip_gui_startup_keychain_blocked",
+        "status": "built_signed_runtime_zip_scoped_updater_gui_passed_and_cleaned",
         "formal_release_candidate": false,
-        "scope": "本轮独立release-lto运行包仅用10.14复验公开latest10.07旧版误提示，并核对英中失败提示；包身份已冻结，实际GUI待用户处理钥匙串，不是正式候选。",
+        "scope": "本轮独立release-lto运行包使用10.14复验公开latest10.07旧版误提示，英中失败/重试和英文恢复已在真实GUI完成；包身份不变，不是正式候选，中文失败AX公告未捕获。",
         "run_id": "r-426c5f7f",
         "source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
         "test_version": "v0.2026.10.14.16.45.oss_00",
         "source_equivalence": "包内产品源码84fbb124…，冻结时checkout661f3359…；后续8e55…仅Windows测试/控制器，不改变Rust/资源。",
-        "build_stage": "release-lto构建exit0，运行ZIP已冻结；应用启动等待钥匙串授权处理",
+        "build_stage": "release-lto构建exit0、运行ZIP冻结；两次GUI续验正常退出并清理",
         "gui_started": true,
         "binding": {
           "created_at": "2026-10-19T11:44:44.216945+00:00",
@@ -1601,7 +1604,7 @@
         },
         "binding_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/binding.json",
         "artifact_hashes_independently_verified": true,
-        "gui_acceptance_started": false,
+        "gui_acceptance_started": true,
         "build_run": {
           "run_id": "r-426c5f7f",
           "exit_code": 0,
@@ -1620,14 +1623,30 @@
         },
         "gui_launch": {
           "run_id": "r-7e0c826e",
-          "status": "active_startup_blocked",
+          "status": "cleaned",
           "record": "/Users/zhishi/InfiniShell-Tests/records/r-7e0c826e.json",
-          "blocker": "SecKeychainFindGenericPassword等待钥匙串处理；CUA对SecurityAgent操作受安全限制。",
-          "requested_user_action": "已向用户异步请求手动拒绝钥匙串提示或解锁，尚未收到回应。",
-          "acceptance_result": "not_run",
-          "boundary": "不绕过钥匙串安全对话框；运行包构建和启动进程不构成GUI通过。"
+          "exit_code": 0,
+          "source_unchanged": false,
+          "executable_unchanged": true,
+          "acceptance_result": "scoped_en_zh_old_release_check_passed",
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+          "historical_blocker": "曾等待SecKeychainFindGenericPassword；用户手动处理后恢复，旧阶段原件保留。",
+          "boundary": "source_unchanged=false保留原记录，运行产品身份依冻结EXE摘要和源码等价收据；不外推正式候选。"
         },
-        "current_source_equivalence": "84->046文件输入一致及8b46 Unix条件编译行为等价由各收据分段绑定；第八Windows原生已过。冻结Mac包/TUI保留原字节身份，未重建为8b46候选，GUI未验。"
+        "current_source_equivalence": "84->046文件输入一致及8b46 Unix条件编译行为等价由各收据分段绑定；冻结Mac包/TUI保留原字节身份，未重建为8b46正式候选。本轮GUI独立按resumption-final计证。",
+        "scoped_gui_acceptance": "passed_with_recorded_limits",
+        "formal_gui_acceptance_complete": false,
+        "failure_retry_gui_launch": {
+          "run_id": "r-3a089b95",
+          "status": "cleaned",
+          "exit_code": 0,
+          "source_unchanged": true,
+          "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+          "acceptance_result": "scoped_en_zh_failure_retry_and_english_recovery_passed",
+          "zh_failure_ax": "not_captured_not_passed",
+          "settings_exact_original_bytes_restored": true,
+          "user_action_pending": false
+        }
       },
       "formal_publication": {
         "status": "awaiting_user_arrangement",
@@ -1644,9 +1663,9 @@
         "nonblocking_followups": "沿用原验收复核记录，不因本次资产替换或源码测试扩大关闭范围"
       },
       "pending_record": [
-        "文档提交后独立final-closeout记录文档HEAD、受测源码8b46、远端与Draft/tag，不回写历史回执",
-        "GUI等待钥匙串；新运行包英中About/失败重试/无障碍仍待真实界面验证",
-        "下次正式候选绑定三端桌面、最终Setup、六daemon内嵌资源，按影响补验Agent文件操作/有序输入/更新器及实际SSH删除移动撤销",
+        "本次GUI续记的实际文档HEAD与远端状态由独立gui-resume-closeout.json绑定；原final-closeout.json为d18历史回执，不覆写",
+        "中文失败AX公告未捕获，不标通过；本轮Mac限定GUI、退出与设置恢复完成，无用户待操作",
+        "未来正式候选绑定三端桌面、最终Setup、六daemon内嵌资源，按影响补验Agent文件操作/有序输入/更新器及实际SSH删除移动撤销",
         "正式构建/12资产回验/签名公证及公开发布等用户安排；不要求现在重复旧包六阶段",
         "七失败、旧candidate/history、延期V01/V02/V05及关闭G09保留；1902是定向执行次数，非全库或唯一测试数"
       ],
@@ -3289,10 +3308,142 @@
         "boundary": "完整已派发定向job成功；非全工作区/唯一测试数，不计GUI、真实SSH或新产品安装器验收。"
       },
       "documentation_closeout": {
-        "status": "document_commit_and_final_receipt_pending",
+        "status": "prior_closeout_preserved_gui_resume_document_identity_in_external_receipt",
         "tested_code_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
         "main_source_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/main-source-integration.json",
-        "boundary": "文档提交后根线程另写final-closeout.json绑定doc HEAD/受测源码/远端/Draft/tag；不预填文档SHA或改写源码回执。"
+        "boundary": "原13:49收尾已绑定d18文档HEAD/受测源码8b46/远端/Draft/tag；其中GUI待验为当时快照。此次续验另记，不覆盖原件，新文档提交SHA留待独立收尾绑定。",
+        "document_head": "d18f9b354a53e64718fb3878d23feb51b617bc43",
+        "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/final-closeout.json",
+        "receipt_sha256": "e31f964d1907caaead3bfd8110be43d31febcb05926f6342adcef65f7c393074",
+        "gui_resume_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/gui-resume-closeout.json"
+      },
+      "macos_update_gui_resume": {
+        "recorded_at": "2026-10-19T14:12:40.814640+00:00",
+        "status": "scoped_macos_updater_gui_passed_and_cleaned",
+        "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+        "receipt_sha256": "6a75e6c7bab2583c827165c96215c41718b893eb88453e2d412add37da758eac",
+        "current_main_at_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43",
+        "product_source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
+        "integrated_product_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+        "executable_sha256": "5d3416466701497f26ff340c032e5fdeb2ca02e7df56e21884f7f9c1cb034649",
+        "formal_release_candidate": false,
+        "observations": {
+          "old_release_en_zh": "手动检查后分别显示 InfiniShell is up to date. / 已是最新版本。；AX No updates available. / 暂无可用更新。",
+          "failure_en": "Could not check for updates. Please try again.；存在 Check for updates 重试入口",
+          "failure_zh": "检查更新失败，请重试。；存在 检查更新 重试入口",
+          "retry_en_zh": "分别点击重试，截图捕获 Checking for updates... / 正在检查更新...；本机单次端点收到 CONNECT api.github.com:443，5 秒后返回 503，GUI 回到失败并保留重试入口",
+          "failure_ax_en": "Could not check for updates. Please try again.",
+          "failure_ax_zh": "本次中文失败 AX 快照没有捕获公告值，不标记该项通过",
+          "recovery_en": "同一进程从失败点击重试，经仅允许 api.github.com:443 的本机 TLS 密文直通隧道恢复真实网络请求；GUI 显示 InfiniShell is up to date.，AX No updates available.",
+          "layout": "2560x1600 原始截图：本次更新状态、检查中、失败和重试入口中英文均无截断或重叠"
+        },
+        "evidence_limits": [
+          "公共 Latest 10.07 为独立 GitHub API 观测；RUST_LOG=warn 未保留应用解析出的版本日志，不冒称抓包证明具体远端版本",
+          "手动 No updates AX 加冻结源码支持本次检查未进入新下载分支；不声称整个历史进程或缓存没有下载",
+          "同版、新版、显式回滚、非法版本的覆盖来自已通过源码单元测试，本次未操纵正式发行元数据",
+          "未进行 VoiceOver 语音、所有窗口尺寸矩阵、新正式三端包验收",
+          "语言切换后重建设置页；不将此作为全应用无需重启语言切换验收",
+          "冻结二进制未随源码工作树变化，r-7e0c826e 的 source_unchanged=false 保留原记录，产品身份依 executable SHA 与源码等价收据确定"
+        ],
+        "settings_restored": {
+          "exact_original_bytes": true,
+          "sha256": "6842e3695fcf85b847358c0d800a59b83650446a0834d0529771cb13d4a6dc52",
+          "bytes": 3543,
+          "appearance.language": "system",
+          "network.proxy_mode": "absent (original)",
+          "network.proxy_url": "absent (original)",
+          "automation_modified_system_network_or_keychain_settings": false,
+          "whole_keychain_state_audited": false,
+          "receipt_field_scope": "原回执system_network_or_keychain_changed=false仅指自动化未改设置；用户手动回应钥匙串提示后未审计整个钥匙串状态。"
+        },
+        "cleanup": {
+          "runs": {
+            "r-7e0c826e": {
+              "status": "cleaned",
+              "exit_code": 0,
+              "cleanup_ready": true,
+              "source_unchanged": false,
+              "ended_at": "2026-10-19T13:56:25.392149+00:00",
+              "cleaned_at": "2026-10-19T13:56:25.863752+00:00",
+              "receipt_sha256": "5c1b3ad584fe2c93749c6a75d44e3f21eac661cfa7b72004433ce5d609e6aed1"
+            },
+            "r-3a089b95": {
+              "status": "cleaned",
+              "exit_code": 0,
+              "cleanup_ready": true,
+              "source_unchanged": true,
+              "ended_at": "2026-10-19T14:11:28.069168+00:00",
+              "cleaned_at": "2026-10-19T14:11:28.435054+00:00",
+              "receipt_sha256": "44e34527c2dc38530bcd50d0d21a142c347b6812257c480f8e8bd42a6045f42f"
+            },
+            "r-ff4aab1a": {
+              "status": "cleaned",
+              "exit_code": 0,
+              "cleanup_ready": true,
+              "source_unchanged": true,
+              "ended_at": "2026-10-19T14:09:11.535608+00:00",
+              "cleaned_at": "2026-10-19T14:09:11.995583+00:00",
+              "receipt_sha256": "f0d3b15806c4dba4daefc75f141b08bb805884ce28867b9a2b7d3829c704f4c7"
+            },
+            "r-d81cf2d9": {
+              "status": "cleaned",
+              "exit_code": 0,
+              "cleanup_ready": true,
+              "source_unchanged": true,
+              "ended_at": "2026-10-19T14:10:02.607524+00:00",
+              "cleaned_at": "2026-10-19T14:10:03.000767+00:00",
+              "receipt_sha256": "8eb6f582ae9ca0da289c6a548a01c0b5073449f68e5efb1c2c9e5a49c50330e2"
+            },
+            "r-01e5e8ff": {
+              "status": "cleaned",
+              "exit_code": 0,
+              "cleanup_ready": true,
+              "source_unchanged": true,
+              "ended_at": "2026-10-19T14:11:20.887100+00:00",
+              "cleaned_at": "2026-10-19T14:11:21.244549+00:00",
+              "receipt_sha256": "6709a434bbcf591939b113efeab45213a47aaff1591611ef61c6545fc9134656"
+            }
+          },
+          "fixture_port_closed": true,
+          "both_gui_launches_normal_exit": true,
+          "executable_unchanged": true
+        },
+        "fixtures": {
+          "zh_503": "r-ff4aab1a",
+          "en_503": "r-d81cf2d9",
+          "en_recovery": "r-01e5e8ff",
+          "request_headers_or_body_retained": false,
+          "tls_intercepted": false,
+          "runtime_script_sha_locked": false,
+          "source_review_boundary": "原run绑定路径和日志；独立复核现存脚本及日志一致，不把复核时脚本SHA倒记为运行时锁定。"
+        },
+        "captures_verified": {
+          "count": 23,
+          "all_size_and_sha256_match_receipt": true,
+          "image_encoding": "jpeg_original_png_filenames_preserved",
+          "screen_size_pixels": [
+            2560,
+            1600
+          ]
+        },
+        "user_action_pending": false,
+        "remote_after_gui": {
+          "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/remote-after-gui.json",
+          "receipt_sha256": "53805e7e4a624a66636092151b4943d9824fff6abb1e5f52e505a085180a55df",
+          "pr26_state": "MERGED",
+          "draft": true,
+          "published_at": null,
+          "asset_count": 12,
+          "asset_id_name_size_digest_equal_previous_closeout": true,
+          "tag_object_and_peeled_unchanged": true,
+          "publication_performed": false
+        },
+        "history_boundary": "resumption-phase-1与final-closeout原件保留；本次只更新当前GUI状态，不改旧candidate或七次CI失败，不授予正式新三端包/实际SSH/VoiceOver语音/全尺寸通过。",
+        "independent_review": {
+          "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-independent-review.json",
+          "receipt_sha256": "d056ff60c993510f1ae4a57141725d4dcb86a6c2be326b66f5c6b5aee568860a",
+          "result": "passed_with_explicit_scope_limits"
+        }
       }
     }
   },
@@ -10747,7 +10898,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "受测源码8b46bcc3…已快进并push main，local/origin/remote一致，PR26 MERGED；第八39256631029 completed/success，PATH/reissue/readonly/通知及四组Rust1902次定向执行全过，app内i18n11。七失败原件保留，非全库或真实SSH；GUI待钥匙串，正式新包未造、未公开发布。",
+  "status_zh": "受测源码8b46已在main，本次续验基线d18f9b354；第八Windows及既有定向门禁通过，七失败保留。本轮冻结Mac运行包英中旧版拒绝、失败/重试及英文恢复限定通过并清理，设置字节还原；中文失败AX公告未捕获。正式新三端包和实际SSH未验，Draft未公开，无用户待操作。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -13193,20 +13344,23 @@
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
     "authority_ref": "main_acceptance.release_integration_20261019",
-    "base_source_commit": "88829618557cad7c162d43d3de8bc01e262d1291",
-    "source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
-    "scope": "受测源码8b46已快进并push main；第八Windows成功、readonly与app/i18n补跑闭合，七历史失败保留。源码/定向门禁不代替GUI、实际SSH或新包验收。",
-    "product_changed": true,
-    "localization": "更新器About及无障碍文案已同步英中；定向nextest和显式i18n 12/12通过，双语真实GUI待验。",
-    "formal_publication": "awaiting_user_arrangement"
+    "base_source_commit": "d18f9b354a53e64718fb3878d23feb51b617bc43",
+    "source_commit": "d18f9b354a53e64718fb3878d23feb51b617bc43",
+    "scope": "本次只续记冻结Mac运行包GUI实测和恢复/清理证据；无产品源码变化。英中旧版拒绝、失败/重试和英文恢复限定通过，中文失败AX未捕获；正式三端新包与实际SSH未验。",
+    "product_changed": false,
+    "localization": "无需本地化变更；既有英中更新文案在2560×1600真实界面检查无截断或重叠，英文失败AX已捕获，中文失败AX公告未捕获。",
+    "formal_publication": "awaiting_user_arrangement",
+    "integrated_product_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
   },
   "latest_resume": {
     "authority_ref": "main_acceptance.release_integration_20261019",
     "source_commit": "5068dae9c75b79628865a0872684113647c204d8",
     "source_commit_scope": "仅为Draft R9所封装原应用；当前主线受测源码8b46另由integration_source_commit绑定，不改写R9身份",
-    "status": "受测源码已在main，第八CI成功；GUI与正式新包待验，保持Draft",
-    "next_step": "文档提交后独立final-closeout绑定doc HEAD/受测源码/远端/Draft/tag；GUI等钥匙串，下次正式候选按影响补验实际SSH与三端界面，不公开发布。",
-    "integration_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
+    "status": "源码及定向门禁已在主线；冻结Mac运行包限定更新GUI已通过并清理，正式新包待安排，保持Draft",
+    "next_step": "本次GUI续记文档与远端由独立gui-resume-closeout.json绑定；中文失败AX未捕获，未来正式候选按影响补验三端UI、最终Setup和实际SSH，不公开发布。",
+    "integration_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+    "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43",
+    "gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"
   },
   "g01_g07_guard_followup": {
     "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",
@@ -15322,7 +15476,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "5068dae9c75b79628865a0872684113647c204d8",
-  "latest_increment": "release_integration_source_main_and_eighth_ci_passed_20261019",
+  "latest_increment": "macos_updater_scoped_gui_resumed_passed_and_cleaned_20261019",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
