@@ -120,7 +120,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: 专项范围（默认all）；upstream_essence验源码，release-installer:<runid>只读验正式Windows安装器
+        description: 专项范围；release-installer:<runid>只读核验，reissue-installer:<runid>回归并重发旧版Windows安装器
         required: true
         default: all
         type: string
@@ -178,15 +178,15 @@ jobs:
           inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
           scope = inputs.get("windows_atomic_debug_scope", "all")
           known_scopes = {"all", "upstream_essence", "stdio", "nul_token", "g09_tokens", "g09_netcredentials", "g09_stdio_lifetime", "codex_hooks", "g09_image_contract", "g09_powershell_contract", "g09_clr_fixture", "g09_npm_powershell"}
-          release_mode = isinstance(scope, str) and re.fullmatch(r"release-installer:[1-9][0-9]*", scope)
+          release_mode = isinstance(scope, str) and re.fullmatch(r"(?:release|reissue)-installer:[1-9][0-9]*", scope)
           if scope not in known_scopes and not release_mode:
-              sys.exit("未知专项范围；仅允许既有白名单或 release-installer:<正整数runid>")
+              sys.exit("未知专项范围；仅允许既有白名单或 release/reissue-installer:<正整数runid>")
           if release_mode:
               allowed = {"run_linux", "run_windows", "windows_atomic_debug_scope"}
               defaults = {"grok_native_source_capability": "terminal-bridge", "windows_atomic_agent": "all", "linux_atomic_agent": "all"}
               conflicts = [name for name, value in inputs.items() if name not in allowed and (value if isinstance(value, bool) else defaults.get(name) != value)]
               if inputs.get("run_windows") is not True or inputs.get("run_linux") is not False or conflicts:
-                  sys.exit("正式安装器只读验证仅允许 Windows，其他输入必须保持默认：" + ", ".join(sorted(conflicts)))
+                  sys.exit("正式安装器核验或重发仅允许 Windows，其他输入必须保持默认：" + ", ".join(sorted(conflicts)))
               sys.exit(0)
           if inputs.get("windows_atomic_debug_scope") == "upstream_essence" and not inputs.get("full_workspace_tests", False):
               allowed = {"run_linux", "run_windows", "windows_atomic_debug_scope"}
@@ -249,11 +249,11 @@ jobs:
           PY
 
   windows_release_installer:
-    name: Windows 正式安装器只读验证
+    name: ${{ startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:') && 'Windows 安装器回归与旧版重发' || 'Windows 正式安装器只读验证' }}
     needs: validate_scope
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && !inputs.run_linux && startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows && !inputs.run_linux && (startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') || startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:')) }}
     runs-on: [self-hosted, windows, x64, infinishell-ci]
-    timeout-minutes: 60
+    timeout-minutes: 120
     permissions:
       contents: read
       actions: read
@@ -267,6 +267,12 @@ jobs:
       - name: 准备已固定的作业内 Python
         shell: pwsh
         run: ./script/cli-agent-parity/prepare_windows_python.ps1
+      - name: 验证重发控制器目录解析
+        if: ${{ startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:') }}
+        shell: pwsh
+        run: |
+          python -I -B script/windows/reissue_release_installer_tests.py
+          if ($LASTEXITCODE -ne 0) { throw '重发控制器回归失败。' }
       - name: 核验正式工件来源、签名和内嵌资源
         id: verify_installer
         shell: pwsh
@@ -275,19 +281,51 @@ jobs:
           ARTIFACT_MODE: ${{ inputs.windows_atomic_debug_scope }}
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:ARTIFACT_MODE -cnotmatch '^release-installer:([1-9][0-9]*)$') { throw '正式构建 run ID 无效。' }
+          if ($env:ARTIFACT_MODE -cnotmatch '^(?:release|reissue)-installer:([1-9][0-9]*)$') { throw '正式构建 run ID 无效。' }
           $releaseRun = $Matches[1]
-          ./script/windows/verify_release_installer.ps1 -ReleaseRun $releaseRun -OutputDirectory (Join-Path $env:RUNNER_TEMP 'verify-release-installer')
+          ./script/windows/verify_release_installer.ps1 -ReleaseRun $releaseRun -OutputDirectory (Join-Path $env:RUNNER_TEMP 'verify-release-installer-${{ github.run_id }}-${{ github.run_attempt }}')
           if ($LASTEXITCODE -ne 0) { throw "正式安装器只读验证失败：$LASTEXITCODE" }
+      - name: 回归 PATH 并从原应用载荷重发安装器
+        id: reissue_installer
+        if: ${{ startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:') }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File script/windows/reissue_release_installer.ps1 -VerifiedDirectory (Join-Path $env:RUNNER_TEMP 'verify-release-installer-${{ github.run_id }}-${{ github.run_attempt }}') -OutputDirectory (Join-Path $env:RUNNER_TEMP 'reissue-installer-${{ github.run_id }}-${{ github.run_attempt }}')
+          if ($LASTEXITCODE -ne 0) { throw "Windows 安装器重发失败：$LASTEXITCODE" }
+      - name: 保存重发回归与构建证据
+        if: ${{ always() && steps.reissue_installer.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-installer-reissue-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reissue-installer-${{ github.run_id }}-${{ github.run_attempt }}/evidence/
+          if-no-files-found: error
+          retention-days: 90
+      - name: 保存独立重发安装器
+        if: ${{ success() && steps.reissue_installer.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: infinishell-windows-x64-reissued-${{ github.sha }}
+          path: ${{ runner.temp }}/reissue-installer-${{ github.run_id }}-${{ github.run_attempt }}/delivery/
+          if-no-files-found: error
+          retention-days: 90
+      - name: 保留未通过最终绑定的重建候选
+        if: ${{ failure() && steps.reissue_installer.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-installer-reissue-failed-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reissue-installer-${{ github.run_id }}-${{ github.run_attempt }}/candidate/InfiniShellSetup.exe
+          if-no-files-found: warn
+          retention-days: 90
       - name: 保存正式安装器只读证据
         if: ${{ always() && steps.verify_installer.outcome != 'skipped' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-release-installer-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/verify-release-installer/*.json
-            ${{ runner.temp }}/verify-release-installer/*.log
-            ${{ runner.temp }}/verify-release-installer/*.py
+            ${{ runner.temp }}/verify-release-installer-${{ github.run_id }}-${{ github.run_attempt }}/*.json
+            ${{ runner.temp }}/verify-release-installer-${{ github.run_id }}-${{ github.run_attempt }}/*.log
+            ${{ runner.temp }}/verify-release-installer-${{ github.run_id }}-${{ github.run_attempt }}/*.py
           if-no-files-found: error
           retention-days: 14
 
@@ -335,6 +373,7 @@ jobs:
         test(ai::byop_compaction::recovery::tests::) |
         test(ai::blocklist::controller::compaction_tests::) |
         test(ai::blocklist::controller::compaction_crash_tests::) |
+        test(autoupdate::) |
         test(ai::blocklist::controller::response_stream::model_routing_tests::) |
         test(ai::blocklist::block::cli::) |
         test(persistence::sqlite::tests::) |
@@ -473,6 +512,25 @@ jobs:
           check-latest: false
           update-environment: true
 
+      - name: 验证 Windows PATH 原生恢复与清理门禁
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        timeout-minutes: 100
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -I -B script/windows/reissue_release_installer_tests.py
+          if ($LASTEXITCODE -ne 0) { throw '重发控制器测试失败。' }
+          python -I -B script/windows/prepare_environment_test_compiler_tests.py
+          if ($LASTEXITCODE -ne 0) { throw '固定编译器准备脚本测试失败。' }
+          $outputRoot = Join-Path $env:RUNNER_TEMP 'upstream-essence/windows-path'
+          New-Item -ItemType Directory -Path $outputRoot -ErrorAction Stop | Out-Null
+          $compiler = python -I -B script/windows/prepare_environment_test_compiler.py --output (Join-Path $outputRoot 'toolchain')
+          if ($LASTEXITCODE -ne 0 -or -not $compiler) { throw '固定 Inno Setup 6.7.1 准备失败。' }
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File script/windows/test_windows_environment.ps1 -CompilerPath $compiler -OutputDirectory (Join-Path $outputRoot 'full')
+          if ($LASTEXITCODE -ne 0) { throw '完整 Windows PATH 回归失败。' }
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File script/windows/test_windows_environment_reissue.ps1 -CompilerPath $compiler -OutputDirectory (Join-Path $outputRoot 'reissue')
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PATH 重发回归失败。' }
+
       - name: 验证 Codex 通知安装事务与真实终端传输
         shell: bash
         env:
@@ -522,8 +580,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files --lib'
-            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files --lib
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files -p channel_versions --lib'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files -p channel_versions --lib
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
 
       - name: 测试窗口迁移与同步错误类型
@@ -564,6 +622,13 @@ jobs:
             ${{ runner.temp }}/upstream-essence/windows-registration/*.log
             ${{ runner.temp }}/upstream-essence/windows-registration/*.json
             ${{ runner.temp }}/upstream-essence/windows-registration/completed.txt
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.json
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.jsonl
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.log
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.iss
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.ps1
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.txt
+            ${{ runner.temp }}/upstream-essence/windows-path/**/*.exit
           if-no-files-found: error
           retention-days: 14
 
@@ -1869,7 +1934,7 @@ jobs:
     needs: validate_scope
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_windows && !startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') &&
+      (github.event_name == 'workflow_dispatch' && inputs.run_windows && !startsWith(inputs.windows_atomic_debug_scope, 'release-installer:') && !startsWith(inputs.windows_atomic_debug_scope, 'reissue-installer:') &&
        inputs.windows_atomic_debug_scope != 'codex_hooks' && inputs.windows_atomic_debug_scope != 'g09_image_contract' && inputs.windows_atomic_debug_scope != 'g09_powershell_contract' && inputs.windows_atomic_debug_scope != 'g09_clr_fixture' && inputs.windows_atomic_debug_scope != 'g09_stdio_lifetime' &&
        (inputs.windows_atomic_debug_scope != 'upstream_essence' || inputs.full_workspace_tests))
     runs-on: [self-hosted, windows, x64, infinishell-ci]
