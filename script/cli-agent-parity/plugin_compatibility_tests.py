@@ -158,6 +158,28 @@ class CompatibilityTests(unittest.TestCase):
         response = self.stop("claude", {"prompt_id": "round", "last_assistant_message": "waiting", "background_tasks": [{"id": "child", "status": "running"}]})
         self.assertEqual(response["event"], "notification")
 
+    def test_claude_scheduled_work_keeps_stop_as_notification(self):
+        for background in ({}, {"background_tasks": []}, {"background_tasks": [{"id": "child"}]}):
+            with self.subTest(background=background):
+                response = self.stop("claude", {"prompt_id": "round", "last_assistant_message": "waiting", "session_crons": [{"id": "wake"}], **background})
+                self.assertEqual(response["event"], "notification")
+                self.assertEqual(response["prompt_id"], "round")
+                self.assertEqual(response["response"], "waiting")
+
+    def test_claude_absent_or_empty_work_registries_preserve_stop(self):
+        for registries in ({}, {"background_tasks": []}, {"session_crons": []}, {"background_tasks": [], "session_crons": []}):
+            with self.subTest(registries=registries):
+                response = self.stop("claude", {"prompt_id": "round", "last_assistant_message": "finished", **registries})
+                self.assertEqual(response["event"], "stop")
+                self.assertEqual(response["prompt_id"], "round")
+
+    def test_claude_malformed_work_registries_keep_stop_as_notification(self):
+        for field, other in (("background_tasks", "session_crons"), ("session_crons", "background_tasks")):
+            for value in (None, False, True, 0, 1, "", "unexpected", {}, {"id": "unexpected"}, [None]):
+                with self.subTest(field=field, value=value):
+                    response = self.stop("claude", {"prompt_id": "round", "last_assistant_message": "waiting", field: value, other: []})
+                    self.assertEqual(response["event"], "notification")
+
     def test_grok_inheritance_never_reaches_claude_or_legacy_output(self):
         environment = self.environment()
         environment.update({"GROK_HOOK_EVENT": "stop", "GROK_SESSION_ID": "grok-session", "TERM_PROGRAM": "WarpTerminal"})

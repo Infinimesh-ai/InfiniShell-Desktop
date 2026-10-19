@@ -50,6 +50,61 @@ class NotificationPatchTests(unittest.TestCase):
             originals[name] = original
         return root, metadata, originals, replacements
 
+    def claude_previous_stop_fixture(self, directory):
+        root, metadata, originals, replacements = self.hook_fixture(directory, "claude")
+        bundle = PATCH.default_bundle() / "claude"
+        reviewed = json.loads((bundle / "PATCH_METADATA.json").read_text())
+        name = "scripts/on-stop.sh"
+        previous = (bundle / "revisions/rev5" / name).read_bytes()
+        self.assertIn(PATCH.digest(previous), reviewed["files"][name]["previous_replacement_sha256"])
+        self.assertNotEqual(previous, replacements[name])
+        metadata["files"][name] = reviewed["files"][name]
+        metadata["compatible_bases"] = [{"version": "test", "tree_sha256": {
+            path: hashes["upstream_sha256"] for path, hashes in metadata["files"].items()
+        }}]
+        originals[name] = previous
+        (root / name).write_bytes(previous)
+        (root / name).chmod(int(reviewed["files"][name]["mode"], 8))
+        return root, metadata, originals, replacements
+
+    def test_claude_previous_stop_revision_migrates_idempotently(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, _, replacements = self.claude_previous_stop_fixture(temporary)
+            modes = {name: (root / name).stat().st_mode for name in replacements}
+            PATCH.validate_tree(root, "test", metadata)
+            PATCH.apply_files(root, metadata, replacements)
+            PATCH.validate_tree(root, "test", metadata)
+            PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual({name: (root / name).read_bytes() for name in replacements}, replacements)
+            self.assertEqual({name: (root / name).stat().st_mode for name in replacements}, modes)
+
+    def test_claude_custom_previous_stop_revision_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, originals, replacements = self.claude_previous_stop_fixture(temporary)
+            originals["scripts/on-stop.sh"] += "\n# 用户自定义修改\n".encode("utf-8")
+            (root / "scripts/on-stop.sh").write_bytes(originals["scripts/on-stop.sh"])
+            with self.assertRaises(ValueError):
+                PATCH.validate_tree(root, "test", metadata)
+            with self.assertRaises(ValueError):
+                PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual({name: (root / name).read_bytes() for name in originals}, originals)
+
+    def test_claude_previous_stop_revision_is_restored_on_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, originals, replacements = self.claude_previous_stop_fixture(temporary)
+            real_write = PATCH.atomic_write
+
+            def fail_notify(path, contents, mode, *, staging_dir=None):
+                if path.name == "warp-notify.sh":
+                    raise OSError("注入旧修订迁移后的通知脚本替换失败")
+                return real_write(path, contents, mode, staging_dir=staging_dir)
+
+            with mock.patch.object(PATCH, "atomic_write", fail_notify):
+                with self.assertRaises(OSError):
+                    PATCH.apply_files(root, metadata, replacements)
+            self.assertEqual({name: (root / name).read_bytes() for name in originals}, originals)
+            PATCH.validate_tree(root, "test", metadata)
+
     def test_codex_additions_cannot_use_per_file_cache_replacement(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -159,7 +214,7 @@ raise AssertionError("未到达注入的进程中断点")
                 cache = parent / "cache/claude-code-warp/warp"
                 root, metadata, replacements = self.fixture(cache / "test")
                 original_modes = {name: (root / name).stat().st_mode & 0o777 for name in replacements}
-                result = subprocess.run([sys.executable, "-I", "-c", child, str(Path(PATCH.__file__).resolve()), str(root), str(parent), json.dumps(metadata), phase], capture_output=True, timeout=10)
+                result = subprocess.run([sys.executable, "-I", "-B", "-c", child, str(Path(PATCH.__file__).resolve()), str(root), str(parent), json.dumps(metadata), phase], capture_output=True, timeout=10)
                 self.assertEqual(result.returncode, 91, result.stderr.decode(errors="replace"))
                 self.assertEqual(result.stdout, b"")
                 self.assertEqual(result.stderr, b"")

@@ -1,5 +1,5 @@
 {
-  "patch_revision": 5,
+  "patch_revision": 6,
   "upstream_repository": "https://github.com/warpdotdev/claude-code-warp",
   "upstream_plugin": "warp",
   "compatible_bases": [
@@ -72,8 +72,11 @@
     },
     "scripts/on-stop.sh": {
       "upstream_sha256": "249852062f8659a265e8b55b887fd5384bc0027ac31c296f3ac9fb13e4341d6c",
-      "replacement_sha256": "3f44cf96f0028fc15333f9ff6f6af5c7bceb545e445a49328a0a0e133bc248f4",
-      "mode": "0755"
+      "replacement_sha256": "2a7892275e3edb485d53f637d84b9bdc2100b91fec0be8fb25096b091e5d238b",
+      "mode": "0755",
+      "previous_replacement_sha256": [
+        "3f44cf96f0028fc15333f9ff6f6af5c7bceb545e445a49328a0a0e133bc248f4"
+      ]
     },
     "scripts/should-use-structured.sh": {
       "upstream_sha256": "f34b95caf2959dcb321d00eb72dc736c85d8f96958b03472380725ea950588bb",

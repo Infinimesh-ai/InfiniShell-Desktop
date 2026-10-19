@@ -94,7 +94,7 @@
  BODY=$(build_payload "$INPUT" "session_start" \
 --- a/plugins/warp/scripts/on-stop.sh
 +++ b/plugins/warp/scripts/on-stop.sh
-@@ -1,73 +1,23 @@
+@@ -1,73 +1,32 @@
  #!/bin/bash
 -# Hook script for Claude Code Stop event
 -# Sends a structured Warp notification when Claude completes a task
@@ -124,8 +124,17 @@
 +RESPONSE=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message | select(type == "string")' 2>/dev/null)
 +TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 +EVENT="stop"
-+# 没有最终文本或仍有后台工作时只报告通知，不声称整项任务已经完成。
-+if [ -z "$RESPONSE" ] || [ "$(printf '%s' "$INPUT" | jq '(.background_tasks // []) | length' 2>/dev/null)" != "0" ]; then
++# 缺字段兼容旧 CLI；已提供的后台任务和定时唤醒字段必须都是空数组。
++PENDING_WORK_EMPTY=$(printf '%s' "$INPUT" | jq -r '
++    . as $input
++    | all(["background_tasks", "session_crons"][];
++        . as $field
++        | if ($input | has($field)) then
++            $input[$field] | if type == "array" then length == 0 else false end
++          else true end)
++' 2>/dev/null)
++# 没有最终文本、仍有后台工作或载荷畸形时只报告通知，不推断任务成功。
++if [ -z "$RESPONSE" ] || [ "$PENDING_WORK_EMPTY" != "true" ]; then
 +    EVENT="notification"
  fi
 -

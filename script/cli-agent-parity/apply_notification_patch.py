@@ -128,8 +128,8 @@ def validate_tree(root, version, metadata):
             if relative not in expected:
                 raise ValueError("插件存在自定义文件，未执行替换")
             actual = digest(checked_file(root, relative).read_bytes())
-            replacement = metadata["files"].get(relative, {}).get("replacement_sha256")
-            if actual not in (expected[relative], replacement):
+            hashes = metadata["files"].get(relative, {})
+            if actual not in (expected[relative], hashes.get("replacement_sha256"), *hashes.get("previous_replacement_sha256", [])):
                 raise ValueError("插件文件存在自定义修改，未执行替换")
             observed.add(relative)
     if observed != set(expected):
@@ -164,7 +164,7 @@ def apply_files(root, metadata, replacements, *, staging_parent=None):
         path = checked_file(root, name)
         original = path.read_bytes()
         hashes = metadata["files"][name]
-        if digest(original) not in (hashes["upstream_sha256"], hashes["replacement_sha256"]) or digest(contents) != hashes["replacement_sha256"]:
+        if digest(original) not in (hashes["upstream_sha256"], hashes["replacement_sha256"], *hashes.get("previous_replacement_sha256", [])) or digest(contents) != hashes["replacement_sha256"]:
             raise ValueError("摘要不匹配，未执行替换")
         originals.append((name, path, original, stat.S_IMODE(path.stat().st_mode)))
     parent = (root.parent if staging_parent is None else staging_parent).resolve(strict=True)
