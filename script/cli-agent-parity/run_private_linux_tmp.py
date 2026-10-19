@@ -101,14 +101,15 @@ def process_table():
     return table, incomplete
 
 
-def reap_adopted(records):
+def reap_adopted(records, protected_pid=None):
     # 子收割者使 setsid、双 fork 后代仍归本包装器；仅 wait 自己的退出子进程，不发信号。
     while True:
         try:
             result = os.waitid(os.P_ALL, 0, os.WEXITED | os.WNOHANG | os.WNOWAIT)
         except ChildProcessError:
             return
-        if result is None:
+        if result is None or result.si_pid == protected_pid:
+            # 主命令的退出状态只由 Popen.poll 消费，不能被子收割者提前取走。
             return
         value = process(result.si_pid)
         _, status = os.waitpid(result.si_pid, os.WNOHANG)
@@ -295,6 +296,7 @@ def execute(argv, receipt_path):
                     records[process_key(value)] = value
                 if incomplete:
                     receipt["process_observation_incomplete"] = True
+                reap_adopted(records, protected_pid=command.pid)
                 result = command.poll()
                 if result is not None:
                     exit_code = result

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import sys
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import run_private_linux_tmp as runner
 
@@ -38,6 +38,76 @@ class PrivateLinuxTmpTests(unittest.TestCase):
         fields = ["S", "9"] + ["0"] * 17 + ["1234", "0"]
         with patch.object(Path, "read_text", return_value="17 (a ) b) " + " ".join(fields)):
             self.assertEqual(runner.process(17), proc(17, 9, 1234))
+
+    def test_reap_adopted_records_exited_child_without_consuming_protected_command(self):
+        records = {}
+        adopted = proc(902, os.getpid(), 42, "Z")
+        flags = os.WEXITED | os.WNOHANG | os.WNOWAIT
+        with (patch.object(runner.os, "waitid", side_effect=[
+                  SimpleNamespace(si_pid=902), SimpleNamespace(si_pid=901)]) as peek,
+              patch.object(runner, "process", return_value=adopted) as inspect,
+              patch.object(runner.os, "waitpid", return_value=(902, 9)) as reap):
+            runner.reap_adopted(records, protected_pid=901)
+        self.assertEqual(peek.call_args_list, [call(os.P_ALL, 0, flags)] * 2)
+        inspect.assert_called_once_with(902)
+        reap.assert_called_once_with(902, os.WNOHANG)
+        self.assertEqual(records, {(902, 42): {**adopted, "reaped_status": 9}})
+
+    def test_running_command_reaps_adopted_exit_and_preserves_its_own_exit_100(self):
+        receipt = self.base / "receipt.json"
+        child = MagicMock(pid=901, returncode=None)
+        adopted = proc(902, os.getpid(), 42, "Z")
+        pending = {902: 9, 901: 100 << 8}
+        polls = 0
+
+        def root(created):
+            created(self.root)
+            return self.root, os.dup(self.descriptor), self.identity
+
+        def waitpid(pid, flags):
+            return pid, pending.pop(pid)
+
+        def poll():
+            nonlocal polls
+            polls += 1
+            if polls == 1:
+                self.assertNotIn(902, pending)
+                self.assertIn(901, pending)
+                return None
+            _, status = runner.os.waitpid(child.pid, os.WNOHANG)
+            child.returncode = os.waitstatus_to_exitcode(status)
+            return child.returncode
+
+        child.poll.side_effect = poll
+        with (patch.object(runner.sys, "platform", "linux"),
+              patch.object(runner, "create_root", side_effect=root),
+              patch.object(runner, "process", side_effect=lambda pid:
+                           adopted if pid == 902 else proc(pid, 0)),
+              patch.object(runner, "process_table", side_effect=[({902: adopted}, []), ({}, [])]),
+              patch.object(runner.ctypes, "CDLL") as library,
+              patch.object(runner.subprocess, "Popen", return_value=child),
+              patch.object(runner.os, "waitid", side_effect=[
+                  SimpleNamespace(si_pid=902), None, SimpleNamespace(si_pid=901)]) as peek,
+              patch.object(runner.os, "waitpid", side_effect=waitpid) as reap,
+              patch.object(runner.time, "sleep") as sleep,
+              patch.object(runner, "cleanup", return_value={
+                  "cleanup_ready": False, "status": "retained", "reasons": ["fixture_retained"]})):
+            library.return_value.prctl.return_value = 0
+            code = runner.execute([sys.executable, "-c", "pass"], receipt)
+        self.assertEqual(code, 100)
+        self.assertEqual(polls, 2)
+        self.assertEqual(peek.call_count, 3)
+        self.assertEqual(reap.call_args_list, [call(902, os.WNOHANG), call(901, os.WNOHANG)])
+        self.assertEqual(pending, {})
+        sleep.assert_called_once_with(0.1)
+        evidence = json.loads(receipt.read_text())
+        self.assertEqual(evidence["command_exit_code"], 100)
+        records = {runner.process_key(value): value for value in evidence["descendants"]}
+        self.assertEqual(records[(902, 42)], {**adopted, "reaped_status": 9})
+        self.assertEqual(records[(901, 10)]["exit_code"], 100)
+        self.assertNotIn("reaped_status", records[(901, 10)])
+        self.assertFalse(evidence["cleanup_ready"])
+        self.assertTrue(self.root.exists())
 
     def test_root_requires_real_account_home_and_checks_budget_before_creating(self):
         home = Path("/" + "x" * 40)
@@ -139,6 +209,7 @@ class PrivateLinuxTmpTests(unittest.TestCase):
               patch.object(runner, "create_root", side_effect=root),
               patch.object(runner, "process", side_effect=lambda pid: proc(pid, 0)),
               patch.object(runner, "process_table", return_value=({}, [])),
+              patch.object(runner, "reap_adopted"),
               patch.object(runner.ctypes, "CDLL") as library,
               patch.object(runner.subprocess, "Popen", return_value=child) as popen,
               patch.object(runner, "cleanup", side_effect=PermissionError)):
