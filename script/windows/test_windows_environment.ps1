@@ -48,6 +48,7 @@ Add-Fixture 'empty-expand' '' 2 '' 2
 Add-Fixture 'plain' 'C:\Windows' 1 'C:\Windows' 1
 $unicodePath = 'C:\raw' + [char]0xD83D + [char]0xDE00
 foreach ($kind in 1..2) { Add-Fixture "unicode-roundtrip-$kind" $unicodePath $kind $unicodePath $kind }
+foreach ($kind in 1..2) { Add-Fixture "unicode-target-$kind" $unicodePath $kind "$unicodePath;D:\User" $kind }
 Add-Fixture 'separators' ';C:\Windows;;;D:\中文 路径;' 1 ';C:\Windows;;;D:\中文 路径;' 1
 Add-Fixture 'expand' '%SystemRoot%\System32;D:\中文;%NOT_DEFINED_InfiniShell%;' 2 '%SystemRoot%\System32;D:\中文;%NOT_DEFINED_InfiniShell%;' 2
 Add-Fixture 'delimiter-only' ';;' 1 ';;' 1

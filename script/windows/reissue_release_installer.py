@@ -14,7 +14,7 @@ import urllib.request
 APP_SOURCE = '5068dae9c75b79628865a0872684113647c204d8'
 APP_VERSION = 'v0.2026.10.14.16.45.oss_00'
 ORIGINAL_SHA = '1ad878fb098c8cc7e49c7dc29aa6afec7ceb34d80fcb9fc8220643f35ec3086a'
-HELPER_SHA = 'd90a0a529d19c1aca5a329c0b9928434702f7a15f5f3f981dd0ac986a6af5fd9'
+HELPER_SHA = '0c56bb22d41007001f4a899502bd6f737f949629aaa87407d7d2c6ea91bae62a'
 LEGACY_SHA = '630fb260603f0279b97d1e206bbb91688f5178aa64806832166b29366a01307a'
 COMPILER = {
     'version': '6.7.1',
@@ -209,7 +209,7 @@ def validate_tests(args):
     root = args.output
     full = read(root / 'test-output/full/result.json')
     fixed = {'status': 'passed', 'error': None, 'native_matrix_skipped': False, 'native_matrix_cases': 200,
-             'native_edge_cases': 38, 'assertions': 1635, 'native_actions': 1438, 'native_actions_attempted': 1438,
+             'native_edge_cases': 38, 'assertions': 1683, 'native_actions': 1438, 'native_actions_attempted': 1438,
              'native_action_failure': None, 'native_step_assertions': 2572,
              'raw_registry_assertions': 90, 'raw_source_gate_assertions': 14,
              'raw_fixture_preflight_cases': 16, 'raw_fixture_preflight_cleanup_passed': True,
@@ -224,7 +224,7 @@ def validate_tests(args):
     require(all(case['passed'] is True and case['kind'] == case['actual']['kind'] and
                 case['expected_bytes'] == case['actual']['bytes'] for case in raw['cases']),
             '原始字节夹具未按类型和字节精确往返')
-    require(len(full['verified_cases']) == 364 and {item['case'] for item in full['known_limits']} ==
+    require(len(full['verified_cases']) == 366 and {item['case'] for item in full['known_limits']} ==
             {'native-limit-future-old-install', 'native-limit-missing-history'}, '完整回归场景/已知边界不符')
     reissue = read(root / 'test-output/reissue/result.json')
     fixed = {'status': 'passed', 'execution_error': None, 'positive_cases': 40, 'negative_control_cases': 2,

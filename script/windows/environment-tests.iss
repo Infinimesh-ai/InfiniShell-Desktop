@@ -89,6 +89,56 @@ begin
   end;
 end;
 
+procedure UnicodeCopyComparisons();
+var
+  Value, State, Slice: String;
+  States: TArrayOfString;
+begin
+  Value := 'C:\raw' + #55357#56832;
+  State := '1' + Value;
+  SetArrayLength(States, 1);
+  States[0] := State;
+  { 记录固定编译器的旧表达式行为，不要求未来编译器永远保留此缺陷。 }
+  Log('fixture old-inline scalar=' + IntToStr(Ord(Value = Copy(State, 2, MaxInt))) +
+    ' array=' + IntToStr(Ord(Value = Copy(States[0], 2, MaxInt))));
+  Slice := Copy(State, 2, MaxInt);
+  Require(Slice = Value, 'unicode-copy: explicit String scalar equality');
+  Require((Length(Slice) = 8) and (Ord(Slice[7]) = 55357) and (Ord(Slice[8]) = 56832),
+    'unicode-copy: explicit String scalar code units');
+  Slice := Copy(States[0], 2, MaxInt);
+  Require(Slice = Value, 'unicode-copy: explicit String array equality');
+  Require((Length(Slice) = 8) and (Ord(Slice[7]) = 55357) and (Ord(Slice[8]) = 56832),
+    'unicode-copy: explicit String array code units');
+end;
+
+procedure UnicodeTargetRoundTrips();
+var
+  Base, Path, Name, Installed: String;
+  Kind: LongWord;
+begin
+  Base := 'C:\raw' + #55357#56832;
+  Path := TestPath + '-' + #55357#56832;
+  for Kind := 1 to 2 do begin
+    Name := 'unicode-target-' + IntToStr(Kind);
+    Require(AddEnvironmentPath(HKCU, CaseKey(Name), Path), Name + ': add non-BMP target');
+    Installed := Base + ';' + Path;
+    CheckState(Name, Installed, Kind);
+    CheckOwners(Name, 1);
+    Require(AddEnvironmentPath(HKCU, CaseKey(Name), OtherPath), Name + ': add second owner');
+    Installed := Installed + ';' + OtherPath;
+    CheckState(Name, Installed, Kind);
+    CheckOwners(Name, 2);
+    { 用户修改使旧锚失信，必须按完整非 BMP token 删除并保留用户新增项。 }
+    Require(WriteEnvironmentPath(HKCU, CaseKey(Name), Installed + ';D:\User', Kind), Name + ': user appends');
+    Require(RemoveEnvironmentPath(HKCU, CaseKey(Name), Path), Name + ': remove non-BMP target after user edit');
+    CheckState(Name, Base + ';' + OtherPath + ';D:\User', Kind);
+    CheckOwners(Name, 1);
+    Require(RemoveEnvironmentPath(HKCU, CaseKey(Name), OtherPath), Name + ': remove final owner');
+    CheckState(Name, Base + ';D:\User', Kind);
+    CheckOwners(Name, 0);
+  end;
+end;
+
 procedure UnicodeRoundTrips();
 var
   Value, Name: String;
@@ -465,7 +515,9 @@ begin
     exit;
   end;
 
+  UnicodeCopyComparisons();
   UnicodeRoundTrips();
+  UnicodeTargetRoundTrips();
 
   RoundTrip('missing');
   RoundTrip('empty-sz');

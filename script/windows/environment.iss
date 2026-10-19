@@ -336,7 +336,7 @@ function EnvironmentSequenceMatches(RootKey: Integer; const SubKey, Base, Curren
   const Names: TArrayOfString): Boolean;
 var
   Step, I, Position, Previous, NextPosition: Integer;
-  Original, Added, NextPath, Expected, Value: String;
+  Original, Added, NextPath, Expected, Value, Token: String;
   Committed, ValueType: LongWord;
 begin
   Result := False;
@@ -350,7 +350,8 @@ begin
       if not ReadEnvironmentOwner(RootKey, EnvironmentGroupKey(SubKey) + '\' + Names[I],
         Original, Added, Committed) or (Committed <> 1) then exit;
       if EnvironmentPathCount(Value, Added, ValueType, Position) <> 1 then exit;
-      if (Copy(Value, Position, Length(Added)) <> Added) or
+      Token := Copy(Value, Position, Length(Added));
+      if (Token <> Added) or
         ((Position + Length(Added) <= Length(Value)) and
          (Copy(Value, Position + Length(Added), 1) <> ';')) then exit;
       if (Position > Previous) and (Position < NextPosition) then begin
@@ -503,11 +504,13 @@ end;
 
 function ExactEnvironmentToken(const Current, Path: String; var Position: Integer): Boolean;
 var
-  Value: String;
+  Value, Token: String;
 begin
   Value := Copy(Current, 2, MaxInt);
-  Result := (EnvironmentPathCount(Value, Path, StrToInt(Copy(Current, 1, 1)), Position) = 1) and
-    (Copy(Value, Position, Length(Path)) = Path) and
+  Result := EnvironmentPathCount(Value, Path, StrToInt(Copy(Current, 1, 1)), Position) = 1;
+  if not Result then exit;
+  Token := Copy(Value, Position, Length(Path));
+  Result := (Token = Path) and
     ((Position + Length(Path) > Length(Value)) or (Copy(Value, Position + Length(Path), 1) = ';'));
 end;
 
@@ -532,7 +535,7 @@ end;
 function ProjectionOwnerMatches(RootKey: Integer; const Key, Original, Added, Base: String;
   Keep: Boolean): Boolean;
 var
-  Value: String;
+  Value, OriginalValue, BaseValue: String;
   Number, StorageType: LongWord;
 begin
   Result := False;
@@ -547,7 +550,10 @@ begin
   end;
   if RegValueExists(RootKey, Key, 'OriginalValue') then begin
     if not ReadEnvironmentValue(RootKey, Key, 'OriginalValue', Value, StorageType) or (StorageType <> 1) then exit;
-    if (Value <> Copy(Original, 2, MaxInt)) and (not Keep or (Value <> Copy(Base, 2, MaxInt))) then exit;
+    { Copy 返回 AnyString，直接比较会经过 ANSI 临时值；先存入 String 保留非 BMP 字符。 }
+    OriginalValue := Copy(Original, 2, MaxInt);
+    BaseValue := Copy(Base, 2, MaxInt);
+    if (Value <> OriginalValue) and (not Keep or (Value <> BaseValue)) then exit;
   end;
   if RegValueExists(RootKey, Key, 'AddedPath') then
     if not ReadEnvironmentValue(RootKey, Key, 'AddedPath', Value, StorageType) or
@@ -701,7 +707,7 @@ end;
 
 function RemoveEnvironmentPath(RootKey: Integer; const SubKey, Path: String): Boolean;
 var
-  Key, Original, AddedPath, Current, Base, Known, Updated, Value: String;
+  Key, Original, AddedPath, Current, Base, Known, Updated, Value, Token: String;
   Committed, ValueType: LongWord;
   Position, Count, DeleteAt, DeleteLength: Integer;
   Trusted: Boolean;
@@ -728,7 +734,8 @@ begin
     Count := EnvironmentPathCount(Value, AddedPath, ValueType, Position);
     if Count = 1 then begin
       { 用户改过其它内容时，仅删除原文仍匹配的唯一新增项，保留当前类型。 }
-      if (Copy(Value, Position, Length(AddedPath)) = AddedPath) and
+      Token := Copy(Value, Position, Length(AddedPath));
+      if (Token = AddedPath) and
         ((Position + Length(AddedPath) > Length(Value)) or
          (Copy(Value, Position + Length(AddedPath), 1) = ';')) then begin
         DeleteAt := Position;

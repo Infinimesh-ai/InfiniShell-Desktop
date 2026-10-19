@@ -54,7 +54,7 @@ end;
 
 procedure TraceEnvironmentProjectionPredicates(const SubKey, LabelText: String);
 var
-  Data, Current, Base, Actual, CountText, Key, Value, OwnerOriginal, OwnerAdded: String;
+  Data, Current, Base, Actual, CountText, Key, Value, OwnerOriginal, OwnerAdded, OriginalValue, BaseValue: String;
   Names, Originals, Added, Keep, ActualNames, FieldNames, Children: TArrayOfString;
   ValueType, Number, StorageType, Committed: LongWord;
   I, J, Count: Integer;
@@ -151,8 +151,10 @@ begin
         if not TraceEnvironmentTestPredicate('original-value.read', ReadEnvironmentValue(HKCU, Key, 'OriginalValue', Value, StorageType)) then exit;
         if not TraceEnvironmentTestPredicate('original-value.string-type', StorageType = 1) then exit;
         Log('fixture stored original units=' + EnvironmentTestCodeUnits(Value));
-        MatchesOriginal := Value = Copy(Originals[I], 2, MaxInt);
-        MatchesBase := Value = Copy(Base, 2, MaxInt);
+        OriginalValue := Copy(Originals[I], 2, MaxInt);
+        BaseValue := Copy(Base, 2, MaxInt);
+        MatchesOriginal := Value = OriginalValue;
+        MatchesBase := Value = BaseValue;
         Log('fixture original-value matches-original=' + IntToStr(Ord(MatchesOriginal)) + ' matches-base=' + IntToStr(Ord(MatchesBase)));
         if not TraceEnvironmentTestPredicate('original-value.allowed', MatchesOriginal or ((Keep[I] = '1') and MatchesBase)) then exit;
       end else Log('fixture original value absent');
