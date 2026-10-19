@@ -8770,6 +8770,7 @@ impl Workspace {
                         .into_item(),
                 ),
                 AutoupdateStage::NoUpdateAvailable
+                | AutoupdateStage::CheckFailed
                 | AutoupdateStage::CheckingForUpdate
                 | AutoupdateStage::DownloadingUpdate
                 | AutoupdateStage::UnableToLaunchNewVersion { .. } => {}
@@ -21687,6 +21688,7 @@ impl Workspace {
                     }
                 }
                 AutoupdateStage::NoUpdateAvailable
+                | AutoupdateStage::CheckFailed
                 | AutoupdateStage::CheckingForUpdate
                 | AutoupdateStage::DownloadingUpdate
                 | AutoupdateStage::Updating { .. }

@@ -20,6 +20,54 @@ fn test_parse_version_string() {
 }
 
 #[test]
+fn current_oss_release_accepts_optional_v_prefix() {
+    let prefixed = ParsedVersion::try_from("v0.2026.10.14.16.45.oss_00").unwrap();
+    let unprefixed = ParsedVersion::try_from("0.2026.10.14.16.45.oss_00").unwrap();
+    assert_eq!(prefixed, unprefixed);
+    assert_eq!(
+        prefixed.date,
+        NaiveDate::from_ymd_opt(2026, 10, 14)
+            .unwrap()
+            .and_hms_opt(16, 45, 0)
+            .unwrap()
+    );
+}
+
+#[test]
+fn current_oss_release_orders_trimmed_older_and_newer_versions() {
+    let current = ParsedVersion::try_from("v0.2026.10.14.16.45.oss_00").unwrap();
+    let older = ParsedVersion::try_from("0.2026.10.07.01.09.oss_00").unwrap();
+    let newer = ParsedVersion::try_from("0.2026.10.15.01.00.oss_00").unwrap();
+    assert!(older < current);
+    assert!(current < newer);
+}
+
+#[test]
+fn current_oss_release_orders_same_minute_patch() {
+    let current = ParsedVersion::try_from("v0.2026.10.14.16.45.oss_00").unwrap();
+    let patched = ParsedVersion::try_from("0.2026.10.14.16.45.oss_01").unwrap();
+    assert!(current < patched);
+}
+
+#[test]
+fn current_oss_release_rejects_extra_prefix_or_suffix() {
+    assert!(ParsedVersion::try_from("vv0.2026.10.14.16.45.oss_00").is_err());
+    assert!(ParsedVersion::try_from("release-v0.2026.10.14.16.45.oss_00").is_err());
+    assert!(ParsedVersion::try_from("v0.2026.10.14.16.45.oss_00-invalid").is_err());
+}
+
+#[test]
+fn current_oss_release_rejects_invalid_calendar_date() {
+    assert!(ParsedVersion::try_from("v0.2026.02.30.16.45.oss_00").is_err());
+    assert!(ParsedVersion::try_from("0.2026.10.14.24.00.oss_00").is_err());
+}
+
+#[test]
+fn legacy_oss_release_rejects_patch_overflow() {
+    assert!(ParsedVersion::try_from("v2026.05.26.99999999999999999999999999999").is_err());
+}
+
+#[test]
 fn test_major_versions_compare_correctly() {
     let older_version: ParsedVersion = "v0.2023.05.15.08.04.stable_01"
         .try_into()

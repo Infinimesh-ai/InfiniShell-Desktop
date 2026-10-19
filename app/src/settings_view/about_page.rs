@@ -287,7 +287,8 @@ impl AboutPageWidget {
         let ui_builder = appearance.ui_builder();
 
         // 当前 stage 决定文案与操作:
-        // - NoUpdateAvailable / 未知错误:已是最新 + "检查更新"
+        // - NoUpdateAvailable:已是最新 + "检查更新"
+        // - CheckFailed:检查失败 + "检查更新"
         // - CheckingForUpdate:正在检查...(无操作)
         // - DownloadingUpdate:正在下载 X% (X MB / Y MB) (无操作)
         // - UpdateReady / UpdatedPendingRestart:可以安装 + "立即安装"按钮
@@ -327,6 +328,10 @@ impl AboutPageWidget {
                 };
                 (text, UpdateAction::None)
             }
+            AutoupdateStage::CheckFailed => (
+                crate::t!("settings-about-update-check-failed"),
+                UpdateAction::Check,
+            ),
             AutoupdateStage::NoUpdateAvailable => (
                 crate::t!("settings-about-update-up-to-date"),
                 UpdateAction::Check,

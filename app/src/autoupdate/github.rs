@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
+use channel_versions::ParsedVersion;
 use lazy_static::lazy_static;
 use serde::Deserialize;
 
@@ -53,8 +54,11 @@ impl GithubAsset {
 }
 
 impl GithubRelease {
-    pub fn version(&self) -> &str {
-        self.tag_name.trim_start_matches('v')
+    pub fn version(&self) -> Result<&str> {
+        // 先验证原始 tag，避免多重前缀或额外后缀在归一化时被误接受。
+        ParsedVersion::try_from(self.tag_name.as_str())?;
+        let tag = self.tag_name.trim();
+        Ok(tag.strip_prefix('v').unwrap_or(tag))
     }
 
     pub fn find_asset(&self, expected_name: &str) -> Option<&GithubAsset> {

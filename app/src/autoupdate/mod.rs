@@ -8,6 +8,7 @@ mod mac;
 #[cfg(windows)]
 mod windows;
 
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
@@ -102,6 +103,8 @@ pub enum AutoupdateStage {
     NoUpdateAvailable,
     /// Checking for an update and downloading it if one exists.
     CheckingForUpdate,
+    /// 更新检查失败，不能确认是否存在可用版本。
+    CheckFailed,
     /// The new version is being downloaded.
     DownloadingUpdate,
     /// An update exists but the user does not have authorization to install it.
@@ -384,14 +387,17 @@ impl AutoupdateState {
     }
 
     /// Given a newly-available version, check if we should update.
-    fn should_update(&mut self, version: VersionInfo, update_id: String) -> UpdateReady {
-        let current_version = match ChannelState::app_version() {
-            Some(version) => version,
-            None => {
-                log::info!("No version tag set, cannot autoupdate");
-                return UpdateReady::No;
-            }
+    fn should_update(&mut self, version: VersionInfo, update_id: String) -> Result<UpdateReady> {
+        let Some(current_version) = ChannelState::app_version() else {
+            log::info!("No version tag set, cannot autoupdate");
+            return Ok(UpdateReady::No);
         };
+
+        // 比较失败必须停止检查，显式回滚也不能绕过版本校验。
+        let parsed_current = ParsedVersion::try_from(current_version)
+            .context("Cannot parse the installed release version")?;
+        let parsed_latest = ParsedVersion::try_from(version.version.as_str())
+            .context("Cannot parse the available release version")?;
 
         // In case the version didn't update, but the soft cutoff did,
         // let's make sure that's reflected in the last downloaded update that we continue to use.
@@ -403,69 +409,45 @@ impl AutoupdateState {
             download.version.update_by = version.update_by;
         }
 
-        // openWarp 注:`ChannelState::app_version()` 返回的是注入的 `GIT_RELEASE_TAG`
-        // 原值,**保留** `v` 前缀(如 `v2026.05.10.preview`);而 `VersionInfo.version`
-        // 在 OSS 分支由 `github::GithubRelease::version()` 提供,已经 `trim_start_matches('v')`
-        // 去掉了 `v`(如 `2026.05.10.preview`)。直接做字符串相等比较会永远 false,导致
-        // "已是最新"被错判为"发现新版本"。这里做幂等的前缀归一化:
-        // - 官方 Zap:tag 一律带 `v`,两边 trim 后仍相等,行为不变。
-        // - openWarp:trim 后才相等,正确识别同版本。
-        if version.version.trim_start_matches('v') == current_version.trim_start_matches('v') {
-            log::info!("Already up to date with {}", version.version);
-            UpdateReady::No
-        } else {
-            if let Ok(true) =
-                self.is_current_version_ahead_of_latest_version(&version, current_version)
-            {
-                let is_rollback = version.is_rollback.unwrap_or(false);
-                if !is_rollback {
-                    log::info!(
-                        "Current version ({}) is ahead of version in channel versions({}), not updating",
-                        current_version,
-                        version.version
-                    );
-                    return UpdateReady::No;
-                }
+        match parsed_current.cmp(&parsed_latest) {
+            Ordering::Equal => {
+                log::info!("Already up to date with {}", version.version);
+                return Ok(UpdateReady::No);
             }
-
-            // We should update - the only thing left to do is check if this version is already
-            // downloaded.
-            match &self.downloaded_update {
-                Some(downloaded_update) if downloaded_update.version.version == version.version => {
-                    // This case occurs if a check runs after an update has already been
-                    // downloaded, but not yet applied, i.e. when opening a new window.
-                    log::info!(
-                        "Already downloaded {} in update_id {}",
-                        version.version,
-                        downloaded_update.update_id
-                    );
-                    UpdateReady::Yes {
-                        new_version: downloaded_update.version.clone(),
-                        update_id: downloaded_update.update_id.clone(),
-                    }
-                }
-                _ => {
-                    // Either we haven't downloaded any updates or we've downloaded a different
-                    // version.
-                    UpdateReady::CanDownload {
-                        new_version: version,
-                        update_id,
-                    }
-                }
+            Ordering::Greater if !version.is_rollback.unwrap_or(false) => {
+                log::info!(
+                    "Current version ({current_version}) is ahead of available version ({}), not updating",
+                    version.version
+                );
+                return Ok(UpdateReady::No);
             }
+            // 仅保留渠道元数据已有的显式回滚；GitHub Releases 不设置该字段。
+            Ordering::Greater | Ordering::Less => {}
         }
-    }
 
-    /// Returns whether the current version is ahead of the version reported by the server as the "latest" version
-    /// in channel versions.
-    fn is_current_version_ahead_of_latest_version(
-        &self,
-        new_version: &VersionInfo,
-        current_version: &str,
-    ) -> Result<bool> {
-        let current_version = ParsedVersion::try_from(current_version)?;
-        let new_version = ParsedVersion::try_from(new_version.version.as_str())?;
-        Ok(current_version > new_version)
+        // 只有确认版本可安装后，才允许复用缓存或启动平台下载。
+        Ok(match &self.downloaded_update {
+            Some(downloaded_update)
+                if ParsedVersion::try_from(downloaded_update.version.version.as_str())
+                    .ok()
+                    .as_ref()
+                    == Some(&parsed_latest) =>
+            {
+                log::info!(
+                    "Already downloaded {} in update_id {}",
+                    version.version,
+                    downloaded_update.update_id
+                );
+                UpdateReady::Yes {
+                    new_version: downloaded_update.version.clone(),
+                    update_id: downloaded_update.update_id.clone(),
+                }
+            }
+            Some(_) | None => UpdateReady::CanDownload {
+                new_version: version,
+                update_id,
+            },
+        })
     }
 
     fn on_update_check_complete(
@@ -476,16 +458,15 @@ impl AutoupdateState {
         is_daily: bool,
         ctx: &mut ModelContext<AutoupdateState>,
     ) {
-        if is_daily && version.is_ok() {
-            self.last_successful_daily_update_check = Some(chrono::Local::now().fixed_offset());
-        }
-
         // If one update was already applied, we cannot apply another.
         if matches!(self.stage, AutoupdateStage::UpdatedPendingRestart { .. }) {
             return;
         }
 
-        let update_available = version.map(|version| self.should_update(version, update_id));
+        let update_available = version.and_then(|version| self.should_update(version, update_id));
+        if is_daily && update_available.is_ok() {
+            self.last_successful_daily_update_check = Some(chrono::Local::now().fixed_offset());
+        }
         match &update_available {
             Ok(UpdateReady::CanDownload {
                 new_version,
@@ -534,7 +515,7 @@ impl AutoupdateState {
                 // We commonly get errors as the autoupdate code runs when a laptop wakes up
                 // briefly while asleep, but the network call to check for updates gets cancelled
                 // when returning to sleep. So we fail silently and wait for the next update poll.
-                self.stage = AutoupdateStage::NoUpdateAvailable;
+                self.stage = AutoupdateStage::CheckFailed;
                 log::warn!("Error checking for update {e:#}");
             }
         };
@@ -862,16 +843,24 @@ pub fn accessibility_content(
 ) -> Option<AccessibilityContent> {
     match (request_type, update_available) {
         // Found autoupdate
-        (RequestType::ManualCheck, Ok(UpdateReady::Yes { .. })) => Some(AccessibilityContent::new(
-            "Update available.",
-            "Use the command palette to install and relaunch InfiniShell",
+        (
+            RequestType::ManualCheck,
+            Ok(UpdateReady::Yes { .. } | UpdateReady::CanDownload { .. }),
+        ) => Some(AccessibilityContent::new(
+            crate::t!("autoupdate-a11y-available"),
+            crate::t!("autoupdate-a11y-install-help"),
             WarpA11yRole::HelpRole,
         )),
-        // Any non-successful autoupdate check
-        (RequestType::ManualCheck, _) => Some(AccessibilityContent::new_without_help(
-            "No updates available",
+        (RequestType::ManualCheck, Err(_)) => Some(AccessibilityContent::new_without_help(
+            crate::t!("settings-about-update-check-failed"),
             WarpA11yRole::HelpRole,
         )),
+        (RequestType::ManualCheck, Ok(UpdateReady::No)) => {
+            Some(AccessibilityContent::new_without_help(
+                crate::t!("autoupdate-a11y-no-updates"),
+                WarpA11yRole::HelpRole,
+            ))
+        }
         _ => None,
     }
 }
@@ -906,7 +895,7 @@ async fn fetch_version(
     // channel_versions / GCS。提前返回避免后续 fetch_channel_versions 必然失败。
     if matches!(channel, Channel::Oss) {
         let release = github::fetch_latest_release(http_client.as_ref()).await?;
-        return Ok(VersionInfo::new(release.version().to_string()));
+        return Ok(VersionInfo::new(release.version()?.to_string()));
     }
 
     let versions = fetch_channel_versions(update_id, http_client.as_ref(), false, is_daily).await?;

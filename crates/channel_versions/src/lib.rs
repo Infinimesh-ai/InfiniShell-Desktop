@@ -31,14 +31,16 @@ impl std::fmt::Display for ChannelVersions {
 }
 
 lazy_static! {
-    static ref VERSION_RE: Regex = Regex::new(r"v(\d+)\.(.+)\.(.+)_(\d+)").unwrap();
+    // 正式发行与当前 OSS tag 共用长格式；前缀在解析入口统一处理。
+    static ref VERSION_RE: Regex = Regex::new(
+        r"^(\d+)\.(\d{4}\.\d{2}\.\d{2}\.\d{2}\.\d{2})\.([A-Za-z][A-Za-z0-9-]*)_(\d+)$"
+    ).unwrap();
 
-    // openWarp(OSS)发布 tag 形如 `v2026.05.26.2`(4 段:年.月.日.序号),没有
+    // 早期 openWarp(OSS)发布 tag 形如 `v2026.05.26.2`(4 段:年.月.日.序号),没有
     // 官方版本里 `_NN` 后缀和 channel 名。主正则匹配不到时再尝试这条 fallback,
-    // 让 is_current_version_ahead_of_latest_version / is_incoming_version_past_current
-    // 能正确比较大小,从而识别回滚或本地构建超前 release 的场景。
+    // 让更新判断能继续比较旧格式，识别回滚或本地构建超前 release 的场景。
     static ref OSS_VERSION_RE: Regex =
-        Regex::new(r"^v?(\d{4})\.(\d{1,2})\.(\d{1,2})(?:\.(\d+))?$").unwrap();
+        Regex::new(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})(?:\.(\d+))?$").unwrap();
 
     // Cached mapping of version strings to semantic versions.
     static ref PARSED_VERSIONS_CACHE: MemoMap<String, ParsedVersion> = Default::default();
@@ -55,6 +57,8 @@ impl TryFrom<&str> for ParsedVersion {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self> {
+        let value = value.trim();
+        let value = value.strip_prefix('v').unwrap_or(value);
         PARSED_VERSIONS_CACHE
             .get_or_try_insert(value, || {
                 if let Some(parsed) = parse_official(value).or_else(|| parse_oss(value)) {
@@ -69,7 +73,7 @@ impl TryFrom<&str> for ParsedVersion {
 }
 
 fn parse_official(value: &str) -> Option<ParsedVersion> {
-    let captures = VERSION_RE.captures(value.trim())?;
+    let captures = VERSION_RE.captures(value)?;
     let date_str = captures.get(2)?.as_str();
     let date = NaiveDateTime::parse_from_str(date_str, "%Y.%m.%d.%H.%M").ok()?;
     Some(ParsedVersion {
@@ -80,15 +84,15 @@ fn parse_official(value: &str) -> Option<ParsedVersion> {
 }
 
 fn parse_oss(value: &str) -> Option<ParsedVersion> {
-    let captures = OSS_VERSION_RE.captures(value.trim())?;
+    let captures = OSS_VERSION_RE.captures(value)?;
     let year: i32 = captures.get(1)?.as_str().parse().ok()?;
     let month: u32 = captures.get(2)?.as_str().parse().ok()?;
     let day: u32 = captures.get(3)?.as_str().parse().ok()?;
     let date = chrono::NaiveDate::from_ymd_opt(year, month, day)?.and_hms_opt(0, 0, 0)?;
-    let patch: usize = captures
-        .get(4)
-        .and_then(|m| m.as_str().parse::<usize>().ok())
-        .unwrap_or(0);
+    let patch = match captures.get(4) {
+        Some(patch) => patch.as_str().parse().ok()?,
+        None => 0,
+    };
     // OSS 没有 major 段;统一记为 0,这样和官方 tag(major>=0)用同一个 Ord 比较时
     // 不会发生 OSS 版本被错误判定"大于"官方版本的情况。
     Some(ParsedVersion {

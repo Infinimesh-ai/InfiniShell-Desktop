@@ -317,11 +317,255 @@ fn make_version_info(version_string: impl Into<String>, is_rollback: bool) -> Ve
     }
 }
 
+fn github_version(tag: &str) -> VersionInfo {
+    let release = github::GithubRelease {
+        tag_name: tag.to_owned(),
+        html_url: "https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest".to_owned(),
+        assets: vec![],
+    };
+    VersionInfo::new(release.version().unwrap().to_owned())
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_rejects_older_github_release() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+    let version = github_version("v0.2026.10.07.01.09.oss_00");
+    assert_eq!(version.version, "0.2026.10.07.01.09.oss_00");
+    assert_eq!(version.is_rollback, None);
+
+    assert_eq!(
+        autoupdate
+            .should_update(version, "older".to_owned())
+            .unwrap(),
+        UpdateReady::No
+    );
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_rejects_same_github_release() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+
+    assert_eq!(
+        autoupdate
+            .should_update(
+                github_version("v0.2026.10.14.16.45.oss_00"),
+                "same".to_owned()
+            )
+            .unwrap(),
+        UpdateReady::No
+    );
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_accepts_newer_github_release() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+    let version = github_version("v0.2026.10.15.01.00.oss_00");
+
+    assert_eq!(
+        autoupdate
+            .should_update(version.clone(), "newer".to_owned())
+            .unwrap(),
+        UpdateReady::CanDownload {
+            new_version: version,
+            update_id: "newer".to_owned(),
+        }
+    );
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_allows_explicit_rollback() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+    let version = make_version_info("0.2026.10.07.01.09.oss_00", true);
+
+    assert_eq!(
+        autoupdate
+            .should_update(version.clone(), "rollback".to_owned())
+            .unwrap(),
+        UpdateReady::CanDownload {
+            new_version: version,
+            update_id: "rollback".to_owned(),
+        }
+    );
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_rejects_malformed_explicit_rollback() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+
+    assert!(
+        autoupdate
+            .should_update(make_version_info("unparseable", true), "invalid".to_owned())
+            .is_err()
+    );
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_rejects_unparseable_installed_version() {
+    ChannelState::set_app_version(Some("local-unversioned-build"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+
+    assert!(
+        autoupdate
+            .should_update(
+                github_version("v0.2026.10.15.01.00.oss_00"),
+                "invalid-current".to_owned()
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn release_update_order_rejects_malformed_github_tag_before_normalization() {
+    let release = github::GithubRelease {
+        tag_name: "vv0.2026.10.15.01.00.oss_00".to_owned(),
+        html_url: String::new(),
+        assets: vec![],
+    };
+    assert!(release.version().is_err());
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_reuses_download_with_equivalent_prefix() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+    let downloaded_version = make_version_info("v0.2026.10.15.01.00.oss_00", false);
+    autoupdate.downloaded_update = Some(DownloadedUpdate {
+        version: downloaded_version.clone(),
+        update_id: "downloaded".to_owned(),
+    });
+
+    assert_eq!(
+        autoupdate
+            .should_update(
+                github_version("v0.2026.10.15.01.00.oss_00"),
+                "retry".to_owned()
+            )
+            .unwrap(),
+        UpdateReady::Yes {
+            new_version: downloaded_version,
+            update_id: "downloaded".to_owned(),
+        }
+    );
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_invalid_metadata_preserves_download() {
+    ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+    let mut autoupdate = AutoupdateState::new(Arc::new(http_client::Client::new()));
+    let downloaded_version = make_version_info("v0.2026.10.15.01.00.oss_00", false);
+    autoupdate.downloaded_update = Some(DownloadedUpdate {
+        version: downloaded_version.clone(),
+        update_id: "downloaded".to_owned(),
+    });
+    let mut invalid_version = make_version_info("unparseable", false);
+    invalid_version.soft_cutoff = Some("v0.2026.10.15.01.00.oss_00".to_owned());
+
+    assert!(
+        autoupdate
+            .should_update(invalid_version, "invalid".to_owned())
+            .is_err()
+    );
+    let download = autoupdate.downloaded_update.as_ref().unwrap();
+    assert_eq!(download.version, downloaded_version);
+    assert_eq!(download.update_id, "downloaded");
+}
+
+#[test]
+#[serial_test::serial(autoupdate_version)]
+fn release_update_order_failed_check_is_retryable_without_new_version_ui() {
+    App::test((), |mut app| async move {
+        let autoupdate_state = initialize_app(&mut app);
+        let results = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let captured_results = results.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&autoupdate_state, move |_, event, _| match event {
+                AutoupdateStateEvent::CheckComplete { result, .. } => {
+                    captured_results.lock().push(Some(result.is_err()));
+                }
+                AutoupdateStateEvent::UpdateAvailable => {
+                    captured_results.lock().push(None);
+                }
+            });
+        });
+
+        app.update_model(&autoupdate_state, |autoupdate, ctx| {
+            ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+            autoupdate.stage = AutoupdateStage::CheckingForUpdate;
+            autoupdate.on_update_check_complete(
+                RequestType::ManualCheck,
+                "invalid".to_owned(),
+                Ok(make_version_info("unparseable", false)),
+                true,
+                ctx,
+            );
+
+            assert_eq!(autoupdate.stage, AutoupdateStage::CheckFailed);
+            assert_eq!(autoupdate.stage.available_new_version(), None);
+            assert!(!autoupdate.stage.ready_for_update());
+            assert!(autoupdate.should_start_update_check());
+            assert!(autoupdate.downloaded_update.is_none());
+            assert!(autoupdate.download_progress.is_none());
+            assert!(autoupdate.last_successful_daily_update_check.is_none());
+        });
+
+        assert_eq!(*results.lock(), vec![Some(true)]);
+
+        app.update_model(&autoupdate_state, |autoupdate, ctx| {
+            autoupdate.on_update_check_complete(
+                RequestType::ManualCheck,
+                "retry-older".to_owned(),
+                Ok(github_version("v0.2026.10.07.01.09.oss_00")),
+                true,
+                ctx,
+            );
+
+            assert_eq!(autoupdate.stage, AutoupdateStage::NoUpdateAvailable);
+            assert_eq!(autoupdate.stage.available_new_version(), None);
+            assert!(autoupdate.downloaded_update.is_none());
+            assert!(autoupdate.download_progress.is_none());
+            assert!(autoupdate.last_successful_daily_update_check.is_some());
+        });
+        assert_eq!(*results.lock(), vec![Some(true), Some(false)]);
+    });
+}
+
+#[test]
+fn release_update_order_failed_check_accessibility_reports_failure() {
+    let content = accessibility_content(
+        &Err(anyhow!("invalid release version")),
+        RequestType::ManualCheck,
+    )
+    .unwrap();
+    assert_eq!(
+        content.value,
+        crate::t!("settings-about-update-check-failed")
+    );
+    assert_ne!(content.value, crate::t!("autoupdate-a11y-no-updates"));
+    assert!(
+        accessibility_content(&Err(anyhow!("invalid release version")), RequestType::Poll)
+            .is_none()
+    );
+}
+
 /// When a download fails, `downloaded_update` must stay None so the next poll retries.
 /// This is the state-machine behavior underlying a disk-space issue where,
 /// without cleanup, every failed download retry would leave lots of failed artifacts behind,
 /// eventually filling the user's cache directory.
 #[test]
+#[serial_test::serial(autoupdate_version)]
 fn test_download_failure_allows_retry() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
@@ -352,7 +596,9 @@ fn test_download_failure_allows_retry() {
 
             // The next should_update call must return CanDownload (allowing retry).
             let version = make_version_info(target_version, false);
-            let result = autoupdate.should_update(version, "retry_id".to_string());
+            let result = autoupdate
+                .should_update(version, "retry_id".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::CanDownload { .. }),
                 "Should allow retry download after failure"
@@ -364,6 +610,7 @@ fn test_download_failure_allows_retry() {
 /// After a successful download, `downloaded_update` is set and subsequent `should_update`
 /// calls return `UpdateReady::Yes` — preventing re-downloads on the next poll.
 #[test]
+#[serial_test::serial(autoupdate_version)]
 fn test_successful_download_prevents_redownload() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
@@ -395,7 +642,9 @@ fn test_successful_download_prevents_redownload() {
 
             // The next should_update call must return Yes, NOT CanDownload.
             let version = make_version_info(target_version, false);
-            let result = autoupdate.should_update(version, "another_id".to_string());
+            let result = autoupdate
+                .should_update(version, "another_id".to_string())
+                .unwrap();
             match result {
                 UpdateReady::Yes { update_id, .. } => {
                     assert_eq!(
@@ -416,6 +665,7 @@ fn test_successful_download_prevents_redownload() {
 /// fix: `download_new_update` captures `last_successful_update_id` from `downloaded_update`,
 /// so failure cleanup preserves the old download's directory on disk.
 #[test]
+#[serial_test::serial(autoupdate_version)]
 fn test_failed_download_preserves_previous_successful_download() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
@@ -462,16 +712,18 @@ fn test_failed_download_preserves_previous_successful_download() {
             assert_eq!(autoupdate.stage, AutoupdateStage::NoUpdateAvailable);
 
             // Re-checking for v2 should return Yes (already downloaded).
-            let result =
-                autoupdate.should_update(make_version_info(v2, false), "check_v2".to_string());
+            let result = autoupdate
+                .should_update(make_version_info(v2, false), "check_v2".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::Yes { ref update_id, .. } if update_id == "id_v2"),
                 "should_update for the preserved v2 should return Yes with the original update_id"
             );
 
             // Checking for v3 should return CanDownload (retry).
-            let result =
-                autoupdate.should_update(make_version_info(v3, false), "check_v3".to_string());
+            let result = autoupdate
+                .should_update(make_version_info(v3, false), "check_v3".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::CanDownload { .. }),
                 "should_update for v3 should allow a retry download"
@@ -484,6 +736,7 @@ fn test_failed_download_preserves_previous_successful_download() {
 /// Verifies that after a failed download preserves an earlier success, a subsequent
 /// successful download correctly replaces it.
 #[test]
+#[serial_test::serial(autoupdate_version)]
 fn test_successful_download_after_failure_replaces_preserved_download() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
@@ -528,7 +781,7 @@ fn test_successful_download_after_failure_replaces_preserved_download() {
             assert!(matches!(autoupdate.stage, AutoupdateStage::UpdateReady { .. }));
 
             // v3 is now the downloaded version.
-            let result = autoupdate.should_update(make_version_info(v3, false), "check".to_string());
+            let result = autoupdate.should_update(make_version_info(v3, false), "check".to_string()).unwrap();
             assert!(
                 matches!(result, UpdateReady::Yes { ref update_id, .. } if update_id == "id_v3_success"),
                 "should_update for v3 should return Yes with the new update_id"
@@ -538,6 +791,7 @@ fn test_successful_download_after_failure_replaces_preserved_download() {
 }
 
 #[test]
+#[serial_test::serial(autoupdate_version)]
 fn test_should_update() {
     App::test((), |mut app| async move {
         app.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
@@ -551,7 +805,9 @@ fn test_should_update() {
                 false, /* is_rollback */
             );
 
-            let result = autoupdate.should_update(version, "update1".to_string());
+            let result = autoupdate
+                .should_update(version, "update1".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::No),
                 "Should not update when no version tag is set"
@@ -563,7 +819,9 @@ fn test_should_update() {
                 "v0.2023.05.15.08.04.stable_01",
                 false, /* is_rollback */
             );
-            let result = autoupdate.should_update(version, "update2".to_string());
+            let result = autoupdate
+                .should_update(version, "update2".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::No),
                 "Should not update when already on the latest version"
@@ -575,7 +833,9 @@ fn test_should_update() {
                 "v0.2023.05.15.08.04.stable_01",
                 false, /* is_rollback */
             );
-            let result = autoupdate.should_update(version, "update3".to_string());
+            let result = autoupdate
+                .should_update(version, "update3".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::No),
                 "Should not update when current version is ahead and no rollback"
@@ -585,7 +845,9 @@ fn test_should_update() {
             ChannelState::set_app_version(Some("v0.2023.05.15.08.04.stable_02"));
             let version =
                 make_version_info("v0.2023.05.15.08.04.stable_01", true /* is_rollback */);
-            let result = autoupdate.should_update(version, "update4".to_string());
+            let result = autoupdate
+                .should_update(version, "update4".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::CanDownload { .. }),
                 "Should update when current version is ahead but rollback is true"
@@ -597,7 +859,9 @@ fn test_should_update() {
                 "v0.2023.05.15.08.04.stable_02",
                 false, /* is_rollback */
             );
-            let result = autoupdate.should_update(version.clone(), "updateid".to_string());
+            let result = autoupdate
+                .should_update(version.clone(), "updateid".to_string())
+                .unwrap();
             match result {
                 UpdateReady::CanDownload {
                     new_version,
@@ -619,27 +883,33 @@ fn test_should_update() {
             // 而 `github::GithubRelease::version()` 已经 trim 掉 `v`。两者只差 `v`
             // 前缀时应识别为 `UpdateReady::No`,否则关于页会永远提示“发现新版本”。
             // Test 6: openWarp 同版本(本地带 v、远端不带 v)
-            ChannelState::set_app_version(Some("v2026.05.10.preview"));
-            let version = make_version_info("2026.05.10.preview", false);
-            let result = autoupdate.should_update(version, "oss_same_version".to_string());
+            ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+            let version = make_version_info("0.2026.10.14.16.45.oss_00", false);
+            let result = autoupdate
+                .should_update(version, "oss_same_version".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::No),
                 "openWarp 仅 v 前缀差异应识别为已是最新,实际: {result:?}"
             );
 
             // Test 7: 反向(本地不带 v、远端带 v)同样应识别为同版本
-            ChannelState::set_app_version(Some("2026.05.10.preview"));
-            let version = make_version_info("v2026.05.10.preview", false);
-            let result = autoupdate.should_update(version, "oss_same_version_2".to_string());
+            ChannelState::set_app_version(Some("0.2026.10.14.16.45.oss_00"));
+            let version = make_version_info("v0.2026.10.14.16.45.oss_00", false);
+            let result = autoupdate
+                .should_update(version, "oss_same_version_2".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::No),
                 "反向前缀差异应识别为已是最新,实际: {result:?}"
             );
 
             // Test 8: 不同版本仍须能识别为可下载(不被归一化误伤)
-            ChannelState::set_app_version(Some("v2026.05.10.preview"));
-            let version = make_version_info("2026.05.11.preview", false);
-            let result = autoupdate.should_update(version, "oss_new_version".to_string());
+            ChannelState::set_app_version(Some("v0.2026.10.14.16.45.oss_00"));
+            let version = make_version_info("0.2026.10.15.01.00.oss_00", false);
+            let result = autoupdate
+                .should_update(version, "oss_new_version".to_string())
+                .unwrap();
             assert!(
                 matches!(result, UpdateReady::CanDownload { .. }),
                 "不同版本应识别为 CanDownload,实际: {result:?}"
