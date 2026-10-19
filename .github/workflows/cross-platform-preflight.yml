@@ -325,6 +325,16 @@ jobs:
         test(cli_subagent_sizes) |
         test(terminal::alt_screen::alt_screen_element::tests::) |
         test(ai::agent_providers::chat_stream::responses_tests::) |
+        test(terminal::local_tty::shell::tests::) |
+        test(code::inline_diff::tests::) |
+        test(ai::blocklist::inline_action::code_diff_view::persistence_tests::) |
+        test(ai::blocklist::action_model::execute::request_file_edits::) |
+        test(remote_server::server_model::) |
+        test(ai::agent::conversation::ordered_input_tests::) |
+        test(ai::agent::conversation::message_failure_tests::) |
+        test(ai::byop_compaction::recovery::tests::) |
+        test(ai::blocklist::controller::compaction_tests::) |
+        test(ai::blocklist::controller::compaction_crash_tests::) |
         test(ai::blocklist::controller::response_stream::model_routing_tests::) |
         test(ai::blocklist::block::cli::) |
         test(persistence::sqlite::tests::) |
@@ -473,7 +483,7 @@ jobs:
           if [[ "$RUNNER_OS" == Windows ]]; then
             python=python
           fi
-          modules=(notification_patch_tests codex_persistent_source_tests codex_windows_hook_tests codex_windows_notify_tests)
+          modules=(notification_patch_tests plugin_compatibility_tests codex_persistent_source_tests codex_windows_hook_tests codex_windows_notify_tests)
           if [[ "$RUNNER_OS" == Windows ]]; then
             modules+=(codex_native_windows_notification_tests)
           else
@@ -512,8 +522,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib'
-            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer --lib
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files --lib'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files --lib
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
 
       - name: 测试窗口迁移与同步错误类型
@@ -537,7 +547,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test_filter="(package(warp) & ($APP_FILTER)) | (package(warp_tui) & test(=terminal_session_view::tests::shell_completion_source_warmup_loads_path_executables))"
+          test_filter="(package(warp) & ($APP_FILTER)) | (package(warp_tui) & (test(=terminal_session_view::tests::shell_completion_source_warmup_loads_path_executables) | test(tui_diff_storage::tests::)))"
           {
             echo "cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp -p warp_tui --lib --features $APP_FEATURES -E '$test_filter'"
             cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p warp -p warp_tui --lib --features "$APP_FEATURES" -E "$test_filter"
