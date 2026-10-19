@@ -473,13 +473,14 @@
       {
         "item": "近期GUI候选包冒烟",
         "status": "historical_candidate_preserved_scoped_macos_updater_runtime_passed_final_candidate_pending",
-        "when": "本轮冻结Apple Development运行ZIP已完成英中旧版拒绝、失败/重试和英文恢复，2560×1600布局通过并清理；中文失败AX公告未捕获，不替代正式三端候选。",
+        "when": "本轮冻结Apple Development运行ZIP已完成英中旧版拒绝、失败/重试和英文恢复，中文失败AX已在同包前台手动检查中补验通过；2560×1600布局通过并清理，不替代正式三端候选。",
         "pass_condition": "绑定新候选源码和最终签名二进制；必要冒烟及重启恢复，保留模型路由/strict schema、浮窗、Retina输入选择、英中错误及Plan提示判据",
         "linux_desktop_matrix_required": false,
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/macos-gui/result.json",
         "historical_completed": "旧01.46结果仅按旧包保留；本轮使用16.45真实包独立执行，不继承旧结论",
         "current_integration_ref": "main_acceptance.release_integration_20261019",
-        "current_runtime_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"
+        "current_runtime_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+        "chinese_failure_ax_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json"
       },
       {
         "item": "Ubuntu DEB安装生命周期",
@@ -498,9 +499,10 @@
         "pass_condition": "实际发行格式和有无v的版本比较、相同/旧/新版本及明确回滚策略回归；解析失败不按新版处理；必要本地化门禁及最终包定向GUI复验",
         "evidence": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.14.16.45.oss_00/native-validation/user-acceptance-review-20261019/update-version-reproduction.json",
         "completed": "实际发行格式、前缀归一化、版本方向和失败保守处理已实现并推送84fbb124…；英中文案同步，61/61 nextest、显式i18n 12/12与warp/warp_tui check通过。",
-        "remaining": "中文失败AX公告未捕获；未来正式三端新包、最终Setup和实际SSH按影响补验。本轮GUI和夹具已清理，设置字节已还原，无用户待操作。",
+        "remaining": "中文失败AX已在同包前台手动检查中补验通过；未来正式三端新包、最终Setup和实际SSH按影响补验。本轮GUI和夹具已清理，设置字节已还原，无用户待操作。",
         "current_integration_ref": "main_acceptance.release_integration_20261019",
-        "current_gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"
+        "current_gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+        "chinese_failure_ax_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json"
       }
     ],
     "ongoing_boundaries": {
@@ -1482,15 +1484,16 @@
     "user_evidence_review_performed_in_this_revision": true,
     "current_work_scope": {
       "status": "source_main_integrated_ci_and_scoped_macos_gui_passed_future_package_pending",
-      "user_direction": "原多端演练已收尾；用户授权继续源码整合、定向验证及受验R9替换Draft Setup，正式发布另行安排。",
+      "user_direction": "用户要求仅补齐中文失败无障碍公告；仍保持Draft，不公开发布，不重跑已完成的旧包验收。",
       "publication_requested": false,
       "upstream_merge_owned_by_other_chat": false,
       "source_changes_in_this_revision": false,
       "integration_source_changes": true,
       "authority_ref": "main_acceptance.release_integration_20261019",
-      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json",
       "implementation_source_sha": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
-      "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43"
+      "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43",
+      "current_main_at_zh_a11y_followup": "1f5041fed0645c328425715a8a01d8387020d6cb"
     },
     "release_integration_20261019": {
       "as_of": "2026-10-19T14:12:40.814640+00:00",
@@ -1558,16 +1561,16 @@
         "cargo_test_i18n_explicit_command": "passed_12_of_12",
         "final_cargo_check": "passed",
         "current_integration_ci": "linux_reused_with_cfg_equivalence_eighth_windows_success",
-        "new_runtime_package_gui": "scoped_macos_old_release_failure_retry_and_english_recovery_passed_zh_failure_ax_not_captured",
+        "new_runtime_package_gui": "scoped_macos_old_release_failure_retry_english_recovery_and_zh_failure_ax_passed",
         "final_source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
-        "acceptance_boundary": "61项nextest、显式12项i18n、warp/warp_tui check及第八Windows定向组通过。冻结Mac运行包英中旧版拒绝、失败/重试和英文恢复已实测；2560×1600布局通过，中文失败AX公告未捕获；不构成最终三端新包、实际SSH或正式发布通过。",
+        "acceptance_boundary": "61项nextest、显式12项i18n、warp/warp_tui check及第八Windows定向组通过。冻结Mac运行包英中旧版拒绝、失败/重试和英文恢复已实测；2560×1600布局通过，中文失败AX在同包前台手动检查中补验通过；不构成最终三端新包、实际SSH或正式发布通过。",
         "warp_tui_cargo_check": "passed"
       },
       "runtime_package_followup": {
         "planned_profile": "release-lto",
         "status": "built_signed_runtime_zip_scoped_updater_gui_passed_and_cleaned",
         "formal_release_candidate": false,
-        "scope": "本轮独立release-lto运行包使用10.14复验公开latest10.07旧版误提示，英中失败/重试和英文恢复已在真实GUI完成；包身份不变，不是正式候选，中文失败AX公告未捕获。",
+        "scope": "本轮独立release-lto运行包使用10.14复验公开latest10.07旧版误提示，英中失败/重试和英文恢复已在真实GUI完成；中文失败AX在同包前台手动检查中补验通过，包身份不变，不是正式候选。",
         "run_id": "r-426c5f7f",
         "source_sha": "84fbb124744ecfd6d0044b6498e304b685b05848",
         "test_version": "v0.2026.10.14.16.45.oss_00",
@@ -1663,8 +1666,8 @@
         "nonblocking_followups": "沿用原验收复核记录，不因本次资产替换或源码测试扩大关闭范围"
       },
       "pending_record": [
-        "本次GUI续记的实际文档HEAD与远端状态由独立gui-resume-closeout.json绑定；原final-closeout.json为d18历史回执，不覆写",
-        "中文失败AX公告未捕获，不标通过；本轮Mac限定GUI、退出与设置恢复完成，无用户待操作",
+        "前轮文档HEAD由gui-resume-closeout.json绑定；本次中文失败AX补验由zh-failure-a11y/closeout.json绑定，历史回执不覆写",
+        "中文失败AX已在同包前台手动检查中补验通过；本轮Mac限定GUI、退出与设置恢复完成，无用户待操作",
         "未来正式候选绑定三端桌面、最终Setup、六daemon内嵌资源，按影响补验Agent文件操作/有序输入/更新器及实际SSH删除移动撤销",
         "正式构建/12资产回验/签名公证及公开发布等用户安排；不要求现在重复旧包六阶段",
         "七失败、旧candidate/history、延期V01/V02/V05及关闭G09保留；1902是定向执行次数，非全库或唯一测试数"
@@ -3316,6 +3319,45 @@
         "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/final-closeout.json",
         "receipt_sha256": "e31f964d1907caaead3bfd8110be43d31febcb05926f6342adcef65f7c393074",
         "gui_resume_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/gui-resume-closeout.json"
+      },
+      "macos_zh_failure_a11y_followup": {
+        "status": "passed_scoped_chinese_failure_accessibility_value",
+        "recorded_at": "2026-10-19T14:32:35.820793+00:00",
+        "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json",
+        "receipt_sha256": "51d4ad92e5afe725ac3c7436041fbde08ecf5b893bfb65ece6a2065bde2ecb27",
+        "source_head_at_start": "1f5041fed0645c328425715a8a01d8387020d6cb",
+        "executable_sha256": "5d3416466701497f26ff340c032e5fdeb2ca02e7df56e21884f7f9c1cb034649",
+        "gui_run": "r-bb166e68",
+        "fixture_run": "r-d7d2df2f",
+        "observed_ax_value": "检查更新失败，请重试。",
+        "passed_failure_transport": "connection_failure_after_fixture_exit_not_503",
+        "initial_uncaptured_attempts_preserved": true,
+        "settings_exact_original_bytes_restored": true,
+        "both_runs_exit_zero_cleaned": true,
+        "product_code_changed": false,
+        "localization": "无需本地化变更",
+        "voiceover_audio_or_ax_event_listener_verified": false,
+        "formal_release_candidate": false,
+        "publication_performed": false,
+        "prior_result": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json",
+        "remote_check_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/remote-after-validation.json",
+        "closeout_receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/closeout.json",
+        "independent_review": {
+          "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/independent-review.json",
+          "receipt_sha256": "cdc8df5acfa751733a30e5db3178d5f970fd7bd85a4bf03a252847ef53aa7f8b",
+          "result": "passed_with_explicit_scope_limits"
+        },
+        "documentation_cargo_check": {
+          "run_id": "r-e99cfb5c",
+          "command": "cargo check --locked -p warp",
+          "exit_code": 0,
+          "status": "cleaned",
+          "source_unchanged": true,
+          "receipt": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-e99cfb5c.json",
+          "receipt_sha256": "06a3786e16c629311db723c6eb977d0ec1070b24206abb9d9a055afc8fcabd6c",
+          "existing_warnings": 5,
+          "scope": "仅本轮文档补记前检查；无产品源码变化"
+        }
       },
       "macos_update_gui_resume": {
         "recorded_at": "2026-10-19T14:12:40.814640+00:00",
@@ -10898,7 +10940,7 @@
     "next": "原runner先复核本提交固定能力，再同提交真实PS新收据；真实分类返回/同停点CLR和精准修复、正常五场景/三次冷恢复、最终同源双平台门禁仍待完成。",
     "localization": "无需本地化变更；仅诊断和证据记录，无用户文案或布局变化。"
   },
-  "status_zh": "受测源码8b46已在main，本次续验基线d18f9b354；第八Windows及既有定向门禁通过，七失败保留。本轮冻结Mac运行包英中旧版拒绝、失败/重试及英文恢复限定通过并清理，设置字节还原；中文失败AX公告未捕获。正式新三端包和实际SSH未验，Draft未公开，无用户待操作。",
+  "status_zh": "受测源码8b46已在main，本次中文失败AX补验起点1f5041fed；第八Windows及既有定向门禁通过，七失败保留。本轮冻结Mac运行包英中旧版拒绝、失败/重试及英文恢复限定通过；中文失败AX在同包前台手动检查中补验通过，进程清理、设置字节还原。正式新三端包和实际SSH未验，Draft未公开，无用户待操作。",
   "g09_ps_unselected_classification_20261006": {
     "commit": "b12f59967cab7af22a6b606c6f7310257e656f44",
     "fixed_run": 37395058332,
@@ -13334,7 +13376,7 @@
   ],
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 38534655990,
-  "localization": "当前整合涉及更新器用户功能，About及无障碍文案已同步英文和简体中文；定向nextest及显式i18n 12/12通过，warp/warp_tui check通过；新包英中GUI布局仍待验。",
+  "localization": "更新器About及无障碍文案已同步英文和简体中文；既有定向nextest、显式i18n 12/12及warp/warp_tui check通过。本轮无需本地化变更，冻结运行包英中布局已验，中文前台失败AX补验通过；正式三端新包仍待按影响补验。",
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "原批准范围11项保持关闭。新候选Windows与Ubuntu24.04 x86_64 DEB安装生命周期由用户操作、助手审核；旧Linux/Windows CLI认证V01/V02/V05矩阵继续按原决定延期，自动检查与本轮包冒烟不代替真实模型、完整输入法或审批矩阵验收。",
@@ -13344,20 +13386,22 @@
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
     "authority_ref": "main_acceptance.release_integration_20261019",
-    "base_source_commit": "d18f9b354a53e64718fb3878d23feb51b617bc43",
-    "source_commit": "d18f9b354a53e64718fb3878d23feb51b617bc43",
-    "scope": "本次只续记冻结Mac运行包GUI实测和恢复/清理证据；无产品源码变化。英中旧版拒绝、失败/重试和英文恢复限定通过，中文失败AX未捕获；正式三端新包与实际SSH未验。",
+    "base_source_commit": "1f5041fed0645c328425715a8a01d8387020d6cb",
+    "source_commit": "1f5041fed0645c328425715a8a01d8387020d6cb",
+    "scope": "本次只补齐同一冻结Mac运行包中文失败AX、恢复及清理证据；无产品源码变化。前台手动检查失败AX值通过，不扩大VoiceOver语音、正式三端新包或实际SSH。",
     "product_changed": false,
-    "localization": "无需本地化变更；既有英中更新文案在2560×1600真实界面检查无截断或重叠，英文失败AX已捕获，中文失败AX公告未捕获。",
+    "localization": "无需本地化变更；既有英中更新文案在2560×1600真实界面检查无截断或重叠，英文失败AX已捕获，中文失败AX在同包前台手动检查中补验通过。",
     "formal_publication": "awaiting_user_arrangement",
-    "integrated_product_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867"
+    "integrated_product_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
+    "source_commit_scope": "本次仅补验与文档续记的起点；实际最终提交由zh-failure-a11y/closeout.json绑定",
+    "evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json"
   },
   "latest_resume": {
     "authority_ref": "main_acceptance.release_integration_20261019",
     "source_commit": "5068dae9c75b79628865a0872684113647c204d8",
     "source_commit_scope": "仅为Draft R9所封装原应用；当前主线受测源码8b46另由integration_source_commit绑定，不改写R9身份",
     "status": "源码及定向门禁已在主线；冻结Mac运行包限定更新GUI已通过并清理，正式新包待安排，保持Draft",
-    "next_step": "本次GUI续记文档与远端由独立gui-resume-closeout.json绑定；中文失败AX未捕获，未来正式候选按影响补验三端UI、最终Setup和实际SSH，不公开发布。",
+    "next_step": "前轮GUI续记由gui-resume-closeout.json绑定，本次中文失败AX补验由zh-failure-a11y/closeout.json绑定；未来正式候选按影响补验三端UI、最终Setup和实际SSH，不公开发布。",
     "integration_source_commit": "8b46bcc33c8c9d69a6bbecc8534edc39001ca867",
     "current_main_at_gui_resume": "d18f9b354a53e64718fb3878d23feb51b617bc43",
     "gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json"

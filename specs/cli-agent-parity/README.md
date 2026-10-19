@@ -4,13 +4,13 @@
 
 ## 当前主线状态（2026-10-19）
 
-**本轮受测源码 `8b46bcc3…` 已快进合入并推送 main，PR #26 已合并；第八 Windows CI 成功，readonly、PATH／reissue、通知及 Rust／i18n 定向门禁通过。七次失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过并清理；中文失败 AX 公告未捕获，正式新包未构建、未公开发布。** 精确身份、计数及边界见[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)，不在本页复制逐次进度。
+**本轮受测源码 `8b46bcc3…` 已快进合入并推送 main，PR #26 已合并；第八 Windows CI 成功，readonly、PATH／reissue、通知及 Rust／i18n 定向门禁通过。七次失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过并清理；中文失败 AX 公告已在同包前台手动检查中补验通过，正式新包未构建、未公开发布。** 精确身份、计数及边界见[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)，不在本页复制逐次进度。
 
 - 原 Windows R9 和 Ubuntu DEB 用户演练已经收尾；R9 `c18725c5…` 已替换 Draft Setup，回下载大小／SHA 一致，其余 11 件资产未变。R9 原应用仍 `5068dae9c…`，不含本轮上游／updater，`NotSigned` 和 Draft 边界保留。
 - 更新器共用链路及英中失败提示已实现；本地 61／61 nextest、显式 i18n 12／12、warp／warp_tui check 通过。Linux 定向 1942 次 Rust 执行和第八 Windows 1902 次执行通过，均非全库；Windows app 内 i18n 11 通过。本轮 Mac 更新状态双语布局已在 2560×1600 实测；最终三端新包与实际 SSH 未验。
 - 旧 CLI V01／V02／V05 仍延期，G09 关闭，原 SSH／输入分类／中文搜索非阻塞项不变。TUI 冒烟未发模型请求，不等于真实 SSH 或 GUI 验证。
 
-证据入口：[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)（源码／包身份、七轮失败简表、清理复查、待验及下次正式候选影响补验）；[机器可读当前记录](/Volumes/SanDisk/github/InfiniShell-Desktop/specs/cli-agent-parity/CURRENT_STATUS.json)的 `main_acceptance.release_integration_20261019`；[R9 回下载](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json)；[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)。`r-384c44cd`／`r-b2fe8bf4` 已依独立复查 cleaned，原 cleanup=false 收据保留；本轮两次 GUI 与三夹具均 exit 0／cleaned，设置已逐字节恢复，无用户待操作，见[GUI 最终续验](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json)。原 `current_release_candidate` 及历史对象继续绑定原字节；不要求现在重跑旧包六阶段，新候选按影响补验，下面 10 月 15 日内容仅为当时快照。
+证据入口：[发布修复整合续记](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19-release-integration.zh-CN.md)（源码／包身份、七轮失败简表、清理复查、待验及下次正式候选影响补验）；[机器可读当前记录](/Volumes/SanDisk/github/InfiniShell-Desktop/specs/cli-agent-parity/CURRENT_STATUS.json)的 `main_acceptance.release_integration_20261019`；[R9 回下载](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/r9-roundtrip.json)；[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)。`r-384c44cd`／`r-b2fe8bf4` 已依独立复查 cleaned，原 cleanup=false 收据保留；本轮两次 GUI 与三夹具均 exit 0／cleaned，设置已逐字节恢复，无用户待操作，见[GUI 最终续验](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/resumption-final.json)。后续[中文失败 AX 补验](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json)捕获中文失败公告值，新增 GUI 与夹具均正常退出／cleaned，设置再次逐字节恢复；未采集 VoiceOver 语音。原 `current_release_candidate` 及历史对象继续绑定原字节；不要求现在重跑旧包六阶段，新候选按影响补验，下面 10 月 15 日内容仅为当时快照。
 
 ## 2026-10-15 状态快照（历史保留）
 

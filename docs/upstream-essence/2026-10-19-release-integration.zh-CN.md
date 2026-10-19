@@ -1,6 +1,6 @@
 # 2026-10-19 发布修复整合续记
 
-**本轮源码已在 main 吸收并推送，受测源码为 `8b46bcc3…`；第八轮 Windows CI 成功，readonly、PATH／reissue、通知链及四组 Rust 定向门禁通过。七次历史失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过，相关进程已清理；中文失败 AX 公告未捕获，实际 SSH 与正式新包未验，未公开发布，保持 Draft。** [第八轮 39256631029](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029) actual head 为 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`；精确计数和限制见[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)。源码吸收和自动门禁通过不等于新包验收通过。
+**本轮源码已在 main 吸收并推送，受测源码为 `8b46bcc3…`；第八轮 Windows CI 成功，readonly、PATH／reissue、通知链及四组 Rust 定向门禁通过。七次历史失败保留。Mac 更新器英中旧版拒绝、失败／重试及英文恢复已在冻结运行包限定范围通过，相关进程已清理；中文失败 AX 公告已在同包前台手动检查中补验通过，实际 SSH 与正式新包未验，未公开发布，保持 Draft。** [第八轮 39256631029](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/39256631029) actual head 为 `8b46bcc33c8c9d69a6bbecc8534edc39001ca867`；精确计数和限制见[审核原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/ci-39256631029/evidence-review.json)。源码吸收和自动门禁通过不等于新包验收通过。
 
 本记录承接[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)及[本轮上游巡检和吸收报告](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/upstream-essence/2026-10-19.md)。已审 upstream 断点仍为 `ae60375ef1d3895908756878fe4a07cbe703ce1a`，没有扩大上游扫描范围。旧包验收只属于原字节，不转记为本轮新源码或新包通过。收拢前的五份未提交文档已完整保存在[进度快照及 SHA-256 清单](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/document-progress-snapshots/20261019T121920.731222Z/manifest.json)；原始失败证据及已提交历史不改写。
 
@@ -38,7 +38,7 @@ Draft `412823983` 已仅将旧 Setup asset `640654138` 换为受验 R9 asset `65
 
 检查错误进入 `CheckFailed`，不宣称最新、不发出可用更新事件、不将错误响应写入 `downloaded_update`，关于页及无障碍反馈提供失败和重试语义。GitHub 响应元数据缓存仍会在获取响应时写入；本轮未修改所有下载／安装失败的完整状态链。历史 Ubuntu 复现只证明旧版被误标新版，用户未点击更新，不记为实际降级。
 
-英文和简体中文同步四个无变量消息键：`settings-about-update-check-failed`、`autoupdate-a11y-available`、`autoupdate-a11y-install-help`、`autoupdate-a11y-no-updates`。失败文案为 “Could not check for updates. Please try again.”／“检查更新失败，请重试。”；i18n 门禁已过；本轮 2560×1600 真实界面已核对英中无更新、检查中、失败及重试入口，无截断或重叠。英文失败 AX 已捕获，中文失败 AX 公告未捕获，后者不标通过；不扩大为 VoiceOver 语音或所有窗口尺寸。PATH helper、诊断及门禁没有新增用户界面文案，无需本地化变更。
+英文和简体中文同步四个无变量消息键：`settings-about-update-check-failed`、`autoupdate-a11y-available`、`autoupdate-a11y-install-help`、`autoupdate-a11y-no-updates`。失败文案为 “Could not check for updates. Please try again.”／“检查更新失败，请重试。”；i18n 门禁已过；本轮 2560×1600 真实界面已核对英中无更新、检查中、失败及重试入口，无截断或重叠。英文失败 AX 已捕获；中文失败 AX 由本页后续补验捕获，前轮未捕获的事实保留；不扩大为 VoiceOver 语音或所有窗口尺寸。PATH helper、诊断及门禁没有新增用户界面文案，无需本地化变更。
 
 ## 已通过门禁与清理状态
 
@@ -117,10 +117,22 @@ TUI 前两次 exit 101 的原始收据保留；第三次额外选择 `-p warp` �
 
 [GUI 后远端回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/resumed-validation/remote-after-gui.json)确认 PR #26 仍为 `MERGED`，Draft 仍 `true`／`published_at=null`，12 件资产的 ID／名称／大小／digest 与原收尾一致，tag 对象及 peeled 源码未变。原 `final-closeout.json` 保留不覆写；本次限定 GUI 通过不授予新三端正式包或实际 SSH 验收通过。
 
+## 中文失败无障碍公告补验（同一冻结运行包）
+
+[中文失败 AX 补验](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/result.json)（SHA-256 `51d4ad92e5afe725ac3c7436041fbde08ecf5b893bfb65ece6a2065bde2ecb27`）绑定续验起点 `1f5041fed…`、原冻结 EXE `5d341646…` 与 `r-bb166e68`。本次只补中文失败 AX：通过 CUA 置前窗口并打开／取消原生菜单，再点击关于页“检查更新”，窗口 AX 从“命令输入。”更新为 **“检查更新失败，请重试。”**，原终端帮助 Description 消失。[AX 原件](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/05-foreground-failure.ax.txt)与[同次原始截图](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/05-foreground-failure.jpg)保留；2560×1600 画面中的失败提示和重试入口完整可见。
+
+本次初次单次夹具返回 503 时，AX 仍未捕获公告；随后首次连接失败快照也未捕获，原件均保留。最终通过属于夹具退出后的本机代理连接失败，不能记为该次收到 503。源码的 macOS 公告接口在无 keyWindow 时直接返回；前台重试后捕获的现象与此条件吻合，但没有插桩证明此前各次缺失的根因，不声称修复了后台窗口公告。当前结论仅为前台手动失败后的中文 AX 值通过，未采集 VoiceOver 音频或独立 AX 事件监听。
+
+本轮没有产品源码或文案修改，无需本地化变更；相关更新器、Fluent 和 macOS 公告路径在冻结源码 `84fbb124…` 与续验起点之间无 diff。GUI `r-bb166e68` 和夹具 `r-d7d2df2f` 均 exit 0／cleaned，源文件与 EXE 未变，进程／launchd／打开文件清理证据完整，端口已关闭。语言与应用代理设置在校验临时文件摘要后逐字节恢复为原 3543 字节／SHA `6842e369…`；自动化未修改系统网络或钥匙串设置。
+
+[远端复核](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/remote-after-validation.json)仍为 Draft `412823983`、`published_at=null`、12 件资产及原 tag；公开 Latest 仍 10.07。原验收、前轮未捕获与失败原件不覆写，原包验收未重跑，正式新包和实际 SSH 仍按下文边界处理。此次文档提交与远端一致性另由 [补验收尾回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/closeout.json)绑定。
+
+[独立复核](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/macos-update-gui/zh-failure-a11y/independent-review.json)确认 10 件捕获摘要、成功 AX／截图、两轮清理、设置恢复及远端身份一致，无阻塞。提交前 `cargo check --locked -p warp` 通过（[r-e99cfb5c](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/r-e99cfb5c.json)，exit 0／cleaned、运行期间源码未变，5 条既有警告）；本次无产品变更，未重跑已通过的产品或旧包验收。
+
 ## 待验与发布边界
 
-- 源码与前轮文档已主线吸收，定向自动门禁已闭合；本次 GUI 续记的实际文档提交与远端状态由独立[续验收尾回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/gui-resume-closeout.json)绑定，不覆盖原收尾。七次失败现场与原件保留，不把第八定向结果扩大为全库、实际 SSH 或正式包通过。
-- 本轮 Mac 更新器限定 GUI 已完成，设置字节恢复、两次 GUI 与三个夹具清理均已核实，无钥匙串待操作。中文失败 AX 公告未捕获，不标该项通过；正式三端候选仍按下表补验，不能以本轮运行 ZIP 或源码单元测试替代最终包。
+- 源码与前轮文档已主线吸收，定向自动门禁已闭合；前轮 GUI 续记的文档提交与远端状态由独立[续验收尾回执](/Volumes/SanDisk/InfiniShell-Archives/upstream-essence/2026-10-19/release-integration/gui-resume-closeout.json)绑定，不覆盖原收尾。七次失败现场与原件保留，不把第八定向结果扩大为全库、实际 SSH 或正式包通过。
+- 本轮 Mac 更新器限定 GUI 已完成，前轮两次 GUI／三个夹具及本次新增 GUI／单次夹具的清理、设置字节恢复均已核实，无钥匙串待操作。中文失败 AX 已在后续同包前台检查中补验通过；正式三端候选仍按下表补验，不能以本轮运行 ZIP 或源码单元测试替代最终包。
 - 原 Mac 签名 DMG、Windows R9、Ubuntu 24.04 GNOME Wayland DEB 六阶段及原资产验收按[原多端验收梳理](/Volumes/SanDisk/github/InfiniShell-Desktop/docs/release-acceptance-review-20261019.zh-CN.md)保留；任何新正式候选仍须绑定源码、包字节、签名和受影响的多端补验。当前运行 ZIP、TUI 冒烟或 R9 资产替换都不能关闭新包验收。
 - 旧 CLI `V01`／`V02`／`V05` 继续延期，`G09` 已关闭，Linux 自动检查保留。SSH 窄侧栏空态裁切、一次中文命令被识别为 Agent（Ctrl-I 可恢复）、Mac 中文“连字”搜索继续作为原非阻塞跟进。物理 IME 只按用户确认及提交／输出截图计证，不扩大为完整组合过程矩阵通过。
 - 受测源码 `8b46bcc3…`、main 整合和第八 CI 已有回执；本轮限定 GUI 已另行续记，新 Setup 与正式三端候选的独立验收仍待后续安排。正式发布需要用户另行安排；保持 Draft，不预填发布或候选通过。
