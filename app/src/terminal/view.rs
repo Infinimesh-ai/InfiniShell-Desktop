@@ -5129,7 +5129,17 @@ impl TerminalView {
         finish_reason: FinishReason,
         ctx: &mut ViewContext<Self>,
     ) {
-        let queued_prompt = self.queued_prompt_callback.take();
+        // 回退取消旧任务时不能消费唯一的排队回调，保留给用户明确继续。
+        let rewinding = self
+            .ai_context_model
+            .as_ref(ctx)
+            .selected_conversation_id(ctx)
+            .is_some_and(|id| self.ai_controller.as_ref(ctx).is_rewinding_conversation(id));
+        let queued_prompt = if rewinding {
+            None
+        } else {
+            self.queued_prompt_callback.take()
+        };
         let callbacks = self
             .conversation_completed_callbacks
             .drain(..)
@@ -5671,6 +5681,13 @@ impl TerminalView {
         finish_reason: FinishReason,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self
+            .ai_controller
+            .as_ref(ctx)
+            .is_rewinding_conversation(conversation_id)
+        {
+            return;
+        }
         match finish_reason {
             FinishReason::Complete => {
                 let input_is_empty = self.input.as_ref(ctx).buffer_text(ctx).is_empty();
@@ -5808,6 +5825,13 @@ impl TerminalView {
         conversation_id: AIConversationId,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self
+            .ai_controller
+            .as_ref(ctx)
+            .is_rewinding_conversation(conversation_id)
+        {
+            return;
+        }
         // 停止或失败后的命令完成事件不能自动发送排队追问并重新启动任务。
         if BlocklistAIHistoryModel::as_ref(ctx)
             .conversation(&conversation_id)
@@ -26133,7 +26157,34 @@ impl TerminalView {
         exchange_id: AIAgentExchangeId,
         conversation_id: AIConversationId,
         ctx: &mut ViewContext<Self>,
-    ) {
+    ) -> Option<SpawnedFutureHandle> {
+        if self
+            .ai_controller
+            .as_ref(ctx)
+            .is_rewinding_conversation(conversation_id)
+        {
+            return None;
+        }
+        let mut blocks = Vec::new();
+        for rich_content in self.rich_content_views.iter().rev() {
+            if let Some(metadata) = rich_content.ai_block_metadata()
+                && metadata.conversation_id == conversation_id
+            {
+                blocks.push(metadata.ai_block_handle.clone());
+                if metadata.ai_block_handle.id() == ai_block_view_id {
+                    break;
+                }
+            }
+        }
+        if blocks.last().map(ViewHandle::id) != Some(ai_block_view_id) {
+            return None;
+        }
+        let original_conversation = BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&conversation_id)
+            .cloned();
+        let rewind_guard = self.ai_controller.update(ctx, |controller, _| {
+            controller.begin_conversation_rewind(conversation_id)
+        })?;
         // First, cancel any in-progress conversation
         self.ai_controller.update(ctx, |controller, ctx| {
             controller.cancel_conversation_progress(
@@ -26164,67 +26215,87 @@ impl TerminalView {
             self.user_write_ctrl_c_to_pty(ctx);
         }
 
-        // Iterate from end backwards, reverting all diffs in each AIBlock from this conversation until the block the user clicked on (inclusive)
-        let mut num_blocks_reverted = 0;
-        for rich_content in self.rich_content_views.iter().rev() {
-            if let Some(ai_metadata) = rich_content.ai_block_metadata() {
-                // Only revert blocks from the same conversation
-                if ai_metadata.conversation_id == conversation_id {
-                    ai_metadata.ai_block_handle.update(ctx, |block, ctx| {
-                        block.revert_all_diffs(ctx);
+        let num_blocks_reverted = blocks.len();
+        let spawner = ctx.spawner();
+        let restore_guard = rewind_guard.clone();
+        Some(ctx.spawn(
+            async move {
+                for block in blocks {
+                    let completion = spawner
+                        .spawn(move |_, ctx| {
+                            block.update(ctx, |block, ctx| block.revert_all_diffs(ctx))
+                        })
+                        .await
+                        .map_err(|error| error.to_string())?;
+                    completion.await.map_err(|error| error.to_string())?;
+                }
+                drop(restore_guard);
+                Ok::<(), String>(())
+            },
+            move |me, result, ctx| {
+                if let Err(error) = result {
+                    crate::safe_error!(
+                        safe: ("Failed to rewind conversation"),
+                        full: ("Failed to rewind conversation: {error}")
+                    );
+                    let window_id = ctx.window_id();
+                    ToastStack::handle(ctx).update(ctx, |stack, ctx| {
+                        stack.add_ephemeral_toast(
+                            DismissibleToast::error(crate::t!("terminal-rewind-failed")),
+                            window_id,
+                            ctx,
+                        );
                     });
-                    num_blocks_reverted += 1;
-                    if ai_metadata.ai_block_handle.id() == ai_block_view_id {
-                        break;
+                    ctx.notify();
+                    return;
+                }
+
+                // 仅在所有恢复成功后备份原会话并截断，失败时保留原位置的重试入口。
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
+                    if let Some(conversation) = original_conversation {
+                        if let Err(error) = history_model.fork_conversation(
+                            &conversation,
+                            PRE_REWIND_PREFIX,
+                            false,
+                            None,
+                            ctx,
+                        ) {
+                            log::warn!("Failed to save pre-rewind backup of conversation {conversation_id}: {error}");
+                        }
+                    }
+                });
+                let removed_exchange_ids = BlocklistAIHistoryModel::handle(ctx).update(
+                    ctx,
+                    |history_model, ctx| {
+                        history_model.truncate_conversation_from_exchange(
+                            conversation_id,
+                            exchange_id,
+                            ctx,
+                        )
+                    },
+                );
+                match removed_exchange_ids {
+                    Ok(removed_ids) => {
+                        me.remove_ai_blocks_for_exchanges(&conversation_id, &removed_ids, ctx)
+                    }
+                    Err(error) => {
+                        log::warn!("Failed to truncate conversation: {error}");
+                        return;
                     }
                 }
-            }
-        }
-
-        // Save a backup of the conversation before truncating, so users can restore it later.
-        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
-            match history_model.conversation(&conversation_id).cloned() { Some(conversation) => {
-                if let Err(e) = history_model.fork_conversation(
-                    &conversation,
-                    PRE_REWIND_PREFIX,
-                    false, /* preserve_task_ids */
-                    None,
-                    ctx,
-                ) {
-                    log::warn!("Failed to save pre-rewind backup of conversation {conversation_id}: {e}");
-                }
-            } _ => {
-                log::warn!("Failed to save pre-rewind backup: conversation {conversation_id} not found in memory");
-            }}
-        });
-
-        // Truncate the conversation history
-        let removed_exchange_ids =
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
-                history_model.truncate_conversation_from_exchange(conversation_id, exchange_id, ctx)
-            });
-
-        // Truncate the blocklist UI
-        match removed_exchange_ids {
-            Ok(removed_ids) => {
-                self.remove_ai_blocks_for_exchanges(&conversation_id, &removed_ids, ctx);
-            }
-            Err(e) => {
-                log::warn!("Failed to truncate conversation: {e}");
-            }
-        }
-
-        // Clear stale action results that reference truncated tool calls.
-        self.ai_controller.update(ctx, |controller, ctx| {
-            controller.clear_finished_action_results(conversation_id, ctx);
-        });
-
-        send_telemetry_from_ctx!(
-            TelemetryEvent::AgentModeRewindExecuted {
-                num_blocks_reverted
+                me.ai_controller.update(ctx, |controller, ctx| {
+                    controller.clear_finished_action_results(conversation_id, ctx);
+                });
+                send_telemetry_from_ctx!(
+                    TelemetryEvent::AgentModeRewindExecuted { num_blocks_reverted },
+                    ctx
+                );
+                // 回退成功后也保留排队输入，由用户选择是否发送到截断后的会话。
+                // 强引用同时由恢复 future 和本回调持有，任一取消/销毁路径均可自动释放。
+                drop(rewind_guard);
+                ctx.notify();
             },
-            ctx
-        );
+        ))
     }
 
     fn handle_input_context_menu_action(
@@ -27716,7 +27787,7 @@ impl TypedActionView for TerminalView {
                 exchange_id,
                 conversation_id,
             } => {
-                self.rewind_ai_conversation(*ai_block_view_id, *exchange_id, *conversation_id, ctx)
+                self.rewind_ai_conversation(*ai_block_view_id, *exchange_id, *conversation_id, ctx);
             }
             ExecuteRewindFromInlineMenu {
                 exchange_id,

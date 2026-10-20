@@ -6028,3 +6028,6 @@ cloud-sync-error-read-secret = 无法读取 { $node }（{ $kind }）的凭据：
 cloud-sync-error-read-previous-secret = 无法读取 { $node }（{ $kind }）的旧凭据：{ $error }。已回滚 { $count } 项凭据变更。请确认凭据存储可用后重试下载。
 cloud-sync-error-write-secret = 无法写入 { $node }（{ $kind }）的凭据：{ $error }。请检查凭据存储权限后重试下载。
 cloud-sync-error-write-database = 无法保存下载的配置：{ $error }。已回滚 { $count } 项凭据变更。
+
+terminal-rewind-failed = 未能完成回退。已保留会话，你可以再次点击“回退”重试。
+terminal-rewind-in-progress = 正在回退，已保留草稿和排队提示。请等待回退结束后再发送。

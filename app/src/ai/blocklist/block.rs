@@ -29,6 +29,7 @@ use base64::Engine as _;
 use chrono::Duration;
 use cli_controller::{CLISubagentController, CLISubagentEvent};
 use find::FindState;
+use futures::FutureExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use model::AIBlockOutputStatus;
@@ -49,6 +50,7 @@ use warp_editor::content::buffer::InitialBufferState;
 use warp_editor::content::edit::resolve_asset_source_relative_to_directory;
 use warp_editor::render::element::VerticalExpansionBehavior;
 use warp_errors::{report_error, report_if_error};
+use warp_util::file::FileSaveError;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warp_util::path::ShellFamily;
 use warpui::assets::asset_cache::AssetCache;
@@ -74,7 +76,7 @@ use super::action_model::{AIActionStatus, BlocklistAIActionEvent, RequestFileEdi
 use super::code_block::CodeSnippetButtonHandles;
 use super::controller::ClientIdentifiers;
 use super::inline_action::code_diff_view::{
-    CodeDiffState, CodeDiffView, CodeDiffViewAction, CodeDiffViewEvent,
+    CodeDiffState, CodeDiffView, CodeDiffViewEvent,
 };
 use super::inline_action::requested_action::{CTRL_C_KEYSTROKE, ENTER_KEYSTROKE};
 use super::inline_action::requested_command_attribution::is_command_copied_from_document;
@@ -107,6 +109,7 @@ use crate::ai::blocklist::block::keyboard_navigable_buttons::{
     KeyboardNavigableButtonBuilder, KeyboardNavigableButtons,
 };
 use crate::ai::blocklist::context_model::AttachmentType;
+use crate::ai::blocklist::diff_storage::SaveFuture;
 #[cfg(feature = "agent_mode_debug")]
 use crate::ai::blocklist::diff_types::FileDiff;
 use crate::ai::blocklist::inline_action::ask_user_question_view::{
@@ -4150,13 +4153,38 @@ impl AIBlock {
         self.client_ids.conversation_id
     }
 
-    /// Reverts all file diffs (CodeDiffViews) in this AIBlock, from newest to oldest (order matters)
-    pub fn revert_all_diffs(&mut self, ctx: &mut ViewContext<Self>) {
-        for edit in self.requested_edits.values().rev() {
-            edit.view.update(ctx, |diff_view, ctx| {
-                diff_view.handle_action(&CodeDiffViewAction::RevertChanges, ctx);
-            });
+    #[cfg(test)]
+    pub(crate) fn insert_requested_edit_for_test(
+        &mut self,
+        action_id: AIAgentActionId,
+        view: ViewHandle<CodeDiffView>,
+    ) {
+        self.requested_edits
+            .insert(action_id, RequestedEdit::new(view));
+    }
+
+    /// 从新到旧逐项等待磁盘恢复；失败时保留尚未撤销的操作以便重试。
+    pub fn revert_all_diffs(&mut self, ctx: &mut ViewContext<Self>) -> SaveFuture {
+        let edits = self
+            .requested_edits
+            .values()
+            .rev()
+            .map(|edit| edit.view.clone())
+            .collect::<Vec<_>>();
+        let spawner = ctx.spawner();
+        async move {
+            for view in edits {
+                let completion = spawner
+                    .spawn(move |_, ctx| view.update(ctx, |view, ctx| view.revert_changes(ctx)))
+                    .await
+                    .map_err(|error| Arc::new(FileSaveError::Other(error.to_string())))?;
+                if let Some(completion) = completion {
+                    completion.await?;
+                }
+            }
+            Ok(())
         }
+        .boxed()
     }
 
     pub fn response_stream_id(&self) -> Option<&ResponseStreamId> {

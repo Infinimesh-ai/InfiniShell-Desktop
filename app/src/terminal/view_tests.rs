@@ -11417,3 +11417,621 @@ fn deferred_ssh_agent_entry_waits_for_remote_bootstrap_and_preserves_origin() {
     );
     assert_eq!(pending, None);
 }
+
+// 使用真实文件和实际 CodeDiffView 保存链，避免仅验证回调顺序。
+fn initialize_rewind_test(app: &mut App) -> ViewHandle<TerminalView> {
+    initialize_app_for_terminal_view(app);
+    app.add_singleton_model(warp_files::FileModel::new);
+    app.add_singleton_model(|_| crate::vim_registers::VimRegisters::new());
+    app.add_singleton_model(crate::notebooks::editor::keys::NotebookKeybindings::new);
+    app.add_singleton_model(|_| ToastStack);
+    add_window_with_terminal(app, None)
+}
+
+fn add_rewind_edit(
+    app: &mut App,
+    block: &ViewHandle<AIBlock>,
+    path: &std::path::Path,
+    base: &str,
+    diff: ai::diff_validation::DiffType,
+) -> ViewHandle<crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView> {
+    use crate::ai::blocklist::RequestFileEditsFormatKind;
+    use crate::ai::blocklist::diff_types::FileDiff;
+    use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView;
+
+    block.update(app, |block, ctx| {
+        let action_id = AIAgentActionId::from(format!("{}:{base}", path.display()));
+        let edit = ctx.add_typed_action_view(|ctx| {
+            let mut edit = CodeDiffView::new_passive(
+                &action_id,
+                None,
+                crate::ai::agent::AIIdentifiers::default(),
+                RequestFileEditsFormatKind::V4A,
+                false,
+                None,
+                ctx,
+            );
+            edit.set_candidate_diffs(
+                vec![FileDiff::new(
+                    base.to_owned(),
+                    path.to_string_lossy().into_owned(),
+                    diff,
+                )],
+                ctx,
+            );
+            edit
+        });
+        block.insert_requested_edit_for_test(action_id, edit.clone());
+        edit
+    })
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn rewind_failed_delete_restore_preserves_original_card_and_history() {
+    use crate::ai::blocklist::diff_storage::RegisteredDiffStorage;
+    use crate::workspace::ToastStackEvent;
+
+    App::test((), |mut app| async move {
+        let terminal = initialize_rewind_test(&mut app);
+        let (conversation_id, _, exchange_id, _) = terminal.update(&mut app, |view, ctx| {
+            append_exchange_and_handle_event(view, agent_view_user_query_input("delete"), ctx)
+        });
+        let block = terminal.read(&app, |view, _| {
+            view.ai_block_for_exchange(&exchange_id).unwrap().clone()
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("guard.txt");
+        std::fs::write(&path, "original\n").unwrap();
+        let edit = add_rewind_edit(
+            &mut app,
+            &block,
+            &path,
+            "original\n",
+            ai::diff_validation::DiffType::deletion(1),
+        );
+        assert!(matches!(
+            app.update(|ctx| edit.downgrade().accept_and_save(ctx))
+                .await,
+            crate::ai::agent::RequestFileEditsResult::Success { .. }
+        ));
+        assert!(!path.exists());
+        std::fs::write(&path, "external blocker\n").unwrap();
+        let (tx, failed) = futures::channel::oneshot::channel();
+        let mut tx = Some(tx);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if matches!(event, ToastStackEvent::AddEphemeralToast { .. }) {
+                    if let Some(tx) = tx.take() {
+                        let _ = tx.send(());
+                    }
+                }
+            });
+        });
+        let rewind = terminal
+            .update(&mut app, |view, ctx| {
+                view.rewind_ai_conversation(block.id(), exchange_id, conversation_id, ctx)
+            })
+            .unwrap();
+        assert_eq!(
+            terminal.read(&app, |view, _| ai_block_ids_for_conversation(
+                view,
+                conversation_id
+            )),
+            vec![block.id()],
+            "恢复尚未完成时不能移除原卡片"
+        );
+        failed.await.unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "external blocker\n"
+        );
+        assert_eq!(
+            terminal.read(&app, |view, _| ai_block_ids_for_conversation(
+                view,
+                conversation_id
+            )),
+            vec![block.id()],
+            "恢复失败后原卡片必须仍可重试"
+        );
+        assert!(
+            BlocklistAIHistoryModel::handle(&app).read(&app, |history, _| history
+                .conversation(&conversation_id)
+                .unwrap()
+                .exchange_with_id(exchange_id)
+                .is_some())
+        );
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        std::fs::remove_file(&path).unwrap();
+        let rewind = terminal
+            .update(&mut app, |view, ctx| {
+                view.rewind_ai_conversation(block.id(), exchange_id, conversation_id, ctx)
+            })
+            .unwrap();
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        assert!(
+            terminal.read(&app, |view, _| view
+                .ai_block_for_exchange(&exchange_id)
+                .is_none()),
+            "修复冲突后应能从原卡片重试成功"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "original\n");
+        assert!(
+            BlocklistAIHistoryModel::handle(&app).read(&app, |history, _| history
+                .conversation(&conversation_id)
+                .unwrap()
+                .exchange_with_id(exchange_id)
+                .is_none())
+        );
+    });
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn rewind_waits_for_newer_block_before_restoring_older_edit_of_same_file() {
+    use crate::ai::blocklist::diff_storage::RegisteredDiffStorage;
+
+    App::test((), |mut app| async move {
+        let terminal = initialize_rewind_test(&mut app);
+        let (conversation_id, _, exchange_id, _) = terminal.update(&mut app, |view, ctx| {
+            append_exchange_and_handle_event(view, agent_view_user_query_input("create"), ctx)
+        });
+        let first_block = terminal.read(&app, |view, _| {
+            view.ai_block_for_exchange(&exchange_id).unwrap().clone()
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("same-file.txt");
+        let created = add_rewind_edit(
+            &mut app,
+            &first_block,
+            &path,
+            "",
+            ai::diff_validation::DiffType::creation("created\n".to_owned()),
+        );
+        assert!(matches!(
+            app.update(|ctx| created.downgrade().accept_and_save(ctx))
+                .await,
+            crate::ai::agent::RequestFileEditsResult::Success { .. }
+        ));
+        terminal.update(&mut app, |view, ctx| {
+            append_inputs_to_conversation_and_handle_event(
+                view,
+                conversation_id,
+                vec![agent_view_user_query_input("delete")],
+                ctx,
+            );
+        });
+        let second_block = terminal.read(&app, |view, _| {
+            view.rich_content_views
+                .iter()
+                .rev()
+                .find_map(|view| {
+                    view.ai_block_metadata()
+                        .map(|metadata| metadata.ai_block_handle.clone())
+                })
+                .unwrap()
+        });
+        let deleted = add_rewind_edit(
+            &mut app,
+            &second_block,
+            &path,
+            "created\n",
+            ai::diff_validation::DiffType::deletion(1),
+        );
+        assert!(matches!(
+            app.update(|ctx| deleted.downgrade().accept_and_save(ctx))
+                .await,
+            crate::ai::agent::RequestFileEditsResult::Success { .. }
+        ));
+        assert!(!path.exists());
+        let rewind = terminal.update(&mut app, |view, ctx| {
+            let rewind = view
+                .rewind_ai_conversation(first_block.id(), exchange_id, conversation_id, ctx)
+                .unwrap();
+            assert!(
+                view.rewind_ai_conversation(first_block.id(), exchange_id, conversation_id, ctx)
+                    .is_none()
+            );
+            assert!(
+                view.ai_controller
+                    .as_ref(ctx)
+                    .is_rewinding_conversation(conversation_id),
+                "重复点击不能发起第二轮回退"
+            );
+            assert_eq!(
+                ai_block_ids_for_conversation(view, conversation_id).len(),
+                2
+            );
+            rewind
+        });
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        assert!(
+            terminal.read(&app, |view, _| ai_block_ids_for_conversation(
+                view,
+                conversation_id
+            )
+            .is_empty()),
+            "必须先恢复后一个删除，再撤销前一个创建，全部完成后才移除卡片"
+        );
+        assert!(!path.exists(), "撤销整个批次后应恢复最初文件不存在的状态");
+    });
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn rewind_partial_success_keeps_card_and_retry_skips_already_restored_edits() {
+    use crate::ai::blocklist::diff_storage::RegisteredDiffStorage;
+    use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffState;
+
+    App::test((), |mut app| async move {
+        let terminal = initialize_rewind_test(&mut app);
+        let (conversation_id, _, exchange_id, _) = terminal.update(&mut app, |view, ctx| {
+            append_exchange_and_handle_event(
+                view,
+                agent_view_user_query_input("delete two files"),
+                ctx,
+            )
+        });
+        let block = terminal.read(&app, |view, _| {
+            view.ai_block_for_exchange(&exchange_id).unwrap().clone()
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let older_path = dir.path().join("older.txt");
+        let newer_path = dir.path().join("newer.txt");
+        std::fs::write(&older_path, "older\n").unwrap();
+        std::fs::write(&newer_path, "newer\n").unwrap();
+        let older = add_rewind_edit(
+            &mut app,
+            &block,
+            &older_path,
+            "older\n",
+            ai::diff_validation::DiffType::deletion(1),
+        );
+        let newer = add_rewind_edit(
+            &mut app,
+            &block,
+            &newer_path,
+            "newer\n",
+            ai::diff_validation::DiffType::deletion(1),
+        );
+        for edit in [&older, &newer] {
+            assert!(matches!(
+                app.update(|ctx| edit.downgrade().accept_and_save(ctx))
+                    .await,
+                crate::ai::agent::RequestFileEditsResult::Success { .. }
+            ));
+        }
+        std::fs::write(&older_path, "external blocker\n").unwrap();
+        let rewind = terminal
+            .update(&mut app, |view, ctx| {
+                view.rewind_ai_conversation(block.id(), exchange_id, conversation_id, ctx)
+            })
+            .unwrap();
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        assert!(newer.read(&app, |view, _| matches!(
+            view.state(),
+            CodeDiffState::Reverted
+        )));
+        assert!(older.read(&app, |view, _| matches!(
+            view.state(),
+            CodeDiffState::Accepted
+        )));
+        assert_eq!(
+            std::fs::read_to_string(&older_path).unwrap(),
+            "external blocker\n"
+        );
+        assert_eq!(
+            terminal.read(&app, |view, _| ai_block_ids_for_conversation(
+                view,
+                conversation_id
+            )),
+            vec![block.id()]
+        );
+        // 已恢复的文件随后发生外部编辑，重试不得再写一次旧内容。
+        std::fs::write(&newer_path, "manual change after restore\n").unwrap();
+        std::fs::remove_file(&older_path).unwrap();
+        let rewind = terminal
+            .update(&mut app, |view, ctx| {
+                view.rewind_ai_conversation(block.id(), exchange_id, conversation_id, ctx)
+            })
+            .unwrap();
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        assert!(
+            terminal.read(&app, |view, _| view
+                .ai_block_for_exchange(&exchange_id)
+                .is_none()),
+            "部分成功后的重试必须只恢复余下编辑"
+        );
+        assert_eq!(std::fs::read_to_string(&older_path).unwrap(), "older\n");
+        assert_eq!(
+            std::fs::read_to_string(&newer_path).unwrap(),
+            "manual change after restore\n"
+        );
+    });
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn rewind_waits_for_newer_edit_in_same_block_before_undoing_creation() {
+    use crate::ai::blocklist::diff_storage::RegisteredDiffStorage;
+
+    App::test((), |mut app| async move {
+        let terminal = initialize_rewind_test(&mut app);
+        let (conversation_id, _, exchange_id, _) = terminal.update(&mut app, |view, ctx| {
+            append_exchange_and_handle_event(
+                view,
+                agent_view_user_query_input("create then delete"),
+                ctx,
+            )
+        });
+        let block = terminal.read(&app, |view, _| {
+            view.ai_block_for_exchange(&exchange_id).unwrap().clone()
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("same-file.txt");
+        let created = add_rewind_edit(
+            &mut app,
+            &block,
+            &path,
+            "",
+            ai::diff_validation::DiffType::creation("created\n".to_owned()),
+        );
+        assert!(matches!(
+            app.update(|ctx| created.downgrade().accept_and_save(ctx))
+                .await,
+            crate::ai::agent::RequestFileEditsResult::Success { .. }
+        ));
+        let deleted = add_rewind_edit(
+            &mut app,
+            &block,
+            &path,
+            "created\n",
+            ai::diff_validation::DiffType::deletion(1),
+        );
+        assert!(matches!(
+            app.update(|ctx| deleted.downgrade().accept_and_save(ctx))
+                .await,
+            crate::ai::agent::RequestFileEditsResult::Success { .. }
+        ));
+        let rewind = terminal
+            .update(&mut app, |view, ctx| {
+                view.rewind_ai_conversation(block.id(), exchange_id, conversation_id, ctx)
+            })
+            .unwrap();
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        assert!(
+            terminal.read(&app, |view, _| view
+                .ai_block_for_exchange(&exchange_id)
+                .is_none()),
+            "同一区块内也必须等待后一个编辑完成恢复"
+        );
+        assert!(!path.exists());
+    });
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn rewind_in_progress_preserves_enter_draft_attachments_and_queued_prompts() {
+    use crate::ai::blocklist::diff_storage::RegisteredDiffStorage;
+    use crate::ai::blocklist::{PendingAttachment, PendingFile};
+
+    for block_restore in [false, true] {
+        App::test((), move |mut app| async move {
+            let _agent_view = FeatureFlag::AgentView.override_enabled(true);
+            let _queue = FeatureFlag::QueueSlashCommand.override_enabled(true);
+            let terminal = initialize_rewind_test(&mut app);
+            let (conversation_id, exchange_id, block) = terminal.update(&mut app, |view, ctx| {
+                let conversation_id = enter_agent_view_for_navigation(view, ctx);
+                append_inputs_to_conversation_and_handle_event(
+                    view,
+                    conversation_id,
+                    vec![agent_view_user_query_input("delete")],
+                    ctx,
+                );
+                let metadata = view
+                    .rich_content_views
+                    .iter()
+                    .rev()
+                    .find_map(|view| view.ai_block_metadata())
+                    .unwrap();
+                (
+                    conversation_id,
+                    metadata.exchange_id,
+                    metadata.ai_block_handle.clone(),
+                )
+            });
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("restore.txt");
+            std::fs::write(&path, "original\n").unwrap();
+            let edit = add_rewind_edit(
+                &mut app,
+                &block,
+                &path,
+                "original\n",
+                ai::diff_validation::DiffType::deletion(1),
+            );
+            assert!(matches!(
+                app.update(|ctx| edit.downgrade().accept_and_save(ctx))
+                    .await,
+                crate::ai::agent::RequestFileEditsResult::Success { .. }
+            ));
+            if block_restore {
+                std::fs::write(&path, "external blocker\n").unwrap();
+            }
+            let attachment = PendingAttachment::File(PendingFile {
+                file_name: "draft.txt".to_owned(),
+                file_path: dir.path().join("draft.txt"),
+                mime_type: "text/plain".to_owned(),
+            });
+            let sent = Rc::new(RefCell::new(0));
+            let sent_for_subscription = sent.clone();
+            let controller = terminal.read(&app, |view, _| view.ai_controller.clone());
+            app.update(|ctx| {
+                ctx.subscribe_to_model(&controller, move |_, event, _| {
+                    if matches!(event, BlocklistAIControllerEvent::SentRequest { .. }) {
+                        *sent_for_subscription.borrow_mut() += 1;
+                    }
+                });
+            });
+            let (rewind, query_id) = terminal.update(&mut app, |view, ctx| {
+                view.ai_context_model.update(ctx, |model, ctx| {
+                    model.append_pending_attachments(vec![attachment.clone()], ctx);
+                });
+                let query_id = QueuedQueryModel::handle(ctx).update(ctx, |queue, ctx| {
+                    queue.append(
+                        conversation_id,
+                        QueuedQuery::new_with_attachments(
+                            "queued follow-up".to_owned(),
+                            QueuedQueryOrigin::LrcAutoQueue,
+                            vec![attachment.clone()],
+                        ),
+                        ctx,
+                    )
+                });
+                let rewind = view
+                    .rewind_ai_conversation(block.id(), exchange_id, conversation_id, ctx)
+                    .unwrap();
+                // 同一 UI 调用内提交，后台恢复尚无法完成主线程回调；不依赖计时或睡眠。
+                view.input.update(ctx, |input, ctx| {
+                    input.replace_buffer_content("keep this draft", ctx);
+                    input.set_input_mode_agent(false, ctx);
+                    input.input_enter(ctx);
+                    assert_eq!(input.buffer_text(ctx), "keep this draft");
+                });
+                view.drain_queued_prompts(conversation_id, FinishReason::Complete, ctx);
+                view.send_lrc_queued_prompts(conversation_id, ctx);
+                view.input.update(ctx, |input, ctx| {
+                    input.replace_buffer_content("", ctx);
+                    input.input_enter(ctx);
+                    input.replace_buffer_content("keep this draft", ctx);
+                });
+                // 普通控制器调用也不能绕过输入层追加 exchange。
+                view.ai_controller.update(ctx, |controller, ctx| {
+                    controller.send_user_query_in_conversation(
+                        "bypass input".to_owned(),
+                        conversation_id,
+                        None,
+                        ctx,
+                    );
+                });
+                assert_eq!(
+                    BlocklistAIHistoryModel::as_ref(ctx)
+                        .conversation(&conversation_id)
+                        .unwrap()
+                        .exchange_count(),
+                    1
+                );
+                assert_eq!(
+                    view.ai_context_model.as_ref(ctx).pending_attachments(),
+                    &[attachment.clone()]
+                );
+                let queued = QueuedQueryModel::as_ref(ctx).queue(conversation_id);
+                assert_eq!(queued.len(), 1);
+                assert_eq!(queued[0].id(), query_id);
+                assert_eq!(queued[0].attachments(), &[attachment.clone()]);
+                (rewind, query_id)
+            });
+            app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+                .await;
+            assert_eq!(*sent.borrow(), 0);
+            terminal.read(&app, |view, ctx| {
+                assert!(
+                    !view
+                        .ai_controller
+                        .as_ref(ctx)
+                        .is_rewinding_conversation(conversation_id)
+                );
+                assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "keep this draft");
+                assert_eq!(
+                    QueuedQueryModel::as_ref(ctx).queue(conversation_id)[0].id(),
+                    query_id
+                );
+                assert_eq!(
+                    view.ai_block_for_exchange(&exchange_id).is_some(),
+                    block_restore
+                );
+            });
+            if block_restore {
+                // 失败已解锁，用户明确发送保留的队列行时仍走原有提交链。
+                terminal.update(&mut app, |view, ctx| {
+                    view.input.update(ctx, |input, ctx| {
+                        input.replace_buffer_content("", ctx);
+                        input.input_enter(ctx);
+                    });
+                    assert!(
+                        QueuedQueryModel::as_ref(ctx)
+                            .queue(conversation_id)
+                            .is_empty()
+                    );
+                });
+                assert_eq!(
+                    *sent.borrow(),
+                    1,
+                    "队列行必须真正进入请求登记链，不能只被移除"
+                );
+                BlocklistAIHistoryModel::handle(&app).read(&app, |history, _| {
+                    let conversation = history.conversation(&conversation_id).unwrap();
+                    assert_eq!(conversation.exchange_count(), 2);
+                    assert!(conversation.exchange_with_id(exchange_id).is_some());
+                    let submitted = conversation
+                        .all_exchanges()
+                        .into_iter()
+                        .find(|exchange| exchange.id != exchange_id)
+                        .unwrap();
+                    assert!(submitted.input.iter().any(|input| matches!(
+                        input,
+                        AIAgentInput::UserQuery { query, .. } if query == "queued follow-up"
+                    )));
+                });
+            }
+        });
+    }
+}
+
+#[test]
+fn aborting_rewind_releases_submission_guard_without_removing_history() {
+    App::test((), |mut app| async move {
+        let terminal = initialize_rewind_test(&mut app);
+        let (conversation_id, _, exchange_id, _) = terminal.update(&mut app, |view, ctx| {
+            append_exchange_and_handle_event(view, agent_view_user_query_input("rewind"), ctx)
+        });
+        let rewind = terminal.update(&mut app, |view, ctx| {
+            let block_id = view.ai_block_for_exchange(&exchange_id).unwrap().id();
+            let rewind = view
+                .rewind_ai_conversation(block_id, exchange_id, conversation_id, ctx)
+                .unwrap();
+            assert!(
+                view.ai_controller
+                    .as_ref(ctx)
+                    .is_rewinding_conversation(conversation_id)
+            );
+            // 主线程回调尚未运行时取消，不能依赖成功回调来清除占用。
+            rewind.abort();
+            rewind
+        });
+        app.update(|ctx| ctx.await_spawned_future(rewind.future_id()))
+            .await;
+        terminal.read(&app, |view, ctx| {
+            assert!(
+                !view
+                    .ai_controller
+                    .as_ref(ctx)
+                    .is_rewinding_conversation(conversation_id)
+            );
+            assert!(view.ai_block_for_exchange(&exchange_id).is_some());
+            assert_eq!(
+                BlocklistAIHistoryModel::as_ref(ctx)
+                    .conversation(&conversation_id)
+                    .unwrap()
+                    .exchange_count(),
+                1
+            );
+        });
+    });
+}

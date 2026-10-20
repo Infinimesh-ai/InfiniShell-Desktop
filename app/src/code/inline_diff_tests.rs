@@ -53,6 +53,7 @@ fn add_diff(app: &mut App, path: &Path, base: &str, diff: DiffType) -> ViewHandl
         });
         let mut view = InlineDiffView::new(
             editor,
+            base.to_owned(),
             Some(diff),
             None,
             Some(StandardizedPath::try_from_local(path).unwrap()),
@@ -393,15 +394,15 @@ fn failed_native_move_can_restore_the_saved_source_content() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("source.txt");
         let target = dir.path().join("directory");
-        fs::write(&source, "original\n").unwrap();
+        fs::write(&source, "original 中文𠮷\r\nsecond\nlast\r").unwrap();
         fs::create_dir(&target).unwrap();
         let view = add_diff(
             &mut app,
             &source,
-            "original\n",
+            "original 中文𠮷\r\nsecond\nlast\r",
             DiffType::update(
                 vec![DiffDelta {
-                    replacement_line_range: 1..2,
+                    replacement_line_range: 1..4,
                     insertion: "updated\n".to_owned(),
                 }],
                 Some(target.to_str().unwrap().to_owned()),
@@ -430,8 +431,148 @@ fn failed_native_move_can_restore_the_saved_source_content() {
         ));
         assert_eq!(fs::read_to_string(&source).unwrap(), "updated\n");
         restore(&mut app, &view).await;
-        assert_eq!(fs::read_to_string(&source).unwrap(), "original\n");
+        assert_eq!(
+            fs::read(&source).unwrap(),
+            "original 中文𠮷\r\nsecond\nlast\r".as_bytes()
+        );
         assert!(target.is_dir());
+    });
+}
+
+#[test]
+fn restore_deleted_file_preserves_crlf_bytes() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("deleted.txt");
+        fs::write(&path, "original 中文𠮷\r\nsecond\r\n").unwrap();
+        let view = add_diff(
+            &mut app,
+            &path,
+            "original 中文𠮷\r\nsecond\r\n",
+            DiffType::deletion(2),
+        );
+        view.update(&mut app, |view, ctx| view.accept_and_save_diff(ctx))
+            .unwrap()
+            .await
+            .unwrap();
+        assert!(!path.exists());
+
+        restore(&mut app, &view).await;
+
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            "original 中文𠮷\r\nsecond\r\n".as_bytes()
+        );
+    });
+}
+
+#[test]
+fn restore_deleted_file_retries_with_original_mixed_line_endings() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("deleted.txt");
+        let retained_blocker = dir.path().join("retained-blocker.txt");
+        fs::write(&path, "original 中文𠮷\r\nsecond\nlast\r").unwrap();
+        let view = add_diff(
+            &mut app,
+            &path,
+            "original 中文𠮷\r\nsecond\nlast\r",
+            DiffType::deletion(3),
+        );
+        view.update(&mut app, |view, ctx| view.accept_and_save_diff(ctx))
+            .unwrap()
+            .await
+            .unwrap();
+        assert!(!path.exists());
+        fs::write(&path, "blocker\r\n").unwrap();
+
+        let result = view
+            .update(&mut app, |view, ctx| view.restore_and_save_diff(ctx))
+            .unwrap()
+            .await;
+        assert!(result.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"blocker\r\n");
+        fs::rename(&path, &retained_blocker).unwrap();
+        restore(&mut app, &view).await;
+
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            "original 中文𠮷\r\nsecond\nlast\r".as_bytes()
+        );
+        assert_eq!(fs::read(&retained_blocker).unwrap(), b"blocker\r\n");
+    });
+}
+
+#[test]
+fn restore_updated_file_preserves_original_mixed_line_endings() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("updated.txt");
+        fs::write(&path, "original 中文𠮷\r\nsecond\nlast\r").unwrap();
+        let view = add_diff(
+            &mut app,
+            &path,
+            "original 中文𠮷\r\nsecond\nlast\r",
+            DiffType::update(
+                vec![DiffDelta {
+                    replacement_line_range: 1..4,
+                    insertion: "updated\n".to_owned(),
+                }],
+                None,
+            ),
+        );
+        view.update(&mut app, |view, ctx| view.accept_and_save_diff(ctx))
+            .unwrap()
+            .await
+            .unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"updated\n");
+
+        restore(&mut app, &view).await;
+
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            "original 中文𠮷\r\nsecond\nlast\r".as_bytes()
+        );
+    });
+}
+
+#[test]
+fn restore_moved_file_preserves_original_source_and_target_bytes() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source.txt");
+        let target = dir.path().join("target.txt");
+        fs::write(&source, "original 中文𠮷\r\nsecond\nlast\r").unwrap();
+        fs::write(&target, "target\r\nlast\n").unwrap();
+        let view = add_diff(
+            &mut app,
+            &source,
+            "original 中文𠮷\r\nsecond\nlast\r",
+            DiffType::update(
+                vec![DiffDelta {
+                    replacement_line_range: 1..4,
+                    insertion: "updated\n".to_owned(),
+                }],
+                Some(target.to_str().unwrap().to_owned()),
+            ),
+        );
+        view.update(&mut app, |view, _| {
+            view.set_rename_target_original_content(Some("target\r\nlast\n".to_owned()));
+        });
+        view.update(&mut app, |view, ctx| view.accept_and_save_diff(ctx))
+            .unwrap()
+            .await
+            .unwrap();
+        assert!(!source.exists());
+        assert_eq!(fs::read(&target).unwrap(), b"updated\n");
+
+        restore(&mut app, &view).await;
+
+        assert_eq!(
+            fs::read(&source).unwrap(),
+            "original 中文𠮷\r\nsecond\nlast\r".as_bytes()
+        );
+        assert_eq!(fs::read(&target).unwrap(), b"target\r\nlast\n");
     });
 }
 

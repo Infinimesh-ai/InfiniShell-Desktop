@@ -62,6 +62,8 @@ enum PersistenceState {
 /// as a read-only diff viewer (e.g. for WASM or restored conversations).
 pub struct InlineDiffView {
     editor: ViewHandle<CodeEditorView>,
+    /// 撤销使用接受差异前的原文，不能从编辑器规范化为 LF 的展示内容重建。
+    original_content: String,
     diff_type: Option<DiffType>,
     file_path: Option<StandardizedPath>,
     /// Whether the user has edited the diff content.
@@ -88,6 +90,7 @@ pub struct InlineDiffView {
 impl InlineDiffView {
     pub fn new(
         editor: ViewHandle<CodeEditorView>,
+        original_content: String,
         diff_type: Option<DiffType>,
         display_mode: Option<DisplayMode>,
         file_path: Option<StandardizedPath>,
@@ -108,6 +111,7 @@ impl InlineDiffView {
 
         let model = Self {
             editor,
+            original_content,
             diff_type,
             file_path,
             was_edited: false,
@@ -396,9 +400,7 @@ impl InlineDiffView {
             let version = self.editor.as_ref(ctx).version(ctx);
             let file_model = FileModel::handle(ctx);
             let operation = if matches!(self.persistence, PersistenceState::SavedAtSource) {
-                let base_content = self
-                    .base_content(ctx)
-                    .ok_or_else(|| "Missing base content".to_owned())?;
+                let base_content = self.original_content.clone();
                 file_model.update(ctx, |model, ctx| {
                     model.save(file_id, base_content, version, ctx)
                 })
@@ -408,9 +410,7 @@ impl InlineDiffView {
                         model.delete_for_diff(file_id, version, ctx)
                     }),
                     diff => {
-                        let base_content = self
-                            .base_content(ctx)
-                            .ok_or_else(|| "Missing base content".to_owned())?;
+                        let base_content = self.original_content.clone();
                         match diff {
                             Some(DiffType::Delete { .. }) => {
                                 file_model.update(ctx, |model, ctx| {

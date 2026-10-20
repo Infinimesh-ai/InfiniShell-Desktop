@@ -11,7 +11,7 @@ use ai::diff_validation::{
 use anyhow::Result;
 use futures::FutureExt;
 use futures::channel::oneshot;
-use futures::future::{BoxFuture, join_all};
+use futures::future::BoxFuture;
 use lazy_static::lazy_static;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_geometry::vector::vec2f;
@@ -908,6 +908,7 @@ impl CodeDiffView {
                 let diff_viewer = ctx.add_typed_action_view(|ctx| {
                     let mut view = InlineDiffView::new(
                         editor.clone(),
+                        diff.base.content,
                         Some(diff.diff_type),
                         Some(display_mode),
                         standardized_path,
@@ -1038,38 +1039,58 @@ impl CodeDiffView {
         self.send_telemetry_for_edit_resolution(RequestedEditResolution::Reject, ctx);
     }
 
-    /// Revert all changes by replacing file contents with the base version.
-    /// For newly created files, this deletes them instead.
-    fn revert_changes(&mut self, ctx: &mut ViewContext<Self>) -> Option<SaveFuture> {
-        if !matches!(self.state, CodeDiffState::Accepted)
-            || self.pending_saves > 0
-            || self.revert_in_progress
-        {
+    /// 等待每个文件实际恢复；保存或撤销进行中必须报告失败，不能当作无需撤销。
+    pub(crate) fn revert_changes(&mut self, ctx: &mut ViewContext<Self>) -> Option<SaveFuture> {
+        if self.pending_saves > 0 || self.revert_in_progress {
+            return Some(
+                futures::future::ready(Err(Arc::new(FileSaveError::Other(
+                    "File operation is still in flight".to_owned(),
+                ))))
+                .boxed(),
+            );
+        }
+        if !matches!(self.state, CodeDiffState::Accepted) {
             return None;
         }
         let restores = self
             .pending_diffs
             .iter()
+            .rev()
             .map(|diff| {
                 let file_name = diff
                     .diff_view
                     .as_ref(ctx)
                     .file_name()
                     .unwrap_or_else(|| "file".to_owned());
-                let restore = diff
-                    .diff_view
-                    .update(ctx, |view, ctx| view.restore_and_save_diff(ctx))
-                    .unwrap_or_else(|error| {
-                        futures::future::ready(Err(Arc::new(FileSaveError::Other(error)))).boxed()
-                    });
-                async move { (file_name, restore.await) }
+                (file_name, diff.diff_view.clone())
             })
             .collect::<Vec<_>>();
+        let spawner = ctx.spawner();
         self.revert_in_progress = true;
         let (tx, rx) = oneshot::channel();
         let window_id = ctx.window_id();
         ctx.spawn(
-            async move { join_all(restores).await },
+            async move {
+                let mut outcomes = Vec::new();
+                for (file_name, view) in restores {
+                    let restore = spawner
+                        .spawn(move |_, ctx| {
+                            view.update(ctx, |view, ctx| view.restore_and_save_diff(ctx))
+                        })
+                        .await;
+                    let outcome = match restore {
+                        Ok(Ok(completion)) => completion.await,
+                        Ok(Err(error)) => Err(Arc::new(FileSaveError::Other(error))),
+                        Err(error) => Err(Arc::new(FileSaveError::Other(error.to_string()))),
+                    };
+                    let failed = outcome.is_err();
+                    outcomes.push((file_name, outcome));
+                    if failed {
+                        break;
+                    }
+                }
+                outcomes
+            },
             move |me, outcomes, ctx| {
                 me.revert_in_progress = false;
                 let mut result = Ok(());

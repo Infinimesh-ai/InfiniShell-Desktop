@@ -6216,3 +6216,6 @@ cloud-sync-error-read-secret = Could not read credentials for { $node } ({ $kind
 cloud-sync-error-read-previous-secret = Could not read the previous credentials for { $node } ({ $kind }): { $error }. Credential changes rolled back: { $count }. Confirm that the credential store is available, then retry the download.
 cloud-sync-error-write-secret = Could not write credentials for { $node } ({ $kind }): { $error }. Check the credential store permissions, then retry the download.
 cloud-sync-error-write-database = Could not save the downloaded configuration: { $error }. Credential changes rolled back: { $count }.
+
+terminal-rewind-failed = Could not finish rewinding. Your conversation has been kept so you can try Rewind again.
+terminal-rewind-in-progress = Rewinding is still in progress. Your draft and queued prompts have been kept. Wait for it to finish before sending.

@@ -9,7 +9,7 @@ pub mod response_stream;
 pub(super) mod shared_session;
 mod slash_command;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use ai::skills::SkillPathOrigin;
 use anyhow::anyhow;
@@ -399,6 +399,9 @@ pub struct BlocklistAIController {
 
     in_flight_response_streams: PendingResponseStreams,
 
+    // 弱引用不延长回退任务寿命；视图关闭或任务取消后不会留下永久忙态。
+    rewinds_in_progress: HashMap<AIConversationId, Weak<()>>,
+
     /// The ID of the terminal view this controller is associated with.
     terminal_view_id: EntityId,
 
@@ -724,6 +727,7 @@ impl BlocklistAIController {
             active_session,
             terminal_model,
             in_flight_response_streams: PendingResponseStreams::new(),
+            rewinds_in_progress: HashMap::new(),
             terminal_view_id,
             should_refresh_available_llms_on_stream_finish: false,
             shared_session_state: shared_session::SharedSessionState::default(),
@@ -737,6 +741,28 @@ impl BlocklistAIController {
             committed_byop_compaction_streams: HashSet::new(),
             byop_compaction_after_stream: HashSet::new(),
         }
+    }
+
+    pub(crate) fn is_rewinding_conversation(&self, conversation_id: AIConversationId) -> bool {
+        self.rewinds_in_progress
+            .get(&conversation_id)
+            .and_then(Weak::upgrade)
+            .is_some()
+    }
+
+    pub(crate) fn begin_conversation_rewind(
+        &mut self,
+        conversation_id: AIConversationId,
+    ) -> Option<Arc<()>> {
+        if self.is_rewinding_conversation(conversation_id) {
+            return None;
+        }
+        self.rewinds_in_progress
+            .retain(|_, guard| guard.strong_count() > 0);
+        let guard = Arc::new(());
+        self.rewinds_in_progress
+            .insert(conversation_id, Arc::downgrade(&guard));
+        Some(guard)
     }
 
     /// Internal method to send a query to the AI model. External callers should use either
@@ -756,6 +782,13 @@ impl BlocklistAIController {
         is_queued_prompt: bool,
         ctx: &mut ModelContext<Self>,
     ) {
+        if let WhichTask::Task {
+            conversation_id, ..
+        } = &input_query.which_task
+            && self.is_rewinding_conversation(*conversation_id)
+        {
+            return;
+        }
         // Store the participant who initiated this query before sending
         // so that send_query can use it when creating the exchange.
         if let Some(participant_id) = shared_session_participant_id {
@@ -1203,6 +1236,9 @@ impl BlocklistAIController {
         is_queued_prompt: bool,
         ctx: &mut ModelContext<Self>,
     ) {
+        if self.is_rewinding_conversation(conversation_id) {
+            return;
+        }
         let is_viewer = self
             .terminal_model
             .lock()
@@ -3337,6 +3373,10 @@ impl BlocklistAIController {
         mut persistence_checkpoint: Option<oneshot::Receiver<Result<(), String>>>,
         ctx: &mut ModelContext<Self>,
     ) -> anyhow::Result<(AIConversationId, ResponseStreamId)> {
+        // 工具回调、摘要续发与斜杠命令也不得越过输入层，在回退快照之后追加 exchange。
+        if self.is_rewinding_conversation(request_input.conversation_id) {
+            return Err(anyhow!(crate::t!("terminal-rewind-in-progress")));
+        }
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         let request_snapshot = self.conversation_snapshot_for_request(&request_input, ctx)?;
         let mut conversation_data = request_snapshot.conversation_data;

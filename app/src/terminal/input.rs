@@ -3903,6 +3903,9 @@ impl Input {
         trigger: QueuedPromptSendNowTrigger,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self.block_submission_during_rewind(Some(conversation_id), ctx) {
+            return;
+        }
         // Read the origin before dispatch; the row is removed once it fires.
         let origin = QueuedQueryModel::as_ref(ctx)
             .queue(conversation_id)
@@ -3965,6 +3968,20 @@ impl Input {
         self.ambient_agent_view_state
             .as_ref()
             .map(AmbientAgentViewState::view_model)
+    }
+
+    // 必须在取走附件、排队或清空输入之前检查，保留原位置的重试入口。
+    fn block_submission_during_rewind(
+        &self,
+        conversation_id: Option<AIConversationId>,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let blocked = conversation_id
+            .is_some_and(|id| self.ai_controller.as_ref(ctx).is_rewinding_conversation(id));
+        if blocked {
+            self.show_ephemeral_error_toast(&crate::t!("terminal-rewind-in-progress"), ctx);
+        }
+        blocked
     }
 
     /// Shows a transient error toast for a follow-up submission that was blocked or redirected.
@@ -4085,6 +4102,14 @@ impl Input {
         zero_state_prompt_suggestion_type: Option<ZeroStatePromptSuggestionType>,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self.block_submission_during_rewind(
+            self.ai_context_model
+                .as_ref(ctx)
+                .selected_conversation_id(ctx),
+            ctx,
+        ) {
+            return;
+        }
         if !self.maybe_route_ai_query_to_remote_target(ctx) {
             self.submit_ai_query_local(zero_state_prompt_suggestion_type, ctx);
         }
@@ -13298,6 +13323,14 @@ impl Input {
             self.emit_submit_cli_agent_input(ctx);
             return;
         }
+        if self.block_submission_during_rewind(
+            self.ai_context_model
+                .as_ref(ctx)
+                .selected_conversation_id(ctx),
+            ctx,
+        ) {
+            return;
+        }
         let command = self.editor.as_ref(ctx).buffer_text(ctx);
 
         ctx.emit(Event::Enter);
@@ -13627,6 +13660,14 @@ impl Input {
         {
             self.emit_submit_cli_agent_input(ctx);
         } else {
+            if self.block_submission_during_rewind(
+                self.ai_context_model
+                    .as_ref(ctx)
+                    .selected_conversation_id(ctx),
+                ctx,
+            ) {
+                return;
+            }
             ctx.emit(Event::CtrlEnter);
         }
     }
@@ -13644,6 +13685,14 @@ impl Input {
     }
 
     fn input_cmd_enter(&mut self, ctx: &mut ViewContext<Self>) {
+        if self.block_submission_during_rewind(
+            self.ai_context_model
+                .as_ref(ctx)
+                .selected_conversation_id(ctx),
+            ctx,
+        ) {
+            return;
+        }
         // NaturalLanguageCommandSearch has its own `cmd+enter` behaviour, not expected to execute here
         let mode = self.suggestions_mode_model.as_ref(ctx).mode().clone();
         match &mode {

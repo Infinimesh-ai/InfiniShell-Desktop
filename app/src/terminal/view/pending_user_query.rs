@@ -160,6 +160,14 @@ impl TerminalView {
     /// status stays `InProgress` across the cancel+resend (see `mark_request_cancelled`
     /// in `conversation.rs`), keeping the warping indicator visible throughout.
     fn send_queued_prompt_now(&mut self, prompt: String, ctx: &mut ViewContext<Self>) {
+        if self
+            .ai_context_model
+            .as_ref(ctx)
+            .selected_conversation_id(ctx)
+            .is_some_and(|id| self.ai_controller.as_ref(ctx).is_rewinding_conversation(id))
+        {
+            return;
+        }
         self.remove_pending_user_query_block(ctx);
         if let Some(conversation_id) = self
             .ai_context_model

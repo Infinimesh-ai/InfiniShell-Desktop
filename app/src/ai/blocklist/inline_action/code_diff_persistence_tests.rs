@@ -674,3 +674,108 @@ fn prepared_move_rejects_deleted_created_or_modified_target_before_writing_sourc
         });
     }
 }
+
+#[test]
+fn rewind_during_save_is_an_error_and_can_retry_after_save_completes() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("saving.txt");
+        fs::write(&path, "original\n").unwrap();
+        let view = add_review(&mut app, &path, DiffType::deletion(1));
+        let save = app.update(|ctx| view.downgrade().accept_and_save(ctx));
+        let revert = view
+            .update(&mut app, |view, ctx| view.revert_changes(ctx))
+            .expect("保存进行中必须返回失败，不能被上层当作无需撤销");
+        assert!(revert.await.is_err());
+        assert!(matches!(save.await, RequestFileEditsResult::Success { .. }));
+        view.update(&mut app, |view, ctx| view.revert_changes(ctx))
+            .unwrap()
+            .await
+            .unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "original\n");
+    });
+}
+
+#[test]
+fn duplicate_rewind_cannot_report_success_before_first_restore_completes() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("restoring.txt");
+        fs::write(&path, "original\n").unwrap();
+        let view = add_review(&mut app, &path, DiffType::deletion(1));
+        assert!(matches!(
+            app.update(|ctx| view.downgrade().accept_and_save(ctx))
+                .await,
+            RequestFileEditsResult::Success { .. }
+        ));
+        let first = view
+            .update(&mut app, |view, ctx| view.revert_changes(ctx))
+            .unwrap();
+        let duplicate = view
+            .update(&mut app, |view, ctx| view.revert_changes(ctx))
+            .expect("恢复进行中不能作为无需撤销返回");
+        assert!(duplicate.await.is_err());
+        first.await.unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "original\n");
+    });
+}
+
+#[test]
+fn rewind_one_card_partial_restore_retries_only_unrestored_files() {
+    App::test((), |mut app| async move {
+        let dir = tempfile::tempdir().unwrap();
+        let blocked = dir.path().join("blocked.txt");
+        let restored = dir.path().join("restored.txt");
+        for path in [&blocked, &restored] {
+            fs::write(path, "original\n").unwrap();
+        }
+        let view = add_review_diffs(
+            &mut app,
+            [&blocked, &restored]
+                .into_iter()
+                .map(|path| {
+                    FileDiff::new(
+                        "original\n".to_owned(),
+                        path.to_str().unwrap().to_owned(),
+                        DiffType::deletion(1),
+                    )
+                })
+                .collect(),
+        );
+        assert!(matches!(
+            app.update(|ctx| view.downgrade().accept_and_save(ctx))
+                .await,
+            RequestFileEditsResult::Success { .. }
+        ));
+        fs::write(&blocked, "external blocker\n").unwrap();
+        assert!(
+            view.update(&mut app, |view, ctx| view.revert_changes(ctx))
+                .unwrap()
+                .await
+                .is_err()
+        );
+        assert_eq!(fs::read_to_string(&blocked).unwrap(), "external blocker\n");
+        assert_eq!(fs::read_to_string(&restored).unwrap(), "original\n");
+        assert!(view.read(&app, |view, _| matches!(
+            view.state(),
+            CodeDiffState::Accepted
+        )));
+
+        // 同一张卡片中已恢复的文件也不能在重试时覆盖后来写入的内容。
+        fs::write(&restored, "manual change after restore\n").unwrap();
+        fs::remove_file(&blocked).unwrap();
+        view.update(&mut app, |view, ctx| view.revert_changes(ctx))
+            .unwrap()
+            .await
+            .unwrap();
+        assert_eq!(fs::read_to_string(&blocked).unwrap(), "original\n");
+        assert_eq!(
+            fs::read_to_string(&restored).unwrap(),
+            "manual change after restore\n"
+        );
+        assert!(view.read(&app, |view, _| matches!(
+            view.state(),
+            CodeDiffState::Reverted
+        )));
+    });
+}
