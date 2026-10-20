@@ -18,7 +18,7 @@ import uuid
 
 
 BASE_SOURCE = "f4dfff885e797fd4db8be9e02f48233d33b35844"
-EXPECTED_PARENT = "58cfbcee8f3ce2a451c4989fa40151b07e8157cf"
+EXPECTED_PARENT = "cf45ac9083f8df9fdcccac713526ce7c74e55414"
 TEST_NAME = "workspace::view::tests::restore_conversation_in_active_pane_enters_existing_live_conversation_without_loading"
 ALLOWED_SOURCE_PATHS = frozenset({
     ".github/workflows/cross-platform-preflight.yml",
@@ -169,11 +169,12 @@ def select_warp_binary(metadata, binaries):
 
 
 def validate_observer_summary(summary, mode, exit_code, stop_exists):
-    require(mode in ("observe", "protocol-normal", "protocol-nonzero", "protocol-sample"), "invalid_observer_mode")
+    require(mode in ("observe", "protocol-normal", "protocol-nonzero", "protocol-sample",
+                     "protocol-job-delayed", "protocol-job-live"), "invalid_observer_mode")
     require(summary["mode"] == mode and summary["observer_exit_code"] == exit_code, "observer_exit_identity_mismatch")
     for key in ("stdout_eof", "stderr_eof", "libtest_success_marker", "libtest_test_ok",
                 "libtest_summary_one_passed", "timed_out", "eof_timeout", "job_terminated", "job_empty",
-                "eof_deadline_recorded"):
+                "eof_deadline_recorded", "job_naturally_settled", "job_saw_live_member"):
         require(type(summary[key]) is bool, "invalid_observer_boolean")
     for key in ("sample_count", "resumed_threads", "sampler_failures"):
         require(type(summary[key]) is int and summary[key] >= 0, "invalid_observer_counter")
@@ -182,24 +183,42 @@ def validate_observer_summary(summary, mode, exit_code, stop_exists):
             "invalid_child_exit_code")
     require(summary["active_processes_final"] is None or (type(summary["active_processes_final"]) is int
             and summary["active_processes_final"] >= 0), "invalid_final_job_count")
+    if mode == "protocol-job-live":
+        # 负协议只有真实拒绝持久后代才通过；不能把强制清理算作自然退出。
+        require(exit_code == 126 and summary["child_exit_code"] == 0
+                and summary["observer_error"] == "job_natural_accounting_not_settled"
+                and summary["stop_reason"] == "observer_error" and stop_exists
+                and summary["job_terminated"] and summary["job_empty"]
+                and summary["active_processes_final"] == 0 and not summary["job_naturally_settled"]
+                and summary["job_saw_live_member"] and summary["eof_deadline_recorded"]
+                and summary["stdout_eof"] and summary["stderr_eof"]
+                and not summary["timed_out"] and not summary["eof_timeout"]
+                and summary["sample_count"] == summary["sampler_failures"] == 0
+                and all(summary[key] for key in ("libtest_success_marker", "libtest_test_ok",
+                                                "libtest_summary_one_passed")),
+                "protocol_live_descendant_not_rejected")
+        return {"continue": True, "reason": "live_descendant_rejected"}
     if mode != "observe":
         expected = 7 if mode == "protocol-nonzero" else 0
         require(exit_code == summary["child_exit_code"] == expected, "protocol_child_exit_mismatch")
         require(summary["stdout_eof"] and summary["stderr_eof"] and not summary["timed_out"]
                 and not summary["eof_timeout"] and summary["observer_error"] is None
                 and summary["sampler_failures"] == 0 and summary["job_empty"]
-                and summary["active_processes_final"] == 0 and summary["eof_deadline_recorded"],
+                and summary["active_processes_final"] == 0 and summary["eof_deadline_recorded"]
+                and summary["job_naturally_settled"],
                 "protocol_observation_failed")
         markers = [summary[key] for key in ("libtest_success_marker", "libtest_test_ok", "libtest_summary_one_passed")]
         require(not any(markers) if mode == "protocol-nonzero" else all(markers), "protocol_markers_mismatch")
-        require(stop_exists == (mode != "protocol-normal"), "protocol_stop_mismatch")
+        require(stop_exists == (mode in ("protocol-nonzero", "protocol-sample")), "protocol_stop_mismatch")
         require(summary["sample_count"] == (2 if mode == "protocol-sample" else 0), "protocol_sample_mismatch")
         require(not summary["job_terminated"], "protocol_required_job_termination")
         expected_reason = {"protocol-normal": None, "protocol-nonzero": "child_nonzero",
-                           "protocol-sample": "alive_at_30s"}[mode]
+                           "protocol-sample": "alive_at_30s", "protocol-job-delayed": None}[mode]
         require(summary["stop_reason"] == expected_reason, "protocol_stop_reason_mismatch")
         if mode == "protocol-sample":
             require(summary["resumed_threads"] > 0, "protocol_resume_missing")
+        if mode == "protocol-job-delayed":
+            require(summary["job_saw_live_member"], "protocol_delayed_member_not_observed")
         return {"continue": True, "reason": "protocol_passed"}
     # 退出码0不能覆盖采样、EOF缺失或STOP，原首次异常永远保留。
     if stop_exists or summary["stop_reason"] is not None:
@@ -212,6 +231,7 @@ def validate_observer_summary(summary, mode, exit_code, stop_exists):
         (not summary["eof_deadline_recorded"] or not summary["stdout_eof"] or not summary["stderr_eof"], "incomplete_eof"),
         (not summary["job_empty"] or summary["active_processes_final"] != 0, "job_not_empty_or_unverified"),
         (summary["job_terminated"], "job_required_termination"),
+        (not summary["job_naturally_settled"], "job_natural_completion_not_observed"),
         (not all(summary[key] for key in ("libtest_success_marker", "libtest_test_ok", "libtest_summary_one_passed")),
          "exact_one_test_success_not_proven"),
     ]:
@@ -393,7 +413,7 @@ def main():
         record["working_directory"] = str(cwd)
         record["process_environment_changes"] = {"CARGO_MANIFEST_DIR": str(cwd),
             "observer_private_keys": ["INFINISHELL_EXIT_OBSERVER_BINARY", "INFINISHELL_EXIT_OBSERVER_ROOT", "INFINISHELL_EXIT_OBSERVER_TEST"]}
-        for mode in ("normal", "nonzero", "sample"):
+        for mode in ("normal", "nonzero", "job-delayed", "job-live", "sample"):
             require(source_identity(repo) == record["source"], "source_changed")
             require(file_identity(observer) == bound_files["observer"], "observer_changed")
             result = observer_call(observer, observer, output / ("protocol-" + mode), cwd, "protocol-" + mode)

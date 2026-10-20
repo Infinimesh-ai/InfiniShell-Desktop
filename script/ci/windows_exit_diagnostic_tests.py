@@ -111,6 +111,7 @@ class ObservationDecisionTests(unittest.TestCase):
             "resumed_threads": 0, "sampler_failures": 0, "observer_error": None,
             "timed_out": False, "eof_timeout": False, "stop_reason": None,
             "job_terminated": False, "job_empty": True, "active_processes_final": 0,
+            "job_naturally_settled": True, "job_saw_live_member": False,
         }
 
     def test_zero_exit_requires_both_output_streams_to_close(self):
@@ -143,6 +144,25 @@ class ObservationDecisionTests(unittest.TestCase):
                        stop_reason="child_nonzero", libtest_success_marker=False,
                        libtest_test_ok=False, libtest_summary_one_passed=False)
         self.assertTrue(DIAGNOSTIC.validate_observer_summary(summary, "protocol-nonzero", 7, True)["continue"])
+
+    def test_delayed_protocol_requires_observed_live_member_and_natural_exit(self):
+        summary = self.successful_summary()
+        summary.update(mode="protocol-job-delayed", job_saw_live_member=True)
+        self.assertTrue(DIAGNOSTIC.validate_observer_summary(summary, "protocol-job-delayed", 0, False)["continue"])
+        for key in ("job_saw_live_member", "job_naturally_settled"):
+            with self.subTest(key=key), self.assertRaises(DIAGNOSTIC.DiagnosticError):
+                DIAGNOSTIC.validate_observer_summary(dict(summary, **{key: False}), "protocol-job-delayed", 0, False)
+
+    def test_live_descendant_protocol_requires_rejection_and_forced_cleanup(self):
+        summary = self.successful_summary()
+        summary.update(mode="protocol-job-live", observer_exit_code=126,
+                       observer_error="job_natural_accounting_not_settled", stop_reason="observer_error",
+                       job_naturally_settled=False, job_saw_live_member=True, job_terminated=True)
+        self.assertTrue(DIAGNOSTIC.validate_observer_summary(summary, "protocol-job-live", 126, True)["continue"])
+        for change in ({"job_naturally_settled": True}, {"job_terminated": False},
+                       {"eof_timeout": True}, {"observer_error": "process_image"}, {"job_saw_live_member": False}):
+            with self.subTest(change=change), self.assertRaises(DIAGNOSTIC.DiagnosticError):
+                DIAGNOSTIC.validate_observer_summary(dict(summary, **change), "protocol-job-live", 126, True)
 
 
 if __name__ == "__main__":

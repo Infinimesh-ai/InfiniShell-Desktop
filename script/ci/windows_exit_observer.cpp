@@ -374,7 +374,7 @@ struct State {
     DWORD child_pid = 0, child_exit = 0;
     bool has_exit = false, timed_out = false, eof_timeout = false, job_terminated = false;
     bool eof_deadline_recorded = false, stdout_eof_at_deadline = false, stderr_eof_at_deadline = false;
-    bool job_empty = false;
+    bool job_empty = false, job_naturally_settled = false, job_saw_live_member = false;
     DWORD active_processes_final = MAXDWORD;
     unsigned samples = 0, resumed = 0, sampler_failures = 0;
     void stop(const char* reason) {
@@ -458,9 +458,27 @@ void take_sample(State& state, HANDLE child, HANDLE job, HANDLE null_handle) {
 }
 
 int fixture(const std::wstring& mode) {
+    if (mode == L"descendant-delayed" || mode == L"descendant-live") {
+        Sleep(mode == L"descendant-delayed" ? 500 : 5000);
+        return 0;
+    }
+    if (mode == L"job-delayed" || mode == L"job-live") {
+        // 后代继承当前自有 Job，但只持有 NUL；独立验证 Job 收尾而不干扰 EOF。
+        BOOL in_job = FALSE;
+        if (!IsProcessInJob(GetCurrentProcess(), nullptr, &in_job)) fail("fixture_job_query");
+        require(in_job != FALSE, "fixture_job_required");
+        SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
+        Handle null_handle(CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr));
+        if (!null_handle) fail("fixture_null");
+        auto descendant = spawn(self_path(), {L"--fixture", mode == L"job-delayed" ? L"descendant-delayed" : L"descendant-live"},
+            {null_handle.value}, null_handle.value, null_handle.value, null_handle.value);
+        resume_primary(descendant);
+    }
     // 两次 sampler 各最多 5 秒，加间隔后仍留足退出余量；不改变产品的 30/60 秒期限。
     if (mode == L"sample") Sleep(45000);
-    require(mode == L"normal" || mode == L"nonzero" || mode == L"sample", "fixture_mode");
+    require(mode == L"normal" || mode == L"nonzero" || mode == L"sample"
+        || mode == L"job-delayed" || mode == L"job-live", "fixture_mode");
     if (mode == L"nonzero") return 7;
     const std::string text = "running 1 test\ntest " + utf8(kTest) + " ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n";
     write_all(GetStdHandle(STD_OUTPUT_HANDLE), text.data(), text.size()); return 0;
@@ -563,7 +581,7 @@ int observe(const std::wstring& protocol) {
             auto observe_members = [&](const char* phase) {
                 JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};
                 if (!QueryInformationJobObject(job.value, JobObjectBasicAccountingInformation, &accounting, sizeof accounting, nullptr)) fail("job_natural_accounting");
-                // 固定容量、失败关闭；不把未识别的后代等到退出后再记为通过。
+                // 固定容量；必须取得完整 Job 列表才能确认自然归零。
                 std::vector<ULONG_PTR> storage(257);
                 auto members = reinterpret_cast<JOBOBJECT_BASIC_PROCESS_ID_LIST*>(storage.data());
                 if (!QueryInformationJobObject(job.value, JobObjectBasicProcessIdList, members,
@@ -580,7 +598,7 @@ int observe(const std::wstring& protocol) {
                     + ",\"active_processes\":" + number(accounting.ActiveProcesses)
                     + ",\"assigned_processes\":" + number(members->NumberOfAssignedProcesses)
                     + ",\"member_pids\":" + ids);
-                // 逐个核验完整列表；首次观察仍存活或身份不明的成员立即失败。
+                // 成员状态仅作诊断。瞬时存活或查询竞态不等于泄漏，最终以自有 Job 归零为准。
                 for (DWORD i = 0; i < members->NumberOfProcessIdsInList; ++i) {
                     const auto pid = members->ProcessIdList[i];
                     // 只有仍持有精确句柄时才沿用 child 已退出的证明，释放后重新核验。
@@ -612,16 +630,14 @@ int observe(const std::wstring& protocol) {
                             log->event("job_other_member_image_error", ",\"pid\":" + number(pid)
                                 + ",\"operation\":" + json(e.operation) + ",\"win32\":" + number(e.code));
                         }
-                        require(wait == WAIT_OBJECT_0, "job_member_not_terminated");
+                        if (wait == WAIT_TIMEOUT) state.job_saw_live_member = true;
                     } catch (const Failure& e) {
                         log->event("job_other_member_identity_error", ",\"pid\":" + number(pid)
                             + ",\"operation\":" + json(e.operation) + ",\"win32\":" + number(e.code));
-                        throw;
                     }
                 }
                 return accounting.ActiveProcesses == 0 && members->NumberOfProcessIdsInList == 0;
             };
-            observe_members("before_child_handle_release");
             child.thread.reset(); child.process.reset();
             log->event("owned_child_handles_released", ",\"pid\":" + number(child.pid));
             const auto settle_started = GetTickCount64();
@@ -633,7 +649,8 @@ int observe(const std::wstring& protocol) {
             } while (GetTickCount64() - settle_started < 1000);
             log->event("job_natural_settle", ",\"empty\":" + boolean(empty)
                 + ",\"elapsed_ms\":" + number(GetTickCount64() - settle_started));
-            require(empty, "job_natural_accounting_not_settled");
+            require(empty && GetTickCount64() - settle_started < 1000, "job_natural_accounting_not_settled");
+            state.job_naturally_settled = true;
         } catch (const Failure& e) {
             state.observer_error = e.operation; result = kObserverError;
             log->event("observer_error", ",\"operation\":" + json(e.operation) + ",\"win32\":" + number(e.code));
@@ -719,6 +736,8 @@ int observe(const std::wstring& protocol) {
         + ",\"timed_out\":" + boolean(state.timed_out) + ",\"eof_timeout\":" + boolean(state.eof_timeout)
         + ",\"stop_reason\":" + (state.stop_reason.empty() ? "null" : json(state.stop_reason))
         + ",\"job_terminated\":" + boolean(state.job_terminated) + ",\"job_empty\":" + boolean(state.job_empty)
+        + ",\"job_naturally_settled\":" + boolean(state.job_naturally_settled)
+        + ",\"job_saw_live_member\":" + boolean(state.job_saw_live_member)
         + ",\"active_processes_final\":" + (state.active_processes_final == MAXDWORD ? "null" : number(state.active_processes_final))
         + ",\"observer_exit_code\":" + number(static_cast<DWORD>(result)) + "}\n";
     log->event("observation_complete"); log->flush(); save(state.directory + L"\\summary.json", summary);
@@ -745,7 +764,8 @@ int wmain(int argc, wchar_t** argv) {
         if (argc == 2 && std::wcscmp(argv[1], L"--observe") == 0) return observe(L"");
         if (argc == 3 && std::wcscmp(argv[1], L"--protocol-test") == 0) {
             std::wstring mode = argv[2];
-            require(mode == L"normal" || mode == L"nonzero" || mode == L"sample", "protocol_mode");
+            require(mode == L"normal" || mode == L"nonzero" || mode == L"sample"
+                || mode == L"job-delayed" || mode == L"job-live", "protocol_mode");
             return observe(mode);
         }
         throw Failure{"arguments_rejected", ERROR_INVALID_PARAMETER};
