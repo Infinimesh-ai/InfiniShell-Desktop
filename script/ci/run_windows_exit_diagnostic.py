@@ -18,7 +18,7 @@ import uuid
 
 
 BASE_SOURCE = "f4dfff885e797fd4db8be9e02f48233d33b35844"
-EXPECTED_PARENT = "2222509470bb6bf6cf9d1e274afc759d984dc765"
+EXPECTED_PARENT = "ead8345e63d7d213793bcb2aed938a15acda355c"
 TEST_NAME = "workspace::view::tests::restore_conversation_in_active_pane_enters_existing_live_conversation_without_loading"
 ALLOWED_SOURCE_PATHS = frozenset({
     ".github/workflows/cross-platform-preflight.yml",

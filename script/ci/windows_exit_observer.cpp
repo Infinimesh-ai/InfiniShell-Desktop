@@ -581,6 +581,38 @@ int observe(const std::wstring& protocol) {
                     + ",\"active_processes\":" + number(accounting.ActiveProcesses)
                     + ",\"assigned_processes\":" + number(members->NumberOfAssignedProcesses)
                     + ",\"member_pids\":" + ids);
+                // 仅为首次未知成员补现场身份；不因此接纳该成员，也不按 PID 终止进程。
+                if (!only_child) {
+                    for (DWORD i = 0; i < members->NumberOfProcessIdsInList; ++i) {
+                        const auto pid = members->ProcessIdList[i];
+                        if (pid == child.pid) continue;
+                        try {
+                            require(pid <= MAXDWORD, "job_member_pid_range");
+                            Handle member(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+                                FALSE, static_cast<DWORD>(pid)));
+                            if (!member) fail("open_job_member_identity");
+                            BOOL in_job = FALSE;
+                            if (!IsProcessInJob(member.value, job.value, &in_job)) fail("query_job_member_identity");
+                            const DWORD actual_pid = GetProcessId(member.value);
+                            if (!actual_pid) fail("query_job_member_pid");
+                            require(in_job && actual_pid == pid, "job_member_identity_changed");
+                            const auto created = creation(member.value);
+                            const auto path = image_path(member.value);
+                            const DWORD wait = WaitForSingleObject(member.value, 0);
+                            if (wait == WAIT_FAILED) fail("wait_job_member_identity");
+                            DWORD exit_code = 0;
+                            if (!GetExitCodeProcess(member.value, &exit_code)) fail("exit_job_member_identity");
+                            log->event("job_other_member_identity", ",\"pid\":" + number(pid)
+                                + ",\"creation_filetime\":" + number(created) + ",\"image_path\":" + json(utf8(path))
+                                + ",\"in_owned_job\":true,\"wait_result\":" + number(wait)
+                                + ",\"exit_code\":" + number(exit_code));
+                        } catch (const Failure& e) {
+                            log->event("job_other_member_identity_error", ",\"pid\":" + number(pid)
+                                + ",\"operation\":" + json(e.operation) + ",\"win32\":" + number(e.code));
+                        }
+                        break;
+                    }
+                }
                 require(only_child, "job_has_other_processes");
                 return accounting.ActiveProcesses == 0 && members->NumberOfProcessIdsInList == 0;
             };
