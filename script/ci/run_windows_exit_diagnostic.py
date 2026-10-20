@@ -18,7 +18,7 @@ import uuid
 
 
 BASE_SOURCE = "f4dfff885e797fd4db8be9e02f48233d33b35844"
-EXPECTED_PARENT = "860bcb7769d8e9aa03aa1ff628102281f3596f1e"
+EXPECTED_PARENT = "3d8f1822927c3ca4fc3586c34990939f9baac35b"
 TEST_NAME = "workspace::view::tests::restore_conversation_in_active_pane_enters_existing_live_conversation_without_loading"
 ALLOWED_SOURCE_PATHS = frozenset({
     ".github/workflows/cross-platform-preflight.yml",
@@ -316,6 +316,19 @@ def metadata_command(command, cwd, root, name, timeout):
                                        "stdout_sha256": hashlib.sha256(result.stdout).hexdigest()}
 
 
+def validate_sample_callers(events, expected_pdb):
+    # 只有真实展开到本地夹具调用者才证明采样器可用；单个 context PC 不够。
+    modules = {event["base"]: event for event in events if event["type"] == "module"}
+    callers = [event for event in events if event["type"] == "frame"
+               and event["depth"] > 0 and "fixture_sample_wait" in (event.get("symbol") or "")
+               and modules.get(event["module_base"], {}).get("name", "").lower() == "windows-exit-observer.exe"
+               and (modules[event["module_base"]].get("pdb_guid") or "").lower() == expected_pdb["guid"]
+               and modules[event["module_base"]].get("pdb_age") == expected_pdb["age"]]
+    require(bool(callers), "protocol_sample_missing_fixture_caller")
+    require(any(event["type"] == "sample_end" for event in events), "protocol_sample_incomplete")
+    return {"fixture_callers": len(callers), "unwind_to_fixture_verified": True}
+
+
 def observer_call(observer, binary, output, cwd, mode):
     output.mkdir()
     env = os.environ.copy()
@@ -330,6 +343,15 @@ def observer_call(observer, binary, output, cwd, mode):
     summary = json.loads(plain_path(summaries[0]).read_text(encoding="utf-8"))
     try:
         decision = validate_observer_summary(summary, mode, result.returncode, (output / "STOP.json").exists())
+        if mode == "protocol-sample":
+            traces = []
+            expected_pdb = read_pe_codeview(observer)
+            for name in ("sample-01.jsonl", "sample-02.jsonl"):
+                path = plain_path(summaries[0].parent / name)
+                require(path.stat().st_size <= 8 * 1024 * 1024, "protocol_sample_too_large")
+                events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+                traces.append(validate_sample_callers(events, expected_pdb))
+            decision["sample_callers"] = traces
     except DiagnosticError as error:
         decision = {"continue": False, "reason": error.code}
     return {"mode": mode, "summary": str(summaries[0].relative_to(output.parent)),
@@ -373,6 +395,12 @@ def main():
         require(record["environment_contract"]["inherited"]["RUST_BACKTRACE"] == "1", "unexpected_rust_backtrace")
         observer = plain_path(args.observer)
         record["observer"] = file_identity(observer)
+        observer_cv = read_pe_codeview(observer)
+        observer_pdb = plain_path(observer.parent / observer_cv["pdb_name"])
+        observer_pdb_identity = read_pdb_identity(observer_pdb)
+        validate_pdb_match(observer_cv, observer_pdb_identity)
+        record["observer_pdb_binding"] = {"pe_codeview": observer_cv, "pdb_stream_one": observer_pdb_identity,
+                                        "guid_and_age_match": True, "file": file_identity(observer_pdb)}
         receipt = json.loads(plain_path(run_root / "build" / "build-receipt.json").read_text(encoding="utf-8-sig"))
         require(receipt["status"] == "compiled" and receipt["source_unchanged"] is True
                 and receipt["source_sha"] == record["source"]["head"]
@@ -407,7 +435,8 @@ def main():
         pdb = plain_path(binary.parent / codeview["pdb_name"])
         pdb_identity = read_pdb_identity(pdb)
         validate_pdb_match(codeview, pdb_identity)
-        bound_files = {"binary": file_identity(binary), "pdb": file_identity(pdb), "observer": record["observer"]}
+        bound_files = {"binary": file_identity(binary), "pdb": file_identity(pdb), "observer": record["observer"],
+                       "observer_pdb": record["observer_pdb_binding"]["file"]}
         record["artifacts"] = bound_files
         record["pdb_binding"] = {"pe_codeview": codeview, "pdb_stream_one": pdb_identity, "guid_and_age_match": True}
         record["working_directory"] = str(cwd)

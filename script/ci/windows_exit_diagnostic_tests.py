@@ -101,6 +101,27 @@ class SymbolIdentityTests(unittest.TestCase):
 
 
 class ObservationDecisionTests(unittest.TestCase):
+    def test_sample_protocol_rejects_pc_only_and_wrong_module(self):
+        events = [{"type": "frame", "tid": 1, "depth": 0, "module_base": "0x10", "symbol": None},
+                  {"type": "module", "base": "0x10", "name": "ntdll.dll", "pdb_guid": None},
+                  {"type": "sample_end"}]
+        with self.assertRaises(DIAGNOSTIC.DiagnosticError):
+            DIAGNOSTIC.validate_sample_callers(events, {"guid": str(GUID), "age": 2})
+        events[0].update(depth=2, symbol="fixture_sample_wait")
+        with self.assertRaises(DIAGNOSTIC.DiagnosticError):
+            DIAGNOSTIC.validate_sample_callers(events, {"guid": str(GUID), "age": 2})
+
+    def test_sample_protocol_requires_resolved_local_fixture_caller(self):
+        events = [{"type": "frame", "tid": 1, "depth": 2, "module_base": "0x10",
+                   "symbol": "fixture_sample_wait"},
+                  {"type": "module", "base": "0x10", "name": "windows-exit-observer.exe",
+                   "pdb_guid": str(GUID), "pdb_age": 2}, {"type": "sample_end"}]
+        self.assertTrue(DIAGNOSTIC.validate_sample_callers(events, {"guid": str(GUID), "age": 2})["unwind_to_fixture_verified"])
+        with self.assertRaises(DIAGNOSTIC.DiagnosticError):
+            DIAGNOSTIC.validate_sample_callers(events[:-1], {"guid": str(GUID), "age": 2})
+        with self.assertRaises(DIAGNOSTIC.DiagnosticError):
+            DIAGNOSTIC.validate_sample_callers(events, {"guid": str(GUID), "age": 3})
+
     def successful_summary(self):
         return {
             "mode": "observe", "child_pid": 421, "child_exit_code": 0,

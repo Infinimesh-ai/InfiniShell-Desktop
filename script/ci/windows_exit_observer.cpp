@@ -313,7 +313,7 @@ int sample_mode(int argc, wchar_t** argv) {
     HMODULE modules[2048]{}; DWORD needed = 0;
     if (!EnumProcessModulesEx(process, modules, sizeof modules, &needed, LIST_MODULES_64BIT)) fail("enumerate_modules");
     require(needed <= sizeof modules, "module_limit");
-    for (size_t i = 0; i < needed / sizeof(HMODULE); ++i) {
+    auto emit_modules = [&]() { for (size_t i = 0; i < needed / sizeof(HMODULE); ++i) {
         wchar_t name[1024]{}; MODULEINFO info{};
         if (!GetModuleBaseNameW(process, modules[i], name, 1024) || !GetModuleInformation(process, modules[i], &info, sizeof info)) fail("module_identity");
         IMAGEHLP_MODULE64 symbol_module{}; symbol_module.SizeOfStruct = sizeof symbol_module;
@@ -326,11 +326,13 @@ int sample_mode(int argc, wchar_t** argv) {
         GUID zero{}; bool pdb_known = known && std::memcmp(&guid, &zero, sizeof guid) != 0;
         emit("{\"type\":\"module\",\"name\":" + json(utf8(name)) + ",\"base\":" + json(hex(reinterpret_cast<uintptr_t>(info.lpBaseOfDll)))
             + ",\"image_size\":" + number(info.SizeOfImage)
+            + ",\"metadata_source\":\"dbghelp_after_walk\""
+            + ",\"symbol_type\":" + (known ? number(symbol_module.SymType) : "null")
             + ",\"pe_timestamp\":" + (known ? number(symbol_module.TimeDateStamp) : "null")
             + ",\"pe_checksum\":" + (known ? number(symbol_module.CheckSum) : "null")
             + ",\"pdb_guid\":" + (pdb_known ? json(guid_text) : "null")
             + ",\"pdb_age\":" + (pdb_known ? number(symbol_module.PdbAge) : "null") + "}");
-    }
+    } };
     unsigned sampled_threads = 0, sampled_frames = 0;
     for (int i = 4; i < argc; ++i) {
         HANDLE thread = reinterpret_cast<HANDLE>(parse_handle(argv[i]));
@@ -349,11 +351,24 @@ int sample_mode(int argc, wchar_t** argv) {
         frame.AddrPC = {context.Rip, 0, AddrModeFlat};
         frame.AddrFrame = {context.Rbp, 0, AddrModeFlat};
         frame.AddrStack = {context.Rsp, 0, AddrModeFlat};
-        DWORD64 previous = 0;
-        for (unsigned depth = 0; depth < 96 && frame.AddrPC.Offset; ++depth) {
+        DWORD64 previous_pc = 0, previous_sp = 0;
+        unsigned thread_frames = 0, walk_calls = 0;
+        DWORD walk_error = 0;
+        const char* end_reason = "frame_limit";
+        for (unsigned depth = 0; depth < 96; ++depth) {
+            // 先让 DbgHelp 初始化当前帧，再比较相邻展开结果；相同 PC 也可能属于递归调用。
+            SetLastError(ERROR_SUCCESS);
+            ++walk_calls;
+            if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &context, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr)) {
+                walk_error = GetLastError();
+                end_reason = "stack_walk_returned_false"; break;
+            }
             DWORD64 pc = frame.AddrPC.Offset;
-            if (depth && pc == previous) break;
-            previous = pc;
+            if (!pc) { end_reason = "zero_pc"; break; }
+            if (depth && pc == previous_pc && frame.AddrStack.Offset == previous_sp) {
+                end_reason = "unchanged_pc_and_sp"; break;
+            }
+            previous_pc = pc; previous_sp = frame.AddrStack.Offset;
             DWORD64 base = SymGetModuleBase64(process, pc);
             alignas(SYMBOL_INFO) unsigned char symbol_bytes[sizeof(SYMBOL_INFO) + MAX_SYM_NAME]{};
             auto symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_bytes);
@@ -363,9 +378,14 @@ int sample_mode(int argc, wchar_t** argv) {
             // 仅记录代码地址与符号，不记录 CONTEXT 寄存器值、栈字节、参数或局部变量。
             emit("{\"type\":\"frame\",\"tid\":" + number(tid) + ",\"depth\":" + number(depth) + ",\"pc\":" + json(hex(pc)) + ",\"module_base\":" + json(hex(base)) + ",\"module_offset\":" + json(hex(base ? pc - base : pc)) + ",\"symbol\":" + (resolved ? json(std::string(symbol->Name, symbol->NameLen)) : "null") + "}");
             ++sampled_frames;
-            if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &context, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr)) break;
+            ++thread_frames;
         }
+        // StackWalk64 通常不设置 last-error；该值仅为辅助记录，不能据此推断失败原因。
+        emit("{\"type\":\"stack_walk_end\",\"tid\":" + number(tid) + ",\"frames\":" + number(thread_frames)
+            + ",\"walk_calls\":" + number(walk_calls) + ",\"reason\":" + json(end_reason)
+            + ",\"auxiliary_win32\":" + number(walk_error) + "}");
     }
+    emit_modules();
     require(sampled_threads > 0 && sampled_frames > 0, "sample_has_no_live_frames");
     emit("{\"type\":\"sample_end\",\"mono_ms\":" + number(GetTickCount64())
         + ",\"sampled_threads\":" + number(sampled_threads) + ",\"sampled_frames\":" + number(sampled_frames) + "}");
@@ -498,6 +518,12 @@ void take_sample(State& state, HANDLE child, HANDLE job, HANDLE null_handle) {
     if (error) { ++state.sampler_failures; state.observer_error = "sampling_failed"; state.stop("observer_error"); }
 }
 
+__declspec(noinline) DWORD fixture_sample_wait() {
+    Sleep(45000);
+    // Sleep 后还有实际调用，避免优化器把这个用于验证展开能力的帧变成尾调用。
+    return GetCurrentThreadId();
+}
+
 int fixture(const std::wstring& mode) {
     if (mode == L"descendant-delayed" || mode == L"descendant-live") {
         Sleep(mode == L"descendant-delayed" ? 500 : 5000);
@@ -517,7 +543,7 @@ int fixture(const std::wstring& mode) {
         resume_primary(descendant);
     }
     // 两次 sampler 各最多 5 秒，加间隔后仍留足退出余量；不改变产品的 30/60 秒期限。
-    if (mode == L"sample") Sleep(45000);
+    if (mode == L"sample") require(fixture_sample_wait() == GetCurrentThreadId(), "fixture_thread_changed");
     require(mode == L"normal" || mode == L"nonzero" || mode == L"sample"
         || mode == L"job-delayed" || mode == L"job-live", "fixture_mode");
     if (mode == L"nonzero") return 7;
