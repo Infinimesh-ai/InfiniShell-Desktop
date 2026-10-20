@@ -341,7 +341,12 @@ class DetachedGrokHookTests(unittest.TestCase):
             self.skipTest(f"需要真实 {shell}；缺失不算该 shell 验证通过")
         body = (self.repo / "app/assets/bundled/bootstrap" / filename).read_text()
         refresh = body[body.index(marker):].split("\n\n", 1)[0]
-        options = ["--noprofile", "--norc"] if shell == "bash" else ["-f"] if shell == "zsh" else []
+        # 这里只验证产品的 TTY 刷新片段，不加载主机或用户的 shell 启动配置。
+        options = {
+            "bash": ["--noprofile", "--norc"],
+            "zsh": ["-f"],
+            "fish": ["--no-config"],
+        }[shell]
         result = subprocess.run([executable, *options, "-c", refresh + "\n" + tail],
                                 stdin=self.terminals[0][1], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 env={**self.env, "WARP_CLI_AGENT_TTY": self.terminals[1][2]},
@@ -359,6 +364,13 @@ class DetachedGrokHookTests(unittest.TestCase):
                                      'printf "%s" "$WARP_CLI_AGENT_TTY"')
 
     def test_fish_bootstrap_replaces_inherited_terminal(self):
+        self.check_bootstrap_refresh("fish", "fish.sh", "# 新 shell 和 SSH 必须刷新当前 PTY",
+                                     'printf "%s" "$WARP_CLI_AGENT_TTY"')
+
+    def test_fish_bootstrap_ignores_external_startup_configuration(self):
+        config_dir = self.root / ".config/fish"
+        config_dir.mkdir(parents=True)
+        (config_dir / "config.fish").write_text('printf "unexpected-fish-startup\\n" >&2\n')
         self.check_bootstrap_refresh("fish", "fish.sh", "# 新 shell 和 SSH 必须刷新当前 PTY",
                                      'printf "%s" "$WARP_CLI_AGENT_TTY"')
 
