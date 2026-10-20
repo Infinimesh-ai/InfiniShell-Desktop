@@ -109,8 +109,8 @@ class ExitDiagnosticScopeTests(unittest.TestCase):
                 self.assertEqual(current, job)
         self.assertEqual(DATA["permissions"], {"contents": "read"})
         self.assertEqual(DATA["jobs"]["windows_workspace_exit"]["needs"], "validate_scope")
-        # 身份校验比较到三代前的固定 f4d，干净浅克隆也必须包含该基线。
-        self.assertGreaterEqual(DATA["jobs"]["windows_workspace_exit"]["steps"][0]["with"]["fetch-depth"], 4)
+        # 身份校验比较到四代前的固定 f4d，干净浅克隆也必须包含该基线。
+        self.assertGreaterEqual(DATA["jobs"]["windows_workspace_exit"]["steps"][0]["with"]["fetch-depth"], 5)
         self.assertEqual(DATA["jobs"]["windows_workspace_exit"]["steps"][-1]["if"], "${{ always() }}")
 
 
