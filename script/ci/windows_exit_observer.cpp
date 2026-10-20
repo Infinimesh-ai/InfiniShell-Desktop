@@ -331,12 +331,20 @@ int sample_mode(int argc, wchar_t** argv) {
             + ",\"pdb_guid\":" + (pdb_known ? json(guid_text) : "null")
             + ",\"pdb_age\":" + (pdb_known ? number(symbol_module.PdbAge) : "null") + "}");
     }
+    unsigned sampled_threads = 0, sampled_frames = 0;
     for (int i = 4; i < argc; ++i) {
         HANDLE thread = reinterpret_cast<HANDLE>(parse_handle(argv[i]));
         require(GetProcessIdOfThread(thread) == target, "sample_thread_owner");
         DWORD tid = GetThreadId(thread); require(tid != 0, "sample_thread_id");
+        const DWORD thread_wait = WaitForSingleObject(thread, 0);
+        if (thread_wait == WAIT_FAILED) fail("sample_thread_wait");
+        if (thread_wait == WAIT_OBJECT_0) {
+            emit("{\"type\":\"thread_exited_before_sample\",\"tid\":" + number(tid) + "}");
+            continue;
+        }
         CONTEXT context{}; context.ContextFlags = CONTEXT_FULL;
         if (!GetThreadContext(thread, &context)) fail("thread_context");
+        ++sampled_threads;
         STACKFRAME64 frame{};
         frame.AddrPC = {context.Rip, 0, AddrModeFlat};
         frame.AddrFrame = {context.Rbp, 0, AddrModeFlat};
@@ -354,10 +362,13 @@ int sample_mode(int argc, wchar_t** argv) {
             bool resolved = SymFromAddr(process, pc, &displacement, symbol) != FALSE;
             // 仅记录代码地址与符号，不记录 CONTEXT 寄存器值、栈字节、参数或局部变量。
             emit("{\"type\":\"frame\",\"tid\":" + number(tid) + ",\"depth\":" + number(depth) + ",\"pc\":" + json(hex(pc)) + ",\"module_base\":" + json(hex(base)) + ",\"module_offset\":" + json(hex(base ? pc - base : pc)) + ",\"symbol\":" + (resolved ? json(std::string(symbol->Name, symbol->NameLen)) : "null") + "}");
+            ++sampled_frames;
             if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &context, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr)) break;
         }
     }
-    emit("{\"type\":\"sample_end\",\"mono_ms\":" + number(GetTickCount64()) + "}");
+    require(sampled_threads > 0 && sampled_frames > 0, "sample_has_no_live_frames");
+    emit("{\"type\":\"sample_end\",\"mono_ms\":" + number(GetTickCount64())
+        + ",\"sampled_threads\":" + number(sampled_threads) + ",\"sampled_frames\":" + number(sampled_frames) + "}");
     if (!FlushFileBuffers(output)) fail("sample_flush");
     return 0;
 }
@@ -398,7 +409,7 @@ void take_sample(State& state, HANDLE child, HANDLE job, HANDLE null_handle) {
         do {
             if (entry.th32OwnerProcessID != state.child_pid) continue;
             require(threads.size() < 256, "thread_limit");
-            Handle thread(OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, entry.th32ThreadID));
+            Handle thread(OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | SYNCHRONIZE, FALSE, entry.th32ThreadID));
             if (!thread) fail("open_child_thread");
             require(GetProcessIdOfThread(thread.value) == state.child_pid, "thread_identity_changed");
             threads.push_back({std::move(thread), entry.th32ThreadID, 0, false});
@@ -414,14 +425,23 @@ void take_sample(State& state, HANDLE child, HANDLE job, HANDLE null_handle) {
         std::vector<HANDLE> inherit{process_copy.value, output_copy.value, null_copy.value};
         std::vector<std::wstring> args{L"--sample", std::to_wstring(reinterpret_cast<uintptr_t>(process_copy.value)), std::to_wstring(reinterpret_cast<uintptr_t>(output_copy.value))};
         for (const auto& t : threads) {
-            copies.push_back(duplicate(t.thread.value, THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, true));
+            copies.push_back(duplicate(t.thread.value, THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | SYNCHRONIZE, true));
             inherit.push_back(copies.back().value); args.push_back(std::to_wstring(reinterpret_cast<uintptr_t>(copies.back().value)));
         }
         sampler = spawn(self_path(), args, inherit, null_copy.value, null_copy.value, null_copy.value);
         assign_job(job, sampler);
         for (auto& t : threads) {
             t.previous = SuspendThread(t.thread.value);
-            if (t.previous == static_cast<DWORD>(-1)) fail("suspend_child_thread");
+            if (t.previous == static_cast<DWORD>(-1)) {
+                const DWORD suspend_error = GetLastError();
+                const DWORD wait = WaitForSingleObject(t.thread.value, 0);
+                state.log->event("thread_suspend_failed", ",\"sample\":" + number(state.samples)
+                    + ",\"tid\":" + number(t.id) + ",\"win32\":" + number(suspend_error)
+                    + ",\"wait_result\":" + number(wait));
+                // 枚举后线程可能自然退出；仅精确句柄已 signaled 时跳过，不扩大权限。
+                if (wait == WAIT_OBJECT_0) continue;
+                throw Failure{"suspend_child_thread", suspend_error};
+            }
             t.added = true;
             state.log->event("thread_suspended", ",\"sample\":" + number(state.samples) + ",\"tid\":" + number(t.id) + ",\"previous_count\":" + number(t.previous));
         }
@@ -683,13 +703,18 @@ int observe(const std::wstring& protocol) {
         job.reset();
     }
     // AssignProcessToJobObject 失败时 child 尚未执行；仍只使用自己创建的精确句柄收回。
-    if (child.process && WaitForSingleObject(child.process.value, 0) == WAIT_TIMEOUT) {
-        if (!TerminateProcess(child.process.value, kObserverError)) state.observer_error = "owned_child_cleanup_failed";
+    if (child.process && !state.job_terminated && WaitForSingleObject(child.process.value, 0) == WAIT_TIMEOUT) {
+        if (!TerminateProcess(child.process.value, kObserverError) && state.observer_error.empty())
+            state.observer_error = "owned_child_cleanup_failed";
         result = kObserverError;
         log->event("owned_child_fallback_terminate");
     }
-    if (child.process && !state.has_exit && WaitForSingleObject(child.process.value, 1000) == WAIT_OBJECT_0) {
-        if (GetExitCodeProcess(child.process.value, &state.child_exit)) state.has_exit = true;
+    if (child.process && !state.has_exit) {
+        const DWORD wait = WaitForSingleObject(child.process.value, 1000);
+        if (wait == WAIT_OBJECT_0 && GetExitCodeProcess(child.process.value, &state.child_exit)) state.has_exit = true;
+        if (!state.has_exit && state.observer_error.empty()) state.observer_error = "owned_child_exit_unconfirmed";
+        log->event("owned_child_cleanup_observed", ",\"wait_result\":" + number(wait)
+            + ",\"exit_code\":" + (state.has_exit ? number(state.child_exit) : "null"));
     }
     // EOF 判定在上述 200ms 截止时已固定；此处只使本工具自己的 IO 线程退出。
     const bool stdout_eof = state.eof_deadline_recorded ? state.stdout_eof_at_deadline : false;
