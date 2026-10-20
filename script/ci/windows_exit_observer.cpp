@@ -410,7 +410,28 @@ void take_sample(State& state, HANDLE child, HANDLE job, HANDLE null_handle) {
             if (entry.th32OwnerProcessID != state.child_pid) continue;
             require(threads.size() < 256, "thread_limit");
             Handle thread(OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | SYNCHRONIZE, FALSE, entry.th32ThreadID));
-            if (!thread) fail("open_child_thread");
+            if (!thread) {
+                const DWORD open_error = GetLastError();
+                state.log->event("thread_open_failed", ",\"sample\":" + number(state.samples)
+                    + ",\"tid\":" + number(entry.th32ThreadID) + ",\"win32\":" + number(open_error));
+                if (open_error == ERROR_INVALID_PARAMETER) {
+                    // 旧快照不能证明线程仍存在；仅一次新完整快照确认已离开 child 后跳过。
+                    Handle fresh(CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0));
+                    if (!fresh) fail("thread_refresh_snapshot");
+                    THREADENTRY32 current{}; current.dwSize = sizeof current;
+                    if (!Thread32First(fresh.value, &current)) fail("thread_refresh_first");
+                    bool still_present = false;
+                    do {
+                        if (current.th32ThreadID == entry.th32ThreadID && current.th32OwnerProcessID == state.child_pid)
+                            still_present = true;
+                    } while (Thread32Next(fresh.value, &current));
+                    require(GetLastError() == ERROR_NO_MORE_FILES, "thread_refresh_incomplete");
+                    state.log->event("thread_refresh_complete", ",\"sample\":" + number(state.samples)
+                        + ",\"tid\":" + number(entry.th32ThreadID) + ",\"still_in_child\":" + boolean(still_present));
+                    if (!still_present) continue;
+                }
+                throw Failure{"open_child_thread", open_error};
+            }
             require(GetProcessIdOfThread(thread.value) == state.child_pid, "thread_identity_changed");
             threads.push_back({std::move(thread), entry.th32ThreadID, 0, false});
         } while (Thread32Next(snapshot.value, &entry));
