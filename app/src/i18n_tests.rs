@@ -155,6 +155,8 @@ fn literal_translation_keys(source: &str) -> Vec<(usize, String)> {
     let bytes = source.as_bytes();
     let mut keys = Vec::new();
     let mut index = 0;
+    let mut line_scan_start = 0;
+    let mut line = 1;
 
     while let Some(relative_bang) = bytes[index..].iter().position(|byte| *byte == b'!') {
         let bang = index + relative_bang;
@@ -205,11 +207,11 @@ fn literal_translation_keys(source: &str) -> Vec<(usize, String)> {
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
         {
-            let line = source[..identifier_start]
+            line += source[line_scan_start..identifier_start]
                 .bytes()
                 .filter(|byte| *byte == b'\n')
-                .count()
-                + 1;
+                .count();
+            line_scan_start = identifier_start;
             keys.push((line, key.to_string()));
         }
         index = key_end + 1;
@@ -435,6 +437,30 @@ let unrelated = format!("not-a-translation-key");
     assert_eq!(
         literal_translation_keys(source),
         vec![(3, "first-key".to_string()), (4, "second-key".to_string())]
+    );
+}
+
+#[test]
+fn literal_translation_key_scanner_preserves_line_numbers_across_skipped_calls() {
+    let source = concat!(
+        "let first = crate::t!(\"first-key\"); let second = warp::t_static!(\"second-key\");\r\n",
+        "// 文档 t!(\"ignored-comment-key\")\r\n",
+        "let ignored = crate::t!(\"INVALID_KEY\");\r\n",
+        "let nonliteral = crate::t!(variable);\r\n",
+        "let 中文 = crate::t!(\r\n",
+        "    \"third-key\",\r\n",
+        ");\r\n",
+        "let tail = crate::t!(\"fourth-key\");",
+    );
+
+    assert_eq!(
+        literal_translation_keys(source),
+        vec![
+            (1, "first-key".to_string()),
+            (1, "second-key".to_string()),
+            (5, "third-key".to_string()),
+            (8, "fourth-key".to_string()),
+        ]
     );
 }
 
