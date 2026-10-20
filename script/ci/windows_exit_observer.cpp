@@ -556,6 +556,52 @@ int observe(const std::wstring& protocol) {
         state.observer_error = "cpp_exception"; result = kObserverError;
         try { state.stop("observer_error"); } catch (...) {}
     }
+    // Job 计数包含尚未释放引用的已退出进程；先保存退出/EOF，再释放自己的句柄。
+    if (job && child.process && state.has_exit && !state.job_terminated && state.observer_error.empty()) {
+        try {
+            require(WaitForSingleObject(child.process.value, 0) == WAIT_OBJECT_0, "recorded_child_not_signaled");
+            auto observe_members = [&](const char* phase) {
+                JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};
+                if (!QueryInformationJobObject(job.value, JobObjectBasicAccountingInformation, &accounting, sizeof accounting, nullptr)) fail("job_natural_accounting");
+                // 固定容量、失败关闭；不把未识别的后代等到退出后再记为通过。
+                std::vector<ULONG_PTR> storage(257);
+                auto members = reinterpret_cast<JOBOBJECT_BASIC_PROCESS_ID_LIST*>(storage.data());
+                if (!QueryInformationJobObject(job.value, JobObjectBasicProcessIdList, members,
+                    static_cast<DWORD>(storage.size() * sizeof(ULONG_PTR)), nullptr)) fail("job_natural_members");
+                require(members->NumberOfAssignedProcesses == members->NumberOfProcessIdsInList
+                    && members->NumberOfProcessIdsInList <= 256, "job_member_list_incomplete");
+                std::string ids = "["; bool only_child = true;
+                for (DWORD i = 0; i < members->NumberOfProcessIdsInList; ++i) {
+                    if (i) ids += ',';
+                    ids += number(members->ProcessIdList[i]);
+                    if (members->ProcessIdList[i] != child.pid) only_child = false;
+                }
+                ids += ']';
+                log->event("job_natural_accounting", ",\"phase\":" + json(phase)
+                    + ",\"active_processes\":" + number(accounting.ActiveProcesses)
+                    + ",\"assigned_processes\":" + number(members->NumberOfAssignedProcesses)
+                    + ",\"member_pids\":" + ids);
+                require(only_child, "job_has_other_processes");
+                return accounting.ActiveProcesses == 0 && members->NumberOfProcessIdsInList == 0;
+            };
+            observe_members("before_child_handle_release");
+            child.thread.reset(); child.process.reset();
+            log->event("owned_child_handles_released", ",\"pid\":" + number(child.pid));
+            const auto settle_started = GetTickCount64();
+            bool empty = false;
+            do {
+                empty = observe_members("after_child_handle_release");
+                if (empty) break;
+                Sleep(10);
+            } while (GetTickCount64() - settle_started < 1000);
+            log->event("job_natural_settle", ",\"empty\":" + boolean(empty)
+                + ",\"elapsed_ms\":" + number(GetTickCount64() - settle_started));
+            require(empty, "job_natural_accounting_not_settled");
+        } catch (const Failure& e) {
+            state.observer_error = e.operation; result = kObserverError;
+            log->event("observer_error", ",\"operation\":" + json(e.operation) + ",\"win32\":" + number(e.code));
+        }
+    }
     // 仅终止并关闭自己创建的 Job；记录清理行为，不能把 EOF 超时改写成成功。
     if (job) {
         JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};

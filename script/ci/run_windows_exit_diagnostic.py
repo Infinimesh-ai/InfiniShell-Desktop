@@ -18,6 +18,7 @@ import uuid
 
 
 BASE_SOURCE = "f4dfff885e797fd4db8be9e02f48233d33b35844"
+EXPECTED_PARENT = "2222509470bb6bf6cf9d1e274afc759d984dc765"
 TEST_NAME = "workspace::view::tests::restore_conversation_in_active_pane_enters_existing_live_conversation_without_loading"
 ALLOWED_SOURCE_PATHS = frozenset({
     ".github/workflows/cross-platform-preflight.yml",
@@ -251,12 +252,13 @@ def git_output(repo, *arguments):
 
 def source_identity(repo):
     head = git_output(repo, "rev-parse", "HEAD")
-    require(git_output(repo, "rev-parse", "HEAD^") == BASE_SOURCE, "unexpected_source_parent")
+    require(git_output(repo, "rev-parse", "HEAD^") == EXPECTED_PARENT, "unexpected_source_parent")
     require(os.environ.get("GITHUB_SHA") == head, "github_source_mismatch")
     require(not git_output(repo, "status", "--porcelain=v1", "--untracked-files=all"), "worktree_not_clean")
     changed = git_output(repo, "diff", "--name-only", "--no-renames", BASE_SOURCE, "HEAD").splitlines()
     require(changed and set(changed) <= ALLOWED_SOURCE_PATHS, "product_tree_changed")
-    return {"head": head, "parent": BASE_SOURCE, "tree": git_output(repo, "rev-parse", "HEAD^{tree}"),
+    return {"head": head, "parent": EXPECTED_PARENT, "base_source": BASE_SOURCE,
+            "tree": git_output(repo, "rev-parse", "HEAD^{tree}"),
             "changed_paths": sorted(changed), "outside_diagnostic_allowlist_equal_to_f4d": True,
             "worktree_clean": True}
 
