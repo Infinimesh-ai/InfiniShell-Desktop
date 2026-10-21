@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ai::api_keys::{ApiKeyManager, CustomEndpointParams, CustomEndpointSchema};
 use warp_core::features::FeatureFlag;
@@ -8,8 +8,9 @@ use warpui::{App, SingletonEntity};
 use super::{
     AIConversation, AIConversationAutoexecuteMode, AIConversationId, ConversationStatus,
     ConversationUsageTotals, RestoreConversationError, TaskId, artifact_from_fork_proto,
-    footer_model_token_usage,
+    footer_model_token_usage, tool_pair_message_ids_to_remove,
 };
+use crate::ai::agent::MessageId;
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::SerializedBlockListItem;
 use crate::ai::blocklist::block::cli_controller::LongRunningCommandControlState;
@@ -207,6 +208,49 @@ fn tool_call_result_message(
         request_id: request_id.to_string(),
         timestamp: None,
     }
+}
+
+#[test]
+fn rewind_removes_all_results_for_one_call_and_preserves_server_call() {
+    let source = api::Task {
+        id: "root-task".to_string(),
+        messages: vec![
+            tool_call_message(
+                "server-call",
+                "keep-request",
+                "server-tool",
+                api::message::tool_call::Tool::Server(Default::default()),
+            ),
+            tool_call_message(
+                "call",
+                "rewind-request",
+                "shell-tool",
+                api::message::tool_call::Tool::RunShellCommand(Default::default()),
+            ),
+            tool_call_result_message(
+                "first-result",
+                "preflight-first",
+                "shell-tool",
+                api::message::tool_call_result::Result::RunShellCommand(Default::default()),
+            ),
+            tool_call_result_message(
+                "second-result",
+                "preflight-second",
+                "shell-tool",
+                api::message::tool_call_result::Result::RunShellCommand(Default::default()),
+            ),
+        ],
+        ..Default::default()
+    };
+    let expected: HashSet<_> = ["call", "first-result", "second-result"]
+        .map(|id| MessageId::new(id.to_string()))
+        .into_iter()
+        .collect();
+    for removed_id in ["call", "first-result", "second-result"] {
+        let removed = HashSet::from([MessageId::new(removed_id.to_string())]);
+        assert_eq!(tool_pair_message_ids_to_remove(&source, &removed), expected);
+    }
+    assert!(tool_pair_message_ids_to_remove(&source, &HashSet::new()).is_empty());
 }
 
 fn restored_conversation_with_messages(messages: Vec<api::Message>) -> AIConversation {

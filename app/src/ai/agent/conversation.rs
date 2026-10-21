@@ -4780,13 +4780,10 @@ impl AIConversation {
             .flat_map(|ex| ex.added_message_ids.iter().cloned())
             .collect();
 
-        // Reconcile sub-agent call/result pairs so the rewind never leaves a
-        // dangling `tool_call`/`tool_call_result` half in the root (see the
-        // helper's doc comment for why). The now-unreferenced subtask is pruned
-        // below.
-        if let Some(root_source) = self.task_store.root_task().and_then(Task::source) {
-            let extra_ids =
-                subagent_pair_message_ids_to_remove(root_source, &message_ids_to_remove);
+        // preflight 结果仅追加到 source，可能不在 exchange 的消息列表中；
+        // 同一任务的工具调用和全部结果必须一起移除，包括已被摘要搬移的消息。
+        for source in self.all_tasks().filter_map(Task::source) {
+            let extra_ids = tool_pair_message_ids_to_remove(source, &message_ids_to_remove);
             message_ids_to_remove.extend(extra_ids);
         }
 
@@ -4882,53 +4879,37 @@ fn is_pure_text_or_reasoning_mask(mask: &prost_types::FieldMask) -> bool {
             .all(|p| p == "agent_output.text" || p == "agent_reasoning.reasoning")
 }
 
-/// Computes the additional message ids to remove during a rewind so that no
-/// sub-agent `tool_call`/`tool_call_result` pair is left dangling.
-///
-/// A sub-agent runs in its own subtask, linked from the root by a `tool_call`
-/// (the invocation) and a `tool_call_result` (its completion). If a rewind
-/// removes only one half — the "straddle" case, where the call is before the
-/// rewind point but the result lands in a rewound turn (common for
-/// long-running terminal sub-agents) — a root-only truncation would leave a
-/// dangling `tool_call` with no result. That both wrongly re-sends the subtask
-/// (it looks unfinished, so it stays reachable/active) and breaks the request.
-/// So if EITHER half of a sub-agent is already in `removed_ids`, this returns
-/// both halves' message ids; the now-unreferenced subtask is pruned separately.
-fn subagent_pair_message_ids_to_remove(
-    root_source: &api::Task,
+/// 若回退包含某个工具调用或结果，则移除同一任务、同一调用的全部消息。
+/// 保留未触及的工具历史，包括本来就不产生结果的服务端工具调用。
+fn tool_pair_message_ids_to_remove(
+    source: &api::Task,
     removed_ids: &HashSet<MessageId>,
 ) -> HashSet<MessageId> {
-    // tool_call_id -> sub-agent call message id
-    let mut subagent_call_message_ids: HashMap<String, String> = HashMap::new();
-    // tool_call_id -> tool_call_result message id
-    let mut tool_call_result_message_ids: HashMap<String, String> = HashMap::new();
-    for message in &root_source.messages {
-        if let Some(tool_call) = message.tool_call()
-            && let Some(subagent) = tool_call.subagent()
-            && !subagent.task_id.is_empty()
-        {
-            subagent_call_message_ids.insert(tool_call.tool_call_id.clone(), message.id.clone());
-        }
-        if let Some(result) = message.tool_call_result() {
-            tool_call_result_message_ids.insert(result.tool_call_id.clone(), message.id.clone());
-        }
-    }
-
-    let mut extra_ids: HashSet<MessageId> = HashSet::new();
-    for (tool_call_id, call_message_id) in &subagent_call_message_ids {
-        let result_message_id = tool_call_result_message_ids.get(tool_call_id);
-        let call_rewound = removed_ids.contains(&MessageId::new(call_message_id.clone()));
-        let result_rewound = result_message_id
-            .map(|id| removed_ids.contains(&MessageId::new(id.clone())))
-            .unwrap_or(false);
-        if call_rewound || result_rewound {
-            extra_ids.insert(MessageId::new(call_message_id.clone()));
-            if let Some(result_message_id) = result_message_id {
-                extra_ids.insert(MessageId::new(result_message_id.clone()));
-            }
-        }
-    }
-    extra_ids
+    let tool_messages: Vec<_> = source
+        .messages
+        .iter()
+        .filter_map(|message| {
+            let call_id = message
+                .tool_call()
+                .map(|call| call.tool_call_id.as_str())
+                .or_else(|| {
+                    message
+                        .tool_call_result()
+                        .map(|result| result.tool_call_id.as_str())
+                })?;
+            Some(((message.task_id.as_str(), call_id), message.id.as_str()))
+        })
+        .collect();
+    let affected_calls: HashSet<_> = tool_messages
+        .iter()
+        .filter(|(_, id)| removed_ids.contains(&MessageId::new((*id).to_owned())))
+        .map(|(key, _)| *key)
+        .collect();
+    tool_messages
+        .into_iter()
+        .filter(|(key, _)| affected_calls.contains(key))
+        .map(|(_, id)| MessageId::new(id.to_owned()))
+        .collect()
 }
 
 fn parse_orchestration_harness_type(value: &str) -> Harness {

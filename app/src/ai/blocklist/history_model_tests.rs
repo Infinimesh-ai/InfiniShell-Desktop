@@ -5173,6 +5173,301 @@ fn regular_tool_call_result_message(
     }
 }
 
+fn rewind_file_call(id: &str, task_id: &str, call_id: &str, request_id: &str) -> api::Message {
+    let mut message = regular_tool_call_message(id, task_id, call_id, request_id);
+    message.message = Some(api::message::Message::ToolCall(api::message::ToolCall {
+        tool_call_id: call_id.to_owned(),
+        tool: Some(api::message::tool_call::Tool::ApplyFileDiffs(
+            api::message::tool_call::ApplyFileDiffs {
+                summary: "删除专用测试文件".to_owned(),
+                deleted_files: vec![api::message::tool_call::apply_file_diffs::DeleteFile {
+                    file_path: "/tmp/rewind-fixture.txt".to_owned(),
+                }],
+                ..Default::default()
+            },
+        )),
+    }));
+    message
+}
+
+fn rewind_file_result(id: &str, task_id: &str, call_id: &str) -> api::Message {
+    let mut message =
+        regular_tool_call_result_message(id, task_id, call_id, "byop-preflight:result");
+    message.message = Some(api::message::Message::ToolCallResult(
+        api::message::ToolCallResult {
+            tool_call_id: call_id.to_owned(),
+            context: None,
+            result: Some(api::message::tool_call_result::Result::ApplyFileDiffs(
+                api::ApplyFileDiffsResult {
+                    result: Some(api::apply_file_diffs_result::Result::Success(
+                        Default::default(),
+                    )),
+                },
+            )),
+        },
+    ));
+    message
+}
+
+#[test]
+fn partial_rewind_removes_preflight_result_and_keeps_earlier_tool_history() {
+    use crate::ai::agent::api::RequestParams;
+    use crate::ai::agent::task::TaskId;
+    use crate::ai::agent_providers::chat_stream::classify_byop_controller_readiness;
+    use crate::ai::byop_readiness::ReadinessState;
+
+    App::test((), |mut app| async move {
+        initialize_settings_for_tests(&mut app);
+        let (sender, receiver) = std::sync::mpsc::sync_channel(16);
+        let mut resources = GlobalResourceHandles::mock(&mut app);
+        resources.model_event_sender = Some(sender);
+        app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(resources));
+        let history = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
+        let retained = vec![
+            create_user_query_message("keep-user", "root", "keep-request", "保留此前工作"),
+            regular_tool_call_message("keep-call", "root", "keep-tool", "keep-request"),
+            regular_tool_call_result_message("keep-result", "root", "keep-tool", "keep-request"),
+            agent_output_message("keep-output", "root", "keep-request", "已完成"),
+        ];
+        let mut messages = retained.clone();
+        messages.extend([
+            create_user_query_message("rewind-user", "root", "rewind-request", "撤回删除"),
+            rewind_file_call("rewind-call", "root", "delete-tool", "rewind-request"),
+        ]);
+        let mut conversation = AIConversation::new_restored(
+            AIConversationId::new(),
+            vec![create_api_task("root", messages)],
+            None,
+        )
+        .unwrap();
+
+        history.update(&mut app, |_, ctx| {
+            // 走实际 preflight 持久化入口；不能把结果预先放进 restored exchange 掩盖缺陷。
+            conversation
+                .append_byop_preflight_messages_to_task(
+                    TaskId::new("root".to_owned()),
+                    vec![rewind_file_result(
+                        "preflight-result",
+                        "root",
+                        "delete-tool",
+                    )],
+                    ctx,
+                )
+                .unwrap();
+            let rewind_id = conversation.root_task_exchanges().last().unwrap().id;
+            assert!(
+                !conversation
+                    .exchange_with_id(rewind_id)
+                    .unwrap()
+                    .added_message_ids
+                    .iter()
+                    .any(|id| &**id == "preflight-result")
+            );
+            assert_eq!(
+                classify_byop_controller_readiness(&RequestParams::new_for_test(
+                    vec![],
+                    conversation.compute_active_tasks(),
+                ))
+                .state,
+                ReadinessState::Ready
+            );
+
+            conversation.truncate_from_exchange(rewind_id, ctx).unwrap();
+
+            assert_eq!(conversation.root_task_exchanges().count(), 1);
+            assert_eq!(
+                conversation
+                    .get_root_task()
+                    .unwrap()
+                    .source()
+                    .unwrap()
+                    .messages,
+                retained
+            );
+            let follow_up = create_exchange_with_query(
+                "回退后继续",
+                Local.timestamp_opt(1_700_000_000, 0).unwrap(),
+                None,
+            );
+            let params =
+                RequestParams::new_for_test(follow_up.input, conversation.compute_active_tasks());
+            assert_eq!(
+                classify_byop_controller_readiness(&params).state,
+                ReadinessState::Ready
+            );
+        });
+
+        let ModelEvent::UpdateMultiAgentConversation {
+            updated_tasks,
+            conversation_data,
+            ..
+        } = last_update_conversation_event(&receiver)
+        else {
+            panic!("必须保存回退后的历史")
+        };
+        let restored = AIConversation::new_restored(
+            AIConversationId::new(),
+            updated_tasks,
+            Some(conversation_data),
+        )
+        .unwrap();
+        assert_eq!(
+            restored.get_root_task().unwrap().source().unwrap().messages,
+            retained
+        );
+        assert_eq!(
+            classify_byop_controller_readiness(&RequestParams::new_for_test(
+                create_exchange_with_query(
+                    "恢复后继续",
+                    Local.timestamp_opt(1_700_000_001, 0).unwrap(),
+                    None
+                )
+                .input,
+                restored.compute_active_tasks(),
+            ))
+            .state,
+            ReadinessState::Ready
+        );
+    });
+}
+
+#[test]
+fn full_rewind_with_preflight_result_resets_root_and_persisted_tasks() {
+    use crate::ai::agent::api::RequestParams;
+    use crate::ai::agent::task::TaskId;
+    use crate::ai::agent_providers::chat_stream::classify_byop_controller_readiness;
+    use crate::ai::byop_readiness::ReadinessState;
+
+    App::test((), |mut app| async move {
+        initialize_settings_for_tests(&mut app);
+        let (sender, receiver) = std::sync::mpsc::sync_channel(16);
+        let mut resources = GlobalResourceHandles::mock(&mut app);
+        resources.model_event_sender = Some(sender);
+        app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(resources));
+        let history = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
+        let mut conversation = AIConversation::new_restored(
+            AIConversationId::new(),
+            vec![create_api_task(
+                "root",
+                vec![
+                    create_user_query_message("user", "root", "request", "撤回全部"),
+                    rewind_file_call("call", "root", "delete-tool", "request"),
+                ],
+            )],
+            None,
+        )
+        .unwrap();
+        history.update(&mut app, |_, ctx| {
+            conversation
+                .append_byop_preflight_messages_to_task(
+                    TaskId::new("root".to_owned()),
+                    vec![rewind_file_result("result", "root", "delete-tool")],
+                    ctx,
+                )
+                .unwrap();
+            let exchange_id = conversation.root_task_exchanges().next().unwrap().id;
+            conversation
+                .truncate_from_exchange(exchange_id, ctx)
+                .unwrap();
+            assert_eq!(conversation.root_task_exchanges().count(), 0);
+            assert!(conversation.get_root_task().unwrap().source().is_none());
+            assert_eq!(
+                classify_byop_controller_readiness(&RequestParams::new_for_test(
+                    create_exchange_with_query(
+                        "重新开始",
+                        Local.timestamp_opt(1_700_000_000, 0).unwrap(),
+                        None
+                    )
+                    .input,
+                    conversation.compute_active_tasks(),
+                ))
+                .state,
+                ReadinessState::Ready
+            );
+        });
+        let ModelEvent::UpdateMultiAgentConversation { updated_tasks, .. } =
+            last_update_conversation_event(&receiver)
+        else {
+            panic!("必须保存空历史")
+        };
+        assert!(updated_tasks.is_empty());
+    });
+}
+
+#[test]
+fn partial_rewind_removes_regular_call_when_its_result_is_in_rewound_exchange() {
+    use crate::ai::agent::api::RequestParams;
+    use crate::ai::agent_providers::chat_stream::classify_byop_controller_readiness;
+    use crate::ai::byop_readiness::ReadinessState;
+
+    App::test((), |mut app| async move {
+        initialize_history_persistence_for_tests(&mut app);
+        let kept = create_user_query_message("keep", "root", "first", "保留提问");
+        let mut result = rewind_file_result("result", "root", "delete-tool");
+        result.request_id = "second".to_owned();
+        let (active, _) = restore_truncate_and_collect(
+            &mut app,
+            create_api_task(
+                "root",
+                vec![
+                    kept.clone(),
+                    rewind_file_call("call", "root", "delete-tool", "first"),
+                    create_user_query_message("later", "root", "second", "撤回结果所在轮"),
+                    result,
+                ],
+            ),
+            vec![],
+            "撤回结果所在轮",
+        );
+        assert_eq!(find_root_task(&active, "root").messages, [kept]);
+        assert_eq!(
+            classify_byop_controller_readiness(&RequestParams::new_for_test(vec![], active,)).state,
+            ReadinessState::Ready
+        );
+    });
+}
+
+#[test]
+fn partial_rewind_keeps_same_named_tool_pair_in_retained_child_task() {
+    use crate::test_util::ai_agent_tasks::create_api_subtask;
+
+    App::test((), |mut app| async move {
+        initialize_history_persistence_for_tests(&mut app);
+        let (subagent, _) = make_subagent_call("subagent", "root", "child", "first", None);
+        let child = create_api_subtask(
+            "child",
+            "root",
+            vec![
+                regular_tool_call_message("child-call", "child", "same-id", "child-request"),
+                regular_tool_call_result_message(
+                    "child-result",
+                    "child",
+                    "same-id",
+                    "child-request",
+                ),
+            ],
+        );
+        let kept = create_user_query_message("keep", "root", "first", "保留子任务");
+        let (active, _) = restore_truncate_and_collect(
+            &mut app,
+            create_api_task(
+                "root",
+                vec![
+                    kept.clone(),
+                    subagent.clone(),
+                    create_user_query_message("later", "root", "second", "撤回根任务工具"),
+                    rewind_file_call("root-call", "root", "same-id", "second"),
+                    rewind_file_result("root-result", "root", "same-id"),
+                ],
+            ),
+            vec![child.clone()],
+            "撤回根任务工具",
+        );
+        assert_eq!(find_root_task(&active, "root").messages, [kept, subagent]);
+        assert_eq!(find_root_task(&active, "child"), &child);
+    });
+}
+
 /// Builds a server-handled tool_call message (like the `RunPrimaryAgent`
 /// bootstrap call at the start of every root task), which never receives a
 /// result by design.
