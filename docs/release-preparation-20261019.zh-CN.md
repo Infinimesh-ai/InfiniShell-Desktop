@@ -1,3 +1,21 @@
+# 当前正式发布结果（2026-10-22）
+
+产品源码固定为 `255849d04ffe6a8645f7ec31f3cd6fd58004c4be`，annotated tag `v0.2026.10.21.15.36.oss_00`（object `bfbf1a35de5f84c403b9cc6b31b7898ac5637db5`），正式构建 run `39627212929/1` 已成功；PR #29 已合入。已于 **2026-10-22 06:05:02（北京时间）** 正式公开为 [Latest](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.21.15.36.oss_00)，Release ID `420079568`，精确12件资产。后续文档提交不会移动冻结产品 tag。
+
+- 同源码完整预检：Linux 12,212 PASS / 123 skip，Windows 11,932 PASS / 160 skip；五项新回归及两端适用12项i18n各三阶段通过。Mac本机115项定向、13项i18n及 `cargo check --locked -p warp` 通过；条件跳过不算通过。
+- 本轮10/10 CI原件已归档。Mac最终DMG为512,352,949 B，SHA-256 `f46b144a6ce12c9b27263f1e5e5ffa7b9afeca1909ab171537fb98f3f8a890d0`，签名、Apple Accepted、装订、Gatekeeper、版本和六资源已验。Linux四包只解包及原生版本核对通过；Windows Setup只读来源、AMD64、内部版本与八成员核对通过，实际 **Authenticode=NotSigned**，没有执行Setup或桌面程序。
+- 最终DMG英中U1–U4、A1原字节/CRLF/0600恢复后同一非空对话续问、A2失败保留原卡并同卡重试、A3依次接受A/B后C、A4当前进程A/B/B/A路由均有独审支持。使用受控provider，不扩为真实模型或重启持久化；审批仍挂起时输入C仍为 `not_executed_not_waived`，不能用审批后C替代。
+- Linux/Windows最终SSH各10真实场景已限定接纳。Windows原20秒 `failed_proxy_exit` 保留，同一本地SSH随后自然退出0；两端后续精确端点缺席不证明远端全部后代/句柄或清理。两语言GUI正常退出、provider退出、镜像正常detach和profile精确恢复已记录；父会话历史EADDRINUSE/exit1与所有 `cleanup_ready=false` 保留。
+- 用户决定Windows交互安装/PATH/非BMP/官方卸载/GUI与Ubuntu GUI不补验（`user_skipped`，`not_required/not_tested`）；Mac发现未来新版GUI延期（`user_deferred/not_tested`）。旧CLI矩阵延期和历史失败不变。
+
+Draft精确12件全量回下载与公开后12件无凭据匿名全量下载均通过，名称/大小/SHA-256三方一致；Latest和tag/source保持。发布后同一最终DMG的英文、简体中文手动检查均显示已是最新版本、无下载安装入口，正常网络且无测试provider/proxy；检查中瞬态未单独捕获，不记作该瞬态已验。语言恢复System default，设置原始字节一致，正常Quit和精确detach均完成。最终正文回写已通过元数据复核。最终证据入口为[本轮台账](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/release-state.json)、[验收计划](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/acceptance-plan.json)、[EN独审](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/macos-en-gui-audit-255/result.json)、[ZH独审](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/macos-zh-gui-audit-255/result.json)、[Linux四包](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/linux-final-packages-20261021T1536Z/final-review.json)及[Windows安装器](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/windows-installer-verification-20261021T1536Z/final-review.json)。正式归档为 `/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00`。
+
+`CURRENT_STATUS.json` 当前入口为 `main_acceptance.release_20261021`；下列10月19日退役说明完整保留为当时历史，不代表本轮无候选或未获发布授权。本次仅文档事实更新，无需本地化变更；文档提交前 `cargo check --locked -p warp`（r-4df159da）实际exit0，8分46秒、5条既有警告；期间仅JSON文档格式调整，Rust源码未变，原source_unchanged=false如实保留。
+
+发布后证据：[匿名12件回环](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/evidence/public-roundtrip-01/result.json)、[EN同版](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/postpublication-en-01/result.json)、[ZH同版](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/postpublication-zh-01/result.json)、[最终正文回执](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/publication-body-closeout-255/execution-01/result.json)。文档提交及远端一致性记录于 `/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/revisions/final-publication-closeout-20261022/git-closeout.json`。
+
+---
+
 # 未发布候选退役与后续正式发布准备（2026-10-19）
 
 **按用户授权，已删除未公开的候选 Draft、tag、对应构建产物及已合并分支。目前没有活动候选或 Draft，本项目本地和 origin 分支均只保留 main；没有创建新 tag、构建新正式包或公开发布。** 公开 Latest 仍为 `v0.2026.10.07.01.09.oss_00`。原“保持 Draft”的指令在本次退役范围内由删除授权替代，正式发布仍待另行安排。
