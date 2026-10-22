@@ -24,6 +24,16 @@ Draft精确12件全量回下载与公开后12件无凭据匿名全量下载均�
 
 证据：[补验结果与摘要清单](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/result.json)、[英文终态](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/en-ready.png)、[中文终态](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/zh-ready.png)、[源码复用边界](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/source-scope-review.json)。
 
+## 发布后补验：本机实际升级与设置／会话保留（2026-10-22）
+
+按用户追加要求，已在旧正式版中实际点击“Install now／立即安装”，由 Finder 打开下载完成的正式 DMG，并复制、确认替换 `/Applications/InfiniShell.app`。首轮 Finder 提示应用仍在使用，核实旧实例再次运行后正常 Quit，重试替换成功；未强制结束进程。上一节“未点击安装”保留为此前发现新版阶段的事实，本节补录之后完成的真实升级。
+
+安装后的可执行文件 SHA-256 为 `6ad38609d61339c7fa4ce4e31a52eb1b0f06dc49cf113402f41b55bd5e51c057`，与正式包一致；`codesign --verify --deep --strict` 通过，Gatekeeper 为 `accepted / Notarized Developer ID`。新版正常启动，“关于”显示 `v0.2026.10.21.15.36.oss_00`，手动检查更新后显示已是最新版。新建临时终端执行 `printf 'INFINISHELL_UPGRADE_OK\n'` 成功（exit0），随后关闭该测试标签；新版正常 Quit 为exit0，再次从已安装路径启动成功，现保持打开供用户使用，安装镜像已正常弹出。
+
+升级前备份与新版退出后的 SQLite 一致性快照均通过 `integrity_check`。只读逐行复核确认：1个窗口、11个标签页、10个终端及其会话引用／布局保留，原104个会话、121个任务、1,013个历史块与1,385条命令的ID和完整内容均未变；仅新增本次测试命令及对应历史块各1条。设置文件3,548 B、SHA-256 `3bbfa67867e416a4397d11790c6a37f34f655230a65f5fd953f25cb4867f98ee` 逐字节不变；另查22个配置／用户／项目相关表，除查看About产生的设置页状态外均不变，包含 `generic_string_objects`。窗口CLI子代理宽高由NULL回填360／320，与代码默认值一致。这证明持久化记录保留和启动恢复，不声称旧shell／PTY／后台进程连续存活，也不扩大为所有会话逐一打开或本轮最终包发现更未来版本已验。
+
+升级前配置、数据库与PTY记录备份保留在本机 `/Users/zhishi/InfiniShell-Backups/upgrade-20261022`（目录0700，数据库0600）；私有正文未进入Git。原始测试现场保持 `cleanup_ready=false`，未删除。证据：[升级结果与摘要清单](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/upgrade-installed-20261022/result.json)、[升级后版本界面](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/upgrade-installed-20261022/new/handoff-about-full.png)、[持久化比较](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/upgrade-installed-20261022/profile-comparison.json)、[独立复核](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/upgrade-installed-20261022/independent-review.json)。仅补验收文档，无需本地化变更；产品源码未变，复用已通过的 `cargo check --locked -p warp`（r-4df159da）。
+
 ---
 
 # 未发布候选退役与后续正式发布准备（2026-10-19）

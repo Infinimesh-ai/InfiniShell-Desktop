@@ -3800,6 +3800,39 @@
         "settings_restored": true,
         "cleanup_ready": false
       },
+      "macos_installed_upgrade": {
+        "status": "passed_real_installed_upgrade_profile_preserved",
+        "old_tag": "v0.2026.10.07.01.09.oss_00",
+        "new_tag": "v0.2026.10.21.15.36.oss_00",
+        "result": {
+          "path": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/upgrade-installed-20261022/result.json",
+          "bytes": 10739,
+          "sha256": "95788e8e5654e66e2ed04cd8dc9274a2d531dcd97724e6cebe56136aba5b49ea"
+        },
+        "installed_path": "/Applications/InfiniShell.app",
+        "install_now_clicked": true,
+        "finder_replace_completed": true,
+        "installed_signature_gatekeeper_version": "passed",
+        "normal_startup_terminal_quit_and_second_launch": "passed",
+        "settings_original_bytes_equal": true,
+        "preserved": {
+          "windows": 1,
+          "tabs": 11,
+          "terminal_panes": 10,
+          "agent_conversations": 104,
+          "agent_tasks": 121,
+          "old_blocks": 1013,
+          "old_commands": 1385
+        },
+        "all_old_records_and_content_equal": true,
+        "new_smoke_blocks_and_commands": 1,
+        "independent_readonly_profile_review": "passed",
+        "app_left_running": true,
+        "private_backup_retained_locally": true,
+        "boundary": "旧正式版到本轮Latest的实际升级与持久化保留；不证明旧shell/PTY/进程连续存活，不扩大为本轮最终包发现更未来版本。此前未安装记录保留为上一阶段历史。",
+        "cleanup_ready": false,
+        "localization": "无需本地化变更：仅补验收记录。"
+      },
       "pending_approval_c": "not_executed_not_waived",
       "draft_12_asset_roundtrip": "passed",
       "published": true,
