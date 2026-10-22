@@ -14,6 +14,16 @@ Draft精确12件全量回下载与公开后12件无凭据匿名全量下载均�
 
 发布后证据：[匿名12件回环](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/evidence/public-roundtrip-01/result.json)、[EN同版](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/postpublication-en-01/result.json)、[ZH同版](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/postpublication-zh-01/result.json)、[最终正文回执](/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/publication-body-closeout-255/execution-01/result.json)。文档提交及远端一致性记录于 `/Volumes/SanDisk/InfiniShell-Releases/release-2026-10-20/revisions/final-publication-closeout-20261022/git-closeout.json`。
 
+## 发布后补验：旧版发现本轮新版（2026-10-22）
+
+按用户追加要求，已使用本机 `/Applications/InfiniShell.app` 的旧正式版本 `v0.2026.10.07.01.09.oss_00`（源码 `2697e16a881af9c67080e683cc59a4b6c4a3e464`，可执行文件 SHA-256 `a19ae2b39505d976a83a3ab7a91d8a55475f6deec149a011c044ea7dc8342032`）完成真实发现新版补验。原有自动检查更新处于开启状态，应用启动后通过正常网络、Proxy Off 自动发现本轮 Latest；这不是手动按钮触发，也没有使用模拟更新源。
+
+英文及简体中文均实际显示下载进度，最终显示 `0.2026.10.21.15.36.oss_00` 已下载及“Install now／立即安装”入口，核心版本号、状态文字和控件未截断。中文重启后应用重新下载一次；两份完整 DMG 均为512,352,949 B，SHA-256与正式资产 `f46b144a6ce12c9b27263f1e5e5ffa7b9afeca1909ab171537fb98f3f8a890d0` 一致。未点击安装；旧程序字节保持不变。两次正常Quit均exit0，语言恢复System default，settings原始字节一致；未回写旧数据库。截图外围存在部分黑色重绘，旧版AX仅暴露应用骨架，不据此宣称更新状态读屏通过。
+
+本次关闭的是**旧正式版发现本轮公开新版的英中正向场景**。Mac下载实现及成功展示、对应双语键在旧版与本轮间未变，可限定复用；本轮新版本解析、CheckFailed与新增无障碍提示并未在旧App中执行。因此，上文“本轮最终包发现更未来版本”仍保持未验，不能把两个受测版本写成同一个场景。无需本地化变更；仅补证据文档，复用相同产品源码已通过的 `cargo check --locked -p warp`（r-4df159da），不新增产品代码或重跑无关测试。
+
+证据：[补验结果与摘要清单](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/result.json)、[英文终态](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/en-ready.png)、[中文终态](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/zh-ready.png)、[源码复用边界](/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/source-scope-review.json)。
+
 ---
 
 # 未发布候选退役与后续正式发布准备（2026-10-19）

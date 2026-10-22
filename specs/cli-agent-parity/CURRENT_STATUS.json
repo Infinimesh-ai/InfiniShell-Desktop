@@ -3791,6 +3791,15 @@
       "ssh_boundary": "各10场景限定接纳；Windows20秒失败保留，同SSH晚exit0。端点缺席不证明全部后代/句柄/远端独立退出码或cleanup。",
       "windows_ubuntu_desktop": "user_skipped_not_required_not_tested",
       "macos_future_version_gui": "user_deferred_not_tested",
+      "macos_older_to_current_gui": {
+        "status": "passed_en_zh_real_automatic_discovery_download_and_ready",
+        "old_tag": "v0.2026.10.07.01.09.oss_00",
+        "new_tag": "v0.2026.10.21.15.36.oss_00",
+        "result": "/Volumes/SanDisk/InfiniShell-Releases/v0.2026.10.21.15.36.oss_00/macos-gui/older-discovers-release-20261022/result.json",
+        "boundary": "旧正式版真实发现本轮Latest；两次完整下载摘要一致，英中已下载及安装入口可见，未点击安装。相同Mac下载/成功展示可限定复用；本轮255最终包发现更未来版本仍未验。",
+        "settings_restored": true,
+        "cleanup_ready": false
+      },
       "pending_approval_c": "not_executed_not_waived",
       "draft_12_asset_roundtrip": "passed",
       "published": true,
