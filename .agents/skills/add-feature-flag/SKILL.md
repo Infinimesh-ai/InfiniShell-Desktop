@@ -9,15 +9,15 @@ Add a new feature flag to gate code changes in the Warp codebase.
 
 ## Overview
 
-Feature flags in Warp are compile-time flags that allow features to be selectively enabled for different channels (e.g.: Dev, Stable). They use a small runtime plumbing layer that checks if a flag is enabled.
+InfiniShell 的 `FeatureFlag` 是运行时开关，定义在 `crates/warp_features/src/lib.rs`，由 `warp_core::features` 重导出。默认优先使用运行时开关；仅当平台或可选依赖导致代码无法编译时，再增加 Cargo feature 和对应桥接。
 
 ## TUI note
-The `FeatureFlag` enum (`warp_core/src/features.rs`) and the runtime `FeatureFlag::X.is_enabled()` check are SHARED by both front-ends: the GUI desktop app (`app/`) and the headless TUI (`crates/warp_tui`). The Cargo-feature steps in this skill (`app/Cargo.toml`, `app/src/lib.rs`) are GUI-app-specific. Prefer runtime `is_enabled()` checks so a flag works in both front-ends with no per-binary wiring. Only if you truly need a compile-time Cargo feature in the TUI, wire it into `crates/warp_tui/Cargo.toml` as well. Test the TUI with `./script/run-tui`.
+The `FeatureFlag` enum (`crates/warp_features/src/lib.rs`) and the runtime `FeatureFlag::X.is_enabled()` check are SHARED by both front-ends: the GUI desktop app (`app/`) and the headless TUI (`crates/warp_tui`). The Cargo-feature steps in this skill (`app/Cargo.toml`, `app/src/features.rs`) are GUI-app-specific. Prefer runtime `is_enabled()` checks so a flag works in both front-ends with no per-binary wiring. Only if you truly need a compile-time Cargo feature in the TUI, wire it into `crates/warp_tui/Cargo.toml` as well. Test the TUI with `./script/run-tui`.
 
 ## Steps
 
-### 1. Add to Cargo.toml
-Add the feature to `app/Cargo.toml` under the `[features]` section, but **NOT** under the `default` nested stanza:
+### 1. 按需增加 Cargo feature
+仅在需要编译期开关时，在 `app/Cargo.toml` 的 `[features]` 下添加；初始不要加入 `default`。纯运行时开关跳过本步骤：
 
 ```toml
 [features]
@@ -25,7 +25,7 @@ your_feature_name = []
 ```
 
 ### 2. Add to FeatureFlag enum
-Add a new variant to the `FeatureFlag` enum in `warp_core/src/features.rs`:
+Add a new variant to the `FeatureFlag` enum in `crates/warp_features/src/lib.rs`:
 
 ```rust
 #[derive(Sequence)]
@@ -34,8 +34,8 @@ pub enum FeatureFlag {
 }
 ```
 
-### 3. Add conditional compilation directive
-Add the feature to `app/src/lib.rs` with a corresponding `#[cfg(feature = "...")]` attribute to ensure it's only included when enabled:
+### 3. 按需增加编译期到运行时的桥接
+仅在第 1 步新增 Cargo feature 时，在 `app/src/features.rs` 的 `enabled_features()` 中增加对应条目：
 
 ```rust
 #[cfg(feature = "your_feature_name")]
@@ -61,7 +61,7 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
 ```
 
 ### 6. Running with feature flags
-To test locally with the feature enabled:
+仅在该 Cargo feature 已定义且已桥接时，以下命令才会启用运行时开关。执行前遵守 `AGENTS.md` 的本机测试配置：
 
 ```bash
 cargo run --features your_feature_name
@@ -85,17 +85,9 @@ EditableBinding::new(
 .with_key_binding("cmdorctrl-key")
 ```
 
-## Rolling Out to Stable
+## 扩大发布范围
 
-When ready to enable the feature for all Warp Stable users, add it to the `default` array in `app/Cargo.toml`:
-
-```toml
-[features]
-default = [
-    "your_feature_name",
-    # other default features...
-]
-```
+使用 `promote-feature` 约定检查实际目标通道。OSS 桌面初始化见 `app/src/features.rs`，TUI 需要单独核对；上游 Dogfood/Preview 列表不自动代表 OSS 可用。
 
 ## Best Practices
 

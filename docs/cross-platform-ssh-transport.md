@@ -179,7 +179,7 @@ Users who prefer to manage the file manually can opt a known host into the
 enhanced transport:
 
 ```sshconfig
-Host 192.168.20.204
+Host ssh.example.com
     UpdateHostKeys no
     ObscureKeystrokeTiming no
 ```

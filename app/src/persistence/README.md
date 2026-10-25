@@ -8,10 +8,10 @@ Since we don't control the machine, we need to be super careful about the migrat
 TODO: C.I. and remediation of failed migrations
 
 ## Step 1: One-time setup
-Make sure you have run `/script/bootstrap` at least once before. That installs our fork of
-`diesel_cli`. Our fork is an old version that [bundles](https://github.com/warpdotdev/diesel/blob/b2c58897c39c519a946314bd5b63765d3af56204/diesel_cli/Cargo.toml#L54)
-SQLite in with the `diesel_cli`. We use these version of Diesel and SQLite instead of relying on
-the versions on our machines. So do not follow the official Diesel CLI installation instructions.
+Complete `./script/bootstrap` as described in the development guide.
+`script/install_cargo_build_deps` installs `diesel_cli` through `cargo binstall`;
+it no longer installs the old private fork and skips this developer tool in GitHub Actions.
+Check `diesel --version` and SQLite support before running migrations.
 
 Additionally, the `sqlite3` binary is useful in development. The one on your Macbook is ok, but
 likely will be missing some basic language features. You can grab the latest binary from the
@@ -19,28 +19,31 @@ official website https://www.sqlite.org/download.html. Note that we use SQL lang
 are not available on old versions of sqlite. Note that you'll have to approve it to be run in your mac system preferences.
 
 ## Step 2: Write the migration
+Run from the repository root with an explicit migrations directory:
+```sh
+diesel migration generate --migration-dir crates/persistence/migrations <descriptive_name>
 ```
-diesel migration generate <descriptive name of your migration>
-```
-This will create a new folder with an up.sql and down.sql.
+This creates a directory containing `up.sql` and `down.sql` under `crates/persistence/migrations/`.
 
 ## Step 3: Run the migration + generate the schema
+Read the local test rules in the root `AGENTS.md`. Choose an isolated development database or a backed-up database copy and assign its absolute path to `INFINISHELL_MIGRATION_DB`. Do not experiment on the database used by your daily application; its location varies by platform and channel.
+
+Run from the repository root:
+```sh
+diesel migration run --migration-dir crates/persistence/migrations --database-url="$INFINISHELL_MIGRATION_DB"
 ```
-cd <repo root>
-diesel migration run --database-url="/Users/$USER/Library/Application Support/dev.warp.Warp-Local/warp.sqlite"
-```
-This will run the migration on the same warp that runs when you run the app locally. This automatically generates or updates the `crates/persistence/src/schema.rs`. We do not make manual edits to `schema.rs`.
+The root `diesel.toml` writes the generated schema to `crates/persistence/src/schema.rs` and applies `crates/persistence/schema.patch`. The app re-exports it through `app/src/persistence/mod.rs`; do not maintain manual edits in the generated file.
 
 You can also print the schema from a database that already has the migration with:
 ```
-diesel print-schema --database-url="/Users/$USER/Library/Application Support/dev.warp.Warp-Local/warp.sqlite"
+diesel print-schema --database-url="$INFINISHELL_MIGRATION_DB"
 ```
 
 ## Reverting/redo-ing migrations
 As you are writing features and changing branches, you'll want to undo migrations to fix your database and make it compatible with older code. Redo-ing can also be helpful as you are iterating on your schema.
 ```
-diesel migration revert --database-url="/Users/$USER/Library/Application Support/dev.warp.Warp-Local/warp.sqlite"
-diesel migration redo --database-url="/Users/$USER/Library/Application Support/dev.warp.Warp-Local/warp.sqlite"
+diesel migration revert --migration-dir crates/persistence/migrations --database-url="$INFINISHELL_MIGRATION_DB"
+diesel migration redo --migration-dir crates/persistence/migrations --database-url="$INFINISHELL_MIGRATION_DB"
 ```
 
 # Schema style

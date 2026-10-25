@@ -1,10 +1,26 @@
 # Changelog
 
-本文档记录 InfiniShell 各个发布版本的关键变更。仅收录功能性 commit,省略 dev / stable 等内部滚动 tag。
+本文档保留历史版本记录并摘录正式版本的关键变更,不保证覆盖所有中间版本。完整版本、资产与验收边界见 [GitHub Releases](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases)。
 
 ## [Unreleased]
 
-- **跨平台 SSH**:新增 Windows PowerShell 远端探测/bootstrap 与 Windows remote-server 打包、daemon/proxy;新增 Windows 客户端 Rust SSH worker,在单个已认证目标 session 内复用交互终端和 remote-server channel;保留 macOS/Linux、ProxyJump/ProxyCommand 与原生 OpenSSH 安全回退,并引入分阶段 `russh` 后端;修复 Windows OpenSSH 9.5 默认 `SecurityKeyProvider=internal` 误触发回退,为两个可选保护项提供按主机一键启用并让当前连接重新尝试,同时让原生回退继承控制台、显示具体原因与扩展能力边界;修复 Windows PowerShell 到 POSIX 远端时递归 wrapper 与 ControlMaster socket 环境丢失,使 Linux 中间跳点可以继续建立增强 SSH。能力边界与观察清单见 [技术文档](docs/cross-platform-ssh-transport.zh-CN.md)
+当前仅有文档整理,暂无新增产品功能条目。
+
+## [v0.2026.10.21.15.36.oss_00] — 2026-10-22
+
+- **CLI Agent**:完善受管更新的来源核验与恢复、富输入和父子任务审批;具体 CLI、版本与平台仍按已核验范围支持。
+- **Agent 恢复**:修复回退后同一对话无法续问、文件字节与权限恢复、失败后原卡与重试入口丢失,并保留草稿、附件与输入顺序。
+- **终端与平台**:修复 Windows SSH 载荷、进程退出死锁、安装卸载的 URI/PATH 处理,以及 Debian 卸载后的命令链接残留。
+- **更新与模型**:修复同版/旧版被误判为新版、CLI 模型选择和部分 Responses 工具参数兼容问题,隔离自定义端点的内部请求头。
+- **发行范围**:提供 Apple Silicon macOS、Windows x64、Linux x86_64 桌面包和六种 SSH 扩展,共12件资产。macOS DMG 已签名、公证;Windows 安装器为 `NotSigned`。
+- **验收边界**:Windows 交互安装及 GUI、Ubuntu GUI 和部分 CLI 矩阵未作为本轮通过项;详情与已知限制见 [正式发布说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.21.15.36.oss_00)。
+
+## [Historical notes]
+
+以下条目原位于旧 `Unreleased` 中,保留为历史摘要;未将它们推定归入上面的正式版本。
+后续4–5月条目来自继承的 Zap 历史,其版本比较链接指向仍保有这些 tag 的 `zerx-lab/zap`。
+
+- **跨平台 SSH**:新增 Windows PowerShell 远端探测/bootstrap 与 Windows remote-server 打包、daemon/proxy;新增 Windows 客户端 Rust SSH worker,在单个已认证目标 session 内复用交互终端和 remote-server channel;保留 macOS/Linux、ProxyJump/ProxyCommand 与原生 OpenSSH 安全回退,并引入分阶段 `russh` 后端;修复 Windows OpenSSH 9.5 默认 `SecurityKeyProvider=internal` 误触发回退,为两个可选保护项提供按主机一键启用并让当前连接重新尝试,同时让原生回退继承控制台、显示具体原因与扩展能力边界;修复 Windows PowerShell 到 POSIX 远端时递归 wrapper 与 ControlMaster socket 环境丢失,使 Linux 中间跳点可以继续建立增强 SSH。能力边界与观察清单见 [技术文档](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/main/docs/cross-platform-ssh-transport.zh-CN.md)
 - **AI / BYOP**:port opencode `applyCaching`,启用 prompt caching;`write_to_long_running_shell_command` 在 line 模式下拒绝嵌入 LF;BYOP LRC monitor fallback 改走 silent subtask;`cancel_execution` 50ms 窗口内 sender 泄漏修复(#134 follow-up,#137)
 - **云端剥离 Phase 1–2**:增加 `cloud-disabled` channel 谓词;清理 billing/pricing、referral/reward、cloud sharing dialog UI;退订 RTC UpdateManager;退役 notebook/folder sync queue
 - **平台**:修复 Spotlight/Finder/Launchpad 启动 macOS 时的 panic;`run_shell_command` stdout 兜底回退至 command grid
@@ -90,11 +106,12 @@ Zap 社区分支首个预览版本。
 - **AI**:CJK 输入分类、reasoning 拆分、BYOP tool_call 诊断、LRC tag-in 合成虚拟 subagent + 浮窗 spawn 链路
 - **CI**:Release 显式声明 `contents: write` 权限修 403
 
-[Unreleased]: https://github.com/zerx-lab/warp/compare/v2026.05.06.preview...HEAD
-[v2026.05.06.preview]: https://github.com/zerx-lab/warp/compare/v2026.05.04.preview...v2026.05.06.preview
-[v2026.05.04.preview]: https://github.com/zerx-lab/warp/compare/v2026.05.03.preview.4...v2026.05.04.preview
-[v2026.05.03.preview(.2/.3/.4)]: https://github.com/zerx-lab/warp/compare/v2026.05.02.preview...v2026.05.03.preview.4
-[v2026.05.02.preview]: https://github.com/zerx-lab/warp/compare/v2026.05.01.preview...v2026.05.02.preview
-[v2026.05.01.preview]: https://github.com/zerx-lab/warp/compare/v2026.04.30.oss...v2026.05.01.preview
-[v2026.04.30.oss]: https://github.com/zerx-lab/warp/compare/v2026.04.30.preview...v2026.04.30.oss
-[v2026.04.30.preview]: https://github.com/zerx-lab/warp/releases/tag/v2026.04.30.preview
+[Unreleased]: https://github.com/Infinimesh-ai/InfiniShell-Desktop/compare/v0.2026.10.21.15.36.oss_00...HEAD
+[v0.2026.10.21.15.36.oss_00]: https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/tag/v0.2026.10.21.15.36.oss_00
+[v2026.05.06.preview]: https://github.com/zerx-lab/zap/compare/v2026.05.04.preview...v2026.05.06.preview
+[v2026.05.04.preview]: https://github.com/zerx-lab/zap/compare/v2026.05.03.preview.4...v2026.05.04.preview
+[v2026.05.03.preview(.2/.3/.4)]: https://github.com/zerx-lab/zap/compare/v2026.05.02.preview...v2026.05.03.preview.4
+[v2026.05.02.preview]: https://github.com/zerx-lab/zap/compare/v2026.05.01.preview...v2026.05.02.preview
+[v2026.05.01.preview]: https://github.com/zerx-lab/zap/compare/v2026.04.30.oss...v2026.05.01.preview
+[v2026.04.30.oss]: https://github.com/zerx-lab/zap/compare/v2026.04.30.preview...v2026.04.30.oss
+[v2026.04.30.preview]: https://github.com/zerx-lab/zap/releases/tag/v2026.04.30.preview

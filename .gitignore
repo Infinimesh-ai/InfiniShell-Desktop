@@ -89,5 +89,7 @@ docs/openwarp-cloud-removal-plan.md
 .omx/
 .tmp/
 # Project notes
-.note/
-.claude/scheduled_tasks.lock
+
+# 本机工程约定、证据映射和历史调试副本
+/.local/
+/scratchpad/regression-fix/

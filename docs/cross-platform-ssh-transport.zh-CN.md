@@ -143,7 +143,7 @@ Windows OpenSSH 9.5 默认报告 `SecurityKeyProvider=internal`;当目标没有�
 希望手动管理配置的用户可以只为已知目标显式选择增强 transport:
 
 ```sshconfig
-Host 192.168.20.204
+Host ssh.example.com
     UpdateHostKeys no
     ObscureKeystrokeTiming no
 ```

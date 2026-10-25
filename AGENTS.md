@@ -1,20 +1,20 @@
 # AGENTS.md
 
-> 本文件是给在本仓库中工作的 AI/自动化 agent 的导航文档。它汇总了仓库的整体架构、Cargo 工作区中每个 crate 的职责、`app/` 主二进制下各子模块的边界,以及在做改动前必须遵守的工程约定。
+> 本文件是给在本仓库中工作的 AI/自动化 agent 的导航文档。它汇总了仓库的整体架构、Cargo 工作区的主要 crate 职责、`app/` 主二进制下各子模块的边界,以及在做改动前必须遵守的工程约定。
 >
 ---
 
 ## 1. 仓库总览
 
-Warp 是一个以 Rust 为主的 **agentic 终端 / 开发环境**:在一个自研 UI 框架(WarpUI)上,集成了终端模拟、AI Agent、云同步(Drive)、代码评审、补全、Notebook、设置、IPC 等能力。
+InfiniShell 是基于 Warp 的本地优先 **agentic 终端 / 开发环境**，以 Rust 和 WarpUI 为主，提供终端、BYOP AI、CLI Agent、SSH/SFTP、项目管理、代码评审、Notebook 和设置。上游兼容模块仍保留部分 Warp 命名；是否启用能力以 OSS 入口、运行时 feature flag 和当前实现为准。
 
 顶层目录:
 
 | 目录 | 作用 |
 |------|------|
 | `app/` | 主二进制 crate(`warp`),装配所有子系统、UI、数据库迁移、平台粘合层 |
-| `crates/` | 67 个工作区成员,按职责拆分的库 crate |
-| `command-signatures-v2/` | 独立子项目(在 nextest 运行时被 `--exclude`) |
+| `crates/` | 按职责拆分的库及 TUI crate，成员由根 `Cargo.toml` 的 `crates/*` 定义 |
+| `crates/command-signatures-v2/` | 命令签名工作区成员，在常规 workspace nextest 命令中显式排除 |
 | `script/` | 跨平台 bootstrap、构建、presubmit 脚本 |
 | `resources/` | 字体、图标、shell 集成脚本、shaders 等运行时资源 |
 | `docker/` | 容器化构建相关 |
@@ -38,13 +38,13 @@ Warp 是一个以 Rust 为主的 **agentic 终端 / 开发环境**:在一个自�
 app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图根)
   ↑
 产品域 crate:ai / computer_use / vim / onboarding /
-              warp_completer / lsp / languages / code-review …
+              warp_completer / languages / infinishell_projects / infinishell_sftp …
   ↑
 框架 crate:warpui / warpui_core / warpui_extras / editor /
             ui_components / sum_tree / syntax_tree
   ↑
 基础设施 crate:warp_core / warp_util / http_client /
-                websocket / ipc / jsonrpc / persistence / graphql /
+                websocket / ipc / jsonrpc / persistence / mcp /
                 managed_secrets / virtual_fs / watcher / asset_cache …
 ```
 
@@ -53,15 +53,15 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 1. **Entity-Handle 系统**:`App` 全局拥有所有 view/model entity,View 之间通过 `ViewHandle<T>` 引用,而不是直接拥有。
 2. **Element / Action**:UI 由声明式 Element 树 + Action 事件系统组成(Flutter 风格)。
 3. **跨平台**:macOS / Windows / Linux 原生实现 + WASM 目标;平台代码用 `#[cfg(...)]` 隔离。
-4. **AI 集成**:Agent Mode 与上下文索引,代码集中在 `app/src/ai`(389 文件)与 `crates/ai`。
-5. **云同步**:`Drive` 让对象在多设备同步,见 `app/src/drive` 与 `crates/warp_files`。
-6. **Feature Flag**:运行时灰度优先于 `#[cfg]`,枚举定义在 `crates/warp_core/src/features.rs`。
+4. **AI 集成**:Agent Mode、BYOP 与 CLI Agent 集成集中在 `app/src/ai` 与 `crates/ai`；TUI 入口位于 `crates/warp_tui`。
+5. **持久化与同步**:项目、SSH 和可选同步分别见 `crates/infinishell_projects`、`crates/warp_ssh_manager`、`crates/infinishell_sync`。`app/src/drive` 等上游兼容模块的存在不表示 OSS 启用了 Warp 云服务。
+6. **Feature Flag**:运行时灰度优先于 `#[cfg]`,枚举与通道列表定义在 `crates/warp_features/src/lib.rs`，`warp_core::features` 重导出。
 
 ---
 
 ## 3. `crates/` 一览
 
-下表按主题分组列出全部 67 个 crate。每行只写**一句话职责**;要看实现细节,直接打开对应 `crates/<name>/src/lib.rs`(很多 crate 在 `lib.rs` 顶部有 `//!` 模块文档)。
+下表按主题分组列出主要 crate。完整成员以根 `Cargo.toml` 和 `crates/*/Cargo.toml` 为准；实现细节见对应 `src/lib.rs` 或二进制入口。
 
 ### 3.1 UI 框架 / 视图层
 
@@ -77,6 +77,8 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 | `markdown_parser` | Markdown 解析(用于 AI 消息、文档视图、Notebook 等) |
 | `vim` | Vim 模式键绑定与操作语义 |
 | `voice_input` | 语音输入支持 |
+| `warp_tui` | 无图形窗口的 InfiniShell TUI 前端，默认二进制为 `infinishell-tui` |
+| `ipynb_parser` | 将 Jupyter Notebook 内容解析为只读富文本展示 |
 
 ### 3.2 终端
 
@@ -92,8 +94,9 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 |-------|------|
 | `ai` | AI 模型客户端、Prompt 编排、Agent 协议、工具调用框架 |
 | `computer_use` | "Computer Use" 工具能力(截屏、点击、键入等)的 Rust 端实现 |
-| `command-signatures-v2` | 命令签名 v2(给 AI 用的命令分类元数据);独立项目,不进入主工作区测试集 |
+| `command-signatures-v2` | 命令签名 v2 元数据工作区成员；常规测试命令通过 `--exclude` 排除 |
 | `onboarding` | 新用户引导流程数据/状态 |
+| `warp_multi_agent_client` | 保留多 Agent 协议辅助类型与纯逻辑，当前不发起云端 RPC |
 
 ### 3.4 网络 / 协议 / IPC
 
@@ -104,22 +107,28 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 | `websocket` | 原生与 WASM 共用的 WebSocket 抽象,适配 `graphql_ws_client` |
 | `ipc` | 通用类型化 IPC 请求/响应协议(进程间) |
 | `jsonrpc` | JSON-RPC 实现 |
-| `lsp` | Language Server Protocol 客户端实现 |
+| `mcp` | MCP 运行时、OAuth 和协议集成 |
+| `local_control` | 本地应用控制协议、发现、认证和客户端类型 |
 | `remote_server` | 远端 sshd 模式下的服务端逻辑 |
 | `serve-wasm` | 把 WASM 构建产物 host 出来的辅助 server(默认不参与编译) |
-| `firebase` | Firebase 客户端工具(Crash/分析等渠道) |
 
 ### 3.5 持久化 / 文件 / 资源
 
 | Crate | 职责 |
 |-------|------|
-| `persistence` | Diesel + SQLite 持久层基础;**migrations 在 `app/migrations/`,schema 在 `app/src/persistence/schema.rs`** |
+| `persistence` | Diesel + SQLite 持久层基础；迁移在 `crates/persistence/migrations/`，schema 在 `crates/persistence/src/schema.rs` |
 | `warp_files` | Drive 文件、Workflow、Notebook 等可同步文件对象 |
 | `virtual_fs` | 抽象文件系统(测试用 mock 与生产用真实 FS 同接口) |
 | `repo_metadata` | 仓库元数据:文件树构建、`.gitignore` 处理、文件系统监听 |
 | `watcher` | 文件系统监视器(对 `notify` 的封装) |
 | `asset_cache` | 资源磁盘/内存缓存 |
 | `asset_macro` | `bundled!` / `theme!` 等资源引用宏 |
+| `warp_assets` | 嵌入资源与 WarpUI 资源提供接口 |
+| `cloud_objects` / `cloud_object_models` | 上游云对象的公共元数据、类型与具体对象模型 |
+| `infinishell_projects` | 项目及项目与 SSH 服务器关联的持久化数据层 |
+| `infinishell_sync` | 可选同步的通用基础设施 |
+| `infinishell_sftp` | SFTP 会话与远程文件操作 |
+| `warp_ssh_manager` | SSH 服务器树、凭据存储与命令构造的数据层 |
 | `managed_secrets` / `managed_secrets_wasm` | Keychain / DPAPI / Linux Keyring 抽象 + WASM 代理 |
 
 ### 3.6 配置 / 设置
@@ -129,8 +138,9 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 | `settings` | 设置存储与变更分发 |
 | `settings_value` | `SettingsValue` trait:控制 TOML 序列化语义 |
 | `settings_value_derive` | `#[derive(SettingsValue)]` 过程宏(枚举变体转 snake_case 等) |
-| `warp_features` | Feature flag 高层 API(消费者侧) |
-| `channel_versions` | 发布通道(stable/preview/dogfood)与版本对比 |
+| `warp_features` | FeatureFlag 枚举、运行时 API 和各通道功能列表 |
+| `channel_versions` | 发布通道版本与版本比较 |
+| `warp_channel_config` | GUI/TUI 共用的通道配置加载 |
 
 ### 3.7 命令 / 补全 / 语言
 
@@ -157,9 +167,12 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 
 | Crate | 职责 |
 |-------|------|
-| `warp_core` | 工作区内最底层的"core":平台抽象、`features.rs` 中 `FeatureFlag` 枚举与 `DOGFOOD/PREVIEW/RELEASE_FLAGS` |
+| `warp_core` | 工作区内最底层的"core":平台抽象，并重导出 `warp_features` 的功能开关 API |
 | `warp_util` | 跨多个 crate 复用的通用工具函数 |
 | `warp_logging` | 日志配置统一入口 |
+| `warp_errors` | 错误报告宏与错误类型扩展 |
+| `warp_search_core` | 共享搜索数据源、候选项和结果组合逻辑 |
+| `build_cache` | 沙箱 Agent 的持久化构建缓存管理 |
 | `simple_logger` | 给 `remote_server` 等 stderr-only 进程用的简易异步文件日志 |
 | `warp_web_event_bus` | Web 端事件总线(给嵌入的 web view) |
 | `field_mask` | gRPC/Proto 风格 FieldMask 工具 |
@@ -173,85 +186,89 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 
 ## 4. `app/` 子模块导航
 
-`app/src/` 下平铺了 60+ 个产品域目录,每个目录大致对应一条产品功能线。以下按主题分组,括号内是大致 `.rs` 文件数,用于估计模块体量:
+以下按主题列出 `app/src/` 的主要入口。新增模块和文件名以当前源码为准，不以静态文件数量判断模块边界。
 
 ### 4.1 启动 / 装配 / 全局
-- `bin/` (7) — 多个二进制入口(主程序、附带工具)。
+- `bin/` — 多个二进制入口(主程序、附带工具)。
 - `lib.rs` / `app_state.rs` / `app_state_tests.rs` — 应用状态根。
-- `app_menus.rs`, `app_services/`, `app_id_test.rs`
+- `app_menus.rs`, `app_services/`
 - `appearance.rs`, `gpu_state.rs`, `font_fallback.rs`, `global_resource_handles.rs`
 - `dynamic_libraries.rs`, `alloc.rs`, `tracing.rs`, `profiling.rs`
-- `crash_recovery.rs`, `crash_reporting/` (4)
+- `crash_recovery.rs`, `crash_reporting/`
 - `features.rs` — `app/` 内对 `warp_core::FeatureFlag` 的消费;新增 flag 时通常需要在两处都接好。
-- `channel.rs`, `download_method.rs`, `autoupdate/` (8)
+- `channel.rs`, `autoupdate/`
 
 ### 4.2 终端
-- `terminal/` (427) — 主体:shell 进程、PTY、grid、blocks、shell 集成、命令执行、I/O 流水线。
-- `default_terminal/` (2) — 默认终端启动逻辑。
-- `shell_indicator.rs`, `prefix.rs` / `prefix_test.rs`(命令前缀解析),`vim_registers.rs`
+- `terminal/` — 主体:shell 进程、PTY、grid、blocks、shell 集成、命令执行、I/O 流水线。
+- `default_terminal/` — 默认终端启动逻辑。
+- `shell_indicator.rs`, `prefix.rs`(命令前缀解析),`vim_registers.rs`
 
 ### 4.3 AI / Agent
-- `ai/` (389) — 包含 Agent UI、对话模型、Agent 管理、工具/MCP、Cloud Agent、Plan/Diff 视图、artifacts、blocklist、execution profiles 等。**这是仓库最大的子树**,改动前先在该目录内 grep 具体子主题(`agent_*`, `conversation_*`, `cloud_agent_*`, `mcp`, `tool_*`)。
-- `ai_assistant/` (9) — 旧版 AI 辅助入口/适配。
-- `chip_configurator/`, `context_chips/` (22) — Agent 上下文 chip 选择/构造。
-- `coding_entrypoints/` (5), `coding_panel_enablement_state.rs`
-- `prompt/` (2), `tips/` (3), `voice/` (2), `completer/` (3)
+- `ai/` — 包含 Agent UI、对话模型、Agent 管理、工具/MCP、Cloud Agent、Plan/Diff 视图、artifacts、blocklist、execution profiles 等。改动前先在该目录内搜索具体子主题(`agent_*`, `conversation_*`, `cloud_agent_*`, `mcp`, `tool_*`)。
+- `ai_assistant/` — 旧版 AI 辅助入口/适配。
+- `chip_configurator/`, `context_chips/` — Agent 上下文 chip 选择/构造。
+- `coding_entrypoints/`, `coding_panel_enablement_state.rs`
+- `prompt/`, `tips/`, `voice/`, `completer/`
 
 ### 4.4 编辑器 / 代码 / Review
-- `editor/` (38) — 主编辑器集成。
-- `code/` (52) — 代码视图、diff、navigation。
-- `code_review/` (36) — Code Review 流。
-- `notebooks/` (30), `workflows/` (22)
+- `editor/` — 主编辑器集成。
+- `code/` — 代码视图、diff、navigation。
+- `code_review/` — Code Review 流。
+- `notebooks/`, `workflows/`
 
 ### 4.5 搜索
-- `search/` (172) — 多目标搜索(文件、命令、Agent 历史等)。
+- `search/` — 多目标搜索(文件、命令、Agent 历史等)。
 - `search_bar.rs`
 
 ### 4.6 服务端通信 / Drive / 同步
-- `server/` (55) — 与 warp 后端的 HTTP/WS 交互(对应本地开发模式 `with_local_server`)。
-- `drive/` (45) — 云端对象同步入口。
-- `cloud_object/` (12) — 云对象抽象层(workflow、notebook 等)。
-- `remote_server/` (5) — 客户端侧连接 remote 模式 sshd 的 glue。
+- `server/` — 服务端通信及上游兼容适配，实际启用范围以当前 OSS 入口为准。
+- `drive/` — 上游 Drive 兼容入口，不代表 OSS 已启用 Warp 云同步。
+- `cloud_object/` — 云对象抽象层(workflow、notebook 等)。
+- `remote_server/` — 客户端侧连接 remote 模式 sshd 的 glue。
 
 ### 4.7 设置 / 用户配置 / 主题 / Onboarding
-- `settings/` (46), `settings_view/` (63)
-- `user_config/` (6), `themes/` (11), `appearance.rs`
-- `experiments/` (7), `tab_configs/` (15), `launch_configs/` (4)
-- `tips/`, `banner/` (3), `quit_warning/` (1), `wasm_nux_dialog.rs`, `referral_theme_status.rs`
+- `settings/`, `settings_view/`
+- `user_config/`, `themes/`, `appearance.rs`
+- `experiments/`, `tab_configs/`, `launch_configs/`
+- `tips/`, `banner/`, `quit_warning/`, `wasm_nux_dialog.rs`
 
-### 4.8 认证 / 计费 / 使用量
-- `auth/` (22) — 登录、token、SSO。
-- `billing/` (3), `pricing/` (1), `usage/` (1), `reward_view.rs`
+### 4.8 上游兼容边界
+- `auth/`、`pricing/` — 保留的上游兼容代码；OSS 的实际账户与云功能边界见当前入口和 feature flag。
 
 ### 4.9 持久化
-- `persistence/` (9) — Diesel migrations 装配、`schema.rs`(由 Diesel 生成)、迁移运行器。
-- 迁移文件在仓库 `migrations/` 顶级目录(由 Diesel CLI 管理)。
+- `persistence/` — 应用持久化集成，并重导出 `persistence` crate 的模型和 schema。
+- 迁移文件在 `crates/persistence/migrations/`；生成的 schema 及配置分别见 `crates/persistence/src/schema.rs`、根 `diesel.toml`。
 
 ### 4.10 平台 / 系统集成
-- `platform/` (2), `system/` (3) / `system.rs`
-- `login_item/` (3), `antivirus/` (3), `network.rs`
-- `external_secrets/` (1), `env_vars/` (14)
-- `keyboard.rs` / `keyboard_test.rs`, `safe_triangle.rs` / `safe_triangle_tests.rs`(菜单悬停安全三角)
+- `platform/`, `system/` / `system.rs`
+- `login_item/`, `antivirus/`, `network.rs`
+- `external_secrets/`, `env_vars/`
+- `keyboard.rs`, `safe_triangle.rs` / `safe_triangle_tests.rs`(菜单悬停安全三角)
 
 ### 4.11 视图根 / 面板 / 通用 UI
 - `root_view.rs` / `root_view_tests.rs`
-- `pane_group/` (35) — 分屏分块布局。
-- `tab.rs`, `command_palette.rs`, `modal.rs`, `menu.rs` / `menu_test.rs`
-- `palette.rs`, `notification.rs`, `resource_center/` (10)
-- `view_components/` (20), `ui_components/` (14)
-- `workspace/` (54), `workspaces/` (10), `voltron.rs`(多窗口/多 workspace 协调)
-- `session_management.rs`, `undo_close/` (3), `word_block_editor.rs`
-- `suggestions/` (2), `input_suggestions.rs` / `input_suggestions_test.rs`
-- `plugin/` (21) — 插件系统接入。
-- `uri/` (7) — `warp://` URL 处理。
-- `debug_dump.rs`, `debounce.rs`, `interval_timer.rs`, `throttle.rs`
+- `pane_group/` — 分屏分块布局。
+- `tab.rs`, `command_palette.rs`, `modal.rs`, `menu.rs`
+- `palette.rs`, `notification.rs`, `resource_center/`
+- `view_components/`, `ui_components/`
+- `workspace/`, `workspaces/`, `voltron.rs`(多窗口/多 workspace 协调)
+- `session_management.rs`, `undo_close/`, `word_block_editor.rs`
+- `suggestions/`, `input_suggestions.rs`
+- `plugin/` — 插件系统接入。
+- `uri/` — `infinishell://` 及兼容 URI 的路由。
+- `debug_dump.rs`, `interval_timer.rs`, `throttle.rs`
 - `linear.rs`, `resource_limits.rs`, `warp_managed_paths_watcher.rs`
 - `preview_config_migration.rs` / `preview_config_migration_tests.rs`
 - `window_settings.rs`, `projects.rs`
 
-### 4.12 测试基建
-- `integration_testing/` (79) — 端到端集成测试支撑。
-- `test_util/` (6) — 单元测试公共 util。
+### 4.12 InfiniShell 与 TUI 集成
+- `ssh_manager/`、`sftp_manager/`、`project_manager/` — SSH/SFTP 和项目管理视图。
+- `skill_manager/`、`storage_cleanup/`、`local_control/` — Skill 管理、存储清理、本地控制集成。
+- `tui/`、`tui_export/` — 应用层 TUI 适配；独立前端见 `crates/warp_tui`。
+
+### 4.13 测试基建
+- `integration_testing/` — 端到端集成测试支撑。
+- `test_util/` — 单元测试公共 util。
 
 ---
 
@@ -286,14 +303,14 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 - 持锁范围最小化,持锁时不要调用可能再次加锁的函数。
 
 ### 5.4 Feature Flag
-- 新增:在 `crates/warp_core/src/features.rs` 的 `FeatureFlag` 枚举里加 variant;按需把它加入 `DOGFOOD_FLAGS` / `PREVIEW_FLAGS` / `RELEASE_FLAGS`。
+- 新增:在 `crates/warp_features/src/lib.rs` 的 `FeatureFlag` 枚举里加 variant;按需把它加入 `DOGFOOD_FLAGS` / `PREVIEW_FLAGS` / `RELEASE_FLAGS`。
 - 使用:**优先**用运行时 `FeatureFlag::Xxx.is_enabled()`,而不是 `#[cfg(...)]`;只有当无 `cfg` 就无法编译(平台/可选依赖)时才用 `cfg`。
 - 包裹整段产品功能,而非每个调用点都加;上线稳定后**清理 flag 与死分支**。
 - UI 入口要与代码路径用同一个 flag。
 
 ### 5.5 数据库
 - ORM:Diesel + SQLite。
-- 新增/改 schema 必须走 migration:在 `migrations/` 加新目录(`up.sql` / `down.sql`),不要手改 `app/src/persistence/schema.rs`(由 `diesel print-schema` 生成)。
+- 新增/改 schema 必须走 migration:在 `crates/persistence/migrations/` 加新目录(`up.sql` / `down.sql`),不要手改 `crates/persistence/src/schema.rs`(由 `diesel print-schema` 生成)。
 
 ### 5.6 测试
 - 用 `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2`。
@@ -322,11 +339,12 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 - 提交前必须运行 `cargo test -p warp --lib i18n::tests` 和 `cargo check -p warp`;涉及 TUI 资源时还应运行对应 TUI 测试。任何门禁失败都不得视为功能完成。
 - 文案可能影响布局时,必须分别在英文和简体中文界面检查截断、换行和控件尺寸;检查结果应在交付说明中记录。
 
-### 5.10 本机 macOS 测试临时目录
-- 用户本机固定根为 `/Users/zhishi/InfiniShell-Tests`（`0700`）；每轮新建短名称 `r-<随机值>` 子目录，仅为该轮命令设置 `TMPDIR`，不改 `HOME` / `CODEX_HOME`。开始前核实真实路径、owner、device/inode、与 `/Users` 同设备及祖先无组/其他用户写权限，不能靠修改既有目录权限绕过安全测试。
-- 每轮在 `records/<run-id>.json` 记录状态、目录/进程身份、归档位置及默认 `false` 的 `cleanup_ready`。仅在命令、后代和 launchd 服务均退出、打开文件已释放、小证据已归档后设为 `true` 并即时清理；每日北京时间 `04:00` 补查超过 `24` 小时的已完成、明确可清理目录。
+### 5.10 本机测试与临时目录
+- 在本机执行构建或测试前，必须先读取未纳入 Git 的 `.local/README.md` 及其引用的机器配置。若当前 worktree 没有该文件，使用 `git worktree list --porcelain` 定位主检出，再读取其 `.local/README.md`。未找到适用机器配置时不得猜测目录或放松安全门禁，应先取得必要的机器配置。
+- 按机器配置选择安全测试根，每轮创建短名称子目录，仅为该轮命令设置 `TMPDIR`，不改 `HOME` / `CODEX_HOME`。核实真实路径、owner、device/inode、设备约束及祖先权限，不能靠修改既有目录权限绕过检查。
+- 每轮记录状态、目录/进程身份、归档位置和默认 `false` 的 `cleanup_ready`。仅在命令、后代及关联服务均退出、打开文件已释放、小证据已归档后，才可标记可清理并删除。个人定时补查计划保存在本机配置。
 - 活动、归属不明、挂载点、符号链接或清理证据不足的目录保留；不删除源码、`target`、缓存、凭据、外置归档或唯一证据。删除前重新核对记录身份，不追随链接、不跨设备、不按宽泛进程名结束进程。
-- 本机真实 launchd/多进程测试沿用短 `TMPDIR` 和 `--features warpui/test-util,rust-embed/debug-embed`，避免已观察到的外置源码本地化资源读取阻塞；不为此启用 `release_bundle` 或改动产品超时。此规则只适用于用户这台 Mac，不把路径或功能开关硬编码进产品及 Linux/Windows runner。详见 [本机测试存储约定](docs/local-test-storage.zh-CN.md)。
+- 本机专用功能开关和已验证的测试规避措施按机器配置执行；不将个人路径或开关硬编码进产品及其他平台 runner，不为通过测试启用 `release_bundle` 或改动产品超时。通用约定见 [本机测试存储约定](docs/local-test-storage.zh-CN.md)。
 
 ---
 
@@ -339,9 +357,9 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 | 改命令补全 | `crates/warp_completer/`(注意 `--features v2`) |
 | 改 AI 模型 / 工具调用协议 | `crates/ai/` |
 | 加新设置项 | `crates/settings_value*`、`crates/settings`,UI 在 `app/src/settings_view/` |
-| 加 Feature Flag | `crates/warp_core/src/features.rs` + 使用点 |
+| 加 Feature Flag | `crates/warp_features/src/lib.rs` + `app/src/features.rs` / TUI 消费点 |
 | 改云端同步对象 | `crates/warp_files` + `app/src/drive/` + `app/src/cloud_object/` |
-| 改持久化结构 | `migrations/` 加迁移 + `crates/persistence` |
+| 改持久化结构 | `crates/persistence/migrations/` 加迁移 + `crates/persistence` |
 | 加新二进制工具 | `app/src/bin/` |
 | 平台特定代码 | 用 `#[cfg(target_os = "...")]`,UI 平台胶水在 `app/src/platform/` |
 | Vim 模式 | `crates/vim` + `app/src/vim_registers.rs` |

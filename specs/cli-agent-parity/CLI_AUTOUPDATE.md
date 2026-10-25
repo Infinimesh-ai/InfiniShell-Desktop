@@ -1,32 +1,8 @@
 # 三款 CLI 自动升级与渠道约定
 
-**自动升级属于原 Goal；阶段交付，整体尚未完成。** 本文基于 `e3ef39689cd8b686dfe040b90217ed1067b4d268`（2026-09-25），固定开发／验收版本为 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。不将历史渠道发现写成今日最新版，也不把本机手动更新当作产品事务通过。状态见 [CURRENT_STATUS](CURRENT_STATUS.json)，真实范围见[验证结论](VALIDATION_REPORT.md)。
+本文维护自动升级的现行行为与安全合同。原批准合并范围 G01–G10、V03 已关闭；当前发布见[发布入口](../../docs/releases/README.zh-CN.md)，机器状态见 [CURRENT_STATUS](CURRENT_STATUS.json)，平台延期与独立补验见[已知缺项](KNOWN_GAPS.md)。关闭批准范围不等于所有安装来源、版本与平台组合均已实机通过。
 
-**2026-10-05 用户确认的权限范围**：带额外共享写权限、文件保护标志或特殊链接权限的安装允许提示使用原安装工具升级；普通安装和已支持只读ACL安装仍要求自动升级，并保留来源、身份、权限、配置及恢复核验。现有英中 `settings-cli-updates-unsupported-source` 已明确表达原安装工具，无需本地化变更。以下历史阶段的额外ACL拒绝及待决记录保留当时事实，当前范围以本段为准。此决定新增关闭0项；G09仍开放，Windows原矩阵失败、Linux通知send超时及最终同冻结源码双平台门禁仍须解决或完成，PR保持草稿。
-
-2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；另有 `39941b281` 的 Linux Grok 正常升级、交换后恢复、外部改动保留、候选改动拒绝四场景通过。其他平台恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
-
-`56f6da217` 已修正 Linux 官方 Node 大 ELF 字符串表误拒，同提交 Linux 原文件依赖闭包通过；新增 Windows Codex npm 五场景入口仍在真实私有 npm 登记阶段失败，尚未进入产品事务。两平台编译与定向 Rust 通过，离线夹具修复已另提交；G09 未关闭，详细范围见[验证结论](VALIDATION_REPORT.md)。
-
-`97649deb2` 修正 npm 验收的 Windows 路径表示；`bd80cc9ed` 将 cmd-shim 6.0.1 与既有 8 按三份原字节完整校验，旧事务摘要固定模板，候选和恢复禁止改换身份。无需本地化变更；九项新回归、本地更新模块与编译门禁通过，同提交 [36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) 的真实 npm 登记通过，但首个 CMD 候选探针拒绝未绑定子映像，停留 Prepared，清理未获完整证明；PowerShell、发布和后续恢复场景未执行，不宣称升级完成。
-
-`ca37b9cbf` 已补 Windows npm 拒绝后的显式 Job／ACL／profile 清理与脱敏映像诊断；本地编译和 i18n 门禁通过，仅 Windows 的[同提交验证 36270700886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886) 因 Win32 事件码字段类型错误在编译阶段失败，原生场景未运行；字段修正待新增量复验。候选拒绝仍需定位，未扩大白名单或宣称真实升级完成。
-
-后续 `console-binding-04` 已在 `43c9709d2` 提交：仅 Codex npm 候选预先绑定系统 `conhost.exe` 精确租约，并在事件继续前验证本次 Job、相同 AppContainer SID 与零 capability；未知映像及系统目录兜底不放行，所有退出句柄跨失败保留。同提交 Windows 编译和普通／原生边界回归通过；真实 `0.156.1` npm 的首个 CMD 候选仍在 `Prepared` 返回 `RecoveryRequired`，CMD 报 verbatim 工作目录不兼容及拒绝访问，`cleanup_confirmed=false`，缺 AppContainer 清理收据；PowerShell、发布和后续恢复未到达。后续须核 npm 专属 cwd 的 DOS 路径传递及独立清理原因，不能仅据 stderr 判定全部根因。本地 check、i18n 重试02（11项）和 actionlint 通过，首次链接空间不足原件保留；无需本地化变更，不关闭 G09，详见[验证结论](VALIDATION_REPORT.md)。
-
-Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e2`）：明确区分 canonical ACL 路径与 CreateProcessW 执行路径，启动前重复核对同一目录，其他来源调用保持原参数。固定阶段诊断用于定位旧输出超时与清理未知，未调整时限；本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows [CI 36280073722](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722) 已结束：主组981项、command7项、显式atomic7项通过（含新增5项），真实更新首个CMD候选仍失败。旧UNC提示消失，但原生“拒绝访问”后缺完整清理收据；剩余进程和拒绝对象尚未定位，PowerShell、发布与恢复未执行；真实更新／恢复仍未通过，G09 不关闭。
-
-`0525c9439` 的协作取消已接入原认证通道，本地check、i18n 11项及control6项通过；同提交 [Windows CI 36282335500](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36282335500) 编译通过，普通回归986项通过/1项失败，失败为Drop的2秒回收等待（nextest既有3次自动尝试）；新增原生取消2项均通过、atomic9项和command7项通过。真实npm首updated返回Network、未形成journal/generation或候选执行/清理收据，不能继承上一轮cleanup=false，发布/恢复未验。后续修正 `49ea40561` 已提交推送，监听改为非阻塞读取及可唤醒等待，保留6项契约和2秒断言；独立审查、本地02 check、i18n 11项、control6项及actionlint通过。同提交 [Windows CI 36283908796](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36283908796) 已结束：编译通过，主组987项、control6项、command7项及原生atomic9项通过；Drop首次0.112秒通过，原生取消2项也首次通过。真实npm首updated仍返回ProbeFailed，原生拒绝访问后因取消中断；本轮已取得Job／ACL／profile清理标记及cleanup_confirmed=true。无原生根退出码，外层worker码1不代替它；PowerShell／发布及后续恢复场景未验。无需本地化变更，G09及Goal保持开放。
-
-**Windows npm 诊断增量 `ae4279e48`**：固定下载角色与失败阶段、已核验 CREATE/EXIT 角色和清理模式已接入，授权、隔离及失败判定不变。本地 check、i18n 11项及 actionlint 通过；同提交 [Windows CI 36285301933](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36285301933) 已结束：Windows 编译、主组990项、command7项、原生atomic9项通过，真实 npm 首个 updated 返回 ProbeFailed。正常阶段仅记录 root／console CREATE；取消清理阶段记录 root／console EXIT1，另有尚未分类的 unknown CREATE／EXIT3221225738，不能据此认定 Node 从未启动或定位拒绝对象。最终取得 cleanup_confirmed=true 及 AppContainer 清理标记；PowerShell、发布与独立恢复未验。CREATE/EXIT 与 root_exit 使用同一 session 时钟，probe 阶段仍用自身起点，不直接相减。按用户代码优先、修复与联测后置要求封存本轮，不自动重试或追加猜测性诊断；G09和Goal保持开放。无需本地化变更。
-
-`debed8c51` 已补 Linux／Windows 的会话模型变更通知，使专属 Grok 恢复清理后重新同步空闲条件；沿用既有英中等待说明，本地门禁通过，真实更新链待验。`c7ef8d95b` 仅修 Python 重解析点验收夹具，生产来源与隔离合同不变。
-
-仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
-
-2026-09-26 未验证代码增量：Claude Homebrew／WinGet portable 和 Codex Homebrew macOS ARM64 的来源绑定、候选探测、替换及中断恢复已接入。Codex 固定 0.156.1 的完整归档与三种 shell 补全共同恢复；Codex npm macOS ARM64／Linux x64／Windows x64 的 Node、官方 wrapper、完整平台包与事务恢复现也已接线；实际 Node 公共入口在私有依赖快照中探测，不能仅测 native 二进制。Windows x64 保留实际 cmd/PowerShell 公共 shim 两条 Node 链，私有 AppContainer 候选经真实退出后才能发布，源码已接；Claude Windows npm 的固定包内硬链接和公开双入口、Grok 三平台 npm 的完整三包/Brotli解压/用户bin多位置事务、Grok Mac ARM Homebrew 的双别名和三补全也已接入。Codex WinGet完整目录/登记/依赖事务也已接入；Claude Unix npm 2.1.280→2.1.278受限主动降级合同已接，仅在显式Stable且官方实时指针匹配时开放；当前2.1.274仍拒绝。macOS Intel 已按用户明确范围排除，Mac 仅支持 Apple Silicon。功能代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，已通过 macOS arm64 编译与 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收。新增来源的真实升级与恢复验收仍待补；下文历史结果保持原范围，不能据此扩大支持。
-
-Linux x64 三款固定 Homebrew cask 的代码现已接通默认 Linuxbrew prefix、完整安装登记、来源发现、受监督候选、原子交换与恢复；Claude 单独记录旧入口／候选／新入口三个探针，Codex 与 Grok 分别保留完整资源与补全／别名。Grok Windows x64 官方 WinGet portable 1.0.40→1.0.41 也已接通原文件、别名、公共链接及 ARP 事务，保留 ACL 和下载来源标记。官方原始材料已归档，实际升级均未执行，G09 保持开放。
+固定开发／验收基线为 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，不表示上游最新版本。新版发现、真实升级事务与升级后的托管协议兼容必须分别判断；开发机手动升级不能代替产品事务验收。
 
 ## 渠道与消费者入口
 
@@ -34,26 +10,22 @@ Linux x64 三款固定 Homebrew cask 的代码现已接通默认 Linuxbrew prefi
 
 | CLI | 新安装默认 | 可手动切换 | 合同 |
 | --- | --- | --- | --- |
-| Codex | latest | latest／alpha | latest 为正式发行，alpha 为预发布；原生 update 不提供同等渠道选择，应用须解析可信目标并匹配安装来源 |
+| Codex | latest | latest／alpha | latest 为正式发行，alpha 为预发布；应用解析可信目标并匹配安装来源 |
 | Claude | latest | latest／stable | stable 延迟接收更新；跟随安装读取 `autoUpdatesChannel`，未配置用 latest |
 | Grok | stable | stable／alpha | stable 为正式发行，alpha 为预发布；跟随安装以原生检查渠道为准 |
 
-默认采用官方正式渠道，不宣称掌握消费者渠道占比。现有预发布安装不被默默转为正式版；显式切换可能降级，成功不能仅由版本号增大判断。Homebrew 等来源只使用实际支持的发行包，不能为切换渠道隐式卸载或创建第二套安装。
+现有预发布安装不被默默转为正式版；显式切换可能降级，成功不能仅由版本号增大判断。Homebrew 等来源只使用实际支持的发行包，不能为切换渠道隐式卸载或创建第二套安装。
 
 ## 版本与来源边界
 
-- 固定版本用于可复核的开发与验收；消费者发现新版与该版托管协议兼容分开管理。新支持版本以小迭代核实真实接口、插件、权限、输入、取消和恢复，再更新矩阵，不循环追逐最新版本或直接放宽兼容检查（G13）。
-- macOS arm64、Linux x64、Windows x64 的已核验官方原生安装已有正式更新事务证据；具体源码与版本范围以验证结论为准，不外推其他架构。
-- 已验收的 Claude Unix npm 单包事务与上方新增未验证代码分开记录；新 npm、Homebrew、WinGet 路径不能继承其通过结论。未知来源、未审核版本和不同安装布局仍不可自动执行（G09），开发机手动升级成功不能关闭缺项。
-- 原生、npm、Homebrew、WinGet、自定义入口与 helper 分别识别实际路径、来源、依赖和渠道；无权限、企业策略、不支持组合或身份不确定时显示原因与下一步，不猜测更新命令。
-- Linux Codex npm 和三款 Linux Homebrew 的候选执行要求 Landlock ABI≥3；检查阶段只读查询能力，执行时仍须真实安装隔离规则。ABI1 的拒绝表示该环境不可执行这些更新，不是更新成功；Grok npm 不使用这一 Landlock 门槛，须按其真实事务回执判断。`unshare` 命令缺失不能推出内核禁止 namespace；Windows 的 `WinGet.exe` 不在 PATH 也不能单独推出已登记 portable 来源的宿主事务不可用，仍须核验安装归属、权限、依赖与实际执行。
-- SSH／tmux 以远端实际版本与安装来源为准，本机发现或升级不代表远端更新成功。
-
-2026-09-25 续接增量已收紧 npm 安装归属：包名、精确版本、清单中的入口及当前命令必须属于同一前缀，npm 管理器本身也须有注册清单；Windows 入口支持 npm `cmd-shim 8` 的 Node 和原生二进制模板，拒绝追加命令、跨前缀入口和 `npm link`。macOS 已用实际隔离安装的 Codex `0.156.1`、Claude `2.1.280` 验证来源识别；模板测试不代替 Windows 实机验证。该来源识别提交当时不执行包管理器升级，npm／Homebrew 为 `ManualOnly`；后续单包事务见下文，G09 保持未关闭。没有新增或改变界面文案，**无需本地化变更**；现有来源标签语义仍适用。
-
-2026-09-26 工作区继续接入 Claude npm 单包更新：从两份官方归档验证 SHA-512 SRI、精确清单与完整成员，在原前缀构造私有新树；宿主复制官方 native 到公共 `bin/claude.exe`，不执行安装脚本。候选只在空配置、拒绝网络的监督进程中运行 `--version`，确认退出和清理后才交换目录；公共 symlink 保留，原有 POSIX 权限保留。额外 ACL／安全属性与未审核目标仍拒绝；Codex Node 闭包已由上方代码检查点所列增量接入，真实事务验收待补。journal 负责交换中断恢复；清理逐成员复核身份及内容，发现外部改动保留现场，不宣称防御任意同 UID 恶意竞争。macOS 私有安装的真实更新、交换后冷恢复、外部改动保留、候选改动拒绝及未审核降级拒绝五场景已通过。原 15 秒探针预算不足已改为受监督更新的 300 秒上限；先确认清理再报告超时，保留原失败。该范围不含 GUI 更新点击、插件重检或模型生命周期，跨平台仍待验，不能据此关闭 G09。
-
-当前三款 CLI 的 Mac ARM/Linux x64 Homebrew cask 与 Windows x64 WinGet 固定来源事务已纳入上述代码提交。该批新增路径的真实升级与恢复验收仍待补，未修改本机用户安装；保留既有未知版本兼容门禁。已开展的跨平台编译与定向回归见[最新门禁](VALIDATION_REPORT.md)，不将来源识别或自动化门禁直接记为升级能力完成。
+- macOS Apple Silicon、Linux x64、Windows x64 分别管理；不外推 macOS Intel 或其他架构。新支持版本先核实真实接口、插件、权限、输入、取消与恢复，再更新[能力矩阵](CAPABILITY_MATRIX.md)，不直接放宽兼容检查。
+- 原生、npm、Homebrew、WinGet、自定义入口及 helper 分别核验路径、来源、依赖、安装登记和渠道。未知来源、未审核版本、不同安装布局或身份不确定时提示原因及原安装工具，不猜测更新命令。
+- 普通安装与已支持只读 ACL 安装保留自动升级要求；带额外共享写权限、文件保护标志或特殊链接权限的安装可提示使用原安装工具。拒绝不支持的来源不等于升级成功。
+- npm 包名、精确版本、清单入口、当前命令和管理器登记必须属于同一前缀；完整核验公共 wrapper／shim、Node 及依赖闭包，拒绝追加命令、跨前缀入口与 `npm link`。不能只探测包内原生二进制便宣称公共入口可用。
+- 包管理器来源须保留完整安装登记、别名、补全、资源及需要的权限信息；替换与恢复覆盖整个事务，不只复制主程序。Windows 的 cmd 与 PowerShell 公共入口分别验证。
+- Linux Codex npm 和三款 Linux Homebrew 仅在确需更换版本时要求 Landlock ABI≥3；不足时不生成计划，执行时仍须安装隔离规则。Grok npm、其他来源、macOS／Windows及同版本配置事务不继承这一门槛。
+- `unshare` 命令缺失不能推出内核禁止 namespace；`WinGet.exe` 不在 PATH 不能单独推出已登记 portable 来源不可用。仍须核验安装归属、权限、依赖和实际执行。
+- SSH／tmux 以远端实际版本与来源为准，本机升级不代表远端成功。各来源的实现与静态回归不能相互替代真实升级、恢复或 GUI 验收。
 
 ## 事务与配置合同
 
@@ -69,14 +41,13 @@ Linux x64 三款固定 Homebrew cask 的代码现已接通默认 Linuxbrew prefi
 10. Codex 原生正式更新标记仅在匹配发行目录时有效；保留原开启／关闭语义，不激活无效标记。切到 alpha 后保留官方移除标记的结果，切回正式版不默默重启原生 daemon；InfiniShell 更新偏好独立。
 11. CLI 和通知／编排插件分别更新；插件不兼容时限制相应操作，不能以下载成功或新版本发现代替协议验收。失败只回退本次拥有的配置和文件，不覆盖用户并发修改。
 
-## 必须完成的验收
+## 新增版本或来源的验收
 
-- P0：记录新支持版本的官方接口、运行包身份、帮助与来源，更新开发准备器及兼容矩阵。
-- P1／P2：安装发现、版本、渠道、更新状态、开关与错误提示完成英中同步；插件缺失、更新、禁用、不兼容和回退验证。
-- P3／P4：忙碌延期不破坏运行、审批、父子消息 ACK 或结果；升级后新建与冷继续选用正确版本，历史输入不自动重放。
-- P5：包含实际修改的同一提交覆盖 macOS、Linux、Windows 的相关验证，SSH／tmux 单列；三款目标版本满足 [PLAN](PLAN.md) 的完整生命周期。
-- 渠道：新装默认、保留当前渠道、手动切换、降级、同版本渠道同步、不支持的来源／渠道组合，以及重启后仍跟进所选渠道。
-- 故障：并发检查、运行中延期、网络失败、下载／摘要／签名错误、更新进程失败、无权限、未知来源、目标未生效、插件不兼容、中断恢复、失败重试、旧版本可用与全局无关配置保持。
-- G09 的包管理器来源须分别证明入口／依赖绑定、真实升级及降级、失败回滚和重启恢复，不能只删 `ManualOnly`。G13 按每个新增支持版本维护，不要求一次覆盖未来所有发布。
+- 核对官方接口、完整运行包身份、帮助与来源，更新开发准备器、兼容矩阵及必要固定夹具。
+- 验证新装默认、保留当前渠道、手动切换、允许的降级、同版本渠道同步、不支持组合及重启后的渠道保持。
+- 证明入口与依赖绑定、受监督候选、真实升级、失败回滚及重启恢复；不能只移除 `ManualOnly`，也不能用模拟结果替代真实执行。
+- 覆盖运行中延期、并发检查、网络／摘要／签名错误、无权限、未知来源、目标未生效、插件不兼容、中断、失败重试、旧版本可用和无关配置保持。
+- 验证升级不破坏审批、父子消息 ACK、结果回收；升级后新建及冷继续使用正确版本，历史输入不自动重放。CLI、通知插件和托管协议分别判定。
+- 对安装发现、版本、渠道、状态及错误提示完成英中同步和布局检查；按相关平台完成[验证门禁](VALIDATION_REPORT.md)，SSH／tmux 单列。生命周期要求见 [PLAN](PLAN.md)。
 
-每项结论记录源码提交、CLI 前后版本、来源／渠道、平台／架构、执行场景、结果和未覆盖范围；必要复现夹具保留，逐轮过程日志和大体积原始产物不继续加入此规格目录。当前限制与关闭条件以[已知缺项](KNOWN_GAPS.md)为准，本次整理不改变任何验收状态。
+结论绑定源码提交、CLI 前后版本、来源／渠道、平台／架构及场景，区分通过、失败、跳过和未覆盖。进程退出、下载完成、来源识别、清理成功均不能独立证明升级成功；失败现场与未知归属不因文档整理获得清理授权。

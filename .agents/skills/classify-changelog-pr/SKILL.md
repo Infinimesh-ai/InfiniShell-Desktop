@@ -12,9 +12,9 @@ This document provides classification rules for PRs that lack explicit `CHANGELO
 - **NEW-FEATURE** — A substantial new user-facing capability. Reserve for features that would warrant docs, marketing, or social media attention.
 - **IMPROVEMENT** — Enhances an existing feature in a way users would notice (performance, UX, new options).
 - **BUG-FIX** — Fixes a user-visible bug or regression.
-- **OZ** — Changes to Oz / AI agent capabilities. At most 4 per release in the stable changelog.
+- **OZ** — 上游兼容分类；本项目需先复核实际能力，不能自动将 Oz 云功能列入 OSS 更新。
 - **TUI** — User-visible changes that impact InfiniShell TUI, including shared Agent capabilities.
-- **NONE** — Explicitly opt out of changelog inclusion. Handled upstream by `fetch_prs.py` marker extraction.
+- **NONE** — 明确不纳入更新说明，由当前草稿流程读取实际标记。
 
 ## Decision rules
 
@@ -39,6 +39,7 @@ This document provides classification rules for PRs that lack explicit `CHANGELO
 - A TUI-only entry belongs only in the TUI category. An entry that impacts both TUI and another surface should appear in both `TUI` and its regular category.
 
 ### Conditional on channel
+- **OSS 通道：** 以目标 SHA 的 `app/src/features.rs`、通道入口、`crates/warp_features/src/lib.rs` 和 TUI 初始化为准。Cargo feature 存在不表示运行时功能已启用；不直接套用以下上游通道规则。
 - **Stable channel:** Only include changes that are live for all users. Exclude PRs gated behind `DOGFOOD_FLAGS` or `PREVIEW_FLAGS`.
 - **Preview channel:** Include PRs gated behind `PREVIEW_FLAGS`. Still exclude `DOGFOOD_FLAGS`-only changes.
 - **Dev channel:** Include everything that's user-visible, regardless of flag gates.
@@ -47,7 +48,7 @@ This document provides classification rules for PRs that lack explicit `CHANGELO
 If a PR mentions a `FeatureFlag` variant in its diff or title:
 1. Check which flag list it belongs to (`RELEASE_FLAGS`, `PREVIEW_FLAGS`, `DOGFOOD_FLAGS`).
 2. Apply the channel rules above.
-3. If the flag is in `RELEASE_FLAGS` or enabled by default in `app/Cargo.toml`, treat it as live.
+3. 结合目标通道的运行时初始化及 Cargo feature 判断是否可见；`RELEASE_FLAGS` 在 release bundle 条件下启用，单独存在于列表或 Cargo 默认配置不足以证明所有前端可用。
 4. Set `feature_flag` in the classification output to the flag name.
 
 ### Confidence levels

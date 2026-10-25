@@ -1,11 +1,16 @@
 # Security Policy
 
-We take security seriously at InfiniShell and appreciate the efforts of security researchers who help keep our users safe.
-
 ## Reporting a Vulnerability
 
-If you believe you've found a security vulnerability, please follow responsible disclosure practices and **do not** open a public GitHub issue or pull request, as this could expose the vulnerability before a fix is available.
+Do not post vulnerabilities, exploit details, credentials or private logs in public
+GitHub issues or pull requests.
 
-Instead, please open a private [GitHub Security Advisory](https://github.com/zerx-lab/warp/security/advisories/new).
+To arrange a private reporting channel, email **contact@infinimesh.ai**, the contact
+address published on the [Infinimesh-ai organization profile](https://github.com/Infinimesh-ai).
+Start with the affected product and version and a brief, non-sensitive description;
+ask where to send the full report before sharing sensitive details.
 
-We will acknowledge your report promptly and work with you to understand and resolve the issue as quickly as possible.
+GitHub private vulnerability reporting is not currently enabled for this repository.
+The organization contact address is not a dedicated security-response service, and
+this policy does not promise a response time. Upstream Warp and other forks have
+separate maintainers; do not send InfiniShell reports to their channels.

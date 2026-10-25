@@ -26,7 +26,7 @@
 ## 特性
 
 - 🔌 **BYOP AI provider** — 任意 OpenAI 兼容端点,外加 OpenAI / Anthropic /
-  Gemini / DeepSeek / Ollama 原生协议。API 密钥永不离开本机。
+  Gemini / DeepSeek / Ollama 原生协议。API 密钥保存在系统密钥库中,请求时发送给你配置的提供商端点。
 - 🤖 **第三方 CLI agent** — DeepSeek-TUI、Codex CLI、Claude Code、Google
   Antigravity(`agy`)接入 Blocks 与通知中心。
 - 🖥️ **跨平台 SSH 增强** — 在终端内管理主机、配置与会话,并为
@@ -102,6 +102,12 @@ Git 仓库地址和运维规则/习惯组织成一个**项目**(`Ctrl+7` / Linux
 对话(或直接连任意项目主机)→ 让 Agent 巡检、改配置、批量发布。
 
 ## 快速开始
+
+参见[文档索引](docs/README.zh-CN.md)与[当前发布及验收范围](docs/releases/README.zh-CN.md)。
+
+从 [GitHub Releases](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest)
+下载桌面安装包:macOS Apple Silicon DMG、Windows x64 安装程序或 Linux x86_64 软件包。
+签名状态、已知限制与验收范围以对应版本的发布说明为准。
 
 macOS 桌面正式版仅支持 Apple Silicon(`arm64`),不再为 Intel Mac 提供桌面
 DMG。macOS `x86_64` remote-server 归档仅作为 Intel 远端主机的 SSH 扩展保留。

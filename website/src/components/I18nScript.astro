@@ -8,12 +8,11 @@
 <script is:inline>
   (function () {
     try {
-      var supportedLocales = ['en', 'zh', 'ja'];
-      var htmlLang = { en: 'en', zh: 'zh-CN', ja: 'ja' };
+      var supportedLocales = ['en', 'zh'];
+      var htmlLang = { en: 'en', zh: 'zh-CN' };
       function normalizeLocale(value) {
         var tag = String(value || '').toLowerCase();
         if (tag.indexOf('zh') === 0) return 'zh';
-        if (tag.indexOf('ja') === 0) return 'ja';
         if (tag.indexOf('en') === 0) return 'en';
         return supportedLocales.indexOf(tag) >= 0 ? tag : null;
       }
@@ -29,10 +28,12 @@
       }
       var saved = (localStorage.getItem('infinishell:locale') || localStorage.getItem('zap:locale'));
       var savedLocale = normalizeLocale(saved);
-      var locale = savedLocale || detectFromNavigator();
+      // 不支持的旧偏好回退英文;未保存偏好时继续跟随浏览器。
+      var locale = saved ? (savedLocale || 'en') : detectFromNavigator();
       window.__infinishellLocale = locale;
-      window.__infinishellLocaleSource = savedLocale ? 'saved' : 'auto';
+      window.__infinishellLocaleSource = saved ? 'saved' : 'auto';
       document.documentElement.lang = htmlLang[locale] || 'en';
+      document.documentElement.setAttribute('data-locale', locale);
       if (document.body) document.body.dataset.locale = locale;
       document.addEventListener('DOMContentLoaded', function () {
         document.body.dataset.locale = locale;

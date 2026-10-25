@@ -2,59 +2,22 @@
 
 Thanks for helping improve InfiniShell! This guide explains how to open issues, propose changes, and get your work reviewed.
 
-## TL;DR
+## Contribution workflow
 
-- Bug fixes are welcome for any issue. All bugs are marked as `ready-to-implement`.
-- Feature requests must be marked `ready-to-spec` or `ready-to-implement` before PRs are accepted.
-- Specs are the place where technical and design discussion on larger issues happen.
-- Oz automatically triages incoming issues and reviews open PRs.
-
-## How Contributing to InfiniShell Works
-
-InfiniShell's contribution model is shaped by Oz, an agent that automates parts of triage, spec writing, implementation, and review. Compared with a typical open-source repository, a few things work differently here:
-
-- **Issues are the starting point for everything.** Discussion, scoping, and design happen on the issue before any PR is opened.
-- **Feature requests differ from bug fixes:**
-  - Features are gated by readiness labels — `ready-to-spec`, then `ready-to-implement` once the design is settled — that signal when contributors can pick up the work. Discussion alone is not approval to begin work.
-  - Feature work needs a written spec first: feature requests go through a spec PR (a *product spec* + *tech spec* committed under [`specs/`](specs/)) before any code is written.
-  - Bug fixes skip both steps; they are implicitly `ready-to-implement` once triaged.
-- **Review is largely automated.** When you open a PR, Oz is auto-assigned and produces an initial review. Once Oz approves, it automatically requests a follow-up review from an InfiniShell team subject-matter expert — you do not need to assign human reviewers yourself.
-
-### Readiness labels
-
-The InfiniShell team applies one of the following labels when an issue is ready for contribution:
-
-- **`ready-to-spec`** — The problem is understood but the design is open. Open a spec PR with a *product spec* (`product.md`) and a *tech spec* (`tech.md`) under [`specs/`](specs/) — see [Opening a Spec PR](#opening-a-spec-pr) for what goes in each. This label is **reserved for feature requests**.
-- **`ready-to-implement`** — The design is settled. Open a code PR. **All triaged bug reports are implicitly `ready-to-implement`** once accepted — you don't need to wait for an explicit label on a confirmed bug.
-- **`needs-mocks`** — Design mocks are required before implementation can begin. Wait for the InfiniShell team to land them.
-
-Anyone can pick up a ready issue — readiness labels are not assignments, and the best implementation wins through normal review. If an issue has been sitting un-triaged or you'd like readiness re-evaluated, mention **@oss-maintainers** in a comment to flag it for the team.
-
-## Contribution Flow
-
-Steps owned by you (the contributor) are shown in yellow; steps owned by the InfiniShell team or Oz are shown in blue.
-
-```mermaid
-flowchart TD
-    A[File an issue] --> B{InfiniShell team triages}
-    B -- ready-to-spec<br/>(feature requests) --> C[Open spec PR<br/>product.md + tech.md]
-    B -- needs-mocks --> D[Design mocks produced]
-    D --> E[Open code PR]
-    C -- specs approved --> E
-    B -- ready-to-implement<br/>(incl. all triaged bugs) --> E
-    E --> F[Oz review → SME review → CI → merge]
-
-    classDef contributor fill:#fef3c7,stroke:#b45309,color:#78350f;
-    classDef warpTeam fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
-    class A,C,E contributor;
-    class B,D,F warpTeam;
-```
+- Start with an issue in this repository to describe the problem and agree on scope.
+- For larger features, discuss a product and technical spec with the maintainers
+  before implementation. Bug fixes can usually proceed with a focused regression test.
+- Maintainers review the change, its tests and its compatibility boundaries before
+  merging.
+- If an issue has a readiness label, follow it; otherwise ask about scope on the issue.
+  A label is not an assignment or a guarantee that a proposed implementation will merge.
 
 ## Filing a Good Issue
 
-Search [existing issues](https://github.com/zerx-lab/warp/issues) before filing to avoid duplicates. Use the issue templates when filing.
+Search [existing issues](https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues) before filing to avoid duplicates.
 
-If you're already running InfiniShell, the fastest way to file is the `/feedback` command — it opens a public GitHub issue with relevant context (logs, environment details) automatically attached.
+Use the repository issue templates. Review logs, screenshots and attachments before
+posting; remove credentials, private host details and unrelated conversation content.
 
 ### Bug reports
 
@@ -66,7 +29,7 @@ A good bug report includes:
 - InfiniShell version and OS (see `Settings → About`).
 - Logs, screenshots, or screen recordings when relevant.
 
-Once an issue is triaged as a bug (by Oz's triage agent or a maintainer), it is implicitly **`ready-to-implement`** — you can pick it up and open a code PR without waiting for a separate label.
+Link the issue in the fix PR and explain how the regression test reproduces it.
 
 ### Feature requests
 
@@ -77,54 +40,42 @@ A good feature request describes the user-facing problem before any proposed imp
 - A sketch of the desired behavior or workflow (a short example or mock is helpful but not required).
 - Any relevant constraints (compatibility, related features, prior art, etc.).
 
-Feature requests are the path that goes through the spec flow: a maintainer applies **`ready-to-spec`** when the problem is understood and the design is open for contributors. From there, the next step is a spec PR — not a code PR.
-
-Automated triage may add informational labels (`area:*`, `repro:*`, etc.). Those do not affect readiness.
+Discuss scope with a maintainer before implementing larger features. Use a spec PR
+when the behavior, architecture or compatibility tradeoffs need agreement.
 
 ## Opening a Spec PR
 
-Issues labeled `ready-to-spec` need a spec before code can begin. A spec consists of two short documents committed under [`specs/GH<issue-number>/`](specs/):
+For work that needs a spec, agree on it before writing the implementation. A spec consists of two short documents committed under [`specs/GH<issue-number>/`](specs/):
 
 - **`product.md`** (the *product spec*) — Defines the desired behavior from the consumer's perspective (the user, an API caller, a CLI user, etc.) and stays out of implementation detail. The core is a numbered list of **testable behavior invariants** covering the happy path, user-visible states, inputs and responses, and edge cases (empty / error / loading, cancellation, offline, permission denied, races, accessibility). Optional sections: problem statement, goals / non-goals, Figma link, open questions.
 - **`tech.md`** (the *tech spec*) — The implementation plan, grounded in this codebase. Required sections: **Context** (the current system and relevant files with line references), **Proposed changes** (modules touched, new types / APIs / state, data flow, tradeoffs), and **Testing and validation** (how each invariant from the product spec will be verified). Optional: end-to-end flow, Mermaid diagrams, risks, parallelization, follow-ups.
 
 To open a spec PR:
 
-1. Add `specs/GH<issue-number>/product.md` and `specs/GH<issue-number>/tech.md`. See [`specs/GH408/`](specs/GH408/), [`specs/GH1063/`](specs/GH1063/), and [`specs/GH1066/`](specs/GH1066/) for examples of well-structured specs, and browse the rest of [`specs/`](specs/) for more. The [`/write-product-spec`](.agents/skills/write-product-spec/SKILL.md) and [`/write-tech-spec`](.agents/skills/write-tech-spec/SKILL.md) skills are available to scaffold these for you.
+1. Add `specs/GH<issue-number>/product.md` and `specs/GH<issue-number>/tech.md`. See [`specs/GH408/`](specs/GH408/), [`specs/GH1063/`](specs/GH1063/), and [`specs/GH1066/`](specs/GH1066/) for examples of well-structured specs, and browse the rest of [`specs/`](specs/) for more.
 2. Use the PR as the home for product and technical discussion.
 3. Once the specs are approved, implementation generally continues on the same PR. In rarer cases — for example, if a large spec is merged on its own so the implementation can be broken up — it can move to a linked follow-up PR.
 
 ## Opening a Code PR
 
-For issues labeled `ready-to-implement` (this includes any triaged bug):
+For an agreed feature or a focused bug fix:
 
-1. Branch from `master`.
+1. Branch from `main`.
 2. Implement the change and add tests (see [Testing](#testing)).
 3. Run `./script/presubmit` and fix any failures before pushing.
 4. Open a PR using the [pull request template](.github/pull_request_template.md) and add a changelog entry (`CHANGELOG-NEW-FEATURE`, `CHANGELOG-IMPROVEMENT`, or `CHANGELOG-BUG-FIX`); omit only for docs-only or refactoring-only changes.
-5. Keep the PR focused on a single logical change and merge `master` in before the PR enters review.
+5. Keep the PR focused on a single logical change and merge `main` in before the PR enters review.
 
-You **do not need to manually request reviewers**. Oz is auto-assigned to PRs that target a ready issue and produces an initial review. After Oz approves, it automatically requests a follow-up review from the appropriate InfiniShell team subject-matter expert.
-
-After you push changes that address Oz's feedback, comment `/oz-review` on the PR to request a re-review — you can do this up to **three times** per PR. If something looks stuck or you need more reviews than that, mention **@oss-maintainers** on the PR to escalate to the team.
+Address reviewer feedback on the PR and describe the validation performed after each
+revision. Maintainers decide when a change is ready to merge.
 
 ## Using a Coding Agent
 
-You can use **any coding agent** to implement a contribution — for example, InfiniShell's built-in agent, Claude Code, Codex, Gemini CLI, or others — or no agent at all. This repository ships agent-readable context (skills under [`.agents/skills/`](.agents/skills/), specs under [`specs/`](specs/), and [`WARP.md`](WARP.md)) that any harness supporting these formats can pick up.
-
-If you'd rather have an **Oz cloud agent** implement a ready issue for you, mention **@oss-maintainers** on the issue to request it. Approved requests run **for free** on complimentary Oz credits — you don't need to set up your own Oz account or pay for compute.
-
-## Becoming a Collaborator
-
-Contributors with several merged PRs may be invited to become collaborators. Collaborators receive expanded permissions including the ability to:
-
-- Assign Oz to work on issues by mentioning `@oz` in a comment on any issue that has a readiness label.
-- Use complimentary Oz credits for contributions to this repository.
-- Apply and manage issue labels.
+You can use **any coding agent** to implement a contribution — for example, InfiniShell's built-in agent, Claude Code, Codex, Gemini CLI, or others — or no agent at all. This repository ships agent-readable context (skills under [`.agents/skills/`](.agents/skills/), specs under [`specs/`](specs/), and [`AGENTS.md`](AGENTS.md)) that any harness supporting these formats can pick up.
 
 ## Development Setup
 
-See [README.md](README.md) and [WARP.md](WARP.md) for the full engineering guide. Quick start:
+See [README.md](README.md) and [AGENTS.md](AGENTS.md) for the full engineering guide. Quick start:
 
 ```bash
 ./script/bootstrap   # platform-specific setup
@@ -140,13 +91,26 @@ Tests are required for most code changes:
 - **Algorithmic or non-trivial logic** needs unit tests.
 - **User-facing flows** should have end-to-end coverage under [`crates/integration/`](crates/integration/) whenever the behavior can be exercised that way. The bar is high-quality coverage of the changes you ship — with agent-driven development the expectation is more integration tests, not just coverage of P0 paths. If a flow is worth shipping, it's usually worth an integration test.
 
-Run unit tests with `cargo nextest run`. See [WARP.md](WARP.md) for more detail.
+Before proposing a PR or pushing a commit, run `cargo check`. Run the
+workspace test suite with:
+
+```bash
+cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
+```
+
+Every new or changed user feature also needs an English/Simplified Chinese audit,
+`cargo test -p warp --lib i18n::tests`, and `cargo check -p warp`. Update both Fluent
+catalogs with matching variables; check both languages when layout can change.
+If no user-visible text changes, record that no localization change is needed.
+See [AGENTS.md](AGENTS.md) for the full gates and platform-specific test guidance.
 
 ## Code Style
 
-- `cargo fmt` and `cargo clippy --workspace --all-targets --all-features --tests -- -D warnings` must pass.
+- Follow the formatting and lint commands in `./script/presubmit`; it checks the
+  workspace and the default GUI configuration separately. Do not substitute an
+  `--all-features` invocation for that script.
 - Prefer imports over path qualifiers, inline format args (`println!("{x}")`), and exhaustive `match` over `_` wildcards.
-- See [WARP.md](WARP.md) for the full style guide, including WarpUI patterns and terminal model locking rules.
+- See [AGENTS.md](AGENTS.md) for the full style guide, including WarpUI patterns and terminal model locking rules.
 
 ## Commit and Branch Conventions
 
@@ -167,4 +131,4 @@ See [`SECURITY.md`](SECURITY.md) for our security disclosure policy and private 
 
 ## Getting Help
 
-- Open a [GitHub issue](https://github.com/zerx-lab/warp/issues) for bugs or feature requests.
+- Open a [GitHub issue](https://github.com/Infinimesh-ai/InfiniShell-Desktop/issues) for bugs or feature requests.

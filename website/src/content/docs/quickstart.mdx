@@ -1,23 +1,24 @@
 ---
 title: Quick Start
 title_zh: 快速开始
-title_ja: クイックスタート
-lede: InfiniShell is in preview — there are no prebuilt installers yet. This page walks through installing build dependencies and producing your own binary on macOS, Linux, and Windows.
-lede_zh: InfiniShell 目前处于 preview 阶段,尚未提供预编译安装包。本文档介绍如何在 macOS、Linux 与 Windows 上安装构建依赖并自行编译。
-lede_ja: InfiniShell は preview 段階で、まだビルド済みインストーラーはありません。このページでは macOS、Linux、Windows でビルド依存関係を入れ、自分でバイナリを作る手順を説明します。
+lede: Download a desktop package from GitHub Releases, or build InfiniShell from source on macOS, Linux, and Windows.
+lede_zh: 从 GitHub Releases 下载桌面安装包,或在 macOS、Linux 与 Windows 上从源码构建 InfiniShell。
 order: 1
 section: Get Started
 section_zh: 快速开始
-section_ja: はじめに
 ---
 import CodeCard from '../../components/docs/CodeCard.astro';
 import TabsCard from '../../components/docs/TabsCard.astro';
+
+## Download / 下载
+
+<p data-lang="en"><a href="https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest">GitHub Releases</a> provides a macOS Apple Silicon DMG, a Windows x64 installer, and Linux x86_64 packages. macOS Intel archives are SSH extensions only. Read the release notes for signing status, known limits and verification scope. The steps below are for building from source.</p>
+<p data-lang="zh"><a href="https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest">GitHub Releases</a> 提供 macOS Apple Silicon DMG、Windows x64 安装程序和 Linux x86_64 软件包。macOS Intel 归档仅用于 SSH 扩展。签名状态、已知限制与验收范围以对应版本发布说明为准。以下步骤用于源码构建。</p>
 
 ## Prerequisites
 
 <p data-lang="en">All builds need: a working <code>git</code>, a Rust toolchain (<code>rustup</code>), and the platform's native build tools listed below. The repo ships a <code>script/bootstrap</code> entrypoint that installs the right set for your OS.</p>
 <p data-lang="zh">所有平台均需准备:可用的 <code>git</code>、Rust 工具链(<code>rustup</code>),以及下文列出的本机构建工具。仓库提供 <code>script/bootstrap</code> 入口脚本,会根据当前操作系统自动安装对应依赖。</p>
-<p data-lang="ja">すべてのビルドには、動作する <code>git</code>、Rust ツールチェーン (<code>rustup</code>)、そして下に示す各プラットフォームのネイティブビルドツールが必要です。リポジトリには OS に合った依存関係を入れる <code>script/bootstrap</code> エントリポイントが含まれています。</p>
 
 ## 1. Clone
 
@@ -32,7 +33,6 @@ import TabsCard from '../../components/docs/TabsCard.astro';
 
 <p data-lang="en">Pick your platform. The bootstrap script delegates to <code>script/macos/bootstrap</code>, <code>script/linux/bootstrap</code>, or <code>script/windows/bootstrap.ps1</code> automatically.</p>
 <p data-lang="zh">请根据当前平台选择对应步骤。<code>script/bootstrap</code> 会根据操作系统自动调用 <code>script/macos/bootstrap</code>、<code>script/linux/bootstrap</code> 或 <code>script/windows/bootstrap.ps1</code>。</p>
-<p data-lang="ja">使っているプラットフォームを選んでください。bootstrap スクリプトは OS に応じて <code>script/macos/bootstrap</code>、<code>script/linux/bootstrap</code>、または <code>script/windows/bootstrap.ps1</code> を自動的に呼び出します。</p>
 
 <TabsCard tabs={[
   {
@@ -60,7 +60,7 @@ import TabsCard from '../../components/docs/TabsCard.astro';
   {
     key: 'windows',
     label: 'Windows',
-    html: `<span class="com"># Run from PowerShell. Requires Git for Windows already installed.</span>
+    html: `<span class="com"># 在 Git Bash 中执行;需先安装 Git for Windows。</span>
 ./script/bootstrap
 
 <span class="com"># Installs via winget: Visual Studio 2022 Build Tools (MSVC + Win11 SDK 22621),</span>
@@ -74,7 +74,6 @@ import TabsCard from '../../components/docs/TabsCard.astro';
   <div>
     <span data-lang="en">The original Warp bootstrap also runs <code>gcloud auth login</code> for upstream's internal SSH integration tests. InfiniShell's OSS build doesn't need it — you can ignore that prompt or skip the <code>gcloud</code> sections.</span>
     <span data-lang="zh">上游 Warp 的 bootstrap 脚本还会执行 <code>gcloud auth login</code>,用于其内部的 SSH 集成测试。InfiniShell 的 OSS 构建不依赖此步骤,可忽略相关提示或直接跳过 <code>gcloud</code> 相关流程。</span>
-    <span data-lang="ja">元の Warp bootstrap は、上流の内部 SSH 統合テスト向けに <code>gcloud auth login</code> も実行します。InfiniShell の OSS ビルドでは不要なので、そのプロンプトは無視するか <code>gcloud</code> 関連部分を飛ばして構いません。</span>
   </div>
 </div>
 
@@ -82,7 +81,6 @@ import TabsCard from '../../components/docs/TabsCard.astro';
 
 <p data-lang="en">InfiniShell's community application binary is <code>infinishell</code>. The workspace also retains the <code>warp</code> library name for upstream source compatibility; it is not a separate community application binary.</p>
 <p data-lang="zh">InfiniShell 的社区应用二进制名为 <code>infinishell</code>。工作区仍为上游源码兼容保留 <code>warp</code> 库名称,但它不是另一个社区应用二进制。</p>
-<p data-lang="ja">InfiniShell のコミュニティ向けアプリケーションバイナリ名は <code>infinishell</code> です。ワークスペースには上流ソースとの互換性のため <code>warp</code> ライブラリ名も残っていますが、別のコミュニティ向けアプリケーションバイナリではありません。</p>
 
 <TabsCard tabs={[
   {
@@ -119,31 +117,16 @@ cargo run <span class="acc">--bin infinishell</span> --features gui`
   <div>
     <span data-lang="en">First build pulls hundreds of crates and can take 10–30 minutes depending on hardware. Incremental rebuilds are seconds. If linking fails on Windows, re-open your shell so the freshly installed MSVC tools land on <code>PATH</code>.</span>
     <span data-lang="zh">首次编译需下载并构建数百个 crate,耗时约 10–30 分钟,具体取决于硬件性能;增量编译为秒级。Windows 上若出现链接失败,请重新打开一个 shell,使新安装的 MSVC 工具加入 <code>PATH</code>。</span>
-    <span data-lang="ja">初回ビルドでは数百の crate を取得してビルドするため、ハードウェアによって 10〜30 分ほどかかる場合があります。差分ビルドは数秒です。Windows でリンクに失敗する場合は、新しく入った MSVC ツールが <code>PATH</code> に入るようにシェルを開き直してください。</span>
   </div>
 </div>
 
 ## 4. Configure a provider
 
-<p data-lang="en">After launch, open <code>Settings → Agents → Providers</code> and add at least one OpenAI-compatible endpoint. Credentials are written to <code>settings.toml</code> on disk and never sent anywhere except the endpoint you configure.</p>
-<p data-lang="zh">启动后,打开 <code>设置 → Agents → 服务商</code>,至少添加一个 OpenAI 兼容端点。凭证仅写入本地 <code>settings.toml</code> 文件,除用户配置的端点外不会发送至任何位置。</p>
-<p data-lang="ja">起動後、<code>Settings → Agents → Providers</code> を開き、少なくとも 1 つの OpenAI 互換エンドポイントを追加してください。認証情報はディスク上の <code>settings.toml</code> に書き込まれ、設定したエンドポイント以外へ送られることはありません。</p>
+<p data-lang="en">After launch, open <code>Settings → AI → Providers</code> and configure a provider endpoint. Provider metadata is saved in <code>settings.toml</code>; API keys are stored in the OS keychain and sent to the endpoint you configure when making requests.</p>
+<p data-lang="zh">启动后,打开 <code>设置 → AI → 提供商</code> 并配置提供商端点。提供商元数据保存在 <code>settings.toml</code>;API 密钥保存在系统密钥库中,请求时发送给你配置的端点。</p>
 
-<CodeCard
-  file="~/.config/infinishell/settings.toml"
-  lang="TOML"
-  html={`<span class="key">[providers.deepseek]</span>
-base_url = <span class="str">"https://api.deepseek.com/v1"</span>
-protocol = <span class="str">"deepseek"</span>     <span class="com"># or: openai, anthropic, gemini, ollama</span>
-api_key  = <span class="str">"sk-•••"</span>          <span class="com"># stored locally, never sent home</span>
+<p data-lang="en">Use the settings UI to save the endpoint, protocol, models and key. For Responses-compatible endpoints, see the <a href="https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/main/docs/ai-provider-responses.md">Responses configuration guide</a>.</p>
+<p data-lang="zh">通过设置界面保存端点、协议、模型与密钥。使用 Responses 兼容端点时,请参见 <a href="https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/main/docs/ai-provider-responses.zh-CN.md">Responses 配置指南</a>。</p>
 
-<span class="key">[[providers.deepseek.models]]</span>
-display = <span class="str">"DeepSeek V4 Pro"</span>
-id      = <span class="str">"deepseek-v4-pro"</span>
-context = <span class="num">1000000</span>
-output  = <span class="num">384000</span>`}
-/>
-
-<p class="muted" data-lang="en">Hit <code>⌘P</code> to switch model, <code>/</code> to open the slash menu. Cloud Agent, Computer Use, and telemetry ship disabled — see the GitHub repo for the full settings reference.</p>
-<p class="muted" data-lang="zh">按 <code>⌘P</code> 切换模型,<code>/</code> 打开 slash 菜单。Cloud Agent、Computer Use 与遥测均默认关闭,完整配置说明请参见 GitHub 仓库。</p>
-<p class="muted" data-lang="ja"><code>⌘P</code> でモデルを切り替え、<code>/</code> で slash メニューを開きます。Cloud Agent、Computer Use、テレメトリーは既定で無効です。完全な設定リファレンスは GitHub リポジトリを参照してください。</p>
+<p class="muted" data-lang="en">Use the model picker to switch models and <code>/</code> to open the slash menu. Cloud Agent, Computer Use, and telemetry ship disabled — see the GitHub repo for the full settings reference.</p>
+<p class="muted" data-lang="zh">通过模型选择器切换模型,<code>/</code> 打开 slash 菜单。Cloud Agent、Computer Use 与遥测均默认关闭,完整配置说明请参见 GitHub 仓库。</p>

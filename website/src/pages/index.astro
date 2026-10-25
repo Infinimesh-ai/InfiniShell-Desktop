@@ -3,80 +3,73 @@ import LandingLayout from '../layouts/LandingLayout.astro';
 
 const repo = 'https://github.com/Infinimesh-ai/InfiniShell-Desktop';
 
-// 文案集中管理,避免三语 data-lang 标签散落各处
+// 文案集中管理,避免双语 data-lang 标签散落各处
 const t = {
   hero: {
-    badge:  { en: 'v0 · OSS preview',     zh: 'v0 · OSS 预览版',     ja: 'v0 · OSS プレビュー' },
-    h1a:    { en: 'The terminal,',         zh: '把终端,',              ja: 'ターミナルを、' },
-    h1b:    { en: 'rebuilt around you.',   zh: '重新交还给你。',         ja: 'あなたの手元に戻す。' },
+    badge:  { en: 'v0 · Open source',     zh: 'v0 · 开源版' },
+    h1a:    { en: 'The terminal,',         zh: '把终端,' },
+    h1b:    { en: 'rebuilt around you.',   zh: '重新交还给你。' },
     lede:   {
-      en: 'InfiniShell is a derivative product built on Warp — a fully open, local-first take on the agentic terminal. Every credential, conversation and key stays on your machine. Bring your own provider, your own keys, your own rules.',
-      zh: 'InfiniShell 是基于 Warp 的衍生产品 — 完全开放、本地优先的 agentic 终端。凭证、会话与密钥全部保存在本地。自带服务商、自带密钥、自带规则。',
-      ja: 'InfiniShell は Warp を基にした派生プロダクト — 完全オープンでローカルファーストな agentic ターミナル。認証情報、会話、鍵はすべて手元のマシンに残ります。プロバイダーも鍵もルールも自分のもの。',
+      en: 'InfiniShell is a derivative product built on Warp — a fully open, local-first take on the agentic terminal. Settings and conversation history are stored locally by default; AI requests go to your configured provider. Bring your own provider, your own keys, your own rules.',
+      zh: 'InfiniShell 是基于 Warp 的衍生产品 — 完全开放、本地优先的 agentic 终端。设置与会话历史默认保存在本地;AI 请求发送给你配置的提供商。自带服务商、自带密钥、自带规则。',
     },
-    primary:   { en: 'Install InfiniShell',     zh: '安装 InfiniShell',     ja: 'InfiniShell をインストール' },
-    secondary: { en: 'View on GitHub',  zh: '在 GitHub 查看', ja: 'GitHub で見る' },
+    primary:   { en: 'Install InfiniShell',     zh: '安装 InfiniShell' },
+    secondary: { en: 'View on GitHub',  zh: '在 GitHub 查看' },
   },
   logos: {
     title: {
       en: 'Native protocols — bring any provider',
       zh: '原生协议 — 自带任意服务商',
-      ja: 'ネイティブプロトコル — 任意のプロバイダーを接続',
     },
   },
   feat1: {
-    eyebrow: { en: 'TERMINAL',    zh: '终端',          ja: 'ターミナル' },
-    h:       { en: 'A real terminal, with an AI you actually own.',  zh: '一个真正的终端,搭配你自己掌控的 AI。',  ja: '本物のターミナル、自分で制御できる AI 付き。' },
+    eyebrow: { en: 'TERMINAL',    zh: '终端' },
+    h:       { en: 'A real terminal, with an AI you actually own.',  zh: '一个真正的终端,搭配你自己掌控的 AI。' },
     p:       {
-      en: 'Every Block — cwd, env, exit code — feeds an AI conversation you can swap, replay or kill at any time. No telemetry, no remote calls, no hidden cloud.',
-      zh: '每一个 Block(工作目录、环境变量、退出码)都为 AI 会话提供上下文,而对话本身可以随时替换、重放、终止。无遥测、无远程调用、无隐藏云服务。',
-      ja: 'すべての Block(cwd、env、終了コード)が AI 会話に流れ込み、いつでも切り替え・再実行・停止できます。テレメトリも遠隔呼び出しも隠れたクラウドもありません。',
+      en: 'Every Block — cwd, env, exit code — feeds an AI conversation you can swap, replay or kill at any time. Telemetry is disabled by default; provider and remote-host connections remain under your control.',
+      zh: '每一个 Block(工作目录、环境变量、退出码)都为 AI 会话提供上下文,而对话本身可以随时替换、重放、终止。遥测默认关闭;提供商与远端主机连接由你配置。',
     },
-    more: { en: 'Read the docs →', zh: '查看文档 →', ja: 'ドキュメントを見る →' },
+    more: { en: 'Read the docs →', zh: '查看文档 →' },
   },
   feat2: {
-    eyebrow: { en: 'PROVIDERS',   zh: '服务商',        ja: 'プロバイダー' },
-    h:       { en: 'Six native protocols. Hundreds of presets. Your keys.', zh: '6 种原生协议,数百个预设,你的密钥。', ja: '6 種のネイティブプロトコル、数百のプリセット、あなたの鍵。' },
+    eyebrow: { en: 'PROVIDERS',   zh: '服务商' },
+    h:       { en: 'Six native protocols. Hundreds of presets. Your keys.', zh: '6 种原生协议,数百个预设,你的密钥。' },
     p:       {
       en: 'Pick from a directory of 250+ providers — OpenAI-compatible, Anthropic, Gemini, Ollama, DeepSeek, OpenAI-Response — or wire your own endpoint in one paste. Keys live in the OS keychain.',
       zh: '从内置 250+ 服务商目录中挑选 — OpenAI 兼容、Anthropic、Gemini、Ollama、DeepSeek、OpenAI-Response — 也可一键粘贴你自己的端点。密钥仅保存在系统密钥库。',
-      ja: '内蔵の 250+ プロバイダーディレクトリから選択(OpenAI 互換、Anthropic、Gemini、Ollama、DeepSeek、OpenAI-Response)。あるいは自分のエンドポイントを 1 度の貼り付けで接続。鍵は OS のキーチェーンに保管されます。',
     },
-    more: { en: 'See provider list →', zh: '查看服务商列表 →', ja: 'プロバイダー一覧を見る →' },
+    more: { en: 'See provider list →', zh: '查看服务商列表 →' },
   },
   feat3: {
-    eyebrow: { en: 'LOCALIZED',   zh: '本地化',        ja: 'ローカライズ' },
-    h:       { en: 'Localized end-to-end. Not just labels.',  zh: '端到端本地化,不只是标签翻译。', ja: '端から端までローカライズ。ラベルだけではありません。' },
+    eyebrow: { en: 'LOCALIZED',   zh: '本地化' },
+    h:       { en: 'Localized end-to-end. Not just labels.',  zh: '端到端本地化,不只是标签翻译。' },
     p:       {
-      en: 'Settings, prompts, command palette, telemetry banners — all rewritten in English, 简体中文 and 日本語. Switch any time; preference persists locally.',
-      zh: '设置、Prompt、命令面板、隐私横幅 — 全部用 English / 简体中文 / 日本語 重写。可随时切换,偏好仅保存在本地。',
-      ja: '設定、プロンプト、コマンドパレット、テレメトリバナー — すべて English / 简体中文 / 日本語 で書き直されています。いつでも切替可能、設定はローカルに保存。',
+      en: 'The desktop interface supports English and Simplified Chinese, with the language preference stored locally.',
+      zh: '桌面界面支持英文与简体中文,语言偏好保存在本地。',
     },
-    more: { en: 'Switch language ↑', zh: '切换语言 ↑', ja: '言語を切り替える ↑' },
+    more: { en: 'Switch language ↑', zh: '切换语言 ↑' },
   },
   quote: {
     text: {
       en: 'The terminal was always a local tool. InfiniShell keeps it that way — even when the AI joins.',
       zh: '终端从来都是本地工具。即便引入 AI,InfiniShell 也让它继续如此。',
-      ja: 'ターミナルはずっとローカルなツールでした。AI が入っても、InfiniShell はそのままにします。',
     },
-    cite: { en: 'Project ethos', zh: '项目理念', ja: 'プロジェクトの理念' },
+    cite: { en: 'Project ethos', zh: '项目理念' },
   },
   install: {
-    eyebrow: { en: 'INSTALL',    zh: '安装',           ja: 'インストール' },
-    h:       { en: 'Build it yourself in two commands.', zh: '两条命令,自行构建。',          ja: '2 つのコマンドで自分でビルド。' },
+    eyebrow: { en: 'INSTALL',    zh: '安装' },
+    h:       { en: 'Download, or build from source.', zh: '下载安装包,或从源码构建。' },
     p:       {
-      en: 'No installer in preview — InfiniShell is source-available and ships only as a build script. Clone, bootstrap, run.',
-      zh: 'preview 阶段不提供安装包 — InfiniShell 完全源码公开,只通过构建脚本发布。Clone、bootstrap、run。',
-      ja: 'preview 段階ではインストーラーはありません。InfiniShell はソース公開で、ビルドスクリプトのみが配布物です。Clone、bootstrap、run。',
+      en: 'Desktop packages are available for macOS Apple Silicon, Windows x64 and Linux x86_64. Check the release notes for signing status and known limits, or use the source-build steps below.',
+      zh: '提供 macOS Apple Silicon、Windows x64 与 Linux x86_64 桌面包。签名状态与已知限制请参见发布说明,也可按以下步骤从源码构建。',
     },
     tabMac: 'macOS', tabLinux: 'Linux', tabWin: 'Windows',
   },
   cta: {
-    h:       { en: 'Your terminal. Your keys.',  zh: '你的终端。你的密钥。', ja: 'あなたのターミナル。あなたの鍵。' },
-    p:       { en: 'Source-available · Self-hostable · Built with Rust', zh: '源码公开 · 可自托管 · 基于 Rust 构建', ja: 'ソース公開 · セルフホスト可能 · Rust 製' },
-    primary: { en: 'Quickstart',  zh: '快速开始',  ja: 'クイックスタート' },
-    secondary: { en: 'Read the changelog', zh: '查看更新日志', ja: '変更履歴を読む' },
+    h:       { en: 'Your terminal. Your keys.',  zh: '你的终端。你的密钥。' },
+    p:       { en: 'Source-available · Self-hostable · Built with Rust', zh: '源码公开 · 可自托管 · 基于 Rust 构建' },
+    primary: { en: 'Quickstart',  zh: '快速开始' },
+    secondary: { en: 'Read the changelog', zh: '查看更新日志' },
   },
 };
 
@@ -117,23 +110,21 @@ const eqRight = makeEqBars(16, 2);
     <div class="wrap hero-grid">
       <div class="fade-in" data-stagger>
         <span class="hero-badge stagger-item"><span class="pulse-dot"></span>
-          <span data-lang="en">{t.hero.badge.en}</span><span data-lang="zh">{t.hero.badge.zh}</span><span data-lang="ja">{t.hero.badge.ja}</span>
+          <span data-lang="en">{t.hero.badge.en}</span><span data-lang="zh">{t.hero.badge.zh}</span>
         </span>
         <h1 class="stagger-item">
           <span data-lang="en">{t.hero.h1a.en}<br/><span class="em">{t.hero.h1b.en}</span></span>
           <span data-lang="zh">{t.hero.h1a.zh}<br/><span class="em">{t.hero.h1b.zh}</span></span>
-          <span data-lang="ja">{t.hero.h1a.ja}<br/><span class="em">{t.hero.h1b.ja}</span></span>
         </h1>
         <p class="lede stagger-item" data-lang="en">{t.hero.lede.en}</p>
         <p class="lede stagger-item" data-lang="zh">{t.hero.lede.zh}</p>
-        <p class="lede stagger-item" data-lang="ja">{t.hero.lede.ja}</p>
         <div class="hero-cta stagger-item">
           <a class="btn" href="#install">
-            <span data-lang="en">{t.hero.primary.en}</span><span data-lang="zh">{t.hero.primary.zh}</span><span data-lang="ja">{t.hero.primary.ja}</span>
+            <span data-lang="en">{t.hero.primary.en}</span><span data-lang="zh">{t.hero.primary.zh}</span>
             <span class="arr">→</span>
           </a>
           <a class="btn alt" href={repo} target="_blank" rel="noopener">
-            <span data-lang="en">{t.hero.secondary.en}</span><span data-lang="zh">{t.hero.secondary.zh}</span><span data-lang="ja">{t.hero.secondary.ja}</span>
+            <span data-lang="en">{t.hero.secondary.en}</span><span data-lang="zh">{t.hero.secondary.zh}</span>
           </a>
         </div>
       </div>
@@ -193,18 +184,10 @@ const eqRight = makeEqBars(16, 2);
                     data-lang="zh"
                     placeholder="试试:help、ls、agent 修复链接错误、provider list"
                   />
-                  <input
-                    type="text"
-                    autocomplete="off"
-                    spellcheck="false"
-                    data-lang="ja"
-                    placeholder="例:help、ls、agent リンカーエラーを修正、provider list"
-                  />
                 </div>
                 <div class="ti-help">
                   <span data-lang="en">Type <code>help</code> for commands · <code>↑</code>/<code>↓</code> history · <code>clear</code> reset</span>
                   <span data-lang="zh"><code>help</code> 查看命令 · <code>↑</code>/<code>↓</code> 历史 · <code>clear</code> 清屏</span>
-                  <span data-lang="ja"><code>help</code> で一覧 · <code>↑</code>/<code>↓</code> 履歴 · <code>clear</code> でクリア</span>
                 </div>
               </div>
             </div>
@@ -217,7 +200,7 @@ const eqRight = makeEqBars(16, 2);
   <!-- ============== LOGOS / PROTOCOLS ============== -->
   <div class="logos fade-in" data-stagger>
     <p class="logos-title stagger-item">
-      <span data-lang="en">{t.logos.title.en}</span><span data-lang="zh">{t.logos.title.zh}</span><span data-lang="ja">{t.logos.title.ja}</span>
+      <span data-lang="en">{t.logos.title.en}</span><span data-lang="zh">{t.logos.title.zh}</span>
     </p>
     <div class="logos-track">
       {protocols.map((p) => <span class="item stagger-item">{p}</span>)}
@@ -230,16 +213,14 @@ const eqRight = makeEqBars(16, 2);
       <article class="feat-card fade-in slide-l">
         <div class="feat-text">
           <div class="feat-eyebrow">
-            <span data-lang="en">{t.feat1.eyebrow.en}</span><span data-lang="zh">{t.feat1.eyebrow.zh}</span><span data-lang="ja">{t.feat1.eyebrow.ja}</span>
+            <span data-lang="en">{t.feat1.eyebrow.en}</span><span data-lang="zh">{t.feat1.eyebrow.zh}</span>
           </div>
           <h3 data-lang="en">{t.feat1.h.en}</h3>
           <h3 data-lang="zh">{t.feat1.h.zh}</h3>
-          <h3 data-lang="ja">{t.feat1.h.ja}</h3>
           <p data-lang="en">{t.feat1.p.en}</p>
           <p data-lang="zh">{t.feat1.p.zh}</p>
-          <p data-lang="ja">{t.feat1.p.ja}</p>
           <a class="more" href="/docs/quickstart">
-            <span data-lang="en">{t.feat1.more.en}</span><span data-lang="zh">{t.feat1.more.zh}</span><span data-lang="ja">{t.feat1.more.ja}</span>
+            <span data-lang="en">{t.feat1.more.en}</span><span data-lang="zh">{t.feat1.more.zh}</span>
           </a>
         </div>
         <div class="feat-vis">
@@ -264,10 +245,9 @@ const eqRight = makeEqBars(16, 2);
                 <span class="ti-chip">block · cwd · env · exit</span>
                 <div class="ti-prompt" data-lang="en">▌ Why did the linker fail on this target?</div>
                 <div class="ti-prompt" data-lang="zh">▌ 这个 target 链接为什么失败?</div>
-                <div class="ti-prompt" data-lang="ja">▌ なぜこのターゲットでリンカーが失敗したのか?</div>
                 <div class="ti-meta">
                   <span style="font-family: 'JetBrains Mono', monospace; color: var(--accent)">/agent</span>
-                  <span data-lang="en">Anthropic · claude-opus-4-7</span><span data-lang="zh">Anthropic · claude-opus-4-7</span><span data-lang="ja">Anthropic · claude-opus-4-7</span>
+                  <span data-lang="en">Anthropic · claude-opus-4-7</span><span data-lang="zh">Anthropic · claude-opus-4-7</span>
                 </div>
               </div>
             </div>
@@ -283,16 +263,14 @@ const eqRight = makeEqBars(16, 2);
       <article class="feat-card reverse fade-in slide-r">
         <div class="feat-text">
           <div class="feat-eyebrow">
-            <span data-lang="en">{t.feat2.eyebrow.en}</span><span data-lang="zh">{t.feat2.eyebrow.zh}</span><span data-lang="ja">{t.feat2.eyebrow.ja}</span>
+            <span data-lang="en">{t.feat2.eyebrow.en}</span><span data-lang="zh">{t.feat2.eyebrow.zh}</span>
           </div>
           <h3 data-lang="en">{t.feat2.h.en}</h3>
           <h3 data-lang="zh">{t.feat2.h.zh}</h3>
-          <h3 data-lang="ja">{t.feat2.h.ja}</h3>
           <p data-lang="en">{t.feat2.p.en}</p>
           <p data-lang="zh">{t.feat2.p.zh}</p>
-          <p data-lang="ja">{t.feat2.p.ja}</p>
           <a class="more" href={repo} target="_blank" rel="noopener">
-            <span data-lang="en">{t.feat2.more.en}</span><span data-lang="zh">{t.feat2.more.zh}</span><span data-lang="ja">{t.feat2.more.ja}</span>
+            <span data-lang="en">{t.feat2.more.en}</span><span data-lang="zh">{t.feat2.more.zh}</span>
           </a>
         </div>
         <div class="feat-vis">
@@ -302,7 +280,7 @@ const eqRight = makeEqBars(16, 2);
               <div class="app-tabs">
                 <div class="app-tab">~ - fish</div>
                 <div class="app-tab active">
-                  <span data-lang="en">Settings</span><span data-lang="zh">设置</span><span data-lang="ja">設定</span>
+                  <span data-lang="en">Settings</span><span data-lang="zh">设置</span>
                 </div>
                 <div class="app-tab add">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
@@ -314,39 +292,38 @@ const eqRight = makeEqBars(16, 2);
               <div class="set-sidebar">
                 <div class="ss-search">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M14 14l-3.5-3.5"/></svg>
-                  <span data-lang="en">Search</span><span data-lang="zh">搜索</span><span data-lang="ja">検索</span>
+                  <span data-lang="en">Search</span><span data-lang="zh">搜索</span>
                 </div>
                 <div class="ss-group">
                   <span>Agents</span><span class="chev">▾</span>
                 </div>
-                <a class="ss-item" data-lang="en">InfiniShell agent</a><a class="ss-item" data-lang="zh">InfiniShell 智能体</a><a class="ss-item" data-lang="ja">InfiniShell エージェント</a>
-                <a class="ss-item" data-lang="en">Config</a><a class="ss-item" data-lang="zh">配置</a><a class="ss-item" data-lang="ja">設定</a>
-                <a class="ss-item active" data-lang="en">Providers</a><a class="ss-item active" data-lang="zh">提供商</a><a class="ss-item active" data-lang="ja">プロバイダー</a>
-                <a class="ss-item" data-lang="en">MCP servers</a><a class="ss-item" data-lang="zh">MCP 服务器</a><a class="ss-item" data-lang="ja">MCP サーバー</a>
+                <a class="ss-item" data-lang="en">InfiniShell agent</a><a class="ss-item" data-lang="zh">InfiniShell 智能体</a>
+                <a class="ss-item" data-lang="en">Config</a><a class="ss-item" data-lang="zh">配置</a>
+                <a class="ss-item active" data-lang="en">Providers</a><a class="ss-item active" data-lang="zh">提供商</a>
+                <a class="ss-item" data-lang="en">MCP servers</a><a class="ss-item" data-lang="zh">MCP 服务器</a>
                 <a class="ss-item">Rules</a>
-                <a class="ss-top muted" data-lang="en">Code</a><a class="ss-top muted" data-lang="zh">代码</a><a class="ss-top muted" data-lang="ja">コード</a>
-                <a class="ss-top muted" data-lang="en">Appearance</a><a class="ss-top muted" data-lang="zh">外观</a><a class="ss-top muted" data-lang="ja">外観</a>
-                <a class="ss-top muted" data-lang="en">Features</a><a class="ss-top muted" data-lang="zh">功能</a><a class="ss-top muted" data-lang="ja">機能</a>
+                <a class="ss-top muted" data-lang="en">Code</a><a class="ss-top muted" data-lang="zh">代码</a>
+                <a class="ss-top muted" data-lang="en">Appearance</a><a class="ss-top muted" data-lang="zh">外观</a>
+                <a class="ss-top muted" data-lang="en">Features</a><a class="ss-top muted" data-lang="zh">功能</a>
               </div>
 
               <!-- 右内容 -->
               <div class="set-content">
                 <div class="sc-head">
                   <h4 class="sc-h3">
-                    <span data-lang="en">Agent providers</span><span data-lang="zh">Agent 提供商</span><span data-lang="ja">Agent プロバイダー</span>
+                    <span data-lang="en">Agent providers</span><span data-lang="zh">Agent 提供商</span>
                   </h4>
-                  <button class="sc-add" type="button">+ <span data-lang="en">Add</span><span data-lang="zh">添加提供商</span><span data-lang="ja">追加</span></button>
+                  <button class="sc-add" type="button">+ <span data-lang="en">Add</span><span data-lang="zh">添加提供商</span></button>
                 </div>
                 <p class="sc-desc">
                   <span data-lang="en">Configure any OpenAI-compatible / Anthropic / Gemini / Ollama / DeepSeek endpoint. Keys are stored in the OS keychain.</span>
                   <span data-lang="zh">配置任意 OpenAI 兼容 / Anthropic / Gemini / Ollama / DeepSeek 端点。密钥保存在系统密钥库。</span>
-                  <span data-lang="ja">任意の OpenAI 互換 / Anthropic / Gemini / Ollama / DeepSeek エンドポイントを設定。鍵は OS のキーチェーンに保管されます。</span>
                 </p>
 
                 <div class="sc-quickadd">
                   <div class="qa-head">
-                    <span data-lang="en">Quick add</span><span data-lang="zh">快速添加</span><span data-lang="ja">クイック追加</span>
-                    <span class="qa-search" data-lang="en">Search providers…</span><span class="qa-search" data-lang="zh">搜索提供商…</span><span class="qa-search" data-lang="ja">プロバイダーを検索…</span>
+                    <span data-lang="en">Quick add</span><span data-lang="zh">快速添加</span>
+                    <span class="qa-search" data-lang="en">Search providers…</span><span class="qa-search" data-lang="zh">搜索提供商…</span>
                   </div>
                   <div class="chip-grid">
                     {providerChips.map((p) => (
@@ -359,12 +336,12 @@ const eqRight = makeEqBars(16, 2);
                 <div class="set-form">
                   <div class="sf-row">
                     <div class="sf-label">
-                      <span data-lang="en">Name</span><span data-lang="zh">名称</span><span data-lang="ja">名前</span>
+                      <span data-lang="en">Name</span><span data-lang="zh">名称</span>
                     </div>
                     <div class="sf-val">Anthropic</div>
                   </div>
                   <div class="sf-row">
-                    <div class="sf-label">API <span data-lang="en">protocol</span><span data-lang="zh">协议</span><span data-lang="ja">プロトコル</span></div>
+                    <div class="sf-label">API <span data-lang="en">protocol</span><span data-lang="zh">协议</span></div>
                     <div class="sf-protocols">
                       <span class="ptab">OpenAI</span>
                       <span class="ptab">OpenAI-Response</span>
@@ -375,8 +352,8 @@ const eqRight = makeEqBars(16, 2);
                     </div>
                   </div>
                   <div class="sf-actions">
-                    <button class="sf-btn" type="button" data-lang="en">+ Add model</button><button class="sf-btn" type="button" data-lang="zh">+ 添加模型</button><button class="sf-btn" type="button" data-lang="ja">+ モデル追加</button>
-                    <button class="sf-btn primary" type="button" data-lang="en">Save</button><button class="sf-btn primary" type="button" data-lang="zh">保存</button><button class="sf-btn primary" type="button" data-lang="ja">保存</button>
+                    <button class="sf-btn" type="button" data-lang="en">+ Add model</button><button class="sf-btn" type="button" data-lang="zh">+ 添加模型</button>
+                    <button class="sf-btn primary" type="button" data-lang="en">Save</button><button class="sf-btn primary" type="button" data-lang="zh">保存</button>
                   </div>
                 </div>
               </div>
@@ -393,14 +370,12 @@ const eqRight = makeEqBars(16, 2);
       <article class="feat-card fade-in slide-l">
         <div class="feat-text">
           <div class="feat-eyebrow">
-            <span data-lang="en">{t.feat3.eyebrow.en}</span><span data-lang="zh">{t.feat3.eyebrow.zh}</span><span data-lang="ja">{t.feat3.eyebrow.ja}</span>
+            <span data-lang="en">{t.feat3.eyebrow.en}</span><span data-lang="zh">{t.feat3.eyebrow.zh}</span>
           </div>
           <h3 data-lang="en">{t.feat3.h.en}</h3>
           <h3 data-lang="zh">{t.feat3.h.zh}</h3>
-          <h3 data-lang="ja">{t.feat3.h.ja}</h3>
           <p data-lang="en">{t.feat3.p.en}</p>
           <p data-lang="zh">{t.feat3.p.zh}</p>
-          <p data-lang="ja">{t.feat3.p.ja}</p>
         </div>
         <div class="feat-vis">
           <div class="app-window mock-language">
@@ -408,7 +383,7 @@ const eqRight = makeEqBars(16, 2);
               <div class="tb-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6 3v10"/></svg></div>
               <div class="app-tabs">
                 <div class="app-tab active">
-                  <span data-lang="en">Settings · Appearance</span><span data-lang="zh">设置 · 外观</span><span data-lang="ja">設定 · 外観</span>
+                  <span data-lang="en">Settings · Appearance</span><span data-lang="zh">设置 · 外观</span>
                 </div>
                 <div class="app-tab add">
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
@@ -417,36 +392,32 @@ const eqRight = makeEqBars(16, 2);
             </div>
             <div class="app-body">
               <div class="lang-block">
-                <div class="lb-h" data-lang="en">Language</div><div class="lb-h" data-lang="zh">语言</div><div class="lb-h" data-lang="ja">言語</div>
+                <div class="lb-h" data-lang="en">Language</div><div class="lb-h" data-lang="zh">语言</div>
                 <div class="lb-row">
                   <div class="lb-text">
-                    <div class="t" data-lang="en">Language</div><div class="t" data-lang="zh">语言</div><div class="t" data-lang="ja">言語</div>
+                    <div class="t" data-lang="en">Language</div><div class="t" data-lang="zh">语言</div>
                     <div class="d" data-lang="en">Restart InfiniShell to fully apply this change.</div>
                     <div class="d" data-lang="zh">重启 InfiniShell 以让此更改完全生效。</div>
-                    <div class="d" data-lang="ja">InfiniShell を再起動すると完全に反映されます。</div>
                   </div>
                   <div class="lb-select" id="hero-lang-select">
                     <span class="lb-current" data-locale-current="en">System default</span>
                     <span class="lb-current" data-locale-current="zh">系统默认</span>
-                    <span class="lb-current" data-locale-current="ja">システムデフォルト</span>
                     <div class="lang-dropdown">
                       <button class="ldi" type="button" data-mock-lang="system">
-                        <span data-lang="en">System default</span><span data-lang="zh">系统默认</span><span data-lang="ja">システムデフォルト</span>
+                        <span data-lang="en">System default</span><span data-lang="zh">系统默认</span>
                       </button>
                       <button class="ldi" type="button" data-mock-lang="en">English</button>
                       <button class="ldi" type="button" data-mock-lang="zh">简体中文</button>
-                      <button class="ldi" type="button" data-mock-lang="ja">日本語</button>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="lang-block">
-                <div class="lb-h" data-lang="en">Window</div><div class="lb-h" data-lang="zh">窗口</div><div class="lb-h" data-lang="ja">ウィンドウ</div>
+                <div class="lb-h" data-lang="en">Window</div><div class="lb-h" data-lang="zh">窗口</div>
                 <div class="lb-row">
                   <div class="lb-text">
                     <div class="t" data-lang="en">Window opacity: 100</div>
                     <div class="t" data-lang="zh">窗口不透明度: 100</div>
-                    <div class="t" data-lang="ja">ウィンドウ不透明度: 100</div>
                   </div>
                 </div>
               </div>
@@ -462,9 +433,8 @@ const eqRight = makeEqBars(16, 2);
     <div class="wrap">
       <blockquote data-lang="en">{t.quote.text.en}</blockquote>
       <blockquote data-lang="zh">{t.quote.text.zh}</blockquote>
-      <blockquote data-lang="ja">{t.quote.text.ja}</blockquote>
       <div class="cite">
-        — <span data-lang="en">{t.quote.cite.en}</span><span data-lang="zh">{t.quote.cite.zh}</span><span data-lang="ja">{t.quote.cite.ja}</span>
+        — <span data-lang="en">{t.quote.cite.en}</span><span data-lang="zh">{t.quote.cite.zh}</span>
       </div>
     </div>
   </section>
@@ -474,14 +444,16 @@ const eqRight = makeEqBars(16, 2);
     <div class="wrap">
       <div class="fade-in" style="max-width: 720px;">
         <div class="feat-eyebrow">
-          <span data-lang="en">{t.install.eyebrow.en}</span><span data-lang="zh">{t.install.eyebrow.zh}</span><span data-lang="ja">{t.install.eyebrow.ja}</span>
+          <span data-lang="en">{t.install.eyebrow.en}</span><span data-lang="zh">{t.install.eyebrow.zh}</span>
         </div>
         <h2 class="sec-h2" data-lang="en">{t.install.h.en}</h2>
         <h2 class="sec-h2" data-lang="zh">{t.install.h.zh}</h2>
-        <h2 class="sec-h2" data-lang="ja">{t.install.h.ja}</h2>
         <p class="sec-lede" data-lang="en">{t.install.p.en}</p>
         <p class="sec-lede" data-lang="zh">{t.install.p.zh}</p>
-        <p class="sec-lede" data-lang="ja">{t.install.p.ja}</p>
+        <p><a href={`${repo}/releases/latest`}>
+          <span data-lang="en">Download from GitHub Releases →</span>
+          <span data-lang="zh">从 GitHub Releases 下载 →</span>
+        </a></p>
       </div>
 
       <div class="install-card fade-in delay-1">
@@ -514,7 +486,7 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
         </div>
 
         <div class="pre-wrap" data-pane="windows" hidden>
-          <pre class="code"><span class="com"># Run from PowerShell (winget + rustup)</span>
+          <pre class="code"><span class="com"># 在 Git Bash 中执行（winget + rustup）</span>
 git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
 <span class="key">cd</span> infinishell
 ./script/bootstrap
@@ -531,18 +503,17 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
   <section class="cta-band">
     <div class="wrap fade-in">
       <h2>
-        <span data-lang="en">{t.cta.h.en}</span><span data-lang="zh">{t.cta.h.zh}</span><span data-lang="ja">{t.cta.h.ja}</span>
+        <span data-lang="en">{t.cta.h.en}</span><span data-lang="zh">{t.cta.h.zh}</span>
       </h2>
       <p data-lang="en">{t.cta.p.en}</p>
       <p data-lang="zh">{t.cta.p.zh}</p>
-      <p data-lang="ja">{t.cta.p.ja}</p>
       <div class="btn-row">
         <a class="btn" href="/docs/quickstart">
-          <span data-lang="en">{t.cta.primary.en}</span><span data-lang="zh">{t.cta.primary.zh}</span><span data-lang="ja">{t.cta.primary.ja}</span>
+          <span data-lang="en">{t.cta.primary.en}</span><span data-lang="zh">{t.cta.primary.zh}</span>
           <span class="arr">→</span>
         </a>
         <a class="btn alt" href="/changelog">
-          <span data-lang="en">{t.cta.secondary.en}</span><span data-lang="zh">{t.cta.secondary.zh}</span><span data-lang="ja">{t.cta.secondary.ja}</span>
+          <span data-lang="en">{t.cta.secondary.en}</span><span data-lang="zh">{t.cta.secondary.zh}</span>
         </a>
       </div>
     </div>
@@ -556,7 +527,7 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
   // ============================================================
   // Hero 仿真终端:可执行的 fake shell
   // - 预设几个命令(help / ls / pwd / clear / agent / provider / theme / whoami / echo)
-  // - 响应按当前 locale 切换三语
+  // - 响应按当前 locale 切换双语
   // - 上/下箭头可走历史
   // ============================================================
   (function () {
@@ -567,7 +538,7 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
     // 命令本身保留英文(真实 shell 也是英文),只本地化人类语言部分
     // 叙事:构建失败 → AI 用 block 上下文(cwd/exit code)诊断并给出修复建议
     // 呼应 feat1 文案 "Every Block — cwd, env, exit code — feeds an AI conversation"
-    const initLinesByLocale: Record<'en' | 'zh' | 'ja', string[]> = {
+    const initLinesByLocale: Record<'en' | 'zh', string[]> = {
       en: [
         `<span class="p">$</span> cargo build --release`,
         `<span class="dim">   Compiling infinishell v0.1.0</span>`,
@@ -594,19 +565,6 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
           <div class="st-meta"><span class="ok">anthropic / claude-opus-4-7</span><span>本地 · 无遥测</span></div>
         </div>`,
       ],
-      ja: [
-        `<span class="p">$</span> cargo build --release`,
-        `<span class="dim">   infinishell v0.1.0 をコンパイル中</span>`,
-        `<span class="err">error[E0433]: 解決できません: 宣言されていないクレート \`openssl\`</span>`,
-        `<span class="err">  --&gt; src/tls.rs:4:5</span>`,
-        `<div class="stage-turn">
-          <div class="st-chip">block · cwd ~/infinishell · exit 101</div>
-          <div class="st-prompt">▌ なぜ失敗したの?</div>
-          <div class="st-think">block コンテキストを読み取り中 <span class="dots"><span></span><span></span><span></span></span></div>
-          <div class="st-answer">Cargo.toml に <code>openssl</code> がありません。<code>cargo add openssl --features vendored</code> を実行して再ビルドしてください。</div>
-          <div class="st-meta"><span class="ok">anthropic / claude-opus-4-7</span><span>ローカル · テレメトリなし</span></div>
-        </div>`,
-      ],
     };
     function renderInitLines() {
       stage.innerHTML = initLinesByLocale[locale()]
@@ -623,9 +581,9 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
     const history: string[] = [];
     let histIdx = -1;
 
-    function locale(): 'en' | 'zh' | 'ja' {
+    function locale(): 'en' | 'zh' {
       const l = document.body.dataset.locale || document.documentElement.getAttribute('data-locale') || 'en';
-      if (l === 'zh' || l === 'ja') return l;
+      if (l === 'zh') return l;
       return 'en';
     }
 
@@ -653,7 +611,7 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
     }
 
     // 多语响应表
-    const responses: Record<string, Record<'en' | 'zh' | 'ja', string[]>> = {
+    const responses: Record<string, Record<'en' | 'zh', string[]>> = {
       help: {
         en: [
           'Available commands:',
@@ -679,26 +637,13 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
           '  theme              切换深/浅色主题',
           '  clear              清屏',
         ],
-        ja: [
-          '利用可能なコマンド:',
-          '  help               この一覧を表示',
-          '  ls                 カレントディレクトリ表示',
-          '  pwd                現在のパスを表示',
-          '  whoami             現在のユーザーを表示',
-          '  echo &lt;テキスト&gt;    テキストをそのまま出力',
-          '  agent &lt;prompt&gt;     ローカル AI エージェントに送信',
-          '  provider list      設定済みプロバイダー一覧',
-          '  theme              ダーク / ライトを切り替え',
-          '  clear              画面をクリア',
-        ],
       },
       ls: {
         en: ['Cargo.toml  CHANGELOG.md  README.md  app/  crates/  docs/  scripts/  website/'],
         zh: ['Cargo.toml  CHANGELOG.md  README.md  app/  crates/  docs/  scripts/  website/'],
-        ja: ['Cargo.toml  CHANGELOG.md  README.md  app/  crates/  docs/  scripts/  website/'],
       },
-      pwd: { en: ['/home/you/infinishell'], zh: ['/home/you/infinishell'], ja: ['/home/you/infinishell'] },
-      whoami: { en: ['you'], zh: ['you'], ja: ['you'] },
+      pwd: { en: ['/home/you/infinishell'], zh: ['/home/you/infinishell'] },
+      whoami: { en: ['you'], zh: ['you'] },
       providerList: {
         en: [
           '<span class="k">PROTOCOL</span>           <span class="k">NAME</span>          <span class="k">STATUS</span>',
@@ -714,35 +659,19 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
           'deepseek          deepseek-v4   <span class="s">就绪</span>',
           'ollama            local         <span class="s">就绪</span>',
         ],
-        ja: [
-          '<span class="k">プロトコル</span>         <span class="k">名前</span>          <span class="k">状態</span>',
-          'openai            anthropic     <span class="s">準備完了</span>',
-          'anthropic         claude-4-7    <span class="s">準備完了</span>',
-          'deepseek          deepseek-v4   <span class="s">準備完了</span>',
-          'ollama            local         <span class="s">準備完了</span>',
-        ],
       },
     };
 
     function agentResponse(prompt: string): string[] {
       const lc = locale();
-      const cleaned = prompt.trim() || (lc === 'zh' ? '没有输入提示' : lc === 'ja' ? 'プロンプトがありません' : 'no prompt');
+      const cleaned = prompt.trim() || (lc === 'zh' ? '没有输入提示' : 'no prompt');
       if (lc === 'zh') {
         return [
           `<span class="k">[agent]</span> <span class="dim">路由至</span> anthropic/claude-4-7`,
           `<span class="k">[agent]</span> <span class="dim">提示</span>: ${escape(cleaned)}`,
           `<span class="dim">思考中...</span>`,
           `<span class="s">→</span> 这是一个仿真响应。实际使用时会在本地调用你配置的服务商。`,
-          `<span class="dim">凭证、会话、上下文全部在本地。</span>`,
-        ];
-      }
-      if (lc === 'ja') {
-        return [
-          `<span class="k">[agent]</span> <span class="dim">ルーティング:</span> anthropic/claude-4-7`,
-          `<span class="k">[agent]</span> <span class="dim">プロンプト</span>: ${escape(cleaned)}`,
-          `<span class="dim">考え中...</span>`,
-          `<span class="s">→</span> これはシミュレーションです。実際にはローカルで設定済みプロバイダーを呼び出します。`,
-          `<span class="dim">認証、会話、コンテキストはすべてローカルに残ります。</span>`,
+          `<span class="dim">请求时会向配置的提供商端点发送凭据和所选上下文。</span>`,
         ];
       }
       return [
@@ -750,7 +679,7 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
         `<span class="k">[agent]</span> <span class="dim">prompt</span>: ${escape(cleaned)}`,
         `<span class="dim">thinking...</span>`,
         `<span class="s">→</span> This is a simulated response. In real InfiniShell this would call your configured provider locally.`,
-        `<span class="dim">Credentials, conversation and context all stay on your machine.</span>`,
+        `<span class="dim">Requests send credentials and the selected context to your configured provider endpoint.</span>`,
       ];
     }
 
@@ -784,13 +713,9 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
         try { localStorage.setItem('infinishell:theme', next); } catch (_) {}
         const themeName = lc === 'zh'
           ? (next === 'dark' ? '深色' : '浅色')
-          : lc === 'ja'
-          ? (next === 'dark' ? 'ダーク' : 'ライト')
           : next;
         const msg = lc === 'zh'
           ? `已切换至${themeName}主题`
-          : lc === 'ja'
-          ? `テーマを${themeName}に切り替えました`
           : `Theme switched to ${themeName}`;
         printRaw(msg, 'ok');
         return;
@@ -804,8 +729,6 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
       // 未知命令
       const errMsg = lc === 'zh'
         ? `infinishell: 未知命令: ${escape(head)}。输入 <span class="s">help</span> 查看可用命令。`
-        : lc === 'ja'
-        ? `infinishell: コマンドが見つかりません: ${escape(head)}。<span class="s">help</span> で一覧。`
         : `infinishell: command not found: ${escape(head)}. Type <span class="s">help</span> to list commands.`;
       printRaw(errMsg, 'err');
     }
@@ -839,11 +762,11 @@ git clone https://github.com/Infinimesh-ai/InfiniShell-Desktop.git infinishell
     // 这里重用 LandingLayout 中已有的 setLocale 逻辑:直接写 localStorage + body.dataset.locale +
     // applyLocale 生效。为避免重写,使用同一 storage key 与同一套选择器。
     function setLocaleAcrossSite(lc) {
-      const supported = ['en', 'zh', 'ja'];
+      const supported = ['en', 'zh'];
       let actual = lc;
       if (lc === 'system') {
         const nav = (navigator.language || 'en').toLowerCase();
-        actual = nav.startsWith('zh') ? 'zh' : nav.startsWith('ja') ? 'ja' : 'en';
+        actual = nav.startsWith('zh') ? 'zh' : 'en';
       }
       if (!supported.includes(actual)) actual = 'en';
       // 1. body.dataset.locale 控制 [data-lang] 的可见性

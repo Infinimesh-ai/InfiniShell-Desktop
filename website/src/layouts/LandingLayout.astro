@@ -40,9 +40,11 @@ const {
         } catch (_) {}
         try {
           var lc = (localStorage.getItem('infinishell:locale') || localStorage.getItem('zap:locale'));
-          if (!lc) {
+          if (lc) {
+            lc = lc.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+          } else {
             var nav = (navigator.language || 'en').toLowerCase();
-            lc = nav.startsWith('zh') ? 'zh' : nav.startsWith('ja') ? 'ja' : 'en';
+            lc = nav.startsWith('zh') ? 'zh' : 'en';
           }
           document.documentElement.setAttribute('data-locale', lc);
         } catch (_) {}
@@ -55,7 +57,6 @@ const {
     <Banner
       en="Early development · An independent product built on Warp · Not affiliated with Warp Inc."
       zh="早期开发阶段 · 基于 Warp 构建的独立产品 · 与 Warp Inc. 无隶属关系"
-      ja="初期開発段階 · Warp を基にした独立プロダクト · Warp Inc. とは無関係"
     />
     <LandingNav />
 
@@ -66,17 +67,17 @@ const {
     <script>
       // 语言切换、页内导航、标签页、复制按钮与滚动渐显
       (function () {
-        const htmlLang: Record<string, string> = { en: 'en', zh: 'zh-CN', ja: 'ja' };
+        const htmlLang: Record<string, string> = { en: 'en', zh: 'zh-CN' };
         function normalizeLocale(value: string | null) {
           const tag = String(value || '').toLowerCase();
           if (tag.startsWith('zh')) return 'zh';
-          if (tag.startsWith('ja')) return 'ja';
           if (tag.startsWith('en')) return 'en';
           return htmlLang[tag] ? tag : null;
         }
         function applyLocale(l: string) {
           const locale = normalizeLocale(l) || 'en';
           document.body.dataset.locale = locale;
+          document.documentElement.setAttribute('data-locale', locale);
           document.documentElement.lang = htmlLang[locale] || 'en';
           document.querySelectorAll<HTMLElement>('[data-set-lang]').forEach((option) => {
             const active = option.getAttribute('data-set-lang') === locale;
@@ -198,7 +199,7 @@ const {
             const pre = btn.closest('.pre-wrap, .code-card')?.querySelector<HTMLElement>('pre.code');
             if (pre && navigator.clipboard) navigator.clipboard.writeText(pre.innerText);
             const prev = btn.textContent;
-            btn.textContent = document.body.dataset.locale === 'zh' ? '已复制' : document.body.dataset.locale === 'ja' ? 'コピー済み' : 'Copied';
+            btn.textContent = document.body.dataset.locale === 'zh' ? '已复制' : 'Copied';
             btn.classList.add('copied');
             setTimeout(() => {
               btn.textContent = prev;

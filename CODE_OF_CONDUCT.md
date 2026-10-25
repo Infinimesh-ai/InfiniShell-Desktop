@@ -36,7 +36,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement by emailing warp-coc at warp.dev. All complaints will be reviewed and investigated promptly and fairly.
+To arrange a private report of abusive, harassing, or otherwise unacceptable behavior, contact **contact@infinimesh.ai**, the address published on the [Infinimesh-ai organization profile](https://github.com/Infinimesh-ai). Start with a brief description and ask for the appropriate contact before sending personal information or private evidence. Do not post those details in a public issue. This is the organization contact address, not a dedicated moderation service; no response time is promised.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

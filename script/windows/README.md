@@ -12,7 +12,7 @@ The installer is a single executable that takes care of:
 
 
 `windows-installer.iss` is an **Inno Setup script**:
-a configuration file for building a Warp installer.
+a configuration file for building the InfiniShell installer.
 The Inno Setup Compiler takes a script file and generates an installer executable.
 This is roughly equivalent to the bundling process on MacOS.
 
@@ -24,49 +24,27 @@ This script can be edited manually using any code editor.
 However, it requires the Inno Setup compiler to be turned into a `.exe` file.
 
 
-## How to compile this installer
+## Building the InfiniShell installer
 
-First, ensure you've set up your environment.
-* Download and install the [Inno Setup Compiler](https://jrsoftware.org/isdl.php).
-* Run `cargo build` to ensure the installer uses the latest version of Warp.
+Use `bundle.ps1` from the repository root. Install the Windows build dependencies from the development guide and add Inno Setup 6.7 or later `ISCC.exe` to PATH; the installer uses the `RedirectionGuard` option introduced in 6.7.
 
-### Option 1: Use the CLI
-1. Add the Inno Setup Command-line Compiler executable to your shell path.
-By default, it is located at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`.
-2. 生成已展开 include 的 PowerShell bootstrap:
-```shell
-.\script\windows\prepare_pwsh_bootstrap.ps1 -DestinationPath .\target\release-lto-debug_assertions\pwsh.ps1
-```
-3. Compile the installer:
-```shell
-iscc .\script\windows\windows-installer.iss
-```
-4. Run the generated executable:
-```shell
-.\script\windows\Output\Warp-Windows-Setup.exe
+Replace the placeholder with the actual candidate tag:
+
+```powershell
+.\script\windows\bundle.ps1 -CHANNEL oss -ARTIFACT app -ARCH x64 -RELEASE_TAG '<candidate-tag>'
 ```
 
-The script begins with a series of preprocessor definitions.
-From the command line, use the `/D` flag to emulate preprocessor definitions
-and override the hardcoded defaults.
-Usage: `iscc <script path> /D<name>[=<value>]`
+The script selects the Cargo profile, builds the application and bundled tools, expands the PowerShell bootstrap, prepares resources, and supplies Inno definitions including `Arch`, `OutputName`, `MyAppExeName`, and `TargetProfileDir`. The OSS x64 GUI installer is written to `script\windows\Output\InfiniShellSetup.exe`. Without signing configured, the result is unsigned; a successful build does not establish signing or installation lifecycle acceptance.
 
-The following constants can be overwritten:
-* `MyAppVersion` (default: `0.1.0`)
-* `MyAppExeName` (default: `warp.exe`)
-* `ReleaseChannel` (default: `dev`)
-* `TargetProfileDir` (default: `debug`)
+Use `-SKIP_BUILD_BINARY` only when all binaries and resources are ready for the same candidate, architecture, and profile. A standalone `cargo build` does not prepare every required installer input.
 
-### Option 2: Use the GUI
-1. Open the Inno Setup application and select this script.
-2. Click the "compile" button. This will generate an installer executable in a directory called `Output` at the same level as this script.
-2. To run the installer, click the "run" button in Inno Setup.
+When debugging the `.iss` script, inspect the current `$ISCC_ARGS` in `bundle.ps1` and keep application identity, architecture, output name, and resource paths consistent. Do not invoke bare `iscc windows-installer.iss` or rely on old executable/profile defaults. Compiling through the Inno GUI requires the same complete definitions and resources.
 
 
 ## Using icons
 
 Windows has its own icon file format that bundles together multiple icon sizes.
-App icons are located in `app/channels/<channel_name>/icon/padded` (内含 ~10% safe-area, macOS dock 与 Linux/Windows 共用).
+App icons are located in `app/channels/<channel_name>/icon/padded` (with approximately 10% safe area, shared by the macOS Dock and Linux/Windows).
 The `.ico` files are generated using imagemagick:
 
 ```shell

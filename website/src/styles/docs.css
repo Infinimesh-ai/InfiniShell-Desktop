@@ -1105,8 +1105,7 @@ aside.toc {
 
 /* ---------- i18n 可见性 ---------- */
 body[data-locale="en"] [data-lang]:not([data-lang="en"]),
-body[data-locale="zh"] [data-lang]:not([data-lang="zh"]),
-body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
+body[data-locale="zh"] [data-lang]:not([data-lang="zh"]) {
     display: none;
 }
 

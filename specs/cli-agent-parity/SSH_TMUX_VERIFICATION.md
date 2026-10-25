@@ -1,7 +1,9 @@
-# SSH／tmux 验证结论
+# SSH／tmux 验证范围
 
-固定版本的现有覆盖是 macOS 到本机隔离 OpenSSH，包含三款 CLI 的原生通知和 tmux 断连重接；不能外推到远端 Linux、Windows、容器或 WSL 的全部组合。
+已接纳的固定版本覆盖 macOS 到本机隔离 OpenSSH 的三款 CLI 原生通知与 tmux 断连重接；不能外推到远端 Linux、Windows、容器或 WSL 的全部组合。G08、G10 已在原批准范围内关闭，当前范围以[状态摘要](CURRENT_STATUS.json)和[验证报告](VALIDATION_REPORT.md)为准。
 
-`allow-passthrough=on` 由用户在目标 tmux 会话显式配置，安装器不改全局 tmux 配置。Codex 关闭透传时尚缺内层原生发送的独立证据；外层零接收不能单独证明正确拦截。远程图片传输仍有 G08 缺项。
+`allow-passthrough=on` 由用户在目标 tmux 会话显式配置，安装器不改全局 tmux 配置。验证关闭透传的负例时，必须分别取得内层原生发送与外层接收证据；外层零接收不能单独证明正确拦截。既有 Codex 关闭透传的内层发送证据不足，不能扩大为全部透传负例均已验证。
 
-当前结论见[验证报告](VALIDATION_REPORT.md)，补验与关闭条件见[统一缺项](KNOWN_GAPS.md)。早期脚本级正负例见[固定提交历史原文](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/SSH_TMUX_VERIFICATION.md)，不代替原生 CLI 或完整产品链。
+远程图片应分别核对本地附件、实际请求字节、目标模型与回答；普通文件卡不会自动上传。Codex 应用内图片理解的独立补验见[统一缺项](KNOWN_GAPS.md#v04--图片投递与模型理解分别验收)。
+
+后续修改 SSH、tmux、通知或附件链时，按受影响路径重新绑定源码、CLI 版本、会话与测试环境。脚本正负例不代替原生 CLI 和完整应用链，连接关闭也不证明全部后代进程及句柄已释放。

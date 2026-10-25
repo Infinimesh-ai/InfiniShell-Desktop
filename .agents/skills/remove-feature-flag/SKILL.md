@@ -14,7 +14,7 @@ After a feature flag has been enabled for all users and has stabilized in produc
 ## When to Remove
 
 Remove a feature flag when:
-- The feature has been enabled in `default` features in `app/Cargo.toml`
+- 已核对功能在目标通道和相关 GUI/TUI 中实际启用；不能只根据 `app/Cargo.toml` 的 `default` 判断
 - The feature has been stable in production for a reasonable period
 - There are no plans to disable the feature or provide configuration options
 - The team agrees the feature is permanent
@@ -22,7 +22,7 @@ Remove a feature flag when:
 ## Steps
 
 ### 1. Remove from app/Cargo.toml
-Remove the feature from both the `[features]` section and the `default` array:
+仅当该运行时开关存在对应 Cargo feature 时，删除 `[features]` 和 `default` 中的相关条目；不要删除仍被其他能力使用的依赖开关：
 
 ```toml
 [features]
@@ -35,7 +35,7 @@ default = [
 ```
 
 ### 2. Remove from FeatureFlag enum
-Remove the variant from the `FeatureFlag` enum in `warp_core/src/features.rs`:
+Remove the variant from the `FeatureFlag` enum in `crates/warp_features/src/lib.rs`:
 
 ```rust
 #[derive(Sequence)]
@@ -44,8 +44,8 @@ pub enum FeatureFlag {
 }
 ```
 
-### 3. Remove from app/src/lib.rs
-Remove the conditional compilation directive:
+### 3. Remove from app/src/features.rs
+若存在对应编译期桥接，删除该条目；同时核对 OSS 桌面专用启用列表及 TUI 初始化：
 
 ```rust
 // Remove these lines:
@@ -79,9 +79,9 @@ if FeatureFlag::YourFeatureName.is_enabled() {
 // new behavior (unconditionally enabled)
 ```
 
-Use ripgrep to find all occurrences. The shared `FeatureFlag` may be used from the headless TUI, so search `crates/warp_tui/` (and other non-`app/` crates), not just `app/` and `warp_core/`:
+Use ripgrep to find all occurrences. The shared `FeatureFlag` may be used from the headless TUI, so search `crates/warp_tui/` (and other non-`app/` crates), not just `app/` and `crates/warp_core/`:
 ```bash
-rg "YourFeatureName" app/ warp_core/ crates/warp_tui/
+rg "YourFeatureName" app/ crates/
 ```
 
 ### 6. Remove keybinding predicates
@@ -141,7 +141,7 @@ cargo run
 
 ```bash
 # Find all occurrences of the flag name (include the TUI and other non-app crates)
-rg "YourFeatureName" app/ warp_core/ crates/warp_tui/
+rg "YourFeatureName" app/ crates/
 
 # Find feature flag checks
 rg "FeatureFlag::YourFeatureName" app/ crates/warp_tui/

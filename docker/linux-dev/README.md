@@ -20,7 +20,7 @@ First, build the docker container image:
 
 ```
 CONTAINER_NAME="warp-client-linux-dev"
-docker build -t $CONTAINER_NAME docker/linux-dev
+docker build -f docker/linux-dev/Dockerfile -t "$CONTAINER_NAME" .
 ```
 
 Next, run the container:

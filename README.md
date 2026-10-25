@@ -27,8 +27,8 @@ default. No account. No mandatory cloud.
 ## Highlights
 
 - 🔌 **BYOP AI providers** — any OpenAI-compatible endpoint, plus native
-  OpenAI / Anthropic / Gemini / DeepSeek / Ollama protocols. API keys never
-  leave your machine.
+  OpenAI / Anthropic / Gemini / DeepSeek / Ollama protocols. API keys are
+  stored in the OS keychain and sent to the provider endpoint you configure.
 - 🤖 **Third-party CLI agents** — DeepSeek-TUI, Codex CLI, Claude Code and
   Google Antigravity (`agy`) wired into Blocks and the notification center.
 - 🖥️ **Cross-platform enhanced SSH** — manage hosts, configs and sessions
@@ -121,6 +121,12 @@ Typical workflow: create a project → link servers, set the repo URL and rules
 host) → have the agent inspect, reconfigure, or roll out across the fleet.
 
 ## Getting Started
+
+See the [documentation index](docs/README.md) and [current release and acceptance scope](docs/releases/README.md).
+
+Download desktop packages from [GitHub Releases](https://github.com/Infinimesh-ai/InfiniShell-Desktop/releases/latest).
+Choose the macOS Apple Silicon DMG, Windows x64 installer, or Linux x86_64 package.
+Read that release's notes for signing status, known limits and verification scope.
 
 Official macOS desktop builds support Apple Silicon (`arm64`). Intel Macs no
 longer receive desktop DMGs. The macOS `x86_64` remote-server archive remains

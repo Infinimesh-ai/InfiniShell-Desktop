@@ -1707,8 +1707,7 @@ pre.code .acc {
     display: none;
 }
 body[data-locale="en"] .lb-current[data-locale-current="en"],
-body[data-locale="zh"] .lb-current[data-locale-current="zh"],
-body[data-locale="ja"] .lb-current[data-locale-current="ja"] {
+body[data-locale="zh"] .lb-current[data-locale-current="zh"] {
     display: inline;
 }
 
@@ -1779,8 +1778,7 @@ body[data-locale="ja"] .lb-current[data-locale-current="ja"] {
 
 /* ---------- i18n 可见性 ---------- */
 body[data-locale="en"] [data-lang]:not([data-lang="en"]),
-body[data-locale="zh"] [data-lang]:not([data-lang="zh"]),
-body[data-locale="ja"] [data-lang]:not([data-lang="ja"]) {
+body[data-locale="zh"] [data-lang]:not([data-lang="zh"]) {
     display: none;
 }
 
