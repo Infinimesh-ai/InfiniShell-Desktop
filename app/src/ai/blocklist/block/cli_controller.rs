@@ -736,6 +736,10 @@ impl CLISubagentController {
                 else {
                     return;
                 };
+                // 子任务创建可能晚于命令完成，此后没有完成事件再清除监控状态和展开状态。
+                if block.finished() {
+                    return;
+                }
                 // 停止可能先于异步的子任务创建事件，不能让迟到的事件重新交出控制权。
                 if block.long_running_control_state().is_some_and(|state| {
                     matches!(

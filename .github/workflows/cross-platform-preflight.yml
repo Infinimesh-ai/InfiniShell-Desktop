@@ -352,6 +352,10 @@ jobs:
       APP_FILTER: >-
         test(ai::mcp::) | test(call_mcp_tool::) |
         test(ai::agent_sdk::driver::terminal::tests::) |
+        test(ai::blocklist::block::cli_controller::tests::) |
+        test(stop_task_before_cli_initialization_does_not_regain_agent_control) |
+        test(stopped_command_resumes_only_from_explicit_user_handoff) |
+        test(completed_user_controlled_lrc_) |
         test(ai::blocklist::action_model::execute::shell_command::) |
         test(history_up_does_not_reenter_inline_history_menu_update) |
         test(editor_down_does_not_reenter_inline_history_menu_update) |
@@ -586,8 +590,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files -p channel_versions --lib'
-            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p warp_files -p channel_versions --lib
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p websocket -p warp_files -p channel_versions --lib'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p websocket -p warp_files -p channel_versions --lib
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
 
       - name: 测试窗口迁移与同步错误类型

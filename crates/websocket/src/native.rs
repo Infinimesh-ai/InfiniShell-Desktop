@@ -93,3 +93,7 @@ impl WebsocketMessage for Message {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "native_tls_tests.rs"]
+mod tls_tests;

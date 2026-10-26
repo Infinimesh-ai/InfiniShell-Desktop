@@ -47,6 +47,11 @@ pub(crate) enum TerminalDriverEvent {
     SlowBootstrap,
 }
 
+struct WaitingCommand {
+    exit_tx: oneshot::Sender<ExitCode>,
+    started_block_id: Option<BlockId>,
+}
+
 /// Manages the terminal session lifecycle for the agent driver.
 ///
 /// Responsibilities:
@@ -56,7 +61,7 @@ pub(crate) enum TerminalDriverEvent {
 pub(crate) struct TerminalDriver {
     terminal_view: ViewHandle<TerminalView>,
     session_bootstrapped: Condition,
-    waiting_command: Option<oneshot::Sender<ExitCode>>,
+    waiting_command: Option<WaitingCommand>,
 
     /// State for the pending command we're expecting to start executing.
     /// The `String` is the expected command text, and the sender is used
@@ -293,7 +298,10 @@ impl TerminalDriver {
 
         let command_string = command.to_string();
         self.terminal_view.update(ctx, |terminal, ctx| {
-            self.waiting_command = Some(exit_tx);
+            self.waiting_command = Some(WaitingCommand {
+                exit_tx,
+                started_block_id: None,
+            });
             self.pending_command_start = Some((command_string, start_tx));
             terminal.execute_command_or_set_pending(command, ctx);
         });
@@ -474,6 +482,11 @@ impl TerminalDriver {
             crate::terminal::view::Event::SessionBootstrapped => {
                 self.session_bootstrapped.set();
             }
+            crate::terminal::view::Event::Exited => {
+                // 关闭通道，让尚未开始和等待退出的调用方都收到既有错误，避免永久等待。
+                drop(self.pending_command_start.take());
+                drop(self.waiting_command.take());
+            }
             crate::terminal::view::Event::SlowBootstrap => {
                 ctx.emit(TerminalDriverEvent::SlowBootstrap);
             }
@@ -485,26 +498,19 @@ impl TerminalDriver {
                     let block_id = self.terminal_view.read(ctx, |terminal, _| {
                         terminal.model.lock().block_list().active_block_id().clone()
                     });
+                    if let Some(command) = self.waiting_command.as_mut() {
+                        command.started_block_id = Some(block_id.clone());
+                    }
                     let _ = sender.send(block_id);
                 }
             }
             crate::terminal::view::Event::BlockCompleted { block, .. } => {
-                if let Some(sender) = self.waiting_command.take_if(|_| {
-                    let bootstrapping_done = self.terminal_view.read(ctx, |terminal, _| {
-                        terminal
-                            .model
-                            .lock()
-                            .block_list()
-                            .is_bootstrapping_precmd_done()
-                    });
-                    // This was originally checking `bootstrapping_done && block.did_execute`.
-                    // Oddly, we've seen cases where we missed the preexec hook, so
-                    // `block.did_execute` is false even though the command actually did run.
-                    // To hedge against this while we're still figuring out the root cause,
-                    // we instead simply make sure it was not a background block.
-                    bootstrapping_done && !block.is_background
-                }) {
-                    let _ = sender.send(block.exit_code);
+                // 漏掉 Preexec 时 did_execute 仍可能为 false，按实际开始的块关联完成事件。
+                if let Some(command) = self
+                    .waiting_command
+                    .take_if(|command| command.started_block_id.as_ref() == Some(&block.id))
+                {
+                    let _ = command.exit_tx.send(block.exit_code);
                 }
             }
             _ => (),
