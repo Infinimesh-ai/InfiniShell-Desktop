@@ -7057,6 +7057,16 @@ impl Input {
             return;
         }
 
+        // 最终 bootstrap precmd 仍会替换活动块；读取状态后先释放锁，再检查执行条件。
+        let bootstrap_precmd_done = self
+            .model
+            .lock()
+            .block_list()
+            .is_bootstrapping_precmd_done();
+        if !bootstrap_precmd_done {
+            return;
+        }
+
         let command = self.get_command(ctx);
         if self.can_execute_command(ctx).is_no() {
             return;

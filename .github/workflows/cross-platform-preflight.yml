@@ -352,6 +352,12 @@ jobs:
       APP_FILTER: >-
         test(ai::mcp::) | test(call_mcp_tool::) |
         test(ai::agent_sdk::driver::terminal::tests::) |
+        test(ai::blocklist::block::status_bar::tests::) |
+        test(pending_command_waits_for_final_bootstrap_precmd) |
+        test(specific_cli_launch_does_not_consume_intent_during_long_running_command) |
+        test(replacing_pending_command_invalidates_specific_cli_launch) |
+        test(terminal::input::cli_update_launch_tests::) |
+        test(settings_view::features_page::tests::) |
         test(ai::blocklist::block::cli_controller::tests::) |
         test(stop_task_before_cli_initialization_does_not_regain_agent_control) |
         test(stopped_command_resumes_only_from_explicit_user_handoff) |

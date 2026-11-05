@@ -151,6 +151,29 @@ impl BlocklistAIStatusBar {
     ) -> Self {
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         ctx.subscribe_to_model(&history_model, move |me, _, event, ctx| {
+            // 订阅随视图存活，切换 exchange 时复用它，避免旧回调继续处理当前输出。
+            if let BlocklistAIHistoryEvent::UpdatedStreamingExchange {
+                exchange_id,
+                conversation_id,
+                ..
+            } = event
+            {
+                if let Some(model) = me.active_exchange_model.as_ref() {
+                    if model.exchange_id(ctx) == Some(*exchange_id) {
+                        me.on_updated_active_exchange_output(ctx);
+                    } else if model.conversation_id(ctx) == Some(*conversation_id) {
+                        ctx.notify();
+                    }
+                }
+                return;
+            }
+            if matches!(
+                event,
+                BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. }
+            ) {
+                ctx.notify();
+                return;
+            }
             if event
                 .terminal_surface_id()
                 .is_some_and(|id| id != terminal_view_id)
@@ -498,13 +521,7 @@ impl BlocklistAIStatusBar {
                     )
                     .ok()
                 })
-                .map(|model| {
-                    model.on_updated_output(
-                        Box::new(|me, ctx| me.on_updated_active_exchange_output(ctx)),
-                        ctx,
-                    );
-                    Box::new(model) as Box<dyn AIBlockModel<View = BlocklistAIStatusBar>>
-                });
+                .map(|model| Box::new(model) as Box<dyn AIBlockModel<View = BlocklistAIStatusBar>>);
             self.is_summarization_cancel_dialog_open = false;
             self.stop_summarization_timer();
 
@@ -1415,3 +1432,7 @@ impl TypedActionView for BlocklistAIStatusBar {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "status_bar_tests.rs"]
+mod tests;

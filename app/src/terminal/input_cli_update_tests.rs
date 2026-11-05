@@ -2,6 +2,7 @@ use warpui::App;
 
 use super::*;
 use crate::terminal::cli_agent_updates::{CliAgentUpdatePhase, CliAgentUpdatesModel};
+use crate::terminal::model::ansi::{CommandFinishedValue, Handler};
 use crate::terminal::model::session::{BootstrapSessionType, SessionInfo};
 use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};
 
@@ -190,6 +191,15 @@ fn pending_launch_is_consumed_only_after_update_guard_accepts_dispatch() {
         let terminal =
             super::tests::add_window_with_bootstrapped_terminal(&mut app, None, None).await;
         let input = terminal.read(&app, |view, _| view.input().clone());
+        // 该测试只验证更新门禁，先补齐引导块完成，再由下方 helper 提供最终 precmd。
+        terminal.update(&mut app, |terminal, _| {
+            let mut model = terminal.model.lock();
+            let session_id = model.block_list().active_block().session_id().unwrap();
+            model.command_finished(CommandFinishedValue {
+                completion_metadata: Default::default(),
+                session_id: Some(session_id.as_u64()),
+            });
+        });
         super::tests::simulate_directory_for_completion(
             0.into(),
             &terminal,
@@ -201,6 +211,13 @@ fn pending_launch_is_consumed_only_after_update_guard_accepts_dispatch() {
         });
         input.update(&mut app, |input, ctx| {
             assert!(!input.can_execute_command(ctx).is_no());
+            assert!(
+                input
+                    .model
+                    .lock()
+                    .block_list()
+                    .is_bootstrapping_precmd_done()
+            );
             assert!(
                 input
                     .model

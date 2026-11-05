@@ -85,7 +85,9 @@ use crate::terminal::input::slash_commands::SlashCommandsEvent;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::terminal::local_shell::LocalShellState;
 use crate::terminal::local_tty::shell::ShellStarter;
-use crate::terminal::model::ansi::{Handler, PromptMetadata};
+use crate::terminal::model::ansi::{
+    CommandFinishedValue, CompletionMetadata, Handler, PrecmdValue, PromptMetadata,
+};
 use crate::terminal::model::block::{BlockId, SerializedBlock};
 use crate::terminal::model::blocks::{BlockListPoint, insert_block};
 use crate::terminal::model::grid::Dimensions as _;
@@ -97,6 +99,7 @@ use crate::terminal::resizable_data::ResizableData;
 use crate::terminal::shared_session::protocol::Role;
 use crate::terminal::shell::ShellType;
 use crate::terminal::universal_developer_input::UniversalDeveloperInputButtonBarEvent;
+use crate::terminal::view::Event as TerminalViewEvent;
 use crate::terminal::view::inline_banner::ByoLlmAuthBannerSessionState;
 use crate::terminal::writeable_pty::command_history::update_command_history;
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -107,6 +110,82 @@ use crate::workspace::{ActiveSession, OneTimeModalModel, ToastStack, WorkspaceRe
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider, experiments};
+
+#[test]
+fn pending_command_waits_for_final_bootstrap_precmd() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+        terminal.read(&app, |terminal, _| {
+            let model = terminal.model.lock();
+            assert!(model.block_list().is_bootstrapped());
+            assert!(!model.block_list().is_bootstrapping_precmd_done());
+            assert!(
+                model.block_list().active_block().has_received_precmd(),
+                "回归前提：旧实现会接受已带 precmd 的引导活动块"
+            );
+        });
+        input.read(&app, |input, ctx| {
+            assert!(!input.can_execute_command(ctx).is_no());
+        });
+
+        let executed_commands = Rc::new(RefCell::new(Vec::<String>::new()));
+        let executed_commands_for_subscription = executed_commands.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let TerminalViewEvent::ExecuteCommand(event) = event {
+                    executed_commands_for_subscription
+                        .borrow_mut()
+                        .push(event.command.clone());
+                }
+            });
+        });
+
+        terminal.update(&mut app, |terminal, ctx| {
+            terminal.execute_command_or_set_pending("echo ready", ctx);
+        });
+        input.read(&app, |input, ctx| {
+            assert!(input.has_pending_command());
+            assert_eq!(input.buffer_text(ctx), "echo ready");
+        });
+        assert!(executed_commands.borrow().is_empty());
+
+        terminal.update(&mut app, |terminal, ctx| {
+            {
+                let mut model = terminal.model.lock();
+                let session_id = model.block_list().active_block().session_id().unwrap();
+                let completion_metadata = CompletionMetadata::default();
+                model.command_finished(CommandFinishedValue {
+                    completion_metadata: completion_metadata.clone(),
+                    session_id: Some(session_id.as_u64()),
+                });
+                model.precmd_with_completion_metadata(PrecmdValue {
+                    completion_metadata,
+                    prompt_metadata: PromptMetadata {
+                        session_id: Some(session_id.as_u64()),
+                        ..Default::default()
+                    },
+                });
+                assert!(model.block_list().is_bootstrapping_precmd_done());
+            }
+            terminal.model_event_dispatcher().update(ctx, |_, ctx| {
+                ctx.emit(ModelEvent::BootstrapPrecmdDone);
+            });
+        });
+
+        assert!(!input.read(&app, |input, _| input.has_pending_command()));
+        assert_eq!(executed_commands.borrow().as_slice(), ["echo ready"]);
+
+        terminal.update(&mut app, |terminal, ctx| {
+            terminal.model_event_dispatcher().update(ctx, |_, ctx| {
+                ctx.emit(ModelEvent::BootstrapPrecmdDone);
+            });
+            terminal.execute_pending_command((), ctx);
+        });
+        assert_eq!(executed_commands.borrow().as_slice(), ["echo ready"]);
+    });
+}
 
 #[test]
 fn renders_git_checkout_prompt_chip_command_as_single_shell_argument() {
