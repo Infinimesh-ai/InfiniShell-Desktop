@@ -45,6 +45,9 @@ pub enum OpenAiCompatibleError {
     #[error("Responses 协议失败: {0}")]
     Protocol(String),
 
+    #[error("response stopped after sustained repetition")]
+    RepeatedResponse,
+
     #[error("调用失败: {0}")]
     Other(String),
 }

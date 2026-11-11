@@ -284,10 +284,8 @@ fn whole_conversation_stop_discards_deferred_follow_ups() {
                             query_metadata: None,
                             default_to_follow_up_on_success: false,
                             can_attempt_resume_on_error: true,
-                            is_queued_prompt: false,
                             allow_auto_compaction: true,
                             recovery_id: None,
-                            context_snapshot: None,
                         },
                     );
                 }

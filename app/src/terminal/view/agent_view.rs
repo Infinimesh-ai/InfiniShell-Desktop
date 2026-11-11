@@ -316,15 +316,9 @@ impl TerminalView {
                     }
                 });
 
-                self.ai_controller.update(ctx, |controller, ctx| {
-                    controller.send_user_query_in_conversation(
-                        initial_prompt,
-                        conversation_id,
-                        None,
-                        ctx,
-                    );
+                did_auto_trigger_request = self.input.update(ctx, |input, ctx| {
+                    input.submit_user_query_now(initial_prompt, false, ctx)
                 });
-                did_auto_trigger_request = true;
             } else {
                 let appearance = Appearance::handle(ctx).as_ref(ctx);
                 let message = Message::new(vec![

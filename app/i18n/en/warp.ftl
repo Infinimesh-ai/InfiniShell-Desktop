@@ -6219,3 +6219,7 @@ cloud-sync-error-write-database = Could not save the downloaded configuration: {
 
 terminal-rewind-failed = Could not finish rewinding. Your conversation has been kept so you can try Rewind again.
 terminal-rewind-in-progress = Rewinding is still in progress. Your draft and queued prompts have been kept. Wait for it to finish before sending.
+
+ai-long-response-scroll = Long response (scroll)
+ai-long-response-expand = Long response (expand)
+ai-error-repeated-response = The response kept repeating, so generation was stopped. Received text has been preserved. Send a new message to try again.

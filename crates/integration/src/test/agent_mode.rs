@@ -10,6 +10,7 @@ use pathfinder_geometry::vector::{Vector2F, vec2f};
 use settings::{Setting, ToggleableSetting};
 use warp::cmd_or_ctrl_shift;
 use warp::features::FeatureFlag;
+use warp::integration_testing::agent_mode::long_response_error_visual_steps;
 use warp::integration_testing::clipboard::assert_clipboard_contains_string;
 use warp::integration_testing::step::new_step_with_default_assertions;
 use warp::integration_testing::terminal::{
@@ -230,6 +231,16 @@ pub fn test_restored_ai_block_renders_mermaid_and_local_images() -> Builder {
                     })
                 }),
         )
+}
+
+/// 手动验收双语长回复、折叠与重复停止提示的真实窗口布局。
+pub fn test_long_response_error_visual_preview() -> Builder {
+    new_builder()
+        .use_tmp_filesystem_for_test_root_directory()
+        .with_real_display()
+        .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
+        .with_step(clear_blocklist_to_remove_bootstrapped_blocks())
+        .with_steps(long_response_error_visual_steps())
 }
 
 fn select_first_to_last_through_ai_simple(is_copy_on_select: bool) -> Builder {
