@@ -918,9 +918,14 @@ impl Input {
                         prompt,
                     });
                 } else {
-                    // Not in progress: submit immediately as a regular (non-queued) user query so
-                    // the live staging is sent and reset, rather than treated as a queued-row fire.
-                    self.submit_user_query_now(prompt, ctx);
+                    // /queue 的实际请求已去掉前缀；同步确认时消费原始草稿及附件。
+                    let revision = self.editor.as_ref(ctx).buffer_revision(ctx);
+                    let context_snapshot =
+                        self.ai_context_model.as_ref(ctx).pending_context_snapshot();
+                    if !self.submit_user_query_now(prompt, false, ctx) {
+                        return true;
+                    }
+                    self.acknowledge_ai_input_submission(&revision, &context_snapshot, ctx);
                 }
             }
             open_repo if command.name == commands::OPEN_REPO.name => {

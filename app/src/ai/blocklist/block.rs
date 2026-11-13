@@ -668,6 +668,7 @@ pub struct CollapsibleElementState {
     pub scroll_state: ClippedScrollStateHandle,
     last_known_is_finished: bool,
     user_toggled_while_streaming: bool,
+    pin_to_bottom_on_expand: bool,
 }
 
 impl Default for CollapsibleElementState {
@@ -681,11 +682,24 @@ impl Default for CollapsibleElementState {
             scroll_state: ClippedScrollStateHandle::new(),
             last_known_is_finished: false,
             user_toggled_while_streaming: false,
+            pin_to_bottom_on_expand: true,
         }
     }
 }
 
 impl CollapsibleElementState {
+    fn long_response() -> Self {
+        Self {
+            // 正文持续追加时保留阅读位置，不沿用思考块的自动追随行为。
+            expansion_state: CollapsibleExpansionState::Expanded {
+                is_finished: false,
+                scroll_pinned_to_bottom: false,
+            },
+            pin_to_bottom_on_expand: false,
+            ..Default::default()
+        }
+    }
+
     fn collapsed() -> Self {
         Self {
             expansion_state: CollapsibleExpansionState::Collapsed,
@@ -695,7 +709,7 @@ impl CollapsibleElementState {
     fn expand(&mut self) {
         self.expansion_state = CollapsibleExpansionState::Expanded {
             is_finished: self.last_known_is_finished,
-            scroll_pinned_to_bottom: true,
+            scroll_pinned_to_bottom: self.pin_to_bottom_on_expand,
         };
     }
 
@@ -789,6 +803,33 @@ impl CollapsibleElementState {
     }
 }
 
+fn is_long_response(sections: &[AIAgentTextSection]) -> bool {
+    let mut characters = 0;
+    let mut lines = 0;
+    for section in sections {
+        let text = match section {
+            AIAgentTextSection::PlainText { text } => text.text(),
+            AIAgentTextSection::Code { code, .. } => code,
+            AIAgentTextSection::Table { table } => &table.markdown_source,
+            AIAgentTextSection::Image { .. } | AIAgentTextSection::MermaidDiagram { .. } => {
+                continue;
+            }
+        };
+        lines += 1;
+        for character in text.chars() {
+            characters += 1;
+            if character == '\n' {
+                lines += 1;
+            }
+            // 仅限制视口，不修改正文或根据措辞推断思考内容。
+            if characters >= 4_000 || lines >= 80 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 const RECEIVED_MESSAGE_COLLAPSIBLE_ID_PREFIX: &str = "received-message:";
 
 pub(crate) fn received_message_collapsible_id(message_id: &str) -> MessageId {
@@ -876,7 +917,7 @@ pub struct AIBlock {
 
     comment_states: HashMap<CommentId, CommentElementState>,
 
-    /// Map from collapsible block message IDs (reasoning or summarization) to their states.
+    /// 思考、摘要、长正文及编排消息的折叠状态，按消息 ID 保存。
     collapsible_block_states: HashMap<MessageId, CollapsibleElementState>,
 
     /// Map from suggested prompt action ID to its view handle and status.
@@ -2092,6 +2133,18 @@ impl AIBlock {
 
         // Register element state for reasoning messages and track summarization timing.
         for message in &output.messages {
+            if let AIAgentOutputMessageType::Text(text) = &message.message {
+                // 阈值跨越时不改变正在选择的正文布局；后续更新再启用受限视口。
+                if !self.state_handles.selection_handle.is_selecting()
+                    && is_long_response(&text.sections)
+                {
+                    self.collapsible_block_states
+                        .entry(message.id.clone())
+                        .or_insert_with(CollapsibleElementState::long_response)
+                        .sync_finished_state(!self.model.status(ctx).is_streaming());
+                }
+            }
+
             if let AIAgentOutputMessageType::Reasoning {
                 finished_duration, ..
             } = &message.message

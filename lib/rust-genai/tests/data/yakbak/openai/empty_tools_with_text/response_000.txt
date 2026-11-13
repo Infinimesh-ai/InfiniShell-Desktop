@@ -1,0 +1,6 @@
+data: {"choices":[{"index":0,"delta":{"reasoning_content":"reasoning","content":"answer","tool_calls":[]}}]}
+
+data: {"choices":[{"index":0,"finish_reason":"stop","delta":{}}]}
+
+data: [DONE]
+

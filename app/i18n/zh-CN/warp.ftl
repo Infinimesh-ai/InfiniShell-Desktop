@@ -6031,3 +6031,7 @@ cloud-sync-error-write-database = 无法保存下载的配置：{ $error }。已
 
 terminal-rewind-failed = 未能完成回退。已保留会话，你可以再次点击“回退”重试。
 terminal-rewind-in-progress = 正在回退，已保留草稿和排队提示。请等待回退结束后再发送。
+
+ai-long-response-scroll = 较长回复（可滚动阅读）
+ai-long-response-expand = 较长回复（点击展开）
+ai-error-repeated-response = 回复持续重复，已停止生成并保留收到的内容。请重新发送消息重试。

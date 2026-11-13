@@ -30,7 +30,7 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonE
 use self::response_stream::{PendingTitleGeneration, ResponseStream, ResponseStreamEvent};
 use super::action_model::{BlocklistAIActionEvent, BlocklistAIActionModel};
 use super::agent_view::{AgentViewController, AgentViewControllerEvent, AgentViewEntryOrigin};
-use super::context_model::{BlocklistAIContextModel, PendingContextSnapshot};
+use super::context_model::BlocklistAIContextModel;
 use super::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel, UpdateHistoryError};
 use super::input_model::InputConfig;
 use super::{BlocklistAIInputModel, InputType, QueuedQueryModel, ResponseStreamId};
@@ -439,6 +439,8 @@ pub struct BlocklistAIController {
     /// 避免用户提交的 prompt 被静默丢弃。
     /// 每个 conversation 最多保留 1 条;用户后续直接提交新请求会覆盖。
     pending_byop_requests: HashMap<AIConversationId, PendingByopRequest>,
+    /// 已接受输入的保存确认；停止或新输入会撤销旧确认的续发权限。
+    pending_byop_checkpoints: HashMap<AIConversationId, AIAgentExchangeId>,
     /// 以摘要流绑定原始待发输入；只有该摘要成功提交后才允许续发一次。
     pending_byop_compaction_requests: HashMap<ResponseStreamId, PendingByopCompactionRequest>,
     committed_byop_compaction_streams: HashSet<ResponseStreamId>,
@@ -446,16 +448,14 @@ pub struct BlocklistAIController {
 }
 
 /// 见 `pending_byop_requests`。
+#[derive(Clone)]
 struct PendingByopRequest {
     allow_auto_compaction: bool,
     recovery_id: Option<AIAgentExchangeId>,
-    /// readiness 等待前的上下文；等待期间新增的附件不属于这次待发请求。
-    context_snapshot: Option<PendingContextSnapshot>,
     request_input: RequestInput,
     query_metadata: Option<RequestMetadata>,
     default_to_follow_up_on_success: bool,
     can_attempt_resume_on_error: bool,
-    is_queued_prompt: bool,
 }
 
 struct PendingByopCompactionRequest {
@@ -737,6 +737,7 @@ impl BlocklistAIController {
             pending_passive_follow_ups: HashSet::new(),
             pending_passive_suggestion_results: HashMap::new(),
             pending_byop_requests: HashMap::new(),
+            pending_byop_checkpoints: HashMap::new(),
             pending_byop_compaction_requests: HashMap::new(),
             committed_byop_compaction_streams: HashSet::new(),
             byop_compaction_after_stream: HashSet::new(),
@@ -781,13 +782,13 @@ impl BlocklistAIController {
         shared_session_participant_id: Option<ParticipantId>,
         is_queued_prompt: bool,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         if let WhichTask::Task {
             conversation_id, ..
         } = &input_query.which_task
             && self.is_rewinding_conversation(*conversation_id)
         {
-            return;
+            return false;
         }
         // Store the participant who initiated this query before sending
         // so that send_query can use it when creating the exchange.
@@ -819,8 +820,7 @@ impl BlocklistAIController {
             self.cancel_active_conversation_for_follow_up(conversation_id, ctx);
 
         if let Some(slash_command_request) = SlashCommandRequest::from_query(query.as_str()) {
-            slash_command_request.send_request(self, is_queued_prompt, ctx);
-            return;
+            return slash_command_request.send_request(self, is_queued_prompt, ctx);
         }
 
         let (query, user_query_mode) =
@@ -910,7 +910,7 @@ impl BlocklistAIController {
         };
         inputs.push(ai_input);
 
-        if let Err(e) = self.send_request_input(
+        match self.send_request_input(
             RequestInput::for_task(
                 inputs,
                 task_id,
@@ -930,15 +930,20 @@ impl BlocklistAIController {
             is_queued_prompt,
             ctx,
         ) {
-            if let Some(pending) = e.downcast_ref::<PendingByopToolResultsError>() {
-                log::debug!(
-                    "[byop-readiness] request is waiting for pending tool result(s) \
-                     category={:?} tool_calls={}",
-                    pending.category(),
-                    pending.tool_call_count()
-                );
-            } else {
-                log::error!("Failed to send agent request: {e:?}");
+            Ok(_) => true,
+            Err(e) => {
+                if let Some(pending) = e.downcast_ref::<PendingByopToolResultsError>() {
+                    log::debug!(
+                        "[byop-readiness] request is waiting for pending tool result(s) \
+                         category={:?} tool_calls={}",
+                        pending.category(),
+                        pending.tool_call_count()
+                    );
+                    self.pending_byop_requests.contains_key(&conversation_id)
+                } else {
+                    log::error!("Failed to send agent request: {e:?}");
+                    false
+                }
             }
         }
     }
@@ -1016,7 +1021,7 @@ impl BlocklistAIController {
         entrypoint_type: EntrypointType,
         participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         self.send_user_query_in_new_conversation_internal(
             query,
             static_query_type,
@@ -1024,7 +1029,7 @@ impl BlocklistAIController {
             participant_id,
             /*is_queued_prompt*/ false,
             ctx,
-        );
+        )
     }
 
     /// Sends the first submission of a previously queued user prompt into a new conversation.
@@ -1038,7 +1043,7 @@ impl BlocklistAIController {
         entrypoint_type: EntrypointType,
         participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         self.send_user_query_in_new_conversation_internal(
             query,
             static_query_type,
@@ -1046,7 +1051,7 @@ impl BlocklistAIController {
             participant_id,
             /*is_queued_prompt*/ true,
             ctx,
-        );
+        )
     }
 
     fn send_user_query_in_new_conversation_internal(
@@ -1057,7 +1062,7 @@ impl BlocklistAIController {
         participant_id: Option<ParticipantId>,
         is_queued_prompt: bool,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         let participant_id = participant_id.or_else(|| self.get_sharer_participant_id());
         let running_command = {
             let terminal_model = self.terminal_model.lock();
@@ -1077,7 +1082,7 @@ impl BlocklistAIController {
                 Ok(task_id) => task_id,
                 Err(e) => {
                     log::error!("Could not create CLI subagent task optimistically: {e:?}");
-                    return;
+                    return false;
                 }
             };
             self.send_query(
@@ -1097,7 +1102,7 @@ impl BlocklistAIController {
                 participant_id,
                 is_queued_prompt,
                 ctx,
-            );
+            )
         } else {
             self.send_query(
                 InputQuery {
@@ -1113,7 +1118,7 @@ impl BlocklistAIController {
                 participant_id,
                 is_queued_prompt,
                 ctx,
-            );
+            )
         }
     }
 
@@ -1144,7 +1149,7 @@ impl BlocklistAIController {
         conversation_id: AIConversationId,
         participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
@@ -1154,7 +1159,7 @@ impl BlocklistAIController {
             EntrypointType::UserInitiated,
             /*is_queued_prompt*/ false,
             ctx,
-        );
+        )
     }
 
     /// Sends the first submission of a previously queued user prompt into an existing conversation.
@@ -1167,7 +1172,7 @@ impl BlocklistAIController {
         conversation_id: AIConversationId,
         participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
@@ -1177,7 +1182,7 @@ impl BlocklistAIController {
             EntrypointType::UserInitiated,
             /*is_queued_prompt*/ true,
             ctx,
-        );
+        )
     }
 
     /// Sends the given user query to the AI model, with additional referenced attachments.
@@ -1235,9 +1240,9 @@ impl BlocklistAIController {
         entrypoint_type: EntrypointType,
         is_queued_prompt: bool,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> bool {
         if self.is_rewinding_conversation(conversation_id) {
-            return;
+            return false;
         }
         let is_viewer = self
             .terminal_model
@@ -1287,7 +1292,7 @@ impl BlocklistAIController {
                     Ok(task_id) => (task_id, Some(running_command)),
                     Err(e) => {
                         log::error!("Could not create CLI subagent task optimistically: {e:?}");
-                        return;
+                        return false;
                     }
                 }
             } else if let Some(task_id) = active_block
@@ -1304,7 +1309,7 @@ impl BlocklistAIController {
                     log::error!(
                         "Tried to send follow-up query for non-existent conversation: {conversation_id:?}"
                     );
-                    return;
+                    return false;
                 };
 
                 (conversation.get_root_task_id().clone(), None)
@@ -1349,7 +1354,7 @@ impl BlocklistAIController {
             participant_id,
             is_queued_prompt,
             ctx,
-        );
+        )
     }
 
     /// Sends a request triggered by a zero-state prompt suggestion.
@@ -1409,7 +1414,7 @@ impl BlocklistAIController {
             participant_id,
             /*is_queued_prompt*/ false,
             ctx,
-        )
+        );
     }
 
     pub fn send_slash_command_request(
@@ -1661,6 +1666,204 @@ impl BlocklistAIController {
         self.pending_passive_follow_ups.remove(&conversation_id);
     }
 
+    fn pending_byop_recovery_exchange(
+        &self,
+        pending: &PendingByopRequest,
+        ctx: &AppContext,
+    ) -> Option<AIAgentExchangeId> {
+        let recovery_id = pending.recovery_id?;
+        let conversation = BlocklistAIHistoryModel::as_ref(ctx)
+            .conversation(&pending.request_input.conversation_id)?;
+        conversation
+            .compaction_state
+            .pending_recovery()
+            .into_iter()
+            .chain(conversation.compaction_state.retained_recoveries())
+            .find(|recovery| recovery.id == recovery_id)
+            .and_then(|recovery| recovery.owner_exchange_id)
+    }
+
+    /// 等待工具期间也先保留可见问题及恢复副本，不把占位输入加入模型历史。
+    fn hold_pending_byop_request(
+        &mut self,
+        mut pending: PendingByopRequest,
+        ctx: &mut ModelContext<Self>,
+    ) -> anyhow::Result<()> {
+        let conversation_id = pending.request_input.conversation_id;
+        if !pending
+            .request_input
+            .all_inputs()
+            .any(AIAgentInput::is_user_query)
+        {
+            self.pending_byop_requests.insert(conversation_id, pending);
+            return Ok(());
+        }
+        if let Some(exchange_id) = self.pending_byop_recovery_exchange(&pending, ctx) {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                if let Some(conversation) = history.conversation_mut(&conversation_id)
+                    && let Ok(exchange) = conversation.get_exchange_to_update(exchange_id)
+                {
+                    if !exchange
+                        .input
+                        .iter()
+                        .any(|input| matches!(input, AIAgentInput::SummarizeConversation { .. }))
+                    {
+                        exchange.output_status = AIAgentOutputStatus::Streaming { output: None };
+                    }
+                    ctx.emit(BlocklistAIHistoryEvent::UpdatedStreamingExchange {
+                        exchange_id,
+                        terminal_surface_id: self.terminal_view_id,
+                        conversation_id,
+                        is_hidden: conversation.is_exchange_hidden(exchange_id),
+                    });
+                }
+                history.update_conversation_status(
+                    self.terminal_view_id,
+                    conversation_id,
+                    ConversationStatus::InProgress,
+                    ctx,
+                );
+            });
+            self.pending_byop_requests.insert(conversation_id, pending);
+            return Ok(());
+        }
+
+        let mut recovery = PendingCompactionRecovery::from_request(&pending.request_input);
+        let recovery_id = recovery.id;
+        pending.recovery_id = Some(recovery_id);
+        let history = BlocklistAIHistoryModel::handle(ctx);
+        let checkpoint = history.update(ctx, |history, ctx| {
+            let conversation = history
+                .conversation_mut(&conversation_id)
+                .ok_or_else(|| anyhow!("待发输入的会话不存在"))?;
+            recovery.anchor_message_id = conversation
+                .get_root_task()
+                .and_then(|task| task.source())
+                .and_then(|task| task.messages.last())
+                .map(|message| message.id.clone());
+            let display_input = recovery.to_request_input(
+                conversation_id,
+                conversation.get_root_task_id(),
+                pending
+                    .request_input
+                    .shared_session_response_initiator
+                    .clone(),
+            );
+            conversation.compaction_state.set_pending_recovery(recovery);
+            let display_stream = ResponseStreamId::new_local();
+            history.update_conversation_for_new_request_input(
+                display_input,
+                display_stream.clone(),
+                self.terminal_view_id,
+                ctx,
+            )?;
+            history.mark_active_conversation_id(conversation_id, self.terminal_view_id, ctx);
+            history.update_conversation_status(
+                self.terminal_view_id,
+                conversation_id,
+                ConversationStatus::InProgress,
+                ctx,
+            );
+            let conversation = history.conversation_mut(&conversation_id).unwrap();
+            let exchange_id = conversation
+                .new_exchange_ids_for_response(&display_stream)
+                .next();
+            if let Some(exchange_id) = exchange_id {
+                conversation
+                    .compaction_state
+                    .set_recovery_owner(recovery_id, exchange_id);
+            }
+            // 占位没有网络流；真正发送时另建 exchange，不能登记为活动请求。
+            conversation.cleanup_completed_response_stream(&display_stream);
+            conversation
+                .checkpoint_compaction_recovery_state(ctx)
+                .map_err(anyhow::Error::from)
+        });
+        let checkpoint = match checkpoint {
+            Ok(checkpoint) => checkpoint,
+            Err(error) => {
+                self.fail_pending_byop_save(pending, ctx);
+                return Err(error);
+            }
+        };
+        self.pending_byop_requests.insert(conversation_id, pending);
+        if let Some(checkpoint) = checkpoint {
+            self.pending_byop_checkpoints
+                .insert(conversation_id, recovery_id);
+            let _ = ctx.spawn(async move { checkpoint.await }, move |me, result, ctx| {
+                me.complete_pending_byop_checkpoint(
+                    conversation_id,
+                    recovery_id,
+                    matches!(result, Ok(Ok(()))),
+                    ctx,
+                );
+            });
+        }
+        Ok(())
+    }
+
+    fn complete_pending_byop_checkpoint(
+        &mut self,
+        conversation_id: AIConversationId,
+        recovery_id: AIAgentExchangeId,
+        saved: bool,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if self.pending_byop_checkpoints.get(&conversation_id) != Some(&recovery_id) {
+            return;
+        }
+        self.pending_byop_checkpoints.remove(&conversation_id);
+        if saved {
+            self.flush_pending_byop_request_after_finished_action(conversation_id, ctx);
+        } else if let Some(pending) = self.pending_byop_requests.remove(&conversation_id) {
+            self.fail_pending_byop_save(pending, ctx);
+        }
+    }
+
+    fn fail_pending_byop_save(
+        &mut self,
+        pending: PendingByopRequest,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let exchange_id = self.pending_byop_recovery_exchange(&pending, ctx);
+        if let Some(exchange_id) = exchange_id {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
+                if let Some(conversation) =
+                    history.conversation_mut(&pending.request_input.conversation_id)
+                    && let Ok(exchange) = conversation.get_exchange_to_update(exchange_id)
+                {
+                    exchange.output_status = AIAgentOutputStatus::Finished {
+                        finished_output: FinishedAIAgentOutput::Error {
+                            output: None,
+                            error: RenderableAIError::Other {
+                                error_message: crate::t!("ai-error-compaction-save-failed"),
+                                will_attempt_resume: false,
+                                waiting_for_network: false,
+                                is_user_error: false,
+                            },
+                        },
+                    };
+                }
+            });
+        }
+        self.retain_input_after_failed_compaction(pending, exchange_id, None, ctx);
+    }
+
+    fn cancel_pending_byop_request(
+        &mut self,
+        conversation_id: AIConversationId,
+        reason: CancellationReason,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.pending_byop_checkpoints.remove(&conversation_id);
+        if let Some(pending) = self.pending_byop_requests.remove(&conversation_id)
+            && pending.recovery_id.is_some()
+        {
+            let exchange_id = self.pending_byop_recovery_exchange(&pending, ctx);
+            self.retain_input_after_failed_compaction(pending, exchange_id, Some(reason), ctx);
+        }
+    }
+
     /// 当 conversation 的 live action 完成时,如果该 conversation 之前有 BYOP 请求因
     /// readiness 报 PendingToolResults 被暂存,优先重发该请求(以便用户的原始 prompt 不被丢失),
     /// 并把 action 完成产出的 finished_action_results 合入同一个 RequestInput,避免发出两次请求。
@@ -1670,24 +1873,22 @@ impl BlocklistAIController {
         conversation_id: AIConversationId,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
+        if self.pending_byop_checkpoints.contains_key(&conversation_id) {
+            return true;
+        }
         let Some(pending) = self.pending_byop_requests.remove(&conversation_id) else {
             return false;
         };
+        let display_exchange_id = self.pending_byop_recovery_exchange(&pending, ctx);
+        let backup = pending.clone();
         let PendingByopRequest {
             allow_auto_compaction,
             recovery_id,
-            context_snapshot,
             mut request_input,
             query_metadata,
             default_to_follow_up_on_success,
             can_attempt_resume_on_error,
-            is_queued_prompt,
         } = pending;
-        // 旧请求恢复时沿用排队提交语义，不能消费后来加入的草稿上下文。
-        let is_queued_prompt = is_queued_prompt
-            || context_snapshot.is_some_and(|snapshot| {
-                snapshot != self.context_model.as_ref(ctx).pending_context_snapshot()
-            });
 
         let finished_results = self.action_model.update(ctx, |action_model, _| {
             action_model.drain_finished_action_results(conversation_id)
@@ -1716,21 +1917,65 @@ impl BlocklistAIController {
             "[byop-readiness] flushing pending BYOP request after finished action \
              conversation_id={conversation_id:?}"
         );
-        if let Err(e) = self.send_request_input_with_compaction(
+        let result = self.send_request_input_with_compaction(
             request_input,
             query_metadata,
             default_to_follow_up_on_success,
             can_attempt_resume_on_error,
-            is_queued_prompt,
+            true,
             allow_auto_compaction,
             recovery_id,
             None,
             ctx,
-        ) {
+        );
+        if result.is_ok()
+            && let Some(exchange_id) = display_exchange_id
+        {
+            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                if let Some(conversation) = history.conversation_mut(&conversation_id) {
+                    let is_summary =
+                        conversation
+                            .exchange_with_id(exchange_id)
+                            .is_some_and(|exchange| {
+                                exchange.input.iter().any(|input| {
+                                    matches!(input, AIAgentInput::SummarizeConversation { .. })
+                                })
+                            });
+                    if !is_summary {
+                        if let Ok(exchange) = conversation.get_exchange_to_update(exchange_id) {
+                            exchange.output_status = AIAgentOutputStatus::Finished {
+                                finished_output: FinishedAIAgentOutput::Cancelled {
+                                    output: None,
+                                    reason: CancellationReason::FollowUpSubmitted {
+                                        is_for_same_conversation: true,
+                                    },
+                                },
+                            };
+                        }
+                        conversation.set_is_exchange_hidden(
+                            exchange_id,
+                            true,
+                            self.terminal_view_id,
+                            ctx,
+                        );
+                    }
+                }
+            });
+            self.clear_compacting_input_projection(conversation_id, exchange_id, ctx);
+        }
+        if let Err(e) = result {
             // 二次失败时不再循环排队:若仍报 Pending,Err 已被 send_request_input 内部重新
             // 写入 pending_byop_requests;若是其它错误则按 controller 已有路径处理。
             if e.downcast_ref::<PendingByopToolResultsError>().is_none() {
                 log::error!("[byop-readiness] failed to flush pending BYOP request: {e:?}");
+                if backup.recovery_id.is_some() {
+                    self.retain_input_after_failed_compaction(
+                        backup,
+                        display_exchange_id,
+                        None,
+                        ctx,
+                    );
+                }
             }
         }
         true
@@ -3192,13 +3437,25 @@ impl BlocklistAIController {
                 let Some(conversation) = history.conversation_mut(&conversation_id) else {
                     return false;
                 };
+                let owns_recovery = pending.recovery_id.is_some_and(|recovery_id| {
+                    conversation
+                        .compaction_state
+                        .pending_recovery()
+                        .into_iter()
+                        .chain(conversation.compaction_state.retained_recoveries())
+                        .any(|recovery| {
+                            recovery.id == recovery_id
+                                && recovery.owner_exchange_id == Some(exchange_id)
+                        })
+                });
                 let Ok(exchange) = conversation.get_exchange_to_update(exchange_id) else {
                     return false;
                 };
-                if !exchange
-                    .input
-                    .iter()
-                    .any(|input| matches!(input, AIAgentInput::SummarizeConversation { .. }))
+                if !owns_recovery
+                    && !exchange
+                        .input
+                        .iter()
+                        .any(|input| matches!(input, AIAgentInput::SummarizeConversation { .. }))
                 {
                     return false;
                 }
@@ -3306,6 +3563,74 @@ impl BlocklistAIController {
         });
     }
 
+    /// 原问题只投影在摘要的客户端 exchange；模型请求及 task.source.messages 保持不变。
+    fn project_compacting_input(
+        &self,
+        conversation_id: AIConversationId,
+        stream_id: &ResponseStreamId,
+        request_input: &RequestInput,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let queries = request_input
+            .all_inputs()
+            .filter(|input| input.is_user_query())
+            .cloned()
+            .collect_vec();
+        if queries.is_empty() {
+            return;
+        }
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            let Some(conversation) = history.conversation_mut(&conversation_id) else {
+                return;
+            };
+            let exchange_ids = conversation
+                .new_exchange_ids_for_response(stream_id)
+                .collect_vec();
+            for exchange_id in exchange_ids {
+                if let Ok(exchange) = conversation.get_exchange_to_update(exchange_id)
+                    && exchange
+                        .input
+                        .iter()
+                        .any(|input| matches!(input, AIAgentInput::SummarizeConversation { .. }))
+                {
+                    exchange.input.retain(|input| !input.is_user_query());
+                    exchange.input.splice(0..0, queries.clone());
+                    ctx.emit(BlocklistAIHistoryEvent::UpdatedStreamingExchange {
+                        exchange_id,
+                        terminal_surface_id: self.terminal_view_id,
+                        conversation_id,
+                        is_hidden: conversation.is_exchange_hidden(exchange_id),
+                    });
+                }
+            }
+        });
+    }
+
+    fn clear_compacting_input_projection(
+        &self,
+        conversation_id: AIConversationId,
+        exchange_id: AIAgentExchangeId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+            if let Some(conversation) = history.conversation_mut(&conversation_id)
+                && let Ok(exchange) = conversation.get_exchange_to_update(exchange_id)
+                && exchange
+                    .input
+                    .iter()
+                    .any(|input| matches!(input, AIAgentInput::SummarizeConversation { .. }))
+            {
+                exchange.input.retain(|input| !input.is_user_query());
+                ctx.emit(BlocklistAIHistoryEvent::UpdatedStreamingExchange {
+                    exchange_id,
+                    terminal_surface_id: self.terminal_view_id,
+                    conversation_id,
+                    is_hidden: conversation.is_exchange_hidden(exchange_id),
+                });
+            }
+        });
+    }
+
     fn complete_byop_compaction_save_failed(
         &mut self,
         request_input: RequestInput,
@@ -3390,9 +3715,14 @@ impl BlocklistAIController {
         {
             handle.abort();
         }
-        // 新一轮请求开始,先丢掉之前因 readiness Pending 暂存的旧请求;
-        // 如果本次 preflight 又遇到 PendingToolResults,下面会重新写回。
-        self.pending_byop_requests.remove(&conversation_id);
+        // 新请求接管等待中的旧输入；保留旧问题的停止记录，撤销其迟到回调。
+        self.cancel_pending_byop_request(
+            conversation_id,
+            CancellationReason::FollowUpSubmitted {
+                is_for_same_conversation: true,
+            },
+            ctx,
+        );
 
         // Make sure there's no existing response stream for the conversation. If
         // there is, something has gone wrong.
@@ -3459,21 +3789,17 @@ impl BlocklistAIController {
                 );
                 // 把用户的输入暂存,等 conversation 内的 live action 完成、触发 FinishedAction
                 // 后,在 `flush_pending_byop_request_after_finished_action` 中重发,避免静默丢失。
-                self.pending_byop_requests.insert(
-                    conversation_id,
+                self.hold_pending_byop_request(
                     PendingByopRequest {
                         allow_auto_compaction,
                         recovery_id,
-                        context_snapshot: Some(
-                            self.context_model.as_ref(ctx).pending_context_snapshot(),
-                        ),
                         request_input,
                         query_metadata,
                         default_to_follow_up_on_success,
                         can_attempt_resume_on_error,
-                        is_queued_prompt,
                     },
-                );
+                    ctx,
+                )?;
                 return Err(error);
             }
             if let Some(blocked) = error.downcast_ref::<BlockedByopReadinessError>() {
@@ -3570,7 +3896,18 @@ impl BlocklistAIController {
                 // readiness 已持久化完成的工具结果；保留剩余原输入，摘要本身不重执行工具。
                 let summary_input =
                     self.byop_compaction_request_input(conversation_id, Some(&request_input), ctx)?;
-                let mut recovery = PendingCompactionRecovery::from_request(&request_input);
+                let mut recovery = recovery_id
+                    .and_then(|recovery_id| {
+                        history_model
+                            .as_ref(ctx)
+                            .conversation(&conversation_id)
+                            .and_then(|conversation| {
+                                conversation.compaction_state.pending_recovery()
+                            })
+                            .filter(|recovery| recovery.id == recovery_id)
+                            .cloned()
+                    })
+                    .unwrap_or_else(|| PendingCompactionRecovery::from_request(&request_input));
                 recovery.summary_request_id = Some(Uuid::new_v4().to_string());
                 let recovery_id = recovery.id;
                 let checkpoint = history_model.update(ctx, |history, ctx| {
@@ -3630,6 +3967,12 @@ impl BlocklistAIController {
                         .in_flight_response_streams
                         .has_active_stream_for_conversation(conversation_id, ctx)
                     {
+                        self.project_compacting_input(
+                            conversation_id,
+                            stream_id,
+                            &request_input,
+                            ctx,
+                        );
                         let original_query = (!is_queued_prompt)
                             .then(|| {
                                 request_input.all_inputs().find_map(|input| {
@@ -3661,12 +4004,10 @@ impl BlocklistAIController {
                                 request: PendingByopRequest {
                                     allow_auto_compaction,
                                     recovery_id: Some(recovery_id),
-                                    context_snapshot: None,
                                     request_input,
                                     query_metadata,
                                     default_to_follow_up_on_success,
                                     can_attempt_resume_on_error,
-                                    is_queued_prompt,
                                 },
                             },
                         );
@@ -3972,12 +4313,20 @@ impl BlocklistAIController {
         self.pending_passive_suggestion_results
             .remove(&conversation_id);
 
+        if matches!(reason, CancellationReason::FollowUpSubmitted { .. })
+            || matches!(
+                reason.conversation_outcome(),
+                CancellationOutcome::Cancelled | CancellationOutcome::FinalizedExternally
+            )
+        {
+            self.cancel_pending_byop_request(conversation_id, reason, ctx);
+        }
+
         if matches!(
             reason.conversation_outcome(),
             CancellationOutcome::Cancelled | CancellationOutcome::FinalizedExternally
         ) {
-            // 整任务结束后不能由旧工具结果重发暂存输入；正常接管和同会话追问仍保留。
-            self.pending_byop_requests.remove(&conversation_id);
+            // 整任务结束后，旧工具结果不能再触发被动续发。
             self.pending_passive_follow_ups.remove(&conversation_id);
         }
 
@@ -4680,7 +5029,11 @@ impl BlocklistAIController {
                             None,
                             ctx,
                         );
-                        if result.is_err() {
+                        if result.as_ref().is_err_and(|error| {
+                            error
+                                .downcast_ref::<PendingByopToolResultsError>()
+                                .is_none()
+                        }) {
                             self.retain_input_after_failed_compaction(
                                 PendingByopRequest {
                                     request_input: backup_input,
@@ -4691,6 +5044,13 @@ impl BlocklistAIController {
                                 ctx,
                             );
                         } else if let Ok((_, resumed_stream_id)) = result {
+                            if let Some(exchange_id) = compaction_exchange_id {
+                                self.clear_compacting_input_projection(
+                                    conversation_id,
+                                    exchange_id,
+                                    ctx,
+                                );
+                            }
                             submitted = self
                                 .in_flight_response_streams
                                 .stream_ids_for_conversation(conversation_id, ctx)

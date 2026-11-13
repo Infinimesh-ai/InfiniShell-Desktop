@@ -17,10 +17,12 @@ use super::{AIBlockEvent, open_code_action_event};
 use super::{
     CollapsibleElementState, CollapsibleExpansionState,
     default_collapsible_state_for_orchestration_action,
-    default_collapsible_state_for_orchestration_message, received_message_collapsible_id,
-    recording_artifact_view_url,
+    default_collapsible_state_for_orchestration_message, is_long_response,
+    received_message_collapsible_id, recording_artifact_view_url,
 };
-use crate::ai::agent::{AIAgentActionType, StartAgentExecutionMode};
+use crate::ai::agent::{
+    AIAgentActionType, AIAgentTextSection, AgentOutputMermaidDiagram, StartAgentExecutionMode,
+};
 use crate::ai::blocklist::action_model::{
     compose_run_agents_child_prompt, run_agents_to_start_agent_mode,
 };
@@ -28,6 +30,90 @@ use crate::ai::blocklist::action_model::{
 use crate::code::editor_management::CodeSource;
 use crate::settings::{AISettings, OrchestrationMessageDisplayMode};
 use crate::test_util::settings::initialize_settings_for_tests;
+
+#[test]
+fn long_response_preserves_manual_collapse_across_stream_updates() {
+    let mut state = CollapsibleElementState::long_response();
+    state.toggle_expansion();
+    state.sync_finished_state(false);
+    state.sync_finished_state(true);
+
+    assert!(matches!(
+        state.expansion_state,
+        CollapsibleExpansionState::Collapsed
+    ));
+    state.toggle_expansion();
+    assert!(matches!(
+        state.expansion_state,
+        CollapsibleExpansionState::Expanded {
+            is_finished: true,
+            scroll_pinned_to_bottom: false,
+        }
+    ));
+}
+
+#[test]
+fn long_response_does_not_move_the_reading_position_during_streaming() {
+    let mut state = CollapsibleElementState::long_response();
+    state.sync_finished_state(false);
+
+    assert!(matches!(
+        state.expansion_state,
+        CollapsibleExpansionState::Expanded {
+            is_finished: false,
+            scroll_pinned_to_bottom: false,
+        }
+    ));
+}
+
+#[test]
+fn long_response_threshold_counts_characters_instead_of_utf8_bytes() {
+    let section = AIAgentTextSection::Code {
+        code: "中".repeat(1_500),
+        language: None,
+        source: None,
+    };
+
+    assert!(!is_long_response(&[section]));
+}
+
+#[test]
+fn long_response_threshold_combines_markdown_sections() {
+    let first = AIAgentTextSection::Code {
+        code: "a".repeat(2_000),
+        language: None,
+        source: None,
+    };
+    let second = AIAgentTextSection::Code {
+        code: "中".repeat(2_000),
+        language: None,
+        source: None,
+    };
+
+    assert!(is_long_response(&[first, second]));
+}
+
+#[test]
+fn long_response_limits_many_short_lines() {
+    let section = AIAgentTextSection::Code {
+        code: "a\n".repeat(80),
+        language: None,
+        source: None,
+    };
+    assert!(is_long_response(&[section]));
+}
+
+#[test]
+fn long_response_does_not_count_hidden_visual_source_as_visible_text() {
+    let section = AIAgentTextSection::MermaidDiagram {
+        diagram: AgentOutputMermaidDiagram {
+            source: "A-->B;".repeat(1_000),
+            markdown_source: "A-->B;".repeat(1_000),
+        },
+    };
+
+    assert!(!is_long_response(&[section]));
+}
 
 #[test]
 fn reasoning_auto_collapses_when_user_has_not_manually_toggled() {

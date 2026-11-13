@@ -93,6 +93,9 @@ use crate::ai::byop_readiness::{
 use crate::ai::skills::SkillDescriptor;
 use crate::settings::{AgentProvider, AgentProviderApiType};
 
+#[path = "chat_stream_repetition.rs"]
+mod repetition;
+
 #[cfg(not(target_family = "wasm"))]
 type ProviderChatEventStream = Pin<
     Box<
@@ -4066,6 +4069,9 @@ fn map_genai_error(err: genai::Error) -> OpenAiCompatibleError {
 
 fn into_ai_api_error(context: &'static str, error: OpenAiCompatibleError) -> AIApiError {
     match error {
+        OpenAiCompatibleError::RepeatedResponse => {
+            AIApiError::ProviderProtocol(crate::t!("ai-error-repeated-response"))
+        }
         OpenAiCompatibleError::Http(error) => AIApiError::Transport(error),
         OpenAiCompatibleError::Status { status, body } => {
             match http::StatusCode::from_u16(status) {
@@ -4552,6 +4558,7 @@ pub async fn generate_byop_output(
     let response_cancel_control = native_responses_request
         .as_ref()
         .map(|(_, _, _, _, control)| control.clone());
+    let repetition_cancel_control = response_cancel_control.clone();
 
     // ⚠️ BYOP 持久化关键:warp 自家路径下,以下 ClientAction 都是 server 端 emit
     // 让 client 端把 UserQuery / ToolCallResult 等"非模型产出"的 message
@@ -4806,7 +4813,7 @@ pub async fn generate_byop_output(
         }
 
         log::info!("[byop] opening stream: model={model_id}");
-        let mut sdk_stream: ProviderChatEventStream = if let Some((
+        let sdk_stream: ProviderChatEventStream = if let Some((
             responses_client,
             responses_request,
             state_fallback_request,
@@ -4858,6 +4865,8 @@ pub async fn generate_byop_output(
                 }
             }
         };
+
+        let mut sdk_stream = repetition::guard(sdk_stream, repetition_cancel_control);
 
         // 流式状态:文本 / 推理各自的 message id 在第一次 chunk 到达时生成,
         // 之后的 chunk 走 AppendToMessageContent 增量追加。

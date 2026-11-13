@@ -75,6 +75,341 @@ fn automatic_summary_targets_original_conversation_and_model() {
     });
 }
 
+#[test]
+fn compacting_query_projection_never_changes_provider_history() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |terminal, ctx| {
+            let (conversation_id, root) =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id =
+                        history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                    history
+                        .conversation_mut(&id)
+                        .unwrap()
+                        .upgrade_optimistic_root_to_server_task_for_test(create_api_task(
+                            "projection-root",
+                            vec![create_message("prior-answer", "projection-root")],
+                        ));
+                    (id, TaskId::new("projection-root".to_owned()))
+                });
+            let original =
+                request_input(conversation_id, root, query_input("摘要期间可见的原问题"));
+            terminal.ai_controller().update(ctx, |controller, ctx| {
+                let canonical_before = controller
+                    .conversation_snapshot_for_request(&original, ctx)
+                    .unwrap()
+                    .conversation_data
+                    .tasks;
+                let summary = controller
+                    .byop_compaction_request_input(conversation_id, Some(&original), ctx)
+                    .unwrap();
+                assert!(matches!(
+                    summary.input_messages[0].1.as_slice(),
+                    [AIAgentInput::SummarizeConversation { .. }]
+                ));
+                let stream_id = ResponseStreamId::new_local();
+                let exchange_id =
+                    BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                        history
+                            .update_conversation_for_new_request_input(
+                                summary,
+                                stream_id.clone(),
+                                terminal.id(),
+                                ctx,
+                            )
+                            .unwrap();
+                        history
+                            .conversation(&conversation_id)
+                            .unwrap()
+                            .new_exchange_ids_for_response(&stream_id)
+                            .next()
+                            .unwrap()
+                    });
+
+                controller.project_compacting_input(conversation_id, &stream_id, &original, ctx);
+                controller.project_compacting_input(conversation_id, &stream_id, &original, ctx);
+                BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
+                    let exchange = history
+                        .conversation(&conversation_id)
+                        .unwrap()
+                        .exchange_with_id(exchange_id)
+                        .unwrap();
+                    assert!(matches!(exchange.input.as_slice(), [
+                        AIAgentInput::UserQuery { query, .. },
+                        AIAgentInput::SummarizeConversation { overflow: true, .. },
+                    ] if query == "摘要期间可见的原问题"));
+                });
+                assert_eq!(
+                    controller
+                        .conversation_snapshot_for_request(&original, ctx)
+                        .unwrap()
+                        .conversation_data
+                        .tasks,
+                    canonical_before
+                );
+
+                controller.clear_compacting_input_projection(conversation_id, exchange_id, ctx);
+                BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
+                    let exchange = history
+                        .conversation(&conversation_id)
+                        .unwrap()
+                        .exchange_with_id(exchange_id)
+                        .unwrap();
+                    assert!(matches!(
+                        exchange.input.as_slice(),
+                        [AIAgentInput::SummarizeConversation { .. }]
+                    ));
+                });
+                assert_eq!(
+                    controller
+                        .conversation_snapshot_for_request(&original, ctx)
+                        .unwrap()
+                        .conversation_data
+                        .tasks,
+                    canonical_before
+                );
+            });
+        });
+    });
+}
+
+fn waiting_query(
+    conversation_id: AIConversationId,
+    root: TaskId,
+    query: &str,
+) -> PendingByopRequest {
+    PendingByopRequest {
+        allow_auto_compaction: true,
+        recovery_id: None,
+        request_input: request_input(conversation_id, root, query_input(query)),
+        query_metadata: None,
+        default_to_follow_up_on_success: true,
+        can_attempt_resume_on_error: false,
+    }
+}
+
+#[test]
+fn stopping_readiness_wait_retains_one_visible_recoverable_query() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        GeneralSettings::handle(&app).update(&mut app, |settings, ctx| {
+            settings
+                .persist_conversations
+                .set_value(false, ctx)
+                .unwrap();
+        });
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |terminal, ctx| {
+            let (conversation_id, root) = BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                let id = history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                (id, history.conversation(&id).unwrap().get_root_task_id().clone())
+            });
+            terminal.ai_controller().update(ctx, |controller, ctx| {
+                let pending = waiting_query(conversation_id, root, "等待工具的原问题");
+                let canonical_before = controller.conversation_snapshot_for_request(&pending.request_input, ctx).unwrap().conversation_data.tasks;
+                let original = pending.request_input.clone();
+                controller.hold_pending_byop_request(pending, ctx).unwrap();
+                let pending = controller.pending_byop_requests.remove(&conversation_id).unwrap();
+                let recovery_id = pending.recovery_id.unwrap();
+                let owner = controller.pending_byop_recovery_exchange(&pending, ctx).unwrap();
+                controller.hold_pending_byop_request(pending, ctx).unwrap();
+                assert_eq!(controller.pending_byop_requests[&conversation_id].recovery_id, Some(recovery_id));
+                assert_eq!(controller.conversation_snapshot_for_request(&original, ctx).unwrap().conversation_data.tasks, canonical_before);
+                BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
+                    let conversation = history.conversation(&conversation_id).unwrap();
+                    assert_eq!(conversation.all_exchanges().len(), 1);
+                    assert!(!conversation.is_exchange_hidden(owner));
+                    assert_eq!(conversation.status(), &ConversationStatus::InProgress);
+                });
+
+                // 保存确认先排队、Stop 先执行；随后到达的成功和失败确认都必须失效。
+                controller.pending_byop_checkpoints.insert(conversation_id, recovery_id);
+                controller.cancel_conversation_progress(conversation_id, CancellationReason::ManuallyCancelled, ctx);
+                controller.complete_pending_byop_checkpoint(conversation_id, recovery_id, true, ctx);
+                controller.complete_pending_byop_checkpoint(conversation_id, recovery_id, false, ctx);
+                assert!(!controller.flush_pending_byop_request_after_finished_action(conversation_id, ctx));
+                assert!(!controller.has_active_stream_for_conversation(conversation_id, ctx));
+                assert!(!controller.pending_byop_checkpoints.contains_key(&conversation_id));
+                BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
+                    let conversation = history.conversation(&conversation_id).unwrap();
+                    let recovery = conversation.compaction_state.pending_recovery().unwrap();
+                    assert_eq!(recovery.id, recovery_id);
+                    assert!(recovery.is_resume_target(owner));
+                    assert_eq!(recovery.queries[0].query, "等待工具的原问题");
+                    assert_eq!(conversation.status(), &ConversationStatus::Cancelled);
+                    assert_eq!(conversation.all_exchanges().len(), 1);
+                    let exchange = conversation.exchange_with_id(owner).unwrap();
+                    assert!(exchange.output_status.is_cancelled());
+                    assert!(matches!(exchange.input.as_slice(), [AIAgentInput::UserQuery { query, .. }] if query == "等待工具的原问题"));
+                });
+            });
+        });
+    });
+}
+
+#[test]
+fn stale_readiness_checkpoint_cannot_consume_new_pending_query() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        GeneralSettings::handle(&app).update(&mut app, |settings, ctx| {
+            settings
+                .persist_conversations
+                .set_value(false, ctx)
+                .unwrap();
+        });
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |terminal, ctx| {
+            let (conversation_id, root) =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id =
+                        history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                    (
+                        id,
+                        history
+                            .conversation(&id)
+                            .unwrap()
+                            .get_root_task_id()
+                            .clone(),
+                    )
+                });
+            terminal.ai_controller().update(ctx, |controller, ctx| {
+                controller
+                    .hold_pending_byop_request(
+                        waiting_query(conversation_id, root.clone(), "已停止的旧问题"),
+                        ctx,
+                    )
+                    .unwrap();
+                let old_id = controller.pending_byop_requests[&conversation_id]
+                    .recovery_id
+                    .unwrap();
+                controller
+                    .pending_byop_checkpoints
+                    .insert(conversation_id, old_id);
+                controller.cancel_conversation_progress(
+                    conversation_id,
+                    CancellationReason::ManuallyCancelled,
+                    ctx,
+                );
+                controller
+                    .hold_pending_byop_request(
+                        waiting_query(conversation_id, root, "随后提交的新问题"),
+                        ctx,
+                    )
+                    .unwrap();
+                let new_id = controller.pending_byop_requests[&conversation_id]
+                    .recovery_id
+                    .unwrap();
+                controller
+                    .pending_byop_checkpoints
+                    .insert(conversation_id, new_id);
+
+                controller.complete_pending_byop_checkpoint(conversation_id, old_id, true, ctx);
+                controller.complete_pending_byop_checkpoint(conversation_id, old_id, false, ctx);
+                assert_eq!(
+                    controller.pending_byop_checkpoints.get(&conversation_id),
+                    Some(&new_id)
+                );
+                assert_eq!(
+                    controller.pending_byop_requests[&conversation_id].recovery_id,
+                    Some(new_id)
+                );
+                assert!(!controller.has_active_stream_for_conversation(conversation_id, ctx));
+                BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
+                    let conversation = history.conversation(&conversation_id).unwrap();
+                    let recovery = conversation.compaction_state.pending_recovery().unwrap();
+                    assert_eq!(recovery.id, new_id);
+                    assert_eq!(recovery.queries[0].query, "随后提交的新问题");
+                    assert_eq!(
+                        conversation.compaction_state.retained_recoveries()[0].id,
+                        old_id
+                    );
+                    assert_eq!(conversation.status(), &ConversationStatus::InProgress);
+                    assert_eq!(conversation.all_exchanges().len(), 2);
+                    assert!(
+                        !conversation
+                            .latest_visible_exchange()
+                            .unwrap()
+                            .output_status
+                            .is_finished()
+                    );
+                });
+            });
+        });
+    });
+}
+
+#[test]
+fn resumed_readiness_wait_reuses_cancelled_query_as_active_owner() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        GeneralSettings::handle(&app).update(&mut app, |settings, ctx| {
+            settings
+                .persist_conversations
+                .set_value(false, ctx)
+                .unwrap();
+        });
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |terminal, ctx| {
+            let (conversation_id, root) =
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, ctx| {
+                    let id =
+                        history.start_new_conversation(terminal.id(), false, false, false, ctx);
+                    (
+                        id,
+                        history
+                            .conversation(&id)
+                            .unwrap()
+                            .get_root_task_id()
+                            .clone(),
+                    )
+                });
+            terminal.ai_controller().update(ctx, |controller, ctx| {
+                controller
+                    .hold_pending_byop_request(
+                        waiting_query(conversation_id, root, "停止后继续的原问题"),
+                        ctx,
+                    )
+                    .unwrap();
+                let pending = controller.pending_byop_requests[&conversation_id].clone();
+                let recovery_id = pending.recovery_id.unwrap();
+                let owner = controller
+                    .pending_byop_recovery_exchange(&pending, ctx)
+                    .unwrap();
+                controller.cancel_conversation_progress(
+                    conversation_id,
+                    CancellationReason::ManuallyCancelled,
+                    ctx,
+                );
+
+                controller.hold_pending_byop_request(pending, ctx).unwrap();
+                BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
+                    let conversation = history.conversation(&conversation_id).unwrap();
+                    assert_eq!(conversation.status(), &ConversationStatus::InProgress);
+                    assert_eq!(conversation.all_exchanges().len(), 1);
+                    assert!(
+                        !conversation
+                            .exchange_with_id(owner)
+                            .unwrap()
+                            .output_status
+                            .is_finished()
+                    );
+                    let recovery = conversation.compaction_state.pending_recovery().unwrap();
+                    assert_eq!(recovery.id, recovery_id);
+                    assert_eq!(recovery.owner_exchange_id, Some(owner));
+                    assert!(
+                        conversation
+                            .compaction_state
+                            .retained_recoveries()
+                            .is_empty()
+                    );
+                });
+            });
+        });
+    });
+}
+
 fn interrupted_compaction_keeps_input(cancellation: Option<CancellationReason>) {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
@@ -124,7 +459,6 @@ fn interrupted_compaction_keeps_input(cancellation: Option<CancellationReason>) 
                     PendingByopCompactionRequest {
                         request: PendingByopRequest {
                             recovery_id: None,
-                            context_snapshot: None,
                             allow_auto_compaction: false,
                             request_input: request_input(
                                 conversation_id,
@@ -134,7 +468,6 @@ fn interrupted_compaction_keeps_input(cancellation: Option<CancellationReason>) 
                             query_metadata: None,
                             default_to_follow_up_on_success: true,
                             can_attempt_resume_on_error: true,
-                            is_queued_prompt: false,
                         },
                         clear_input_on_success: true,
                     },
@@ -200,7 +533,7 @@ fn cancelled_summary_keeps_original_input_and_new_draft() {
 }
 
 #[test]
-fn compacted_input_clear_preserves_new_attachments() {
+fn delayed_compaction_completion_preserves_new_attachments() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let terminal = add_window_with_terminal(&mut app, None);
@@ -247,7 +580,7 @@ fn compacted_input_clear_preserves_new_attachments() {
 }
 
 #[test]
-fn compacted_input_clear_removes_unchanged_plain_and_slash_drafts() {
+fn delayed_compaction_completion_preserves_plain_and_slash_drafts() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let terminal = add_window_with_terminal(&mut app, None);
@@ -286,9 +619,7 @@ fn compacted_input_clear_removes_unchanged_plain_and_slash_drafts() {
                     submitted: true,
                 });
             });
-            input.read(&app, |input, ctx| {
-                assert!(input.buffer_text(ctx).is_empty(), "未清空草稿：{draft}")
-            });
+            input.read(&app, |input, ctx| assert_eq!(input.buffer_text(ctx), draft));
         }
     });
 }
@@ -341,7 +672,7 @@ fn old_compaction_completion_does_not_consume_new_compaction_draft() {
             });
         });
         input.read(&app, |input, ctx| {
-            assert!(input.buffer_text(ctx).is_empty())
+            assert_eq!(input.buffer_text(ctx), "/plan 新问题")
         });
     });
 }
@@ -506,13 +837,11 @@ fn retained_compaction_input_does_not_finish_new_request() {
                 assert!(controller.has_active_stream_for_conversation(conversation_id, ctx));
                 controller.retain_input_after_failed_compaction(PendingByopRequest {
                             recovery_id: None,
-                    context_snapshot: None,
                     allow_auto_compaction: false,
                     request_input: request_input(conversation_id, root, query_input("先前未发的问题")),
                     query_metadata: None,
                     default_to_follow_up_on_success: true,
                     can_attempt_resume_on_error: true,
-                    is_queued_prompt: false,
                 }, Some(summary_exchange), None, ctx);
                 assert!(controller.has_active_stream_for_conversation(conversation_id, ctx));
             });
@@ -603,7 +932,6 @@ fn cancelled_compaction_preserves_new_turn_and_fires_queue_only_after_it_finishe
                         PendingByopCompactionRequest {
                             request: PendingByopRequest {
                                 recovery_id: None,
-                                context_snapshot: None,
                                 allow_auto_compaction: false,
                                 request_input: request_input(
                                     conversation_id,
@@ -613,7 +941,6 @@ fn cancelled_compaction_preserves_new_turn_and_fires_queue_only_after_it_finishe
                                 query_metadata: None,
                                 default_to_follow_up_on_success: true,
                                 can_attempt_resume_on_error: false,
-                                is_queued_prompt: false,
                             },
                             clear_input_on_success: false,
                         },
@@ -797,11 +1124,10 @@ fn retained_compaction_input_preserves_the_actual_summary_error() {
             terminal.ai_controller().update(ctx, |controller, ctx| {
                 controller.retain_input_after_failed_compaction(PendingByopRequest {
                             recovery_id: None,
-                    context_snapshot: None,
                     allow_auto_compaction: false,
                     request_input: request_input(conversation_id, root, query_input("待发原问题")),
                     query_metadata: None, default_to_follow_up_on_success: true,
-                    can_attempt_resume_on_error: false, is_queued_prompt: false,
+                    can_attempt_resume_on_error: false,
                 }, Some(exchange_id), None, ctx);
             });
             BlocklistAIHistoryModel::handle(ctx).read(ctx, |history, _| {
@@ -889,7 +1215,6 @@ fn readiness_compaction_preserves_context_added_while_waiting_with_unchanged_tex
                                 ));
                             (id, TaskId::new(root.to_owned()))
                         });
-                    let snapshot = context.as_ref(ctx).pending_context_snapshot();
                     if changed_context {
                         context.update(ctx, |context, ctx| {
                             context.append_pending_attachments(
@@ -918,13 +1243,11 @@ fn readiness_compaction_preserves_context_added_while_waiting_with_unchanged_tex
                             conversation_id,
                             PendingByopRequest {
                                 recovery_id: None,
-                                context_snapshot: Some(snapshot),
                                 allow_auto_compaction: true,
                                 request_input: pending_input,
                                 query_metadata: None,
                                 default_to_follow_up_on_success: true,
                                 can_attempt_resume_on_error: false,
-                                is_queued_prompt: false,
                             },
                         );
                         assert!(controller.flush_pending_byop_request_after_finished_action(
@@ -938,12 +1261,12 @@ fn readiness_compaction_preserves_context_added_while_waiting_with_unchanged_tex
                                 pending.request.request_input.conversation_id == conversation_id
                             })
                             .expect("预检应确实触发自动摘要");
-                        assert_eq!(pending.clear_input_on_success, !changed_context);
+                        assert!(!pending.clear_input_on_success);
                         summary_id.clone()
                     });
                     (conversation_id, controller, input, context, summary_id)
                 });
-            // 模拟摘要后续发成功的通知，确认旧请求只能清理它真正消费的草稿上下文。
+            // 延迟完成通知不能清理输入框，正文与上下文均由同步接收确认决定。
             controller.update(&mut app, |_, ctx| {
                 ctx.emit(BlocklistAIControllerEvent::SubmittedCompactedInput {
                     stream_id: summary_id,
@@ -951,14 +1274,7 @@ fn readiness_compaction_preserves_context_added_while_waiting_with_unchanged_tex
                 });
             });
             input.read(&app, |input, ctx| {
-                assert_eq!(
-                    input.buffer_text(ctx),
-                    if changed_context {
-                        "相同的原问题"
-                    } else {
-                        ""
-                    }
-                );
+                assert_eq!(input.buffer_text(ctx), "相同的原问题");
             });
             context.read(&app, |context, _| {
                 assert_eq!(
