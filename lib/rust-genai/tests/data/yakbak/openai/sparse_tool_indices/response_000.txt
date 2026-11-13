@@ -1,0 +1,6 @@
+data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":3,"id":"call_d","type":"function","function":{"name":"list_files","arguments":"{\"path\":"}},{"index":0,"id":"call_a","type":"function","function":{"name":"read_file","arguments":"{\"path\":"}}]}}]}
+
+data: {"choices":[{"index":0,"finish_reason":"tool_calls","delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"a\"}"}},{"index":3,"function":{"arguments":"\"d\"}"}}]}}]}
+
+data: [DONE]
+

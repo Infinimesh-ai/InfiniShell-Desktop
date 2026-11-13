@@ -1,5 +1,6 @@
 mod assertions;
 pub mod llm_judge;
+mod long_response;
 mod step;
 mod stop_task;
 mod user_defaults;
@@ -10,6 +11,7 @@ use std::io::Write;
 use std::sync::Mutex;
 
 pub use assertions::*;
+pub use long_response::long_response_error_visual_steps;
 pub use step::*;
 pub use stop_task::*;
 pub use user_defaults::*;

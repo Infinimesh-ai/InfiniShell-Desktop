@@ -152,7 +152,7 @@ use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
     AIAgentAttachment, AIAgentContext, AIAgentExchangeId, CancellationReason, EntrypointType,
-    ImageContext, UserQueryMode,
+    ImageContext,
 };
 use crate::ai::agent_conversations_model::{
     AgentConversationNavigationSubject, AgentConversationsModel,
@@ -178,9 +178,9 @@ use crate::ai::blocklist::{
     BlocklistAIInputEvent, BlocklistAIInputModel, DIFF_HUNK_ATTACHMENT_REGEX,
     DRIVE_OBJECT_ATTACHMENT_REGEX, InputConfig, InputType, InputTypeAutoDetectionSource,
     PendingAttachment, PendingContextSnapshot, PendingFile, QueuedQuery, QueuedQueryEvent,
-    QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin, ResponseStreamId, SlashCommandRequest,
-    ai_brand_color, ai_indicator_height, drive_object_attachment_for_reference,
-    plan_attachment_for_reference, render_ai_agent_mode_icon, render_ai_follow_up_icon,
+    QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin, SlashCommandRequest, ai_brand_color,
+    ai_indicator_height, drive_object_attachment_for_reference, plan_attachment_for_reference,
+    render_ai_agent_mode_icon, render_ai_follow_up_icon,
 };
 // InfiniShell:`ai::cloud_agent_settings` / `ai::cloud_environments` 已删除。
 use crate::ai::connected_self_hosted_workers::{
@@ -223,9 +223,9 @@ use crate::context_chips::spacing;
 use crate::editor::{
     AttachedImage as AttachedImageRawData, AutosuggestionLocation, AutosuggestionType,
     BaselinePositionComputationMethod, CommandXRayAnchor, CrdtOperation, CursorColors,
-    DisplayPoint, EditOrigin, EditorAction, EditorDecoratorElements, EditorOptions, EditorSnapshot,
-    EditorView, Event as EditorEvent, ImageContextOptions, InteractionState,
-    MAX_IMAGES_PER_CONVERSATION, PathTransformerFn, PlainTextEditorViewAction,
+    DisplayPoint, EditOrigin, EditorAction, EditorBufferRevision, EditorDecoratorElements,
+    EditorOptions, EditorSnapshot, EditorView, Event as EditorEvent, ImageContextOptions,
+    InteractionState, MAX_IMAGES_PER_CONVERSATION, PathTransformerFn, PlainTextEditorViewAction,
     Point as BufferPoint, PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys,
     PropagateHorizontalNavigationKeys, ReplicaId, TextColors, TextRun, default_cursor_colors,
     position_id_for_cached_point, position_id_for_cursor, position_id_for_first_cursor,
@@ -1594,8 +1594,6 @@ pub struct Input {
     last_word_insertion: LastWordInsertion,
 
     ai_controller: ModelHandle<BlocklistAIController>,
-    /// 仅保留当前草稿对应的摘要快照；新提交会覆盖或释放它。
-    pending_compacted_input: Option<(ResponseStreamId, String, PendingContextSnapshot)>,
     ai_context_model: ModelHandle<BlocklistAIContextModel>,
     ai_input_model: ModelHandle<BlocklistAIInputModel>,
     ai_action_model: ModelHandle<BlocklistAIActionModel>,
@@ -3120,61 +3118,6 @@ impl Input {
         );
 
         ctx.subscribe_to_model(&ai_controller, |me, _, event, ctx| match event {
-            BlocklistAIControllerEvent::CompactingInput { stream_id, query, user_query_mode } => {
-                let draft = me.buffer_text(ctx);
-                // readiness 等待期间用户可能已经改写草稿；只快照仍对应这次请求的输入。
-                let matches_request = draft == *query
-                    || (*user_query_mode == UserQueryMode::Plan
-                        && commands::strip_command_prefix(&draft, commands::PLAN_NAME).as_deref() == Some(query.as_str()))
-                    || match SlashCommandRequest::from_query(&draft) {
-                        Some(SlashCommandRequest::InitProjectRules { arguments }) => {
-                            crate::ai::agent_providers::prompt_renderer::render_init_project_command(arguments.as_deref()) == *query
-                        }
-                        _ => false,
-                    };
-                me.pending_compacted_input = matches_request.then(|| (
-                    stream_id.clone(), draft,
-                    me.ai_context_model.as_ref(ctx).pending_context_snapshot(),
-                ));
-            }
-            BlocklistAIControllerEvent::SubmittedCompactedInput {
-                stream_id,
-                submitted,
-            } => {
-                if me
-                    .pending_compacted_input
-                    .as_ref()
-                    .is_some_and(|(pending, _, _)| pending == stream_id)
-                {
-                    let (_, query, context_snapshot) = me.pending_compacted_input.take().unwrap();
-                    if *submitted
-                        && me.buffer_text(ctx) == query
-                        && me.ai_context_model.as_ref(ctx).pending_context_snapshot()
-                            == context_snapshot
-                    {
-                        me.editor
-                            .update(ctx, |editor, ctx| editor.system_clear_buffer(true, ctx));
-                        me.ai_context_model
-                            .update(ctx, |context, ctx| context.reset_context_to_default(ctx));
-                        ctx.notify();
-                    }
-                }
-            }
-            BlocklistAIControllerEvent::SentRequest {
-                contains_user_query: is_user_initiated,
-                is_queued_prompt,
-                ..
-            } => {
-                // Skip the buffer clear for queued prompts. The user may have typed new
-                // input while the agent was busy and we don't want to wipe it on auto-send.
-                if *is_user_initiated && !*is_queued_prompt {
-                    me.pending_compacted_input = None;
-                    me.editor.update(ctx, |editor, ctx| {
-                        editor.system_clear_buffer(true, ctx);
-                    });
-                    ctx.notify();
-                }
-            }
             BlocklistAIControllerEvent::ExportConversationToFile {
                 #[cfg_attr(target_family = "wasm", allow(unused))]
                 filename,
@@ -3737,7 +3680,6 @@ impl Input {
             prompt_render_helper,
             prompt_type: current_prompt,
             ai_controller,
-            pending_compacted_input: None,
             ai_context_model,
             ai_input_model,
             ai_action_model,
@@ -14008,32 +13950,83 @@ impl Input {
         ctx.emit(Event::ExecuteAIQuery);
     }
 
-    /// Submits `prompt` immediately as a regular (non-queued) user query — the same controller
-    /// path `submit_ai_query` uses for a typed-and-entered prompt. Used by the `/queue`
-    /// not-in-progress fallback and the legacy pending-user-query submission paths, which are
-    /// immediate sends (not queued-row fires) and therefore reset their live staging.
-    pub(crate) fn submit_user_query_now(&mut self, prompt: String, ctx: &mut ViewContext<Self>) {
-        if let Some(conversation_id) = self
+    /// 提交当前草稿或先前排队的问题；排队回调不能清理当前输入框及其上下文。
+    pub(crate) fn submit_user_query_now(
+        &mut self,
+        prompt: String,
+        is_queued_prompt: bool,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if prompt.trim().is_empty() {
+            return false;
+        }
+        let revision = self.editor.as_ref(ctx).buffer_revision(ctx);
+        let context_snapshot = self.ai_context_model.as_ref(ctx).pending_context_snapshot();
+        let consumes_draft = !is_queued_prompt && self.buffer_text(ctx).trim() == prompt.trim();
+        let accepted = if let Some(conversation_id) = self
             .ai_context_model
             .as_ref(ctx)
             .selected_conversation_id(ctx)
         {
             self.ai_controller.update(ctx, move |controller, ctx| {
-                controller.send_user_query_in_conversation(prompt, conversation_id, None, ctx);
-            });
+                if is_queued_prompt {
+                    controller.send_queued_user_query_in_conversation(
+                        prompt,
+                        conversation_id,
+                        None,
+                        ctx,
+                    )
+                } else {
+                    controller.send_user_query_in_conversation(prompt, conversation_id, None, ctx)
+                }
+            })
         } else {
             self.ai_controller.update(ctx, move |controller, ctx| {
-                controller.send_user_query_in_new_conversation(
-                    prompt,
-                    None,
-                    EntrypointType::UserInitiated,
-                    None,
-                    ctx,
-                );
-            });
+                if is_queued_prompt {
+                    controller.send_queued_user_query_in_new_conversation(
+                        prompt,
+                        None,
+                        EntrypointType::UserInitiated,
+                        None,
+                        ctx,
+                    )
+                } else {
+                    controller.send_user_query_in_new_conversation(
+                        prompt,
+                        None,
+                        EntrypointType::UserInitiated,
+                        None,
+                        ctx,
+                    )
+                }
+            })
+        };
+        if accepted {
+            if consumes_draft {
+                self.acknowledge_ai_input_submission(&revision, &context_snapshot, ctx);
+            }
+            ctx.emit(Event::ExecuteAIQuery);
         }
+        accepted
+    }
 
-        ctx.emit(Event::ExecuteAIQuery);
+    /// 只消费控制器同步接收的草稿版本；旧网络事件没有清理后来输入的权限。
+    fn acknowledge_ai_input_submission(
+        &mut self,
+        revision: &EditorBufferRevision,
+        context_snapshot: &PendingContextSnapshot,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self.editor.as_ref(ctx).buffer_revision(ctx) != *revision {
+            return;
+        }
+        self.editor
+            .update(ctx, |editor, ctx| editor.system_clear_buffer(true, ctx));
+        if self.ai_context_model.as_ref(ctx).pending_context_snapshot() == *context_snapshot {
+            self.ai_context_model
+                .update(ctx, |context, ctx| context.reset_context_to_default(ctx));
+        }
+        ctx.notify();
     }
 
     /// Routes a popped queued prompt to the correct submission path for the active pane,
@@ -14427,27 +14420,7 @@ impl Input {
             model.handle_input_buffer_submitted(ctx);
         });
 
-        if let Some(conversation_id) = self
-            .ai_context_model
-            .as_ref(ctx)
-            .selected_conversation_id(ctx)
-        {
-            self.ai_controller.update(ctx, move |controller, ctx| {
-                controller.send_user_query_in_conversation(ai_query, conversation_id, None, ctx)
-            });
-        } else {
-            self.ai_controller.update(ctx, move |controller, ctx| {
-                controller.send_user_query_in_new_conversation(
-                    ai_query,
-                    None,
-                    EntrypointType::UserInitiated,
-                    None,
-                    ctx,
-                );
-            });
-        }
-
-        ctx.emit(Event::ExecuteAIQuery);
+        self.submit_user_query_now(ai_query, false, ctx);
 
         if let Some(workflow_state) = self.workflows_state.selected_workflow_state.as_ref()
             && let WorkflowType::Cloud(workflow) = &workflow_state.workflow_type
@@ -16465,3 +16438,7 @@ mod tests;
 #[cfg(all(test, not(target_family = "wasm")))]
 #[path = "input_cli_update_tests.rs"]
 mod cli_update_launch_tests;
+
+#[cfg(test)]
+#[path = "input_submission_tests.rs"]
+mod submission_tests;

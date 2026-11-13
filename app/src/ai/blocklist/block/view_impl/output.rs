@@ -365,9 +365,41 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                 },
                                 app,
                             );
-                            output_items.add_child(
-                                text_sections.with_agent_output_item_spacing(app).finish(),
-                            );
+                            let body = text_sections.with_agent_output_item_spacing(app).finish();
+                            if let Some(state) =
+                                props.collapsible_block_states.get(&output_message.id)
+                            {
+                                let header_text = match state.expansion_state {
+                                    CollapsibleExpansionState::Expanded { .. } => {
+                                        crate::t!("ai-long-response-scroll")
+                                    }
+                                    CollapsibleExpansionState::Collapsed => {
+                                        crate::t!("ai-long-response-expand")
+                                    }
+                                };
+                                output_items.add_child(
+                                    Container::new(render_collapsible_header(
+                                        &output_message.id,
+                                        state,
+                                        header_text,
+                                        text_color,
+                                        app,
+                                    ))
+                                    .with_margin_bottom(16.)
+                                    .finish(),
+                                );
+                                if let Some(content) = render_scrollable_collapsible_content(
+                                    &output_message.id,
+                                    state,
+                                    body,
+                                    status.is_streaming(),
+                                    360.,
+                                ) {
+                                    output_items.add_child(content);
+                                }
+                            } else {
+                                output_items.add_child(body);
+                            }
                             has_rendered_first_text_section = true;
                         }
                         AIAgentOutputMessageType::Reasoning {

@@ -78,7 +78,7 @@ impl SlashCommandRequest {
         controller: &mut BlocklistAIController,
         is_queued_prompt: bool,
         ctx: &mut ModelContext<BlocklistAIController>,
-    ) {
+    ) -> bool {
         let conversation_id = self.conversation_id(controller, ctx);
         // For skill invocations, include user-attached context (images, blocks, and selected
         // text) so the skill's agent sees the same attachments a non-slash-command user query
@@ -96,7 +96,7 @@ impl SlashCommandRequest {
         let is_summarize = matches!(self, Self::Summarize { .. });
         let inputs = self.input(context, controller.context_model.as_ref(ctx), ctx);
         if inputs.is_empty() {
-            return;
+            return false;
         }
 
         // If no existing conversation, create a new one.
@@ -119,13 +119,13 @@ impl SlashCommandRequest {
             }
         }) else {
             log::error!("Failed to get conversation ID for slash command request");
-            return;
+            return false;
         };
 
         let Some(conversation) =
             BlocklistAIHistoryModel::as_ref(ctx).conversation(&conversation_id)
         else {
-            return;
+            return false;
         };
 
         let request_input = RequestInput::for_task(
@@ -157,12 +157,12 @@ impl SlashCommandRequest {
                 // only clears that context for `AIAgentInput::UserQuery`, so we mirror its
                 // reset here for `InvokeSkill` to avoid pending attachments sticking around
                 // and getting re-sent on subsequent messages.
-                if is_invoke_skill {
+                if is_invoke_skill && !is_queued_prompt {
                     controller.context_model.update(ctx, |context_model, ctx| {
                         context_model.reset_context_to_default(ctx);
                     });
                 }
-                // Emit SentRequest event to trigger buffer clearing
+                // 保留摘要请求的通知；输入框由调用方同步确认后清理。
                 if is_summarize {
                     ctx.emit(BlocklistAIControllerEvent::SentRequest {
                         contains_user_query: true,
@@ -171,8 +171,14 @@ impl SlashCommandRequest {
                         stream_id,
                     });
                 }
+                true
             }
-            Err(e) => log::error!("Failed to send agent slash command request: {e:?}"),
+            Err(e) => {
+                log::error!("Failed to send agent slash command request: {e:?}");
+                controller
+                    .pending_byop_requests
+                    .contains_key(&conversation_id)
+            }
         }
     }
 
