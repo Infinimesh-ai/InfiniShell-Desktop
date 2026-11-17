@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use futures::executor::block_on;
 use warpui_core::r#async::executor::Background;
 
 use super::LogManager;
@@ -138,18 +139,16 @@ fn simple_logger_with_rotation_rolls_active_file_over_when_threshold_exceeded() 
             "log line {i} padded out so each entry is comfortably over fifty bytes"
         ));
     }
-    // Closing the channel without dropping the Arc lets the background task
-    // finish flushing pending writes deterministically.
+    // 关闭通道后，排队的写入和轮转仍可能继续；等待 writer 退出后再读取或清理文件。
     logger.close();
-    drop(logger);
+    let writer = Arc::try_unwrap(logger.writer)
+        .unwrap_or_else(|_| panic!("logger should have no other owners"));
+    block_on(writer._logging_task).expect("logging task should finish");
 
     // After draining, the active file should be reopened-truncated (or
     // contain just the tail end of writes), and at least one `.1` rotation
     // should exist with the rolled-over contents.
     let rotated = path_with_suffix(&log_path, 1);
-    wait_for(2000, "rotated `.1` to appear", || {
-        if rotated.exists() { Some(()) } else { None }
-    });
 
     assert!(
         rotated.exists(),
