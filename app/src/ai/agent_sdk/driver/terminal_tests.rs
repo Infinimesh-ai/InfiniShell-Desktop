@@ -193,6 +193,36 @@ fn shell_exit_before_command_start_returns_error() {
 }
 
 #[test]
+fn pending_command_ctrl_c_after_start_waits_for_actual_exit() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let driver =
+            app.update(|ctx| TerminalDriver::create_from_existing_view(terminal.clone(), ctx));
+        let command_future = driver
+            .update(&mut app, |driver, ctx| {
+                driver.execute_command("echo ready", ctx)
+            })
+            .expect("应接受命令");
+        terminal.update(&mut app, |_, ctx| {
+            ctx.emit(command_started_event("echo ready"));
+        });
+        let mut handle = command_future.await.expect("应确认命令开始");
+
+        terminal.update(&mut app, |view, ctx| {
+            view.write_to_pty(vec![0x03], ctx);
+        });
+
+        assert!((&mut handle).now_or_never().is_none());
+        let block_id = handle.block_id().clone();
+        terminal.update(&mut app, |_, ctx| {
+            ctx.emit(block_completed_event(block_id, 130));
+        });
+        assert_eq!(handle.await.expect("应等待实际命令退出").value(), 130);
+    });
+}
+
+#[test]
 fn shell_exit_after_command_start_returns_error() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);

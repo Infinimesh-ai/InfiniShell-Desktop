@@ -1562,6 +1562,11 @@ impl CanExecuteCommand {
     }
 }
 
+enum PendingCommand {
+    InputBuffer,
+    Exact(String),
+}
+
 pub struct Input {
     model: Arc<FairMutex<TerminalModel>>,
     menu_positioning_provider: Arc<dyn MenuPositioningProvider>,
@@ -1586,9 +1591,7 @@ pub struct Input {
     last_parsed_tokens: Option<decorations::ParsedTokensSnapshot>,
     debounce_input_background_tx: Sender<InputBackgroundJobOptions>,
     debounce_ai_query_prediction_tx: Sender<()>,
-    /// If true, will submit the command in the editor to the shell upon receiving the
-    /// precmd message.
-    has_pending_command: bool,
+    pending_command: Option<PendingCommand>,
     /// 后台 CLI 不能用 shell 命令块结束证明退出；本次应用生命周期保守保留占用。
     cli_launch_may_outlive_block: bool,
     last_word_insertion: LastWordInsertion,
@@ -2125,7 +2128,7 @@ impl Input {
     }
 
     pub fn run_command_in_synced_terminal_input(&mut self, ctx: &mut ViewContext<Self>) {
-        self.has_pending_command = true;
+        self.pending_command = Some(PendingCommand::InputBuffer);
         self.execute_pending_command(ctx);
     }
 
@@ -3668,7 +3671,7 @@ impl Input {
             last_parsed_tokens: None,
             debounce_input_background_tx,
             debounce_ai_query_prediction_tx,
-            has_pending_command: false,
+            pending_command: None,
             cli_launch_may_outlive_block: false,
             last_word_insertion,
             decorations_future_handle: None,
@@ -6971,10 +6974,9 @@ impl Input {
         command: &str,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        if !self.has_pending_command {
+        if self.pending_command.take().is_none() {
             return false;
         }
-        self.has_pending_command = false;
         if self.can_execute_command(ctx).is_no() {
             return false;
         }
@@ -6991,11 +6993,11 @@ impl Input {
         )
     ))]
     pub(crate) fn cancel_owned_cli_pending_command(&mut self) {
-        self.has_pending_command = false;
+        self.pending_command = None;
     }
 
     pub fn execute_pending_command(&mut self, ctx: &mut ViewContext<Self>) {
-        if !self.has_pending_command {
+        if self.pending_command.is_none() {
             return;
         }
 
@@ -7009,15 +7011,26 @@ impl Input {
             return;
         }
 
-        let command = self.get_command(ctx);
         if self.can_execute_command(ctx).is_no() {
             return;
         }
 
+        let command = match self.pending_command.as_ref() {
+            Some(PendingCommand::Exact(command)) => {
+                let command = command.clone();
+                // 重试同一命令时保留草稿修订号，避免无效改稿使启动身份失效。
+                if self.buffer_text(ctx) != command {
+                    self.replace_buffer_content(&command, ctx);
+                }
+                command
+            }
+            Some(PendingCommand::InputBuffer) => self.get_command(ctx),
+            None => return,
+        };
         if !self.try_execute_command(&command, ctx) {
             return;
         }
-        self.has_pending_command = false;
+        self.pending_command = None;
 
         self.editor.update(ctx, |editor, ctx| {
             editor.set_interaction_state(InteractionState::Editable, ctx);
@@ -13078,12 +13091,27 @@ impl Input {
     }
 
     pub fn has_pending_command(&self) -> bool {
-        self.has_pending_command
+        self.pending_command.is_some()
     }
 
+    /// 程序提交的命令独立保存，不拼接残留输入，也不随之后的编辑变化。
     pub fn set_pending_command(&mut self, exec: &str, ctx: &mut ViewContext<Self>) {
-        self.has_pending_command = true;
-        self.system_insert(exec, ctx);
+        self.pending_command = Some(PendingCommand::Exact(exec.to_owned()));
+        self.replace_buffer_content(exec, ctx);
+    }
+
+    /// CLI 快捷启动允许用户改稿，并在派发前解析实际安装路径。
+    pub(crate) fn set_pending_command_from_input(
+        &mut self,
+        command: &str,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.set_pending_command(command, ctx);
+        self.pending_command = Some(PendingCommand::InputBuffer);
+    }
+
+    pub(crate) fn cancel_pending_command(&mut self) -> bool {
+        self.pending_command.take().is_some()
     }
 
     fn should_enter_accept_completion_suggestion(&self, app: &AppContext) -> bool {
@@ -16442,3 +16470,7 @@ mod cli_update_launch_tests;
 #[cfg(test)]
 #[path = "input_submission_tests.rs"]
 mod submission_tests;
+
+#[cfg(test)]
+#[path = "input_pending_command_tests.rs"]
+mod pending_command_tests;

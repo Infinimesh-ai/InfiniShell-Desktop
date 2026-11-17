@@ -126,7 +126,9 @@ impl TerminalView {
             return;
         }
         self.pending_specific_cli_agent_launch = None;
-        self.set_pending_command(CLIAgent::Codex.command_prefix(), ctx);
+        self.input.update(ctx, |input, ctx| {
+            input.set_pending_command_from_input(CLIAgent::Codex.command_prefix(), ctx);
+        });
         self.pending_specific_cli_agent_launch = Some(PendingSpecificCLIAgentLaunch {
             agent: CLIAgent::Codex,
             executable: None,

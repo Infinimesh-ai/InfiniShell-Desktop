@@ -487,6 +487,12 @@ impl TerminalDriver {
                 drop(self.pending_command_start.take());
                 drop(self.waiting_command.take());
             }
+            crate::terminal::view::Event::PendingCommandCancelled => {
+                // 仅关闭尚未派发命令的等待通道，运行中的命令仍等实际退出。
+                if self.pending_command_start.take().is_some() {
+                    drop(self.waiting_command.take());
+                }
+            }
             crate::terminal::view::Event::SlowBootstrap => {
                 ctx.emit(TerminalDriverEvent::SlowBootstrap);
             }

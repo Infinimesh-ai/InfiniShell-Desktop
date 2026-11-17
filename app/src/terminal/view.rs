@@ -1865,6 +1865,8 @@ pub enum Event {
     /// Emitted when a pending command (e.g. tab config setup commands) has
     /// been submitted and its block has completed.
     PendingCommandCompleted,
+    /// 尚未派发的命令被取消；已开始的命令仍等待实际块完成。
+    PendingCommandCancelled,
     SessionBootstrapped,
     ShellSpawned(ShellType),
     /// Emitted when the PTY failed to spawn. Carries a human-readable reason
@@ -9113,6 +9115,7 @@ impl TerminalView {
     }
 
     pub(crate) fn prepare_for_pty_shutdown(&mut self, ctx: &mut ViewContext<Self>) {
+        self.cancel_pending_command_before_dispatch(ctx);
         self.pending_specific_cli_agent_launch = None;
         self.cli_agent_rich_input_launch = None;
         self.manual_pty_shutdown_requested = true;
@@ -9243,6 +9246,7 @@ impl TerminalView {
         cleared_buffer_len: usize,
         ctx: &mut ViewContext<Self>,
     ) {
+        self.cancel_pending_command_before_dispatch(ctx);
         self.pending_specific_cli_agent_launch = None;
         let did_resolve_prompt_suggestion = self
             .resolve_passive_suggestion(PromptSuggestionResolution::Reject { ctrl_c: true }, ctx);
@@ -9814,6 +9818,7 @@ impl TerminalView {
     ) {
         let bytes = data.into();
         if bytes.as_ref() == [0x03] {
+            self.cancel_pending_command_before_dispatch(ctx);
             self.pending_specific_cli_agent_launch = None;
             self.cli_agent_rich_input_launch = None;
             #[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
@@ -16006,6 +16011,18 @@ impl TerminalView {
         }
     }
 
+    fn cancel_pending_command_before_dispatch(&mut self, ctx: &mut ViewContext<Self>) {
+        if self
+            .input
+            .update(ctx, |input, _| input.cancel_pending_command())
+        {
+            // 这些字段只属于同批 setup 命令；不触碰普通 Agent 提示队列。
+            self.pending_command_queue.clear();
+            self.enter_agent_view_after_pending_commands = false;
+            ctx.emit(Event::PendingCommandCancelled);
+        }
+    }
+
     /// Executes a command that was submitted by the user and not yet sent to the shell.
     pub fn execute_pending_command(&mut self, _: (), ctx: &mut ViewContext<Self>) {
         if !self.prepare_specific_cli_agent_pending_command(ctx) {
@@ -16078,7 +16095,9 @@ impl TerminalView {
             return;
         }
         self.pending_specific_cli_agent_launch = None;
-        self.set_pending_command(agent.command_prefix(), ctx);
+        self.input.update(ctx, |input, ctx| {
+            input.set_pending_command_from_input(agent.command_prefix(), ctx);
+        });
         self.pending_specific_cli_agent_launch = Some(PendingSpecificCLIAgentLaunch {
             agent,
             executable,
