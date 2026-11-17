@@ -354,7 +354,11 @@ jobs:
         test(ai::agent_sdk::driver::terminal::tests::) |
         test(ai::blocklist::block::status_bar::tests::) |
         test(pending_command_waits_for_final_bootstrap_precmd) |
-        test(specific_cli_launch_does_not_consume_intent_during_long_running_command) |
+        test(terminal::input::pending_command_tests::) |
+        test(workspace::view::onboarding::tests::) |
+        test(terminal::view::tests::specific_) |
+        test(editing_and_restoring_cli_draft_invalidates_installation_fallback) |
+        test(ctrl_c_and_terminal_shutdown_invalidate_specific_cli_launch) |
         test(replacing_pending_command_invalidates_specific_cli_launch) |
         test(terminal::input::cli_update_launch_tests::) |
         test(settings_view::features_page::tests::) |
@@ -595,13 +599,16 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw '正式 Hook 信任摘要采集失败' }
           }
 
-      - name: 测试 MCP、远程请求取消、路径工具与默认补全
+      - name: 测试 MCP、远程请求取消、路径工具、默认补全与日志轮转
         shell: bash
         run: |
           set -euo pipefail
           {
-            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p websocket -p warp_files -p channel_versions --lib'
-            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p websocket -p warp_files -p channel_versions --lib
+            echo 'cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p websocket -p warp_files -p channel_versions -p simple_logger --lib'
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 -p mcp -p remote_server -p warp_util -p warp_completer -p http_client -p websocket -p warp_files -p channel_versions -p simple_logger --lib
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 \
+              -p simple_logger --lib --stress-count 100 \
+              -E 'test(=manager::tests::simple_logger_with_rotation_rolls_active_file_over_when_threshold_exceeded)'
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
 
       - name: 测试窗口迁移与同步错误类型
