@@ -418,7 +418,7 @@ windows = { workspace = true, features = [
 windows-registry = { workspace = true }
 windows-result = { workspace = true }
 winreg = { workspace = true, features = ["transactions"] }
-zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 [target.'cfg(unix)'.dev-dependencies]
 nix = { workspace = true, features = ["poll"] }

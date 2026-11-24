@@ -26,7 +26,19 @@ command.workspace = true
 flate2 = "1.0"
 sha2 = { workspace = true }
 tar = "0.4"
-zip = "2.1"
+# 关闭默认 bzip2，避免引入仓库许可证规则不接受的 bzip2-1.0.6。
+zip = { version = "9.0.5", default-features = false, features = [
+    "aes-crypto",
+    "deflate",
+    "deflate64",
+    "lzma",
+    "time",
+    "xz",
+    "zstd",
+] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tempfile.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

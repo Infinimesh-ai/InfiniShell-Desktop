@@ -14,6 +14,7 @@ use warpui::r#async::FutureExt as _;
 use winreg::RegKey;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE, KEY_WOW64_64KEY};
 use winreg::transaction::Transaction;
+use zip::read::ZipReadOptions;
 
 use super::winget::UNINSTALL;
 use super::winget_codex_contract as contract;
@@ -552,7 +553,10 @@ fn extract(archive: &mut File, journal: &Journal) -> Result<(), Error> {
         return Err(Error::InvalidRelease);
     }
     for index in 0..zip.len() {
-        let mut entry = zip.by_index(index).map_err(|_| Error::InvalidRelease)?;
+        // 保持下载摘要和逐文件白名单检查，并拒绝本地头与中央目录不一致的包。
+        let mut entry = zip
+            .by_index_with_options(index, ZipReadOptions::new().enforce_header_consistency(true))
+            .map_err(|_| Error::InvalidRelease)?;
         let path = entry.enclosed_name().ok_or(Error::InvalidRelease)?;
         tree::safe_relative(&path)?;
         if entry.encrypted()

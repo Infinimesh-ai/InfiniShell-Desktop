@@ -17,7 +17,16 @@ warp_errors.workspace = true
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 dirs.workspace = true
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
-zip = "2.1"
+# 关闭默认 bzip2，避免引入仓库许可证规则不接受的 bzip2-1.0.6。
+zip = { version = "9.0.5", default-features = false, features = [
+    "aes-crypto",
+    "deflate",
+    "deflate64",
+    "lzma",
+    "time",
+    "xz",
+    "zstd",
+] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 console_error_panic_hook = { version = "0.1.6" }

@@ -351,6 +351,8 @@ jobs:
       APP_FEATURES: release_bundle,warpui/test-util,rust-embed/debug-embed
       APP_FILTER: >-
         test(ai::mcp::) | test(call_mcp_tool::) |
+        test(ai::aws_credentials::tests::) |
+        test(terminal::cli_agent_updates::sources::tests::) |
         test(ai::agent_sdk::driver::terminal::tests::) |
         test(ai::blocklist::block::status_bar::tests::) |
         test(pending_command_waits_for_final_bootstrap_precmd) |
@@ -610,6 +612,17 @@ jobs:
               -p simple_logger --lib --stress-count 100 \
               -E 'test(=manager::tests::simple_logger_with_rotation_rolls_active_file_over_when_threshold_exceeded)'
           } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/crate-tests.log"
+
+      - name: 测试 ZIP 解压与日志归档
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 \
+              -p node_runtime --lib --features local_fs
+            cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 \
+              -p warp_logging --lib
+          } 2>&1 | tee "$UPSTREAM_ESSENCE_LOG_DIR/zip-tests.log"
 
       - name: 测试窗口迁移与同步错误类型
         shell: bash

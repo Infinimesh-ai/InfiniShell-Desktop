@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{Read, Write};
 
 use super::*;
 
@@ -17,7 +17,14 @@ fn zip_entry_names(zip_path: &Path) -> Vec<String> {
     let file = File::open(zip_path).unwrap();
     let mut archive = zip::ZipArchive::new(file).unwrap();
     (0..archive.len())
-        .map(|index| archive.by_index(index).unwrap().name().to_owned())
+        .map(|index| {
+            archive
+                .by_index(index)
+                .unwrap()
+                .name()
+                .unwrap()
+                .into_owned()
+        })
         .collect()
 }
 fn log_state(base_directory: &Path, frontend: LogFrontend, logfile_name: &str) -> LogState {
@@ -76,6 +83,14 @@ fn tui_bundle_uses_resolved_state_and_ignores_legacy_oz_logs() {
             "warp_preview.log.old.0",
         ]
     );
+    let mut archive = zip::ZipArchive::new(File::open(&zip_path).unwrap()).unwrap();
+    let mut contents = String::new();
+    archive
+        .by_name("warp_preview.log")
+        .unwrap()
+        .read_to_string(&mut contents)
+        .unwrap();
+    assert_eq!(contents, "active tui session");
 }
 
 #[test]

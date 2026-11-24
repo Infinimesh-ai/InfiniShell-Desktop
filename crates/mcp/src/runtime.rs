@@ -143,6 +143,9 @@ fn challenge_parameter_names(www_authenticate: &str) -> Vec<&str> {
     names
 }
 
+/// 某些远端 MCP 网关拒绝缺少 User-Agent 的请求。
+const MCP_USER_AGENT: &str = "InfiniShell-MCP-Client/1.0";
+
 /// Builds a reqwest client with custom headers for MCP HTTP/SSE connections.
 #[allow(clippy::result_large_err)]
 pub fn build_client_with_headers(
@@ -164,6 +167,8 @@ pub fn build_client_with_headers(
     let header_map = build_header_map(headers);
 
     reqwest::Client::builder()
+        // 先设置默认值，保留用户配置的 User-Agent 覆盖行为。
+        .user_agent(MCP_USER_AGENT)
         .default_headers(header_map)
         .build()
         .map_err(|e| {
@@ -319,19 +324,12 @@ pub async fn spawn_server(
                 }
                 Ok(Transport::Http(None)) => {
                     logger.log("[info] MCP: Using Streaming HTTP transport".to_string());
-                    let transport = if headers.is_empty() {
-                        rmcp::transport::StreamableHttpClientTransport::from_uri(
+                    let transport = rmcp::transport::StreamableHttpClientTransport::with_client(
+                        build_client_with_headers(&headers)?,
+                        rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig::with_uri(
                             sse_server.url.clone(),
-                        )
-                    } else {
-                        let client = build_client_with_headers(&headers)?;
-                        rmcp::transport::StreamableHttpClientTransport::with_client(
-                            client,
-                            rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig::with_uri(
-                                sse_server.url.clone(),
-                            ),
-                        )
-                    };
+                        ),
+                    );
                     let transport = TransportLoggingWrapper {
                         transport,
                         logger: logger.clone(),
@@ -359,24 +357,15 @@ pub async fn spawn_server(
                 }
                 Ok(Transport::Sse(None)) => {
                     logger.log("[info] MCP: Using (legacy) SSE transport (due to preflight failing with a 404)".to_string());
-                    let transport = if headers.is_empty() {
-                        crate::sse_transport::SseClientTransport::start(sse_server.url.clone())
-                            .await
-                            .map_err(|e| {
-                                rmcp::RmcpError::transport_creation::<ReqwestSseTransport>(e)
-                            })?
-                    } else {
-                        let client = build_client_with_headers(&headers)?;
-                        crate::sse_transport::SseClientTransport::start_with_client(
-                            client,
-                            crate::sse_transport::SseClientConfig {
-                                sse_endpoint: sse_server.url.clone().into(),
-                                ..Default::default()
-                            },
-                        )
-                        .await
-                        .map_err(rmcp::RmcpError::transport_creation::<ReqwestSseTransport>)?
-                    };
+                    let transport = crate::sse_transport::SseClientTransport::start_with_client(
+                        build_client_with_headers(&headers)?,
+                        crate::sse_transport::SseClientConfig {
+                            sse_endpoint: sse_server.url.clone().into(),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .map_err(rmcp::RmcpError::transport_creation::<ReqwestSseTransport>)?;
                     let transport = TransportLoggingWrapper {
                         transport,
                         logger: logger.clone(),
@@ -697,3 +686,7 @@ impl<T: rmcp::transport::Transport<R>, R: rmcp::service::ServiceRole> rmcp::tran
 #[cfg(test)]
 #[path = "runtime_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "runtime_user_agent_tests.rs"]
+mod user_agent_tests;

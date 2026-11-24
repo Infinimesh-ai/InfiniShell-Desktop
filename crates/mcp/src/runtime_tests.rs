@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use axum::Router;
+use axum::http::{HeaderMap, header};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use rmcp::model::{ErrorCode, ErrorData, Resource, ServerCapabilities, Tool};
@@ -345,6 +346,10 @@ fn only_nonempty_static_auth_headers_count_as_credentials() {
         "application/json"
     )])));
     assert!(!has_caller_supplied_credential(&HashMap::new()));
+    assert!(!has_caller_supplied_credential(&headers(&[(
+        "User-Agent",
+        "InfiniShell-MCP-Client/1.0"
+    )])));
 }
 
 #[test]
@@ -372,10 +377,17 @@ async fn serve_401(
     let handler_requests = requests.clone();
     let app = Router::new().route(
         "/mcp",
-        post(move || {
+        post(move |headers: HeaderMap| {
             let requests = handler_requests.clone();
             async move {
                 requests.fetch_add(1, Ordering::SeqCst);
+                // 认证分类必须仍能通过要求 User-Agent 的网关。
+                if headers
+                    .get(header::USER_AGENT)
+                    .is_none_or(|value| value.is_empty())
+                {
+                    return axum::http::StatusCode::BAD_REQUEST.into_response();
+                }
                 let mut response = axum::http::StatusCode::UNAUTHORIZED.into_response();
                 for challenge in challenges {
                     response.headers_mut().append(
@@ -518,6 +530,29 @@ async fn unresolved_header_secret_fails_before_sending_a_request() {
     assert_eq!(secrets, &["MISSING_SECRET"]);
     assert!(!format!("{error:?}").contains("sensitive-prefix"));
     assert!(!format!("{error}").contains("MISSING_SECRET"));
+    assert_eq!(requests.load(Ordering::SeqCst), 0);
+    server.abort();
+}
+
+#[tokio::test]
+async fn unresolved_user_agent_secret_fails_before_sending_a_request() {
+    let (url, requests, server) = serve_401(&[]).await;
+
+    let error = determine_transport(
+        "unresolved-user-agent".to_string(),
+        &url,
+        &headers(&[("User-Agent", "private-prefix-{{MISSING_SECRET}}")]),
+        None,
+    )
+    .await
+    .err()
+    .expect("User-Agent 覆盖值也必须通过密钥守卫");
+
+    assert!(matches!(
+        authentication_error(&error),
+        McpAuthenticationError::UnresolvedHeaderSecrets { .. }
+    ));
+    assert!(!format!("{error:?}").contains("private-prefix"));
     assert_eq!(requests.load(Ordering::SeqCst), 0);
     server.abort();
 }

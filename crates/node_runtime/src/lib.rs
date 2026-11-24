@@ -17,6 +17,7 @@ cfg_if::cfg_if! {
         use tar::Archive;
         use command::r#async::Command;
         use semver::Version;
+        use zip::read::ZipReadOptions;
     }
 }
 
@@ -338,8 +339,11 @@ where
         let mut result = Vec::new();
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).context("Failed to read zip entry")?;
-            let file_name = file.name().to_string();
+            // zip 的默认读取仍允许双头差异；提取前显式核对本地头与中央目录。
+            let mut file = archive
+                .by_index_with_options(i, ZipReadOptions::new().enforce_header_consistency(true))
+                .context("Failed to read zip entry")?;
+            let file_name = file.name().context("Failed to read zip entry")?.into_owned();
 
             if let Some(ref filter) = file_filter
                 && !filter(&file_name)
@@ -533,3 +537,7 @@ pub async fn fetch_npm_package_version(
         .map(|s| s.to_string())
         .with_context(|| format!("No version found for npm package {}", package_name))
 }
+
+#[cfg(all(test, feature = "local_fs", not(target_arch = "wasm32")))]
+#[path = "lib_tests.rs"]
+mod tests;
